@@ -520,7 +520,9 @@ bool GlobalHotkey::set_sequence(const QKeySequence &value, QString &error) {
 bool GlobalHotkey::nativeEventFilter(const QByteArray &, void *message, qintptr *result) {
     const auto *event = static_cast<MSG *>(message);
     if (event->message == WM_HOTKEY && event->wParam == static_cast<WPARAM>(current_id) && current_id) {
-        *result = 0;
+        // Qt passes a null result for messages handled by the thread's event loop.
+        if (result)
+            *result = 0;
         emit activated();
         return true;
     }
