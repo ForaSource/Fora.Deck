@@ -44,7 +44,8 @@ An app can belong to more than one part of your day. Give your browser both `#wo
 | **Favorites and recent launches** | Keep frequently used apps close and sort your library by last launch. |
 | **Running apps** | See what is running, switch to an existing window when available, or open a new instance. |
 | **Launch scenarios** | Open a group of apps in a defined order, with optional delays between steps. |
-| **Desktop integration** | Use a global hotkey, keep XLibrary in the system tray, and customize keyboard shortcuts. |
+| **Quick search** | Open a compact launcher with Ctrl+Alt+Space, calculate expressions, or browse a folder directly. |
+| **Desktop integration** | Use separate global hotkeys for quick search and the full library, keep XLibrary in the system tray, and customize keyboard shortcuts. |
 | **Appearance** | Choose a light, dark, or system theme and adjust the text size. |
 | **Local storage** | Keep your catalog in SQLite. Import and export application entries, tags, and favorites as JSON. |
 
@@ -142,6 +143,9 @@ No downloads or installations happen in the background.
 ## Search
 
 Search by app name or executable filename, then narrow the results with your own tags.
+Exact names rank first, followed by prefixes and other matches. Russian/English keyboard
+layout mistakes work in both directions: `пщщпду` also finds `google`. Within each match
+class, the literal spelling takes priority over the corrected layout.
 
 | Query | Result |
 | --- | --- |
@@ -151,7 +155,28 @@ Search by app name or executable filename, then narrow the results with your own
 | `#work -#games` | Apps tagged `work`, excluding those tagged `games` |
 | `#dev code` | Apps tagged `dev` that also match “code” |
 
-Press <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>Space</kbd> to bring up the library, or <kbd>Ctrl</kbd> + <kbd>K</kbd> to focus search. Both shortcuts can be changed in settings. On Wayland, assign the global shortcut in your desktop settings to the `XLibrary` command.
+Press <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>Space</kbd> for quick search, or
+<kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>Shift</kbd> + <kbd>Space</kbd> for the full library.
+<kbd>Ctrl</kbd> + <kbd>K</kbd> focuses search inside the library. These shortcuts can be changed
+in settings. Upgrading moves the former default full-library shortcut to Ctrl+Alt+Shift+Space;
+other custom bindings are preserved. On Wayland, assign `XLibrary --overlay` or `XLibrary`
+in your desktop's shortcut settings; these commands also address an already running instance.
+
+Quick search opens with a 200 ms reveal and shows up to five matching applications.
+Use ↑/↓ and Enter to launch, Escape or the global shortcut again to dismiss, and the
+small button on the right to open the full library with the same query. System animation
+preferences are respected. XLibrary must be running for its built-in global shortcuts.
+
+Both search fields also support:
+
+- Arithmetic such as `2+3*4`, `sqrt(81)`, `√(16)`, `2^8`, `2**8`, and `(12+6)/3`.
+  Operators include `+ - * / % ^`; powers associate to the right. Enter copies the result.
+  Division by zero, non-real results, and incomplete expressions do not produce a number.
+- Absolute folder paths, `~/`, `%USERPROFILE%`, and `$HOME/`. Results contain only direct
+  children, including hidden entries, and can be scrolled. A partial final filename filters
+  that folder. Enter on a folder browses it; Enter on a file opens it with its system handler.
+  Registered applications use their library launch configuration. Directory reads happen in
+  the background; slow disks or unavailable network shares can delay their results.
 
 For the selected application:
 
@@ -171,7 +196,7 @@ XLibrary is built with **C++23**, **Qt 6 Widgets**, and **SQLite**. It targets *
 
 Building from source requires a C++23 compiler, **CMake 3.21+**, and **Qt 6.5+** with the Widgets, Concurrent, and Network modules, and the LinguistTools build tools (plus DBus on Linux). CMake downloads SQLite during the initial configuration. See [Building on Windows and Linux](BUILDING.md) for CLion presets, GCC/Clang and MSVC/MinGW builds, portable packages, installers, and release verification.
 
-Planned work includes a compact launcher mode, further search improvements, and extensibility. These are development directions rather than a release schedule.
+Planned work includes further search improvements and extensibility. These are development directions rather than a release schedule.
 
 ## Contributing
 
