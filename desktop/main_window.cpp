@@ -92,7 +92,15 @@ QWidget *shell(const ui_context &context, QWidget *parent) {
 }
 }
 
-MainWindow::MainWindow(DesktopService &service) : service(service), hotkey(this), tray(this) {
+MainWindow::MainWindow(DesktopService &service)
+    : service(service), hotkey(this), overlay_hotkey(this), overlay(std::make_unique<SearchOverlay>(service)),
+      tray(this) {
+    if (!service.settings.contains("shortcuts/overlay")) {
+        // The previous default now belongs to quick search; preserve other user assignments.
+        if (service.settings.value("shortcuts/global").toString() == "Ctrl+Alt+Space")
+            service.settings.setValue("shortcuts/global", desktop_platform::default_global_shortcut());
+        service.settings.setValue("shortcuts/overlay", desktop_platform::default_overlay_shortcut());
+    }
     setWindowTitle("XLibrary");
     setWindowIcon(appearance::logo());
     const auto available = screen()->availableGeometry().size() - QSize(32, 64);
@@ -105,6 +113,7 @@ MainWindow::MainWindow(DesktopService &service) : service(service), hotkey(this)
     context.registry = &registry;
     context.window = this;
     context.parameters.insert("hotkey", QVariant::fromValue(static_cast<QObject *>(&hotkey)));
+    context.parameters.insert("overlay_hotkey", QVariant::fromValue(static_cast<QObject *>(&overlay_hotkey)));
     register_editors(registry);
     register_library_views(registry);
     register_settings_views(registry);
@@ -129,6 +138,13 @@ MainWindow::MainWindow(DesktopService &service) : service(service), hotkey(this)
             show_library();
     });
     connect(&hotkey, &GlobalHotkey::activated, this, &MainWindow::show_library);
+    connect(&overlay_hotkey, &GlobalHotkey::activated, overlay.get(), &SearchOverlay::toggle);
+    connect(overlay.get(), &SearchOverlay::open_library, this, [this](const QString &query) {
+        show_library();
+        this->service.navigate("library");
+        if (auto *search = findChild<QLineEdit *>("search_input"))
+            search->setText(query);
+    });
     connect(&service, &DesktopService::selection_changed, this, &MainWindow::refresh_actions);
     connect(&service, &DesktopService::catalog_changed, this, &MainWindow::refresh_actions);
     connect(&service, &DesktopService::profile_state_changed, this, &MainWindow::refresh_actions);
@@ -308,6 +324,12 @@ void MainWindow::apply_settings() {
                 QKeySequence::PortableText),
             error))
         service.notify(error);
+    if (!overlay_hotkey.set_sequence(
+            QKeySequence::fromString(
+                service.settings.value("shortcuts/overlay", desktop_platform::default_overlay_shortcut()).toString(),
+                QKeySequence::PortableText),
+            error))
+        service.notify(error);
     const QList<QStringList> shortcuts{{"focus_search", "shortcuts/search", "Ctrl+K"},
                                        {"add_application", "shortcuts/add", "Ctrl+N"},
                                        {"settings", "shortcuts/settings", "Ctrl+,"},
@@ -370,6 +392,7 @@ void MainWindow::update_layout() {
 }
 
 void MainWindow::show_library() {
+    overlay->hide();
     if (isMinimized())
         showNormal();
     else
@@ -377,6 +400,10 @@ void MainWindow::show_library() {
     raise();
     activateWindow();
     context.actions.value("focus_search")->trigger();
+}
+
+void MainWindow::show_overlay() {
+    overlay->show_search();
 }
 
 void MainWindow::start() {
@@ -387,7 +414,10 @@ void MainWindow::start() {
         });
     const bool background = QCoreApplication::arguments().contains("--background") ||
                             service.settings.value("behavior/startup", "show").toString() == "tray";
-    if (service.safe_mode() || !background || !tray.isVisible())
+    if (QCoreApplication::arguments().contains("--overlay") &&
+        !QCoreApplication::arguments().contains("--check-startup"))
+        show_overlay();
+    else if (service.safe_mode() || !background || !tray.isVisible())
         show_library();
     if (!QCoreApplication::arguments().contains("--check-startup")) {
         QTimer::singleShot(0, this, [this] {

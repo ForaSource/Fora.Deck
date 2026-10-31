@@ -9,6 +9,7 @@
 
 #include "desktop_service.h"
 #include "platform_integration.h"
+#include "search_overlay.h"
 #include "ui_registry.h"
 
 class MainWindow : public QMainWindow {
@@ -18,6 +19,8 @@ private:
     UiRegistry registry;
     ui_context context;
     GlobalHotkey hotkey;
+    GlobalHotkey overlay_hotkey;
+    std::unique_ptr<SearchOverlay> overlay;
     QSystemTrayIcon tray;
     std::vector<std::unique_ptr<QPluginLoader>> plugins;
     bool quitting = false;
@@ -35,6 +38,7 @@ public:
     explicit MainWindow(DesktopService &service);
     ~MainWindow() override;
     void show_library();
+    void show_overlay();
     void start();
 };
 

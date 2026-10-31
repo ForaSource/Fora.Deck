@@ -29,6 +29,7 @@
 #include "localization.h"
 #include "notification_banner.h"
 #include "profile_view.h"
+#include "search_results.h"
 #include "selection_button.h"
 #include "ui_helpers.h"
 
@@ -309,13 +310,18 @@ QWidget *navigation(const ui_context &context, QWidget *parent) {
 QWidget *search_bar(const ui_context &context, QWidget *parent) {
     auto *service = static_cast<DesktopService *>(context.service);
     auto *widget = new QWidget(parent);
-    auto *layout = new QHBoxLayout(widget);
+    auto *root = new QVBoxLayout(widget);
+    root->setContentsMargins(0, 0, 0, 0);
+    root->setSpacing(4);
+    auto *layout = new QHBoxLayout;
+    root->addLayout(layout);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(12);
     auto *search = new SearchInput;
     search->setObjectName("search_input");
-    search->setAccessibleName(QCoreApplication::translate("XLibrary", "Search applications and tags"));
-    search->setPlaceholderText(QCoreApplication::translate("XLibrary", "Find an application or #tag"));
+    search->setAccessibleName(
+        QCoreApplication::translate("XLibrary", "Search applications, calculate or enter a path"));
+    search->setPlaceholderText(QCoreApplication::translate("XLibrary", "Search, calculate or enter a path"));
     search->setClearButtonEnabled(true);
     search->setMinimumHeight(26);
     search->addAction(appearance::icon("search"), QLineEdit::LeadingPosition);
@@ -353,6 +359,7 @@ QWidget *search_bar(const ui_context &context, QWidget *parent) {
     settings->setAccessibleName(QCoreApplication::translate("XLibrary", "Settings"));
     settings->setFixedWidth(44);
     layout->addWidget(settings);
+    root->addWidget(new SearchResults(*service, *search, false, widget));
     return widget;
 }
 

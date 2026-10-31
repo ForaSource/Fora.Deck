@@ -114,6 +114,8 @@ QWidget *hotkeys(const ui_context &context, QWidget *) {
     const QList<QStringList> values{
         {"shortcuts/global", QCoreApplication::translate("XLibrary", "Show the library from any application"),
          desktop_platform::default_global_shortcut()},
+        {"shortcuts/overlay", QCoreApplication::translate("XLibrary", "Show quick search from any application"),
+         desktop_platform::default_overlay_shortcut()},
         {"shortcuts/search", QCoreApplication::translate("XLibrary", "Search the library"), "Ctrl+K"},
         {"shortcuts/add", QCoreApplication::translate("XLibrary", "Add application"), "Ctrl+N"},
         {"shortcuts/settings", QCoreApplication::translate("XLibrary", "Open settings"), "Ctrl+,"},
@@ -518,6 +520,7 @@ QWidget *update_page(const ui_context &context, QWidget *) {
 QDialog *settings_dialog(const ui_context &context, QWidget *parent) {
     auto *service = static_cast<DesktopService *>(context.service);
     auto *hotkey = static_cast<GlobalHotkey *>(context.parameters.value("hotkey").value<QObject *>());
+    auto *overlay_hotkey = static_cast<GlobalHotkey *>(context.parameters.value("overlay_hotkey").value<QObject *>());
     auto *dialog = new QDialog(parent);
     dialog->setWindowTitle(QCoreApplication::translate("XLibrary", "XLibrary settings"));
     prepare_dialog(dialog, context, {960, 700}, {640, 420});
@@ -646,13 +649,42 @@ QDialog *settings_dialog(const ui_context &context, QWidget *parent) {
         const auto previous_global = QKeySequence::fromString(
             service->settings.value("shortcuts/global", desktop_platform::default_global_shortcut()).toString(),
             QKeySequence::PortableText);
+        const auto previous_overlay = QKeySequence::fromString(
+            service->settings.value("shortcuts/overlay", desktop_platform::default_overlay_shortcut()).toString(),
+            QKeySequence::PortableText);
+        const auto restore_hotkeys = [=] {
+            QString ignored;
+            if (hotkey)
+                hotkey->set_sequence({}, ignored);
+            if (overlay_hotkey)
+                overlay_hotkey->set_sequence({}, ignored);
+            if (hotkey)
+                hotkey->set_sequence(previous_global, ignored);
+            if (overlay_hotkey)
+                overlay_hotkey->set_sequence(previous_overlay, ignored);
+        };
         QString failure;
-        if (hotkey &&
+        const bool hotkeys_changed =
             previous_global !=
-                QKeySequence::fromString(values.value("shortcuts/global").toString(), QKeySequence::PortableText) &&
-            !hotkey->set_sequence(
-                QKeySequence::fromString(values.value("shortcuts/global").toString(), QKeySequence::PortableText),
-                failure)) {
+                QKeySequence::fromString(values.value("shortcuts/global").toString(), QKeySequence::PortableText) ||
+            previous_overlay !=
+                QKeySequence::fromString(values.value("shortcuts/overlay").toString(), QKeySequence::PortableText);
+        if (hotkeys_changed) {
+            // Release the pair together so the user can exchange their assignments.
+            if (hotkey)
+                hotkey->set_sequence({}, failure);
+            if (overlay_hotkey)
+                overlay_hotkey->set_sequence({}, failure);
+        }
+        if (hotkeys_changed &&
+            ((hotkey && !hotkey->set_sequence(QKeySequence::fromString(values.value("shortcuts/global").toString(),
+                                                                       QKeySequence::PortableText),
+                                              failure)) ||
+             (overlay_hotkey &&
+              !overlay_hotkey->set_sequence(
+                  QKeySequence::fromString(values.value("shortcuts/overlay").toString(), QKeySequence::PortableText),
+                  failure)))) {
+            restore_hotkeys();
             show_error(failure);
             categories->button(2)->click();
             return;
@@ -660,10 +692,8 @@ QDialog *settings_dialog(const ui_context &context, QWidget *parent) {
         const bool old_autostart = service->settings.value("behavior/autostart", false).toBool();
         const bool new_autostart = values.value("behavior/autostart").toBool();
         if (old_autostart != new_autostart && !desktop_platform::set_autostart(new_autostart, failure)) {
-            if (hotkey) {
-                QString ignored;
-                hotkey->set_sequence(previous_global, ignored);
-            }
+            if (hotkeys_changed)
+                restore_hotkeys();
             show_error(failure);
             return;
         }
@@ -676,10 +706,8 @@ QDialog *settings_dialog(const ui_context &context, QWidget *parent) {
         if (service->settings.status() != QSettings::NoError) {
             for (auto it = previous.cbegin(); it != previous.cend(); ++it)
                 service->settings.setValue(it.key(), it.value());
-            if (hotkey) {
-                QString ignored;
-                hotkey->set_sequence(previous_global, ignored);
-            }
+            if (hotkeys_changed)
+                restore_hotkeys();
             if (old_autostart != new_autostart) {
                 QString ignored;
                 desktop_platform::set_autostart(old_autostart, ignored);

@@ -1,7 +1,6 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QFutureWatcher>
-#include <QRegularExpression>
 #include <QtConcurrent/QtConcurrentRun>
 #include <QTimer>
 
@@ -177,15 +176,29 @@ LibraryFilter::LibraryFilter(QObject *parent) : QSortFilterProxyModel(parent) {
 }
 
 void LibraryFilter::set_query(const QString &query) {
-#if QT_VERSION >= QT_VERSION_CHECK(6, 10, 0)
-    beginFilterChange();
-#endif
-    terms = query.toCaseFolded().split(QRegularExpression("\\s+"), Qt::SkipEmptyParts);
-#if QT_VERSION >= QT_VERSION_CHECK(6, 10, 0)
-    endFilterChange(Direction::Rows);
-#else
-    invalidateFilter();
-#endif
+    this->query = SearchQuery(query);
+    query_ranks.clear();
+    // Relevance can change even when the set of accepted rows stays the same.
+    invalidate();
+}
+
+void LibraryFilter::setSourceModel(QAbstractItemModel *model) {
+    disconnect(reset_connection);
+    query_ranks.clear();
+    if (model)
+        reset_connection =
+            connect(model, &QAbstractItemModel::modelAboutToBeReset, this, [this] { query_ranks.clear(); });
+    QSortFilterProxyModel::setSourceModel(model);
+}
+
+int LibraryFilter::query_rank(int row) const {
+    const auto *model = static_cast<const LibraryModel *>(sourceModel());
+    if (query_ranks.size() != model->rowCount())
+        query_ranks.fill(-2, model->rowCount());
+    auto &rank = query_ranks[row];
+    if (rank == -2)
+        rank = query.rank(model->search_name(row), model->search_path(row), model->at(row).tags);
+    return rank;
 }
 
 void LibraryFilter::set_section(const QString &value, const QString &tag) {
@@ -231,24 +244,19 @@ bool LibraryFilter::filterAcceptsRow(int row, const QModelIndex &parent) const {
         return false;
     if (!selected_tag.isEmpty() && !record.tags.contains(selected_tag, Qt::CaseInsensitive))
         return false;
-    for (const auto &term : terms) {
-        if (term.startsWith("-#")) {
-            if (record.tags.contains(term.mid(2), Qt::CaseInsensitive))
-                return false;
-        } else if (term.startsWith('#')) {
-            if (!record.tags.contains(term.mid(1), Qt::CaseInsensitive))
-                return false;
-        } else if (!model->search_name(row).contains(term) && !model->search_path(row).contains(term)) {
-            return false;
-        }
-    }
-    return true;
+    return query_rank(row) >= 0;
 }
 
 bool LibraryFilter::lessThan(const QModelIndex &left, const QModelIndex &right) const {
     const auto *model = static_cast<const LibraryModel *>(sourceModel());
     const auto &a = model->at(left.row());
     const auto &b = model->at(right.row());
+    if (query.has_text()) {
+        const auto a_rank = query_rank(left.row());
+        const auto b_rank = query_rank(right.row());
+        if (a_rank != b_rank)
+            return sortOrder() == Qt::AscendingOrder ? a_rank < b_rank : a_rank > b_rank;
+    }
     if (sort_mode == 3) {
         const auto &a_tags = model->tag_names(left.row());
         const auto &b_tags = model->tag_names(right.row());

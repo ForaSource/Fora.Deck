@@ -129,6 +129,10 @@ public:
 }
 
 QString desktop_platform::default_global_shortcut() {
+    return "Ctrl+Alt+Shift+Space";
+}
+
+QString desktop_platform::default_overlay_shortcut() {
     return "Ctrl+Alt+Space";
 }
 
@@ -445,6 +449,7 @@ GlobalHotkey::GlobalHotkey(QObject *parent) : QObject(parent) {
 }
 
 GlobalHotkey::~GlobalHotkey() {
+    qApp->removeNativeEventFilter(this);
     if (current_id) {
         UnregisterHotKey(nullptr, current_id);
     }
@@ -495,6 +500,10 @@ bool GlobalHotkey::set_sequence(const QKeySequence &value, QString &error) {
         flags |= MOD_SHIFT;
     if (modifiers & Qt::MetaModifier)
         flags |= MOD_WIN;
+    if (next_id > 0xbfff) {
+        error = QCoreApplication::translate("XLibrary", "Restart XLibrary before changing the shortcut again.");
+        return false;
+    }
     const auto new_id = next_id++;
     if (!RegisterHotKey(nullptr, new_id, flags, virtual_key)) {
         error = QCoreApplication::translate("XLibrary", "The shortcut is in use by Windows or another application.");

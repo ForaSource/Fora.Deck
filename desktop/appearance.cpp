@@ -20,6 +20,13 @@ QIcon appearance::icon(const QString &name, const QColor &color) {
     } else if (name == "search") {
         painter.drawEllipse(QRectF(4, 4, 12, 12));
         painter.drawLine(QPointF(15, 15), QPointF(21, 21));
+    } else if (name == "external") {
+        painter.drawPolyline(QPolygonF{QPointF(13, 3), QPointF(21, 3), QPointF(21, 11)});
+        painter.drawLine(QPointF(21, 3), QPointF(10, 14));
+        painter.drawPolyline(QPolygonF{QPointF(9, 5), QPointF(3, 5), QPointF(3, 21), QPointF(19, 21), QPointF(19, 15)});
+    } else if (name == "file") {
+        painter.drawPolyline(QPolygonF{QPointF(14, 3), QPointF(14, 9), QPointF(20, 9)});
+        painter.drawPolygon(QPolygonF{QPointF(4, 3), QPointF(14, 3), QPointF(20, 9), QPointF(20, 21), QPointF(4, 21)});
     } else if (name == "library") {
         for (int x : {4, 14})
             for (int y : {4, 14})

@@ -1179,6 +1179,10 @@ bool desktop_platform::animations_enabled() {
 }
 
 QString desktop_platform::default_global_shortcut() {
+    return default_overlay_shortcut().isEmpty() ? QString{} : QStringLiteral("Ctrl+Alt+Shift+Space");
+}
+
+QString desktop_platform::default_overlay_shortcut() {
 #ifdef XLIBRARY_HAVE_X11
     if (!wayland_session() && QGuiApplication::platformName() == "xcb")
         return "Ctrl+Alt+Space";

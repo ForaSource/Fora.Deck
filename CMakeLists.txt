@@ -163,6 +163,9 @@ qt_add_executable(XLibrary WIN32
         desktop/application_paths.h
         desktop/localization.h desktop/localization.cpp
         desktop/library_model.h desktop/library_model.cpp
+        desktop/search_query.h desktop/search_query.cpp
+        desktop/search_results.h desktop/search_results.cpp
+        desktop/search_overlay.h desktop/search_overlay.cpp
         desktop/desktop_service.h desktop/desktop_service.cpp
         desktop/appearance.h desktop/appearance.cpp
         desktop/selection_button.h desktop/selection_button.cpp

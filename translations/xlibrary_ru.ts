@@ -4,6 +4,38 @@
 <context>
     <name>XLibrary</name>
     <message>
+        <source>Search applications, calculate or enter a path</source>
+        <translation>Поиск приложений, вычисление или ввод пути</translation>
+    </message>
+    <message>
+        <source>Search, calculate or enter a path</source>
+        <translation>Поиск, вычисление или путь</translation>
+    </message>
+    <message>
+        <source>Show quick search from any application</source>
+        <translation>Открыть быстрый поиск из любого приложения</translation>
+    </message>
+    <message>
+        <source>Quick search</source>
+        <translation>Быстрый поиск</translation>
+    </message>
+    <message>
+        <source>Search results</source>
+        <translation>Результаты поиска</translation>
+    </message>
+    <message>
+        <source>Folder unavailable</source>
+        <translation>Папка недоступна</translation>
+    </message>
+    <message>
+        <source>Could not open the file.</source>
+        <translation>Не удалось открыть файл.</translation>
+    </message>
+    <message>
+        <source>Restart XLibrary before changing the shortcut again.</source>
+        <translation>Перезапустите XLibrary перед следующим изменением сочетания клавиш.</translation>
+    </message>
+    <message>
         <source>The saved GitHub token was not found. Save a new token or delete it from the update settings.</source>
         <translation>Сохранённый токен GitHub не найден. Сохраните новый токен или удалите его из настроек обновлений.</translation>
     </message>

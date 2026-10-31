@@ -295,6 +295,8 @@ DesktopService::DesktopService(QObject *parent, const QString &profile_path, con
     connect(worker, &CatalogWorker::launched, this,
             [this](qint64 id, const operation_result &result, quint64 from_scenario) {
                 launching.remove(id);
+                if (!from_scenario)
+                    emit application_launch_finished(id, result);
                 if (result.state == operation_state::completed && !from_scenario)
                     emit launch_succeeded();
                 if (!from_scenario || !is_scenario_active() || from_scenario != scenario_generation->load())
@@ -533,15 +535,19 @@ void DesktopService::remove_scenario(qint64 id) {
 }
 
 void DesktopService::launch(qint64 id, bool new_instance, bool scenario) {
+    request_launch(id, new_instance, scenario);
+}
+
+quint64 DesktopService::request_launch(qint64 id, bool new_instance, bool scenario) {
     if (!is_ready() || !id || profile_busy() || restart_pending)
-        return;
+        return 0;
     if (launching.contains(id)) {
         if (scenario) {
             cancel_scenario();
             notify(QCoreApplication::translate(
                 "XLibrary", "The application is still starting. Try the scenario again after it has started."));
         }
-        return;
+        return 0;
     }
     launching.insert(id);
     const auto generation = scenario ? scenario_generation->load() : 0;
@@ -549,7 +555,7 @@ void DesktopService::launch(qint64 id, bool new_instance, bool scenario) {
                       : settings.value("behavior/relaunch", "activate").toString() == "activate"
                           ? desktop_platform::launch_mode::activate
                           : desktop_platform::launch_mode::launch;
-    enqueue(
+    return enqueue(
         "launch",
         [id, mode, generation, token = scenario_generation](CatalogWorker &worker) {
             try {

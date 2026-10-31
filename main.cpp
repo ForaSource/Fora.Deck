@@ -64,7 +64,7 @@ int main(int argc, char *argv[]) {
             QLocalSocket socket;
             socket.connectToServer(server_name);
             if (socket.waitForConnected(1500)) {
-                socket.write("show");
+                socket.write(application.arguments().contains("--overlay") ? "overlay" : "show");
                 socket.flush();
                 socket.waitForBytesWritten(100);
                 return 0;
@@ -119,9 +119,25 @@ int main(int argc, char *argv[]) {
         }
         QObject::connect(&server, &QLocalServer::newConnection, &window, [&] {
             while (auto *socket = server.nextPendingConnection()) {
-                window.show_library();
-                socket->disconnectFromServer();
-                socket->deleteLater();
+                auto request = std::make_shared<QByteArray>();
+                const auto read_request = [socket, request, &window] {
+                    *request += socket->readAll();
+                    if (*request == "overlay")
+                        window.show_overlay();
+                    else if (*request == "show")
+                        window.show_library();
+                    else if (request->size() < 7)
+                        return;
+                    socket->disconnectFromServer();
+                    socket->deleteLater();
+                };
+                QObject::connect(socket, &QLocalSocket::readyRead, &window, read_request);
+                QObject::connect(socket, &QLocalSocket::disconnected, socket, &QObject::deleteLater);
+                QTimer::singleShot(1500, socket, [socket] {
+                    socket->disconnectFromServer();
+                    socket->deleteLater();
+                });
+                read_request();
             }
         });
         window.start();

@@ -119,6 +119,7 @@ public:
     Q_INVOKABLE void export_catalog(const QString &path);
     Q_INVOKABLE void import_catalog(const QString &path);
     Q_INVOKABLE void launch(qint64 id, bool new_instance = false, bool scenario = false);
+    quint64 request_launch(qint64 id, bool new_instance = false, bool scenario = false);
     Q_INVOKABLE void open_folder(qint64 id);
     void clear_history();
     void notify(const QString &message);
@@ -139,6 +140,7 @@ signals:
     void discovery_progress_changed();
     void discovery_report_changed();
     void launch_succeeded();
+    void application_launch_finished(qint64 id, const operation_result &result);
     void scenario_changed(const QString &status);
     void appearance_changed();
     void profile_state_changed();
