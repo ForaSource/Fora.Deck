@@ -1068,7 +1068,10 @@ app_record desktop_platform::resolve_application(const QString &path) {
     } else {
         if (!info.isExecutable())
             throw std::invalid_argument(
-                QCoreApplication::translate("XLibrary", "The file is not executable.").toStdString());
+                QCoreApplication::translate("XLibrary",
+                                            "The file is not executable. Use a .desktop shortcut, executable file, "
+                                            "AppImage or script with executable permission.")
+                    .toStdString());
         result.name = info.completeBaseName();
     }
     return result;

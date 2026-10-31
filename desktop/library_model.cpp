@@ -73,9 +73,10 @@ QVariant LibraryModel::data(const QModelIndex &index, int requested_role) const 
             return record.name;
         if (index.column() == 1)
             return record.tags.join(", ");
-        return record.running     ? QCoreApplication::translate("XLibrary", "Running")
-               : record.available ? QCoreApplication::translate("XLibrary", "Not running")
-                                  : QCoreApplication::translate("XLibrary", "Unavailable");
+        return record.running              ? QCoreApplication::translate("XLibrary", "Running")
+               : record.available          ? QCoreApplication::translate("XLibrary", "Not running")
+               : record.volume_unavailable ? QCoreApplication::translate("XLibrary", "Drive unavailable")
+                                           : QCoreApplication::translate("XLibrary", "Unavailable");
     case Qt::ToolTipRole:
         return record.name + '\n' + QDir::toNativeSeparators(record.path);
     case Qt::DecorationRole:
@@ -151,9 +152,11 @@ void LibraryModel::update_state(const QVector<app_record> &applications) {
         auto &record = records[row];
         const auto *state = states.value(record.id);
         if (state && (record.running != state->running || record.available != state->available ||
+                      record.volume_unavailable != state->volume_unavailable ||
                       record.new_instance_error != state->new_instance_error)) {
             record.running = state->running;
             record.available = state->available;
+            record.volume_unavailable = state->volume_unavailable;
             record.new_instance_error = state->new_instance_error;
             emit dataChanged(index(row, 0), index(row, 2),
                              {Qt::DisplayRole, running_role, available_role, record_role});
@@ -176,10 +179,16 @@ LibraryFilter::LibraryFilter(QObject *parent) : QSortFilterProxyModel(parent) {
 }
 
 void LibraryFilter::set_query(const QString &query) {
+    if (query_text == query) {
+        emit query_changed(query_text);
+        return;
+    }
+    query_text = query;
     this->query = SearchQuery(query);
     query_ranks.clear();
     // Relevance can change even when the set of accepted rows stays the same.
     invalidate();
+    emit query_changed(query_text);
 }
 
 void LibraryFilter::setSourceModel(QAbstractItemModel *model) {
@@ -197,7 +206,8 @@ int LibraryFilter::query_rank(int row) const {
         query_ranks.fill(-2, model->rowCount());
     auto &rank = query_ranks[row];
     if (rank == -2)
-        rank = query.rank(model->search_name(row), model->search_path(row), model->at(row).tags);
+        rank =
+            query.rank(model->search_name(row), model->search_path(row), model->at(row).tags, model->at(row).aliases);
     return rank;
 }
 

@@ -10,6 +10,7 @@
 #include <QProgressBar>
 #include <QRegularExpressionValidator>
 #include <QStackedWidget>
+#include <QTabBar>
 #include <QUrl>
 
 #include "desktop_service.h"
@@ -111,34 +112,65 @@ QWidget *appearance_page(const ui_context &context, QWidget *) {
 
 QWidget *hotkeys(const ui_context &context, QWidget *) {
     auto *widget = page(QCoreApplication::translate("XLibrary", "Keyboard shortcuts"));
-    const QList<QStringList> values{
-        {"shortcuts/global", QCoreApplication::translate("XLibrary", "Show the library from any application"),
-         desktop_platform::default_global_shortcut()},
-        {"shortcuts/overlay", QCoreApplication::translate("XLibrary", "Show quick search from any application"),
-         desktop_platform::default_overlay_shortcut()},
-        {"shortcuts/search", QCoreApplication::translate("XLibrary", "Search the library"), "Ctrl+K"},
-        {"shortcuts/add", QCoreApplication::translate("XLibrary", "Add application"), "Ctrl+N"},
-        {"shortcuts/settings", QCoreApplication::translate("XLibrary", "Open settings"), "Ctrl+,"},
-        {"shortcuts/launch", QCoreApplication::translate("XLibrary", "Launch application"), "Return"},
-        {"shortcuts/new_instance", QCoreApplication::translate("XLibrary", "New instance"), "Ctrl+Return"},
-        {"shortcuts/open_folder", QCoreApplication::translate("XLibrary", "Open application folder"), "Alt+Return"},
-        {"shortcuts/copy_path", QCoreApplication::translate("XLibrary", "Copy path"), "Ctrl+Shift+C"},
-        {"shortcuts/remove", QCoreApplication::translate("XLibrary", "Remove from library"), "Delete"}};
-    for (const auto &value : values) {
-        auto *control = new QKeySequenceEdit(QKeySequence::fromString(
-            context.settings->value(value[0], value[2]).toString(), QKeySequence::PortableText));
-        control->setMaximumSequenceLength(1);
-        control->setClearButtonEnabled(true);
-        control->setProperty("setting_key", value[0]);
-        field(static_cast<QVBoxLayout *>(widget->layout()), value[1], control);
-    }
+    auto *tabs = new QTabBar;
+    tabs->setObjectName("shortcut_tabs");
+    tabs->setDrawBase(false);
+    tabs->setExpanding(true);
+    tabs->setElideMode(Qt::ElideNone);
+    tabs->setFocusPolicy(Qt::StrongFocus);
+    auto *pages = new QStackedWidget;
+    pages->setObjectName("shortcut_pages");
+    auto *transition = new PageTransition(pages);
+    widget->layout()->addWidget(tabs);
+    widget->layout()->addWidget(transition);
+    struct shortcut_group {
+        QString title;
+        QList<QStringList> values;
+    };
+    const QList<shortcut_group> groups{
+        {QCoreApplication::translate("XLibrary", "Global shortcuts"),
+         {{"shortcuts/global", QCoreApplication::translate("XLibrary", "Show the library from any application"),
+           desktop_platform::default_global_shortcut()},
+          {"shortcuts/overlay", QCoreApplication::translate("XLibrary", "Show quick search from any application"),
+           desktop_platform::default_overlay_shortcut()}}},
+        {QCoreApplication::translate("XLibrary", "Navigation"),
+         {{"shortcuts/search", QCoreApplication::translate("XLibrary", "Search the library"), "Ctrl+K"},
+          {"shortcuts/settings", QCoreApplication::translate("XLibrary", "Open settings"), "Ctrl+,"}}},
+        {QCoreApplication::translate("XLibrary", "Application actions"),
+         {{"shortcuts/add", QCoreApplication::translate("XLibrary", "Add application"), "Ctrl+N"},
+          {"shortcuts/launch", QCoreApplication::translate("XLibrary", "Launch application"), "Return"},
+          {"shortcuts/new_instance", QCoreApplication::translate("XLibrary", "New instance"), "Ctrl+Return"},
+          {"shortcuts/open_folder", QCoreApplication::translate("XLibrary", "Open application folder"), "Alt+Return"},
+          {"shortcuts/copy_path", QCoreApplication::translate("XLibrary", "Copy path"), "Ctrl+Shift+C"},
+          {"shortcuts/remove", QCoreApplication::translate("XLibrary", "Remove from library"), "Delete"}}}};
+    for (const auto &group : groups) {
+        tabs->addTab(group.title);
+        auto *contents = new QWidget;
+        auto *layout = new QVBoxLayout(contents);
+        layout->setContentsMargins(0, 0, 0, 0);
+        layout->setSpacing(12);
+        for (const auto &value : group.values) {
+            auto *control = new QKeySequenceEdit(QKeySequence::fromString(
+                context.settings->value(value[0], value[2]).toString(), QKeySequence::PortableText));
+            control->setMaximumSequenceLength(1);
+            control->setClearButtonEnabled(true);
+            control->setProperty("setting_key", value[0]);
+            field(layout, value[1], control);
+        }
 #ifdef Q_OS_LINUX
-    widget->layout()->addWidget(
-        label(QCoreApplication::translate("XLibrary",
-                                          "On Wayland, assign a desktop shortcut to the XLibrary command. It opens "
-                                          "the running library. The built-in global shortcut is available on X11."),
-              "muted"));
+        if (pages->count() == 0)
+            layout->addWidget(label(
+                QCoreApplication::translate("XLibrary",
+                                            "On Wayland, assign a desktop shortcut to the XLibrary command. It opens "
+                                            "the running library. The built-in global shortcut is available on X11."),
+                "muted"));
 #endif
+        layout->addStretch();
+        pages->addWidget(contents);
+    }
+    QObject::connect(tabs, &QTabBar::currentChanged, pages, &QStackedWidget::setCurrentIndex);
+    QObject::connect(pages, &QStackedWidget::currentChanged, tabs, &QTabBar::setCurrentIndex);
+    QObject::connect(pages, &QStackedWidget::currentChanged, transition, [transition] { transition->start(); });
     widget->layout()->addWidget(label(
         QCoreApplication::translate("XLibrary",
                                     "An empty field disables the shortcut. Application actions use the "
@@ -168,14 +200,18 @@ QWidget *library_settings(const ui_context &context, QWidget *) {
                   "XLibrary", "Discovery runs on request. Changed sources will be used after saving settings."),
               "muted"));
     widget->layout()->addWidget(action_button(context.actions.value("discover")));
+    auto *clear_exclusions = button(QCoreApplication::translate("XLibrary", "Reset discovery exclusions"));
+    widget->layout()->addWidget(clear_exclusions);
+    QObject::connect(clear_exclusions, &QPushButton::clicked, service, &DesktopService::clear_discovery_exclusions);
     widget->layout()->addWidget(context.registry->create("discovery_progress", context, widget));
     widget->layout()->addWidget(
         label(QCoreApplication::translate("XLibrary", "Library import and export"), "subheading"));
     widget->layout()->addWidget(
         label(QCoreApplication::translate(
                   "XLibrary",
-                  "JSON saves applications, parameters, favorites, and tags. Existing entries are preserved during "
-                  "import. Applications are never launched automatically."),
+                  "JSON saves applications, parameters, favorites, and tags. Review the entries and conflict policy "
+                  "before importing. Matching configurations are skipped by default. Applications are never launched "
+                  "automatically."),
               "muted"));
     auto *import = button(QCoreApplication::translate("XLibrary", "Import…"));
     auto *export_button = button(QCoreApplication::translate("XLibrary", "Export…"));
@@ -630,6 +666,12 @@ QDialog *settings_dialog(const ui_context &context, QWidget *parent) {
                         show_error(QCoreApplication::translate(
                             "XLibrary", "The shortcut is already assigned to another action or reserved for search."));
                         categories->button(2)->click();
+                        if (auto *shortcut_pages = dialog->findChild<QStackedWidget *>("shortcut_pages"))
+                            for (int index = 0; index < shortcut_pages->count(); ++index)
+                                if (shortcut_pages->widget(index)->isAncestorOf(edit)) {
+                                    shortcut_pages->setCurrentIndex(index);
+                                    break;
+                                }
                         edit->setFocus();
                         return;
                     }
@@ -687,6 +729,8 @@ QDialog *settings_dialog(const ui_context &context, QWidget *parent) {
             restore_hotkeys();
             show_error(failure);
             categories->button(2)->click();
+            if (auto *shortcut_pages = dialog->findChild<QStackedWidget *>("shortcut_pages"))
+                shortcut_pages->setCurrentIndex(0);
             return;
         }
         const bool old_autostart = service->settings.value("behavior/autostart", false).toBool();

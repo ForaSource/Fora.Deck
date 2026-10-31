@@ -263,6 +263,16 @@ QImage desktop_platform::application_icon(const QString &path) {
 }
 
 app_record desktop_platform::resolve_application(const QString &path) {
+    const auto supported_target = [](const QString &value) {
+        const auto suffix = QFileInfo(value).suffix().toLower();
+        if (suffix != "exe" && suffix != "bat" && suffix != "cmd" && suffix != "lnk")
+            throw std::invalid_argument(
+                QCoreApplication::translate("XLibrary", "Supported files: .exe, .lnk, .bat, .cmd.").toStdString());
+        if (!QFileInfo(value).isFile())
+            throw std::invalid_argument(
+                QCoreApplication::translate("XLibrary", "The application file is unavailable.").toStdString());
+    };
+    supported_target(path);
     const ComScope com;
     app_record result;
     result.discovery_source = path;
@@ -312,6 +322,7 @@ app_record desktop_platform::resolve_application(const QString &path) {
                     .toStdString());
         }
     }
+    supported_target(result.path);
     const Application application(std::filesystem::path(result.path.toStdWString()));
     result.name = QFileInfo(path).suffix().compare("lnk", Qt::CaseInsensitive) == 0
                       ? QFileInfo(path).completeBaseName()

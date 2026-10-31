@@ -3,14 +3,18 @@
 #include <QClipboard>
 #include <QCloseEvent>
 #include <QDir>
+#include <QDragEnterEvent>
+#include <QDropEvent>
 #include <QFileInfo>
 #include <QJsonObject>
 #include <QLineEdit>
 #include <QMenu>
+#include <QMimeData>
 #include <QStackedWidget>
 #include <QStyleHints>
 
 #include "appearance.h"
+#include "catalog_review.h"
 #include "editors.h"
 #include "github_token_store.h"
 #include "library_splitter.h"
@@ -48,6 +52,13 @@ QWidget *shell(const ui_context &context, QWidget *parent) {
     const auto show_notice = [=](const QString &text) { notice->show_message(text); };
     QObject::connect(service, &DesktopService::message, notice, show_notice);
     QObject::connect(service, &DesktopService::scenario_changed, notice, show_notice);
+    QObject::connect(service, &DesktopService::undo_removal_changed, notice, [=] {
+        if (service->can_undo_removal()) {
+            notice->activated = [=] { service->undo_removal(); };
+            notice->show_message(QCoreApplication::translate("XLibrary", "Applications removed from the library."), {},
+                                 QCoreApplication::translate("XLibrary", "Undo"));
+        }
+    });
     auto *update_notice = new NotificationBanner(*context.settings, 20);
     body->addWidget(update_notice);
     QObject::connect(service, &DesktopService::appearance_changed, update_notice,
@@ -115,6 +126,8 @@ MainWindow::MainWindow(DesktopService &service)
     context.parameters.insert("hotkey", QVariant::fromValue(static_cast<QObject *>(&hotkey)));
     context.parameters.insert("overlay_hotkey", QVariant::fromValue(static_cast<QObject *>(&overlay_hotkey)));
     register_editors(registry);
+    setAcceptDrops(true);
+    connect(&service, &DesktopService::catalog_preview_ready, this, [this] { show_catalog_review(context); });
     register_library_views(registry);
     register_settings_views(registry);
     registry.add_default("shell", shell);
@@ -229,12 +242,13 @@ void MainWindow::create_actions() {
         const auto *record = service.selected();
         if (!record)
             return;
-        const auto id = record->id;
-        const auto name = record->name;
+        const auto ids = service.selections().isEmpty() ? QVector<qint64>{record->id} : service.selections();
         if (confirm(this, QCoreApplication::translate("XLibrary", "Remove application"),
-                    QCoreApplication::translate("XLibrary", "Remove “") + name +
-                        QCoreApplication::translate("XLibrary", "” from the library? Application files will be kept.")))
-            service.remove_application(id);
+                    QCoreApplication::translate("XLibrary",
+                                                "Remove %1 applications from the library? Application files will be "
+                                                "kept. Linked scenario steps will be removed; Undo can restore them.")
+                        .arg(ids.size())))
+            service.remove_applications(ids);
     });
     context.actions.value("remove_application")
         ->setToolTip(QCoreApplication::translate(
@@ -252,6 +266,16 @@ void MainWindow::create_actions() {
         if (const auto *record = service.selected())
             QApplication::clipboard()->setText(QDir::toNativeSeparators(record->path));
     });
+    add("copy_arguments", QCoreApplication::translate("XLibrary", "Copy arguments"), "copy", [this] {
+        if (const auto *record = service.selected())
+            QApplication::clipboard()->setText(record->arguments);
+    });
+    add("bulk_edit", QCoreApplication::translate("XLibrary", "Edit selected applications"), "settings",
+        [this] { show_bulk_editor(context); });
+    add("undo_removal", QCoreApplication::translate("XLibrary", "Undo removal"), "refresh",
+        [this] { service.undo_removal(); });
+    connect(&service, &DesktopService::undo_removal_changed, this, &MainWindow::refresh_actions);
+    connect(&service, &DesktopService::selections_changed, this, &MainWindow::refresh_actions);
     for (const auto &id : {"launch", "new_instance", "open_folder", "copy_path", "remove_application"})
         context.actions.value(id)->setAutoRepeat(false);
     add("discover", QCoreApplication::translate("XLibrary", "Find installed applications"), "refresh", [this] {
@@ -284,7 +308,7 @@ void MainWindow::refresh_actions() {
     const auto *record = service.selected();
     const bool profile_available = !service.profile_busy() && !service.restart_required();
     for (const auto &id : {"launch", "new_instance", "edit_application", "remove_application", "favorite",
-                           "open_folder", "copy_path", "details"})
+                           "open_folder", "copy_path", "copy_arguments", "details"})
         context.actions.value(id)->setEnabled(profile_available && record != nullptr &&
                                               service.section() != "scenarios");
     auto *new_instance = context.actions.value("new_instance");
@@ -297,6 +321,10 @@ void MainWindow::refresh_actions() {
             : QCoreApplication::translate(
                   "XLibrary", "Runs the launch command directly. The application may reuse an existing window."));
     context.actions.value("add_application")->setEnabled(profile_available && service.is_ready());
+    context.actions.value("bulk_edit")
+        ->setEnabled(profile_available && service.is_ready() && !service.selections().isEmpty());
+    context.actions.value("undo_removal")
+        ->setEnabled(profile_available && service.can_undo_removal() && !service.is_scenario_active());
     context.actions.value("add_tag")->setEnabled(profile_available && service.is_ready());
     context.actions.value("add_scenario")
         ->setEnabled(profile_available && service.is_ready() && service.model.rowCount() > 0);
@@ -451,4 +479,25 @@ void MainWindow::closeEvent(QCloseEvent *event) {
 void MainWindow::resizeEvent(QResizeEvent *event) {
     QMainWindow::resizeEvent(event);
     update_layout();
+}
+
+void MainWindow::dragEnterEvent(QDragEnterEvent *event) {
+    if (event->mimeData()->hasUrls() && service.is_ready() && !service.is_discovering() && !service.profile_busy() &&
+        !service.restart_required()) {
+        for (const auto &url : event->mimeData()->urls())
+            if (!url.isLocalFile())
+                return;
+        event->acceptProposedAction();
+    }
+}
+
+void MainWindow::dropEvent(QDropEvent *event) {
+    QStringList paths;
+    for (const auto &url : event->mimeData()->urls())
+        if (url.isLocalFile())
+            paths.append(url.toLocalFile());
+    if (!paths.isEmpty()) {
+        service.preview_files(paths);
+        event->acceptProposedAction();
+    }
 }

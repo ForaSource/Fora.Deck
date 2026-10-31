@@ -6,9 +6,13 @@
 #include <QGridLayout>
 #include <QHeaderView>
 #include <QLineEdit>
+#include <QListWidget>
+#include <QPlainTextEdit>
 #include <QRegularExpression>
+#include <QSignalBlocker>
 #include <QSpinBox>
 #include <QTableWidget>
+#include <QTextDocument>
 
 #include "desktop_service.h"
 #include "editors.h"
@@ -24,7 +28,7 @@ QStringList parse_tags(const QString &input) {
         tag = tag.trimmed();
         if (tag.startsWith('#'))
             tag.remove(0, 1);
-        if (!tag.isEmpty() && !result.contains(tag))
+        if (!tag.isEmpty() && !result.contains(tag, Qt::CaseInsensitive))
             result.append(tag);
     }
     return result;
@@ -57,6 +61,11 @@ QDialog *application_editor(const ui_context &context, QWidget *parent) {
     name->setObjectName("application_name");
     name->setMaxLength(256);
     field(layout, QCoreApplication::translate("XLibrary", "Name"), name);
+    auto *aliases = new QPlainTextEdit(record.aliases.join('\n'));
+    aliases->setMaximumHeight(90);
+    aliases->setTabChangesFocus(true);
+    aliases->setObjectName("application_aliases");
+    field(layout, QCoreApplication::translate("XLibrary", "Search aliases, one per line"), aliases);
     auto *arguments = new QLineEdit(record.arguments);
     arguments->setObjectName("application_arguments");
     field(layout, QCoreApplication::translate("XLibrary", "Launch arguments"), arguments);
@@ -66,6 +75,43 @@ QDialog *application_editor(const ui_context &context, QWidget *parent) {
     auto *tags = new QLineEdit(record.tags.join(", "));
     tags->setPlaceholderText(QCoreApplication::translate("XLibrary", "development, work"));
     field(layout, QCoreApplication::translate("XLibrary", "Tags separated by commas"), tags);
+    auto *tag_search = new QLineEdit;
+    tag_search->setPlaceholderText(QCoreApplication::translate("XLibrary", "Search tags"));
+    tag_search->setAccessibleName(tag_search->placeholderText());
+    layout->addWidget(tag_search);
+    auto *tag_list = new QListWidget;
+    tag_list->setMaximumHeight(140);
+    for (const auto &tag : service->catalog().tags) {
+        qsizetype usage = 0;
+        for (const auto &application : service->catalog().applications)
+            usage += application.tags.contains(tag, Qt::CaseInsensitive);
+        auto *item = new QListWidgetItem(QString("#%1 (%2)").arg(tag, QString::number(usage)), tag_list);
+        item->setData(Qt::UserRole, tag);
+        item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
+        item->setCheckState(record.tags.contains(tag, Qt::CaseInsensitive) ? Qt::Checked : Qt::Unchecked);
+    }
+    layout->addWidget(tag_list);
+    QObject::connect(tag_search, &QLineEdit::textChanged, dialog, [=](const QString &text) {
+        for (int row = 0; row < tag_list->count(); ++row)
+            tag_list->item(row)->setHidden(!tag_list->item(row)->text().contains(text.trimmed(), Qt::CaseInsensitive));
+    });
+    QObject::connect(tag_list, &QListWidget::itemChanged, dialog, [=](QListWidgetItem *item) {
+        auto names = parse_tags(tags->text());
+        const auto name = item->data(Qt::UserRole).toString();
+        names.removeIf([&](const QString &tag) { return tag.toCaseFolded() == name.toCaseFolded(); });
+        if (item->checkState() == Qt::Checked)
+            names.append(name);
+        tags->setText(names.join(", "));
+    });
+    QObject::connect(tags, &QLineEdit::textChanged, dialog, [=](const QString &text) {
+        const QSignalBlocker blocker(tag_list);
+        const auto names = parse_tags(text);
+        for (int row = 0; row < tag_list->count(); ++row) {
+            auto *item = tag_list->item(row);
+            item->setCheckState(
+                names.contains(item->data(Qt::UserRole).toString(), Qt::CaseInsensitive) ? Qt::Checked : Qt::Unchecked);
+        }
+    });
     auto *favorite = new QCheckBox(QCoreApplication::translate("XLibrary", "Favorite"));
     favorite->setChecked(record.favorite);
     layout->addWidget(favorite);
@@ -117,6 +163,14 @@ QDialog *application_editor(const ui_context &context, QWidget *parent) {
         updated.arguments = arguments->text();
         updated.working_directory = directory->text();
         updated.tags = parse_tags(tags->text());
+        if (aliases->document()->isModified()) {
+            updated.aliases.clear();
+            for (auto alias : aliases->toPlainText().split('\n', Qt::SkipEmptyParts)) {
+                alias = alias.trimmed();
+                if (!alias.isEmpty() && !updated.aliases.contains(alias, Qt::CaseInsensitive))
+                    updated.aliases.append(alias);
+            }
+        }
         updated.favorite = favorite->isChecked();
         if (updated.name.isEmpty() || !QFileInfo(updated.path).isAbsolute()) {
             error->setText(

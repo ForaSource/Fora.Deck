@@ -15,14 +15,18 @@ class SearchQuery {
     QStringList excluded_tags;
     QString phrase;
     QString alternate_phrase;
+    bool incomplete_tag = false;
 
 public:
     explicit SearchQuery(const QString &text = {});
-    int rank(const QString &name, const QString &file_name, const QStringList &tags) const;
+    int rank(const QString &name, const QString &file_name, const QStringList &tags,
+             const QStringList &aliases = {}) const;
+    QString tag_hint(const QStringList &known_tags) const;
     bool has_text() const { return !terms.isEmpty(); }
 };
 
 namespace search_query {
+QString rewrite_tag(const QString &text, const QString &old_name, const QString &new_name);
 QString switch_layout(const QString &text);
 bool is_path(const QString &text);
 QString expanded_path(const QString &text);

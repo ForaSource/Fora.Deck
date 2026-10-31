@@ -43,6 +43,8 @@ SearchOverlay::SearchOverlay(DesktopService &service, QWidget *parent)
     input->setObjectName("overlay_search_input");
     input->setPlaceholderText(QCoreApplication::translate("XLibrary", "Search"));
     input->setAccessibleName(QCoreApplication::translate("XLibrary", "Search applications, calculate or enter a path"));
+    input->setToolTip(
+        QCoreApplication::translate("XLibrary", "#tag includes a tag; -#tag excludes it. All conditions apply."));
     input->setClearButtonEnabled(true);
     input->addAction(appearance::icon("search"), QLineEdit::LeadingPosition);
     row->addWidget(input, 1);

@@ -191,8 +191,13 @@ SearchResults::~SearchResults() {
 }
 
 void SearchResults::replace_entries(QVector<search_entry> entries) {
-    if (entries.isEmpty() && (special || (compact && !input.text().trimmed().isEmpty())))
-        entries.append({search_entry::kind::message, QCoreApplication::translate("XLibrary", "No results"), {}, 0});
+    if (entries.isEmpty() && (special || (compact && !input.text().trimmed().isEmpty()))) {
+        const auto hint = special ? QString{} : SearchQuery(input.text()).tag_hint(service.catalog().tags);
+        entries.append({search_entry::kind::message,
+                        hint.isEmpty() ? QCoreApplication::translate("XLibrary", "No results") : hint,
+                        {},
+                        0});
+    }
     results->replace(std::move(entries));
     setCurrentIndex(results->index(0, 0));
     const auto rows = qMin(results->rowCount(), 5);
@@ -214,7 +219,8 @@ void SearchResults::update_applications() {
     // Keep only the five best matches in O(n), rather than sorting an entire second catalog on each key.
     for (int row = 0; row < service.model.rowCount(); ++row) {
         const auto &record = service.model.at(row);
-        const auto rank = query.rank(service.model.search_name(row), service.model.search_path(row), record.tags);
+        const auto rank =
+            query.rank(service.model.search_name(row), service.model.search_path(row), record.tags, record.aliases);
         if (rank < 0)
             continue;
         const QPair<int, int> candidate{row, rank};

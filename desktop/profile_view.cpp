@@ -32,6 +32,8 @@ QString manifest_summary(const profile_manifest &manifest) {
         {"launch_target", QCoreApplication::translate("XLibrary", "Application targets: %1")},
         {"launch_configuration", QCoreApplication::translate("XLibrary", "Launch configurations: %1")},
         {"tags", QCoreApplication::translate("XLibrary", "Tags: %1")},
+        {"application_alias", QCoreApplication::translate("XLibrary", "Search aliases: %1")},
+        {"saved_filter", QCoreApplication::translate("XLibrary", "Saved filters: %1")},
         {"application_tags", QCoreApplication::translate("XLibrary", "Tag assignments: %1")},
         {"desktop_scenario", QCoreApplication::translate("XLibrary", "Scenarios: %1")},
         {"desktop_scenario_step", QCoreApplication::translate("XLibrary", "Scenario steps: %1")},

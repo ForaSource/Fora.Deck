@@ -55,7 +55,21 @@ JSON format 1 stores application names, absolute paths, launch arguments, workin
 favorites, and assigned tags. Linux executable paths do not need a filename extension. Optional
 fields may be omitted; supplied fields must have the expected JSON types. Import validates the
 entire file before writing and reports the record number, field, and reason on invalid input.
-An import error leaves the catalog unchanged. Files are limited to 5 MiB.
+An import error leaves the catalog unchanged. Files are limited to 32 MiB and 50,000 applications.
+
+Discovery, JSON import, and files dropped onto the main window open a preview with checkboxes,
+search, **Select all**, **Clear selection**, and a selected count. Review names, sources, targets,
+arguments, and working directories before choosing **Import selected**. Select/clear applies to
+visible search results; hidden rows keep their selection. Cancelling the preview imports nothing.
+Windows accepts EXE, LNK, BAT, and CMD files; Linux accepts desktop entries and executable files.
+Rejected files are listed with a reason. Discovery can remember unchecked configurations;
+**Settings → Library → Reset discovery exclusions** makes them eligible again.
+
+JSON conflicts are skipped by default. The explicit replacement policy replaces the matching
+entry's name, search aliases, assigned tags, and favorite while preserving its ID, history,
+and scenario links.
+Discovery always preserves existing metadata. For repeated configurations within one JSON file,
+the first selected entry wins with skip; the last selected entry wins with replacement.
 
 Discovery keeps a report in the library and in Settings → Library. Open **Last scan details** to
 read or copy it. The summary separates additions, duplicates, skipped entries, and errors.
@@ -66,13 +80,44 @@ Cancelling discovery before its transaction is committed rolls back all addition
 starts, cancellation is unavailable. JSON import and discovery never launch applications.
 
 JSON export is an application catalog transfer, not a complete profile backup: scenarios,
-unused tags, settings, and launch history are not included.
+unused tags, saved filters, settings, and launch history are not included.
+
+Use Ctrl/Shift to select several library entries. The selection bar shows the count, clears the
+selection, and opens a bulk editor with searchable tags, usage counts, and favorite state.
+Mixed values remain unchanged until explicitly checked or unchecked. Bulk removal asks for the
+entry count and deletes only catalog entries. **Undo removal** restores the last deletion in the
+current session, including metadata and scenario steps. It refuses to overwrite changed linked
+scenarios or conflicting new entries. Undo is also offered in the shared notification banner.
+
+Application details show discovery sources and offer path/argument copying. Availability refreshes
+periodically without removing entries. Unavailable Windows drives and previously observed Linux
+mounts are distinguished from missing files; an unknown missing location is kept as unavailable.
+
+## Search and saved filters
+
+Search matches names, filenames, and user-defined aliases from **Edit application**.
+Matches are ranked as exact, prefix, then substring, with a stable sort order for ties.
+Case, repeated spaces, Unicode normalization, and English/Russian keyboard layout are
+handled by the same search rules in the library and quick launcher. No fuzzy matching is used.
+Aliases also travel with JSON catalogs; older catalogs without aliases remain importable.
+
+Use `#tag` to require a tag and `-#tag` to exclude it; every condition must match.
+The tag selector near search inserts suggestions. An incomplete `#` shows a prompt;
+an unknown required tag produces no matches, and unknown exclusions hide nothing.
+The active summary shows the query, section, selected tag, and sort order.
+**Clear all filters** returns to the full library with the default sort, including from **No results**.
+
+**Save filter** stores the current query, exclusions, section, selected tag, and sorting.
+Choose it from **Saved filters** to apply it; the adjacent actions rename or remove it.
+Renaming a tag updates saved and active queries. Removing a tag removes its conditions
+from saved and active filters, as explained in the confirmation. Saved filters are stored
+in the profile database and included in complete `.xlprofile` backups and their preview.
 
 ## Profile backup and recovery
 
 **Settings → Profile** creates a complete `.xlprofile` backup with applications, launch
-configurations, all tags, scenarios, settings, discovery sources, and launch history. Before
-restoration, XLibrary checks the format, schema, date, contents, and file fingerprint and shows
+configurations, search aliases, saved filters, all tags, scenarios, settings, discovery sources,
+and launch history. Before restoration, XLibrary checks the format, schema, date, contents, and file fingerprint and shows
 a preview. Replacing the profile preserves its previous database, journals, settings, and a
 complete backup when readable. An interrupted replacement rolls back at the next startup;
 after a successful restore, restart XLibrary to apply all settings.
@@ -80,7 +125,7 @@ after a successful restore, restart XLibrary to apply all settings.
 Backups contain private paths and arguments. Native plugin binaries and OS-stored GitHub tokens
 are not transferred; the local token remains local. JSON catalog import/export remains separate.
 Schema migrations are sequential and transactional; an unsupported newer schema is refused
-without changing it. Existing profiles receive a `.before-schema-v3.*.bak` snapshot before migration.
+without changing it. Existing profiles receive a `.before-schema-v4.*.bak` snapshot before migration.
 
 Start `XLibrary --safe-mode` to use the built-in interface without loading user plugins. Disable
 the faulty module in **Settings → Plugins**, save, and restart. The profile page shows database
@@ -188,7 +233,7 @@ For the selected application:
 | <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>C</kbd> | Copy the application path |
 | <kbd>Delete</kbd> | Remove the entry from the library after confirmation; application files are kept |
 
-Change or clear these bindings in Settings → Keyboard shortcuts. Both main and numeric keypad Enter are supported. Text editing keys keep their usual behavior in text fields. Use ↑/↓ in search to select an application; Escape clears the search and cannot be reassigned. Duplicate shortcuts are rejected when saving settings.
+Change or clear these bindings in Settings → Keyboard shortcuts. Switch between the **Global shortcuts**, **Navigation**, and **Application actions** tabs at the top. Both main and numeric keypad Enter are supported. Text editing keys keep their usual behavior in text fields. Use ↑/↓ in search to select an application; Escape clears the search and cannot be reassigned. Duplicate shortcuts are rejected when saving settings, and the tab containing the conflicting field opens automatically.
 
 ## Development
 

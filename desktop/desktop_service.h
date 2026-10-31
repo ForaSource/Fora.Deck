@@ -36,6 +36,12 @@ private:
     quint64 discovery_request_id = 0;
     discovery_progress scan_progress;
     QString scan_report;
+    QVector<app_record> preview_records;
+    QVector<discovery_issue> preview_issues;
+    QString preview_operation;
+    bool reviewing = false;
+    bool undo_available = false;
+    QVector<qint64> selected_ids;
     std::shared_ptr<discovery_control> discovery_cancelled = std::make_shared<discovery_control>();
     operation_state library_status = operation_state::loading;
     quint64 library_request_id = 0;
@@ -58,6 +64,8 @@ private:
                     operation_error_source source = operation_error_source::sqlite, quint64 request_id = 0);
     void finish_scenario(operation_state state, const operation_error &error = {});
     void next_scenario_step();
+    bool begin_catalog_preview(const QString &operation);
+    void present_catalog_preview(QVector<app_record> records, QVector<discovery_issue> issues = {});
 
 public:
     LibraryModel model;
@@ -101,6 +109,22 @@ public:
     qint64 selection() const { return selected_id; }
     const app_record *selected() const { return model.find(selected_id); }
     const catalog_snapshot &catalog() const { return snapshot; }
+    const QVector<qint64> &selections() const { return selected_ids; }
+    void select_applications(const QVector<qint64> &ids);
+    bool can_undo_removal() const { return undo_available; }
+    void remove_applications(const QVector<qint64> &ids);
+    void undo_removal();
+    quint64 update_metadata(const QVector<qint64> &ids, const QStringList &add_tags, const QStringList &remove_tags,
+                            int favorite);
+    bool is_reviewing() const { return reviewing; }
+    bool is_json_preview() const { return preview_operation == "import"; }
+    bool is_scan_preview() const { return preview_operation == "discover"; }
+    const QVector<app_record> &catalog_preview() const { return preview_records; }
+    QString preview_details() const;
+    void apply_catalog_preview(const QVector<int> &rows, bool remember_exclusions,
+                               import_conflict_policy policy = import_conflict_policy::skip);
+    void preview_files(const QStringList &paths);
+    void clear_discovery_exclusions();
     QString section() const { return current_section; }
     QString tag() const { return current_tag; }
     Q_INVOKABLE void select(qint64 id);
@@ -121,6 +145,10 @@ public:
     Q_INVOKABLE void launch(qint64 id, bool new_instance = false, bool scenario = false);
     quint64 request_launch(qint64 id, bool new_instance = false, bool scenario = false);
     Q_INVOKABLE void open_folder(qint64 id);
+    quint64 save_filter(saved_filter record);
+    void remove_filter(qint64 id);
+    void apply_filter(const saved_filter &record);
+    void clear_filters();
     void clear_history();
     void notify(const QString &message);
 
@@ -129,6 +157,9 @@ signals:
     void library_restore_requested(quint64 request_id, const QString &path);
     void catalog_changed();
     void selection_changed();
+    void selections_changed();
+    void undo_removal_changed();
+    void catalog_preview_ready();
     void navigation_changed();
     void message(const QString &text);
     void operation_changed(const operation_result &result);

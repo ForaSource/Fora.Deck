@@ -1,4 +1,5 @@
 #include <cmath>
+#include <QCoreApplication>
 #include <QDir>
 #include <QRegularExpression>
 
@@ -19,11 +20,19 @@ QString search_query::switch_layout(const QString &text) {
     return result;
 }
 
+namespace {
+QString normalized_search(const QString &text) {
+    return text.normalized(QString::NormalizationForm_C).toCaseFolded().simplified();
+}
+}
+
 SearchQuery::SearchQuery(const QString &text) {
-    const auto words = text.toCaseFolded().split(QRegularExpression("\\s+"), Qt::SkipEmptyParts);
+    const auto words = normalized_search(text).split(' ', Qt::SkipEmptyParts);
     QStringList names;
     for (const auto &word : words) {
-        if (word.startsWith("-#"))
+        if (word == "#" || word == "-#")
+            incomplete_tag = true;
+        else if (word.startsWith("-#"))
             excluded_tags.append(word.mid(2));
         else if (word.startsWith('#'))
             required_tags.append(word.mid(1));
@@ -36,35 +45,81 @@ SearchQuery::SearchQuery(const QString &text) {
     alternate_phrase = search_query::switch_layout(phrase);
 }
 
-int SearchQuery::rank(const QString &name, const QString &file_name, const QStringList &tags) const {
+QString SearchQuery::tag_hint(const QStringList &known_tags) const {
+    if (incomplete_tag)
+        return QCoreApplication::translate("XLibrary", "Enter a tag name after # or -#.");
+    QStringList unknown;
+    for (const auto &tag : required_tags + excluded_tags) {
+        bool found = false;
+        for (const auto &known : known_tags)
+            found |= normalized_search(known) == tag;
+        if (!found && !unknown.contains(tag))
+            unknown.append(tag);
+    }
+    return unknown.isEmpty() ? QString{}
+                             : QCoreApplication::translate("XLibrary", "Unknown tags: %1").arg(unknown.join(", "));
+}
+
+QString search_query::rewrite_tag(const QString &text, const QString &old_name, const QString &new_name) {
+    const QRegularExpression token("(?<!\\S)(-?#)(\\S+)", QRegularExpression::UseUnicodePropertiesOption);
+    const auto previous = normalized_search(old_name);
+    auto matches = token.globalMatch(text);
+    QString result;
+    qsizetype position = 0;
+    while (matches.hasNext()) {
+        const auto match = matches.next();
+        result += text.mid(position, match.capturedStart() - position);
+        if (normalized_search(match.captured(2)) != previous)
+            result += match.captured();
+        else if (!new_name.isEmpty())
+            result += match.captured(1) + new_name;
+        position = match.capturedEnd();
+    }
+    return result + text.mid(position);
+}
+
+int SearchQuery::rank(const QString &name, const QString &file_name, const QStringList &tags,
+                      const QStringList &aliases) const {
+    if (incomplete_tag)
+        return -1;
+    QStringList normalized_tags;
+    for (const auto &tag : tags)
+        normalized_tags.append(normalized_search(tag));
     for (const auto &tag : required_tags)
-        if (!tags.contains(tag, Qt::CaseInsensitive))
+        if (!normalized_tags.contains(tag))
             return -1;
     for (const auto &tag : excluded_tags)
-        if (tags.contains(tag, Qt::CaseInsensitive))
+        if (normalized_tags.contains(tag))
             return -1;
     if (terms.isEmpty())
         return 0;
+    QStringList fields{normalized_search(name), normalized_search(file_name)};
+    for (const auto &alias : aliases)
+        fields.append(normalized_search(alias));
     bool literal_match = true;
     for (const auto &term : terms) {
-        const bool literal = name.contains(term.literal) || file_name.contains(term.literal);
-        if (!literal && !name.contains(term.alternate) && !file_name.contains(term.alternate))
+        bool literal = false;
+        bool alternate = false;
+        for (const auto &field : fields) {
+            literal |= field.contains(term.literal);
+            alternate |= field.contains(term.alternate);
+        }
+        if (!literal && !alternate)
             return -1;
         literal_match &= literal;
     }
-    if (name == phrase)
-        return 0;
-    if (name == alternate_phrase)
-        return 1;
-    if (file_name == phrase)
-        return 2;
-    if (file_name == alternate_phrase)
-        return 3;
-    if (name.startsWith(phrase))
-        return 4;
-    if (name.startsWith(alternate_phrase))
-        return 5;
-    return literal_match ? 6 : 7;
+    int best = literal_match ? 4 : 5;
+    for (const auto &field : fields) {
+        if (field == phrase)
+            best = qMin(best, 0);
+        else if (field == alternate_phrase)
+            best = qMin(best, 1);
+        else if (field.startsWith(phrase))
+            best = qMin(best, 2);
+        else if (field.startsWith(alternate_phrase))
+            best = qMin(best, 3);
+    }
+    return best;
 }
 
 bool search_query::is_path(const QString &text) {

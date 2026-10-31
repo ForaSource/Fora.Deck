@@ -28,6 +28,14 @@
         <translation>Папка недоступна</translation>
     </message>
     <message>
+        <source>…</source>
+        <translation>…</translation>
+    </message>
+    <message>
+        <source>—</source>
+        <translation>—</translation>
+    </message>
+    <message>
         <source>Could not open the file.</source>
         <translation>Не удалось открыть файл.</translation>
     </message>
@@ -156,6 +164,14 @@
         <translation>Приложение уже удалено из библиотеки.</translation>
     </message>
     <message>
+        <source>Invalid saved filter.</source>
+        <translation>Некорректный сохранённый фильтр.</translation>
+    </message>
+    <message>
+        <source>A filter with this name already exists.</source>
+        <translation>Фильтр с таким именем уже существует.</translation>
+    </message>
+    <message>
         <source>Invalid tag name.</source>
         <translation>Недопустимое название тега.</translation>
     </message>
@@ -256,14 +272,6 @@
         <translation>Сканирование прервано; изменения не сохранены.</translation>
     </message>
     <message>
-        <source>Refreshing the library</source>
-        <translation>Обновление библиотеки</translation>
-    </message>
-    <message>
-        <source>Scan complete.</source>
-        <translation>Сканирование завершено.</translation>
-    </message>
-    <message>
         <source>Stopping the scan…</source>
         <translation>Остановка сканирования…</translation>
     </message>
@@ -342,10 +350,6 @@
     <message>
         <source>expected an empty string or an absolute path</source>
         <translation>ожидается пустая строка или абсолютный путь</translation>
-    </message>
-    <message>
-        <source>Applications imported: %1. Duplicates: %2.</source>
-        <translation>Импортировано приложений: %1. Дубли: %2.</translation>
     </message>
     <message>
         <source>Launch history cleared.</source>
@@ -450,6 +454,10 @@
     <message>
         <source>Could not save the tag.</source>
         <translation>Не удалось сохранить тег.</translation>
+    </message>
+    <message>
+        <source>Search aliases, one per line</source>
+        <translation>Псевдонимы для поиска, каждый с новой строки</translation>
     </message>
     <message>
         <source>Edit scenario</source>
@@ -596,18 +604,6 @@
         <translation>Удалить #</translation>
     </message>
     <message>
-        <source> from all applications?</source>
-        <translation> у всех приложений?</translation>
-    </message>
-    <message>
-        <source>Search applications and tags</source>
-        <translation>Поиск приложений и тегов</translation>
-    </message>
-    <message>
-        <source>Find an application or #tag</source>
-        <translation>Найти приложение или #тег</translation>
-    </message>
-    <message>
         <source>Settings</source>
         <translation>Настройки</translation>
     </message>
@@ -646,6 +642,10 @@
     <message>
         <source>Candidates processed: %1 of %2</source>
         <translation>Обработано кандидатов: %1 из %2</translation>
+    </message>
+    <message>
+        <source> from all applications? Saved filters will also stop using this tag.</source>
+        <translation> у всех приложений? Этот тег также будет убран из сохранённых фильтров.</translation>
     </message>
     <message>
         <source>Cancelling…</source>
@@ -692,6 +692,10 @@
         <translation>Загрузка библиотеки…</translation>
     </message>
     <message>
+        <source>Clear all filters</source>
+        <translation>Сбросить все фильтры</translation>
+    </message>
+    <message>
         <source>↑↓  Select</source>
         <translation>↑↓  Выбор</translation>
     </message>
@@ -730,10 +734,6 @@
     <message>
         <source>● Running</source>
         <translation>● Запущено</translation>
-    </message>
-    <message>
-        <source>File unavailable</source>
-        <translation>Файл недоступен</translation>
     </message>
     <message>
         <source>Details will appear here.</source>
@@ -918,10 +918,6 @@ Applications: %1</source>
         <translation>Файл приложения недоступен.</translation>
     </message>
     <message>
-        <source>The file is not executable.</source>
-        <translation>Файл не имеет разрешения на запуск.</translation>
-    </message>
-    <message>
         <source>Preparing the XDG application list…</source>
         <translation>Подготовка списка приложений XDG…</translation>
     </message>
@@ -984,14 +980,6 @@ Applications: %1</source>
     <message>
         <source>Remove application</source>
         <translation>Удалить приложение</translation>
-    </message>
-    <message>
-        <source>Remove “</source>
-        <translation>Удалить «</translation>
-    </message>
-    <message>
-        <source>” from the library? Application files will be kept.</source>
-        <translation>» из библиотеки? Файлы приложения сохранятся.</translation>
     </message>
     <message>
         <source>Remove the selected application from the library. Application files will be kept.</source>
@@ -1122,6 +1110,18 @@ Applications: %1</source>
         <translation>Горячие клавиши</translation>
     </message>
     <message>
+        <source>Global shortcuts</source>
+        <translation>Глобальные</translation>
+    </message>
+    <message>
+        <source>Navigation</source>
+        <translation>Навигация</translation>
+    </message>
+    <message>
+        <source>Application actions</source>
+        <translation>Действия с приложением</translation>
+    </message>
+    <message>
         <source>Show the library from any application</source>
         <translation>Показать библиотеку из любого приложения</translation>
     </message>
@@ -1168,10 +1168,6 @@ Applications: %1</source>
     <message>
         <source>Library import and export</source>
         <translation>Импорт и экспорт библиотеки</translation>
-    </message>
-    <message>
-        <source>JSON saves applications, parameters, favorites, and tags. Existing entries are preserved during import. Applications are never launched automatically.</source>
-        <translation>JSON сохраняет приложения, параметры, избранное и теги. Существующие записи при импорте сохраняются. Приложения автоматически не запускаются.</translation>
     </message>
     <message>
         <source>Import…</source>
@@ -1530,6 +1526,10 @@ Automatic installation is unavailable for this copy or release. Follow the relea
         <translation>Для обновления этой установки используйте выпуск на GitHub.</translation>
     </message>
     <message>
+        <source>Use up to 32 aliases, each on one line with up to 256 characters.</source>
+        <translation>Можно указать до 32 псевдонимов, каждый на одной строке длиной до 256 символов.</translation>
+    </message>
+    <message>
         <source>Select a different, existing SQLite backup file.</source>
         <translation>Выберите другой существующий файл резервной копии SQLite.</translation>
     </message>
@@ -1828,6 +1828,14 @@ Technical reason: %3</source>
         <translation>Теги: %1</translation>
     </message>
     <message>
+        <source>Search aliases: %1</source>
+        <translation>Псевдонимы для поиска: %1</translation>
+    </message>
+    <message>
+        <source>Saved filters: %1</source>
+        <translation>Сохранённые фильтры: %1</translation>
+    </message>
+    <message>
         <source>Tag assignments: %1</source>
         <translation>Привязки тегов: %1</translation>
     </message>
@@ -2022,6 +2030,246 @@ Technical reason: %3</source>
     <message>
         <source>Ready</source>
         <translation>Готово</translation>
+    </message>
+    <message>
+        <source>Add tags separated by commas</source>
+        <translation>Добавить теги через запятую</translation>
+    </message>
+    <message>
+        <source>Applications removed from the library.</source>
+        <translation>Приложения удалены из библиотеки.</translation>
+    </message>
+    <message>
+        <source>Applies to the visible search results. Hidden rows keep their selection.</source>
+        <translation>Действует на видимые результаты поиска. Выбор скрытых строк сохраняется.</translation>
+    </message>
+    <message>
+        <source>Clear selection</source>
+        <translation>Снять выделение</translation>
+    </message>
+    <message>
+        <source>Conflict policy</source>
+        <translation>При совпадении конфигураций</translation>
+    </message>
+    <message>
+        <source>Copy arguments</source>
+        <translation>Копировать аргументы</translation>
+    </message>
+    <message>
+        <source>Discovery exclusions cleared.</source>
+        <translation>Исключения обнаружения сброшены.</translation>
+    </message>
+    <message>
+        <source>Do not offer unchecked applications in future scans</source>
+        <translation>Не предлагать неотмеченные приложения при следующих сканированиях</translation>
+    </message>
+    <message>
+        <source>Drive disconnected or unavailable</source>
+        <translation>Диск отключён или недоступен</translation>
+    </message>
+    <message>
+        <source>Drive unavailable</source>
+        <translation>Диск недоступен</translation>
+    </message>
+    <message>
+        <source>Edit selected applications</source>
+        <translation>Изменить выбранные приложения</translation>
+    </message>
+    <message>
+        <source>Excluded by the user.</source>
+        <translation>Исключено пользователем.</translation>
+    </message>
+    <message>
+        <source>File unavailable; the entry is kept</source>
+        <translation>Файл недоступен; запись сохранена</translation>
+    </message>
+    <message>
+        <source>Import cancelled; changes were not saved.</source>
+        <translation>Импорт отменён; изменения не сохранены.</translation>
+    </message>
+    <message>
+        <source>Import complete. Updated: %1.</source>
+        <translation>Импорт завершён. Обновлено: %1.</translation>
+    </message>
+    <message>
+        <source>Import failed; changes were not saved.</source>
+        <translation>Ошибка импорта; изменения не сохранены.</translation>
+    </message>
+    <message>
+        <source>Import selected</source>
+        <translation>Импортировать выбранное</translation>
+    </message>
+    <message>
+        <source>JSON catalog</source>
+        <translation>Каталог JSON</translation>
+    </message>
+    <message>
+        <source>JSON saves applications, parameters, favorites, and tags. Review the entries and conflict policy before importing. Matching configurations are skipped by default. Applications are never launched automatically.</source>
+        <translation>JSON сохраняет приложения, параметры, избранное и теги. Перед импортом просмотрите записи и выберите правило обработки совпадений. По умолчанию совпадающие конфигурации пропускаются. Приложения никогда не запускаются автоматически.</translation>
+    </message>
+    <message>
+        <source>Mixed means keep each application&apos;s current value.</source>
+        <translation>Смешанное состояние сохраняет текущее значение каждого приложения.</translation>
+    </message>
+    <message>
+        <source>Not selected for import.</source>
+        <translation>Не выбрано для импорта.</translation>
+    </message>
+    <message>
+        <source>Preparing import preview…</source>
+        <translation>Подготовка предпросмотра импорта…</translation>
+    </message>
+    <message>
+        <source>Preview issues: %1</source>
+        <translation>Замечаний при подготовке: %1</translation>
+    </message>
+    <message>
+        <source>Remove %1 applications from the library? Application files will be kept. Linked scenario steps will be removed; Undo can restore them.</source>
+        <translation>Удалить приложения из библиотеки (%1)? Файлы приложений сохранятся. Связанные шаги сценариев будут удалены; отмена удаления восстановит их.</translation>
+    </message>
+    <message>
+        <source>Removed applications and scenario links restored.</source>
+        <translation>Удалённые приложения и связи сценариев восстановлены.</translation>
+    </message>
+    <message>
+        <source>Replace name, tags and favorite for matching configurations</source>
+        <translation>Заменить имя, теги и избранное у совпадающих конфигураций</translation>
+    </message>
+    <message>
+        <source>Reset discovery exclusions</source>
+        <translation>Сбросить исключения обнаружения</translation>
+    </message>
+    <message>
+        <source>Review applications before import</source>
+        <translation>Просмотр приложений перед импортом</translation>
+    </message>
+    <message>
+        <source>Search name, source or target</source>
+        <translation>Поиск по имени, источнику или цели</translation>
+    </message>
+    <message>
+        <source>Search tags</source>
+        <translation>Поиск тегов</translation>
+    </message>
+    <message>
+        <source>Select all</source>
+        <translation>Выбрать всё</translation>
+    </message>
+    <message>
+        <source>Selected applications: %1</source>
+        <translation>Выбрано приложений: %1</translation>
+    </message>
+    <message>
+        <source>Selected: %1 / %2. Shown: %3.</source>
+        <translation>Выбрано: %1 из %2. Показано: %3.</translation>
+    </message>
+    <message>
+        <source>Skip matching launch configurations (default)</source>
+        <translation>Пропустить совпадающие конфигурации (по умолчанию)</translation>
+    </message>
+    <message>
+        <source>Source</source>
+        <translation>Источник</translation>
+    </message>
+    <message>
+        <source>Source: %1</source>
+        <translation>Источник: %1</translation>
+    </message>
+    <message>
+        <source>Source: manually added or imported</source>
+        <translation>Источник: ручное добавление или импорт</translation>
+    </message>
+    <message>
+        <source>Stop the scenario before removing applications.</source>
+        <translation>Остановите сценарий перед удалением приложений.</translation>
+    </message>
+    <message>
+        <source>Stop the scenario before restoring applications.</source>
+        <translation>Остановите сценарий перед восстановлением приложений.</translation>
+    </message>
+    <message>
+        <source>Supported files: .exe, .lnk, .bat, .cmd.</source>
+        <translation>Поддерживаемые файлы: .exe, .lnk, .bat, .cmd.</translation>
+    </message>
+    <message>
+        <source>Target</source>
+        <translation>Цель</translation>
+    </message>
+    <message>
+        <source>The file is not executable. Use a .desktop shortcut, executable file, AppImage or script with executable permission.</source>
+        <translation>Файл не является исполняемым. Выберите ярлык .desktop, исполняемый файл, AppImage или скрипт с правом исполнения.</translation>
+    </message>
+    <message>
+        <source>The library or a linked scenario changed. Undo would overwrite changes.</source>
+        <translation>Библиотека или связанный сценарий изменены. Отмена удаления перезаписала бы изменения.</translation>
+    </message>
+    <message>
+        <source>The selection changed. Select applications again.</source>
+        <translation>Состав записей изменился. Выберите приложения заново.</translation>
+    </message>
+    <message>
+        <source>Undo</source>
+        <translation>Отменить</translation>
+    </message>
+    <message>
+        <source>Undo removal</source>
+        <translation>Отменить удаление</translation>
+    </message>
+    <message>
+        <source>Enter a tag name after # or -#.</source>
+        <translation>Введите имя тега после # или -#.</translation>
+    </message>
+    <message>
+        <source>Unknown tags: %1</source>
+        <translation>Неизвестные теги: %1</translation>
+    </message>
+    <message>
+        <source>Rename filter</source>
+        <translation>Переименовать фильтр</translation>
+    </message>
+    <message>
+        <source>Save current filter</source>
+        <translation>Сохранить текущий фильтр</translation>
+    </message>
+    <message>
+        <source>Filter name</source>
+        <translation>Имя фильтра</translation>
+    </message>
+    <message>
+        <source>Enter a filter name.</source>
+        <translation>Введите имя фильтра.</translation>
+    </message>
+    <message>
+        <source>#tag includes a tag; -#tag excludes it. All conditions apply.</source>
+        <translation>#тег — включить тег; -#тег — исключить. Учитываются все условия.</translation>
+    </message>
+    <message>
+        <source>Tag suggestions</source>
+        <translation>Подсказки тегов</translation>
+    </message>
+    <message>
+        <source>Saved filters</source>
+        <translation>Сохранённые фильтры</translation>
+    </message>
+    <message>
+        <source>Save filter</source>
+        <translation>Сохранить фильтр</translation>
+    </message>
+    <message>
+        <source>Remove filter</source>
+        <translation>Удалить фильтр</translation>
+    </message>
+    <message>
+        <source>Insert tag…</source>
+        <translation>Вставить тег…</translation>
+    </message>
+    <message>
+        <source>Active: %1</source>
+        <translation>Активно: %1</translation>
+    </message>
+    <message>
+        <source>Remove the saved filter “%1”?</source>
+        <translation>Удалить сохранённый фильтр «%1»?</translation>
     </message>
 </context>
 </TS>
