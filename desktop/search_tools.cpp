@@ -1,6 +1,7 @@
 #include <QComboBox>
 #include <QDialogButtonBox>
 #include <QLineEdit>
+#include <QRegularExpression>
 #include <QSignalBlocker>
 
 #include "desktop_service.h"

@@ -188,7 +188,7 @@ void show_bulk_editor(const ui_context &context) {
         qsizetype assigned = 0;
         qsizetype usage = 0;
         for (const auto &record : service->catalog().applications) {
-            if (record.tags.contains(tag, Qt::CaseInsensitive)) {
+            if (has_tag(record.tags, tag)) {
                 ++usage;
                 if (ids.contains(record.id))
                     ++assigned;
@@ -237,7 +237,7 @@ void show_bulk_editor(const ui_context &context) {
                     QCoreApplication::translate("XLibrary", "Tag: up to 64 characters, without spaces, commas, or #."));
                 return;
             }
-            if (!add_tags.contains(tag, Qt::CaseInsensitive))
+            if (!has_tag(add_tags, tag))
                 add_tags.append(tag);
         }
         buttons->button(QDialogButtonBox::Save)->setEnabled(false);

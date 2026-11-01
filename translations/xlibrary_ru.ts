@@ -1614,6 +1614,10 @@ Automatic installation is unavailable for this copy or release. Follow the relea
         <translation>Пути и аргументы: до 32 768 символов; теги: до 256.</translation>
     </message>
     <message>
+        <source>Renaming this tag would make a saved filter query too long (maximum 32768 characters).</source>
+        <translation>Переименование этого тега сделает запрос сохранённого фильтра слишком длинным (максимум 32768 символов).</translation>
+    </message>
+    <message>
         <source>A Windows target requires a filename extension.</source>
         <translation>Для цели Windows требуется расширение имени файла.</translation>
     </message>

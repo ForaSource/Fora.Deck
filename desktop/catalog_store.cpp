@@ -311,13 +311,17 @@ void CatalogStore::write_metadata(qint64 id, const app_record &record) {
     clear.bind(1, id);
     clear.next();
     QHash<QString, QString> known_tags;
+    QSet<QString> existing_tag_names;
     Statement existing_tags(connection, "SELECT name FROM tags;");
     while (existing_tags.next()) {
         const auto name = existing_tags.text(0);
-        known_tags.insert(name.toCaseFolded(), name);
+        known_tags.insert(tag_name_key(name), name);
+        existing_tag_names.insert(name);
     }
     for (const auto &tag : record.tags) {
-        const auto canonical_tag = known_tags.value(tag.toCaseFolded(), tag);
+        const auto key = tag_name_key(tag);
+        // Preserve exact assignments in older profiles that already contain equivalent spellings.
+        const auto canonical_tag = existing_tag_names.contains(tag) ? tag : known_tags.value(key, tag);
         Statement create(connection, "INSERT OR IGNORE INTO tags(name) VALUES(?);");
         create.bind(1, canonical_tag);
         create.next();
@@ -325,7 +329,8 @@ void CatalogStore::write_metadata(qint64 id, const app_record &record) {
         link.bind(1, id);
         link.bind(2, canonical_tag);
         link.next();
-        known_tags.insert(tag.toCaseFolded(), canonical_tag);
+        known_tags.insert(key, canonical_tag);
+        existing_tag_names.insert(canonical_tag);
     }
 }
 
@@ -498,9 +503,9 @@ void CatalogStore::update_metadata(const QVector<qint64> &ids, const QStringList
         if (!selected.contains(record.id))
             continue;
         for (const auto &tag : remove_tags)
-            record.tags.removeIf([&](const QString &name) { return name.toCaseFolded() == tag.toCaseFolded(); });
+            record.tags.removeIf([&](const QString &name) { return tag_name_key(name) == tag_name_key(tag); });
         for (const auto &tag : add_tags)
-            if (!record.tags.contains(tag, Qt::CaseInsensitive))
+            if (!has_tag(record.tags, tag))
                 record.tags.append(tag);
         if (favorite >= 0)
             record.favorite = favorite != 0;
@@ -555,7 +560,12 @@ void CatalogStore::update_filter_tags(const QString &old_name, const QString &ne
     Statement filters(database.get_connection(), "SELECT id,query,tag FROM saved_filter;");
     while (filters.next()) {
         const auto query = search_query::rewrite_tag(filters.text(1), old_name, new_name);
-        const auto tag = filters.text(2).compare(old_name, Qt::CaseInsensitive) == 0 ? new_name : filters.text(2);
+        if (query.size() > catalog_limits::text_length)
+            throw std::invalid_argument(
+                QCoreApplication::translate("XLibrary", "Renaming this tag would make a saved filter query too long "
+                                                        "(maximum 32768 characters).")
+                    .toStdString());
+        const auto tag = tag_name_key(filters.text(2)) == tag_name_key(old_name) ? new_name : filters.text(2);
         Statement update(database.get_connection(), "UPDATE saved_filter SET query=?,tag=? WHERE id=?;");
         update.bind(1, query);
         update.bind(2, tag);
@@ -570,7 +580,7 @@ void CatalogStore::save_tag(const QString &old_name, const QString &new_name) {
     Transaction transaction(database.get_connection());
     Statement existing(database.get_connection(), "SELECT name FROM tags;");
     while (existing.next()) {
-        if (existing.text(0) != old_name && existing.text(0).toCaseFolded() == new_name.toCaseFolded()) {
+        if (existing.text(0) != old_name && tag_name_key(existing.text(0)) == tag_name_key(new_name)) {
             throw std::invalid_argument(
                 QCoreApplication::translate("XLibrary", "A tag with this name already exists.").toStdString());
         }

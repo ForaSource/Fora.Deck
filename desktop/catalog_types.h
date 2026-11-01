@@ -3,7 +3,6 @@
 
 #include <atomic>
 #include <QMetaType>
-#include <QRegularExpression>
 #include <QStringList>
 #include <QVector>
 #include <stdexcept>
@@ -16,8 +15,24 @@ inline constexpr qsizetype tags_per_application = 256;
 }
 
 inline bool valid_tag_name(const QString &tag) {
-    return !tag.isEmpty() && tag.size() <= 64 && !tag.contains(QChar::Null) &&
-           !tag.contains(QRegularExpression("[\\s,#]"));
+    if (tag.isEmpty() || tag.size() > 64)
+        return false;
+    for (const auto character : tag)
+        if (character.isNull() || character.isSpace() || character == ',' || character == '#')
+            return false;
+    return true;
+}
+
+inline QString tag_name_key(const QString &tag) {
+    return tag.normalized(QString::NormalizationForm_C).toCaseFolded();
+}
+
+inline bool has_tag(const QStringList &tags, const QString &tag) {
+    const auto key = tag_name_key(tag);
+    for (const auto &name : tags)
+        if (tag_name_key(name) == key)
+            return true;
+    return false;
 }
 
 struct app_record {

@@ -8,6 +8,7 @@
 #include <QDesktopServices>
 #include <QDirIterator>
 #include <QFileInfo>
+#include <QRegularExpression>
 #include <QSettings>
 #include <QUrl>
 #include <QWidget>
@@ -500,6 +501,10 @@ bool GlobalHotkey::set_sequence(const QKeySequence &value, QString &error) {
     const auto modifiers = combination.keyboardModifiers();
     if (!(modifiers & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier))) {
         error = QCoreApplication::translate("XLibrary", "Add Ctrl, Alt, or Win to the global shortcut.");
+        return false;
+    }
+    if (modifiers & ~(Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier | Qt::ShiftModifier)) {
+        error = QCoreApplication::translate("XLibrary", "The shortcut contains an unsupported modifier.");
         return false;
     }
     UINT flags = MOD_NOREPEAT;

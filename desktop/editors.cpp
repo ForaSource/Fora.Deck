@@ -28,7 +28,7 @@ QStringList parse_tags(const QString &input) {
         tag = tag.trimmed();
         if (tag.startsWith('#'))
             tag.remove(0, 1);
-        if (!tag.isEmpty() && !result.contains(tag, Qt::CaseInsensitive))
+        if (!tag.isEmpty() && !has_tag(result, tag))
             result.append(tag);
     }
     return result;
@@ -48,7 +48,9 @@ QDialog *application_editor(const ui_context &context, QWidget *parent) {
     auto *layout = new QVBoxLayout(form);
     layout->setContentsMargins(0, 16, 0, 8);
     layout->setSpacing(6);
-    auto *path = new QLineEdit(record.path);
+    auto *path = new QLineEdit;
+    path->setMaxLength(static_cast<int>(catalog_limits::text_length));
+    path->setText(record.path);
     path->setObjectName("application_path");
     auto *browse = button(QCoreApplication::translate("XLibrary", "Browse…"));
     auto *file_row = new QWidget;
@@ -66,10 +68,14 @@ QDialog *application_editor(const ui_context &context, QWidget *parent) {
     aliases->setTabChangesFocus(true);
     aliases->setObjectName("application_aliases");
     field(layout, QCoreApplication::translate("XLibrary", "Search aliases, one per line"), aliases);
-    auto *arguments = new QLineEdit(record.arguments);
+    auto *arguments = new QLineEdit;
+    arguments->setMaxLength(static_cast<int>(catalog_limits::text_length));
+    arguments->setText(record.arguments);
     arguments->setObjectName("application_arguments");
     field(layout, QCoreApplication::translate("XLibrary", "Launch arguments"), arguments);
-    auto *directory = new QLineEdit(record.working_directory);
+    auto *directory = new QLineEdit;
+    directory->setMaxLength(static_cast<int>(catalog_limits::text_length));
+    directory->setText(record.working_directory);
     directory->setPlaceholderText(QCoreApplication::translate("XLibrary", "Default: application folder"));
     field(layout, QCoreApplication::translate("XLibrary", "Working directory"), directory);
     auto *tags = new QLineEdit(record.tags.join(", "));
@@ -84,11 +90,11 @@ QDialog *application_editor(const ui_context &context, QWidget *parent) {
     for (const auto &tag : service->catalog().tags) {
         qsizetype usage = 0;
         for (const auto &application : service->catalog().applications)
-            usage += application.tags.contains(tag, Qt::CaseInsensitive);
+            usage += has_tag(application.tags, tag);
         auto *item = new QListWidgetItem(QString("#%1 (%2)").arg(tag, QString::number(usage)), tag_list);
         item->setData(Qt::UserRole, tag);
         item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
-        item->setCheckState(record.tags.contains(tag, Qt::CaseInsensitive) ? Qt::Checked : Qt::Unchecked);
+        item->setCheckState(has_tag(record.tags, tag) ? Qt::Checked : Qt::Unchecked);
     }
     layout->addWidget(tag_list);
     QObject::connect(tag_search, &QLineEdit::textChanged, dialog, [=](const QString &text) {
@@ -98,7 +104,7 @@ QDialog *application_editor(const ui_context &context, QWidget *parent) {
     QObject::connect(tag_list, &QListWidget::itemChanged, dialog, [=](QListWidgetItem *item) {
         auto names = parse_tags(tags->text());
         const auto name = item->data(Qt::UserRole).toString();
-        names.removeIf([&](const QString &tag) { return tag.toCaseFolded() == name.toCaseFolded(); });
+        names.removeIf([&](const QString &tag) { return tag_name_key(tag) == tag_name_key(name); });
         if (item->checkState() == Qt::Checked)
             names.append(name);
         tags->setText(names.join(", "));
@@ -108,8 +114,7 @@ QDialog *application_editor(const ui_context &context, QWidget *parent) {
         const auto names = parse_tags(text);
         for (int row = 0; row < tag_list->count(); ++row) {
             auto *item = tag_list->item(row);
-            item->setCheckState(
-                names.contains(item->data(Qt::UserRole).toString(), Qt::CaseInsensitive) ? Qt::Checked : Qt::Unchecked);
+            item->setCheckState(has_tag(names, item->data(Qt::UserRole).toString()) ? Qt::Checked : Qt::Unchecked);
         }
     });
     auto *favorite = new QCheckBox(QCoreApplication::translate("XLibrary", "Favorite"));
@@ -162,7 +167,8 @@ QDialog *application_editor(const ui_context &context, QWidget *parent) {
         updated.path = QDir::fromNativeSeparators(path->text());
         updated.arguments = arguments->text();
         updated.working_directory = directory->text();
-        updated.tags = parse_tags(tags->text());
+        if (tags->text() != record.tags.join(", "))
+            updated.tags = parse_tags(tags->text());
         if (aliases->document()->isModified()) {
             updated.aliases.clear();
             for (auto alias : aliases->toPlainText().split('\n', Qt::SkipEmptyParts)) {

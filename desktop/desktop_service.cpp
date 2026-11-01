@@ -343,7 +343,7 @@ DesktopService::DesktopService(QObject *parent, const QString &profile_path, con
         if (old_name.isEmpty())
             return;
         filter.set_query(search_query::rewrite_tag(filter.text(), old_name, new_name));
-        if (current_tag.compare(old_name, Qt::CaseInsensitive) == 0)
+        if (tag_name_key(current_tag) == tag_name_key(old_name))
             navigate(current_section, new_name);
     });
     connect(worker, &CatalogWorker::loaded, this, [this](const catalog_snapshot &value) {

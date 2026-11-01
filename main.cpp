@@ -2,6 +2,7 @@
 #include <QApplication>
 #include <QCryptographicHash>
 #include <QDir>
+#include <QFileInfo>
 #include <QLocalServer>
 #include <QLocalSocket>
 #include <QLockFile>
@@ -50,9 +51,11 @@ int main(int argc, char *argv[]) {
             throw std::runtime_error(
                 QCoreApplication::translate("XLibrary", "Could not create the XLibrary settings folder.")
                     .toStdString());
+        const auto profile_identity = normalized_path(QFileInfo(profile).canonicalFilePath());
         const auto server_name =
-            "xlibrary-" + QString::fromLatin1(
-                              QCryptographicHash::hash(profile.toUtf8(), QCryptographicHash::Sha256).toHex().left(24));
+            "xlibrary-" +
+            QString::fromLatin1(
+                QCryptographicHash::hash(profile_identity.toUtf8(), QCryptographicHash::Sha256).toHex().left(24));
         QLockFile instance_lock(profile + "/instance.lock");
         instance_lock.setStaleLockTime(0);
         if (!instance_lock.tryLock(application.arguments().contains("--wait-for-profile") ? 5000 : 0)) {

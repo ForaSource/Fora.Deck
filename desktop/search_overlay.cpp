@@ -41,6 +41,7 @@ SearchOverlay::SearchOverlay(DesktopService &service, QWidget *parent)
     auto *row = new QHBoxLayout;
     row->setSpacing(8);
     input->setObjectName("overlay_search_input");
+    input->setMaxLength(static_cast<int>(catalog_limits::text_length));
     input->setPlaceholderText(QCoreApplication::translate("XLibrary", "Search"));
     input->setAccessibleName(QCoreApplication::translate("XLibrary", "Search applications, calculate or enter a path"));
     input->setToolTip(

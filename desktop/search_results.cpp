@@ -170,8 +170,14 @@ SearchResults::SearchResults(DesktopService &service, QLineEdit &input, bool com
             auto entries = path_watcher.result();
             // Resolve library identities in memory on the GUI thread, preserving launch configurations.
             QHash<QString, qint64> known;
-            for (const auto &record : this->service.model.applications())
-                known.insert(normalized_path(record.path), record.id);
+            for (const auto &record : this->service.model.applications()) {
+                const auto path = normalized_path(record.path);
+                // A file path cannot identify which arguments or working directory the user wants.
+                if (known.contains(path))
+                    known[path] = 0;
+                else
+                    known.insert(path, record.id);
+            }
             for (auto &entry : entries)
                 if (entry.type == search_entry::kind::file) {
                     entry.application_id = known.value(normalized_path(entry.path));

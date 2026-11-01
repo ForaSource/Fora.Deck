@@ -262,7 +262,7 @@ QWidget *navigation(const ui_context &context, QWidget *parent) {
         for (const auto &tag : service->catalog().tags) {
             qsizetype usage = 0;
             for (const auto &record : service->catalog().applications)
-                usage += record.tags.contains(tag, Qt::CaseInsensitive);
+                usage += has_tag(record.tags, tag);
             auto *item = new QListWidgetItem(QString("#%1 (%2)").arg(tag, QString::number(usage)), tags);
             item->setData(Qt::UserRole, tag);
             item->setHidden(!tag.contains(tag_search->text().trimmed(), Qt::CaseInsensitive));
@@ -334,6 +334,7 @@ QWidget *search_bar(const ui_context &context, QWidget *parent) {
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(12);
     auto *search = new SearchInput;
+    search->setMaxLength(static_cast<int>(catalog_limits::text_length));
     search->setObjectName("search_input");
     search->setAccessibleName(
         QCoreApplication::translate("XLibrary", "Search applications, calculate or enter a path"));
@@ -834,6 +835,7 @@ QWidget *details(const ui_context &context, QWidget *parent) {
     root->addSpacing(8);
     root->addWidget(label(QCoreApplication::translate("XLibrary", "Application path"), "muted"));
     auto *path = new QLineEdit;
+    path->setMaxLength(static_cast<int>(catalog_limits::text_length));
     path->setReadOnly(true);
     path->setMinimumWidth(0);
     auto *path_row = new QHBoxLayout;

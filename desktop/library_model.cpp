@@ -252,7 +252,7 @@ bool LibraryFilter::filterAcceptsRow(int row, const QModelIndex &parent) const {
         return false;
     if (section == "running" && !record.running)
         return false;
-    if (!selected_tag.isEmpty() && !record.tags.contains(selected_tag, Qt::CaseInsensitive))
+    if (!selected_tag.isEmpty() && !has_tag(record.tags, selected_tag))
         return false;
     return query_rank(row) >= 0;
 }
