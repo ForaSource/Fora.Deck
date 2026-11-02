@@ -23,11 +23,16 @@ GitHub требует актуальную базу благодаря `strict_r
 | Linux Build | GCC Debug/Release, Clang Debug/Release; Qt 6.8.3; X11/Xvfb startup, CMake install, desktop entry, offscreen startup |
 | Linux Build / packages | Debian 13 и системный Qt; AppImage и DEB, startup offscreen/X11, SHA256, установка и удаление DEB |
 | Workflow Lint | actionlint с проверкой SHA256 инструмента, Python parser упаковщиков, CMake presets, JSON-конфигурация |
+| Prepare Release Draft | Ручной запуск из main, VERSION/SemVer/тег, один SHA; MinGW ZIP/setup, Debian 13 AppImage/DEB, startup/установка/удаление, метаданные и общий SHA256SUMS; только Draft после успеха обеих платформ |
 | Clang Format | Все отслеживаемые C/C++ файлы, clang-format 18.1.8 |
 
 Обычный CI не публикует Release, не создаёт теги и не выполняет deploy.
 Linux-пакеты доступны как artifacts 14 дней; публикация выпуска остаётся отдельным
 решением по [инструкции](../BUILDING.md#github-pre-release).
+Release workflow существует отдельно от обычного CI: подготавливает Draft и тег,
+но **Publish release** выполняется исключительно владельцем вручную.
+Release jobs имеют отдельные таймауты: Validation — 5 минут, сборки — 45,
+Draft — 15. Существующий CI с MinGW и локальные упаковщики сохранены.
 
 ## Время и диагностика
 
