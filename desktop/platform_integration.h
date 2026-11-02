@@ -21,6 +21,7 @@ class LinuxHotkeyState;
 
 namespace desktop_platform {
 QString default_global_shortcut();
+QString default_overlay_shortcut();
 QSet<QString> running_paths(const QVector<app_record> &applications);
 enum class launch_mode { launch, activate, new_instance };
 bool activate_window(const app_record &record);
@@ -44,7 +45,7 @@ class GlobalHotkey : public QObject, public QAbstractNativeEventFilter {
     Q_OBJECT
 private:
     int current_id = 0;
-    int next_id = 1;
+    inline static int next_id = 1;
     QKeySequence sequence;
 #ifdef Q_OS_LINUX
     std::unique_ptr<LinuxHotkeyState> linux_state;

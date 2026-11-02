@@ -2,6 +2,7 @@
 #include <QApplication>
 #include <QCryptographicHash>
 #include <QDir>
+#include <QFileInfo>
 #include <QLocalServer>
 #include <QLocalSocket>
 #include <QLockFile>
@@ -50,9 +51,11 @@ int main(int argc, char *argv[]) {
             throw std::runtime_error(
                 QCoreApplication::translate("XLibrary", "Could not create the XLibrary settings folder.")
                     .toStdString());
+        const auto profile_identity = normalized_path(QFileInfo(profile).canonicalFilePath());
         const auto server_name =
-            "xlibrary-" + QString::fromLatin1(
-                              QCryptographicHash::hash(profile.toUtf8(), QCryptographicHash::Sha256).toHex().left(24));
+            "xlibrary-" +
+            QString::fromLatin1(
+                QCryptographicHash::hash(profile_identity.toUtf8(), QCryptographicHash::Sha256).toHex().left(24));
         QLockFile instance_lock(profile + "/instance.lock");
         instance_lock.setStaleLockTime(0);
         if (!instance_lock.tryLock(application.arguments().contains("--wait-for-profile") ? 5000 : 0)) {
@@ -64,7 +67,7 @@ int main(int argc, char *argv[]) {
             QLocalSocket socket;
             socket.connectToServer(server_name);
             if (socket.waitForConnected(1500)) {
-                socket.write("show");
+                socket.write(application.arguments().contains("--overlay") ? "overlay" : "show");
                 socket.flush();
                 socket.waitForBytesWritten(100);
                 return 0;
@@ -119,9 +122,25 @@ int main(int argc, char *argv[]) {
         }
         QObject::connect(&server, &QLocalServer::newConnection, &window, [&] {
             while (auto *socket = server.nextPendingConnection()) {
-                window.show_library();
-                socket->disconnectFromServer();
-                socket->deleteLater();
+                auto request = std::make_shared<QByteArray>();
+                const auto read_request = [socket, request, &window] {
+                    *request += socket->readAll();
+                    if (*request == "overlay")
+                        window.show_overlay();
+                    else if (*request == "show")
+                        window.show_library();
+                    else if (request->size() < 7)
+                        return;
+                    socket->disconnectFromServer();
+                    socket->deleteLater();
+                };
+                QObject::connect(socket, &QLocalSocket::readyRead, &window, read_request);
+                QObject::connect(socket, &QLocalSocket::disconnected, socket, &QObject::deleteLater);
+                QTimer::singleShot(1500, socket, [socket] {
+                    socket->disconnectFromServer();
+                    socket->deleteLater();
+                });
+                read_request();
             }
         });
         window.start();

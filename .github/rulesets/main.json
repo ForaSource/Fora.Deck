@@ -41,9 +41,7 @@
           {"context": "linux-release"},
           {"context": "linux-clang-debug"},
           {"context": "linux-clang-release"},
-          {"context": "linux-AppImage-and-DEB"},
-          {"context": "Analyze (actions)"},
-          {"context": "Analyze (c-cpp)"}
+          {"context": "linux-AppImage-and-DEB"}
         ]
       }
     }

@@ -97,6 +97,34 @@ void validate_columns(sqlite3 *connection, int version) {
         if (missing.next())
             throw std::runtime_error("Profile contains a card without a launch configuration");
     }
+    if (version >= 4) {
+        SqliteStatement aliases(connection, "SELECT application_id,position,name FROM application_alias LIMIT 0;");
+        aliases.next();
+        require_unique(connection, "application_alias", {"application_id", "position"});
+        require_reference(connection, "application_alias", "application_id", "applications", "CASCADE");
+        SqliteStatement filters(connection,
+                                "SELECT id,name,query,section,tag,sort_mode,sort_order FROM saved_filter LIMIT 0;");
+        filters.next();
+        require_unique(connection, "saved_filter", {"name"});
+        SqliteStatement invalid_filters(connection, R"(
+            SELECT 1 FROM saved_filter WHERE id<=0 OR name IS NULL OR length(trim(name))=0 OR length(name)>128
+                OR instr(name,char(0))>0 OR query IS NULL OR length(query)>32768 OR instr(query,char(0))>0
+                OR section IS NULL OR section NOT IN ('library','favorites','running')
+                OR tag IS NULL OR length(tag)>64 OR instr(tag,char(0))>0
+                OR sort_mode IS NULL OR sort_mode NOT BETWEEN 0 AND 4
+                OR sort_order IS NULL OR sort_order NOT IN (0,1) LIMIT 1;
+        )");
+        if (invalid_filters.next())
+            throw std::runtime_error("Profile contains an invalid saved filter");
+        SqliteStatement invalid_aliases(connection, R"(
+            SELECT 1 FROM application_alias WHERE position<0 OR position IS NULL OR name IS NULL
+                OR length(trim(name))=0 OR length(name)>256 OR instr(name,char(0))>0
+                OR instr(name,char(10))>0 OR instr(name,char(13))>0
+            UNION ALL SELECT 1 FROM application_alias GROUP BY application_id HAVING count(*)>32 LIMIT 1;
+        )");
+        if (invalid_aliases.next())
+            throw std::runtime_error("Profile contains invalid search aliases");
+    }
     check_integrity(connection);
 }
 
@@ -263,7 +291,8 @@ void xlibrary::migrate_profile(sqlite3 *connection, const std::filesystem::path 
             std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch())
                 .count();
         auto backup = path;
-        backup += ".before-schema-v3." + std::to_string(timestamp) + ".bak";
+        backup +=
+            ".before-schema-v" + std::to_string(profile_schema_version) + "." + std::to_string(timestamp) + ".bak";
         backup_database(connection, backup);
     }
     sqlite_execute(connection, "BEGIN IMMEDIATE;");
@@ -280,6 +309,20 @@ void xlibrary::migrate_profile(sqlite3 *connection, const std::filesystem::path 
                 break;
             case 2:
                 migrate_identity(connection);
+                break;
+            case 3:
+                sqlite_execute(connection, R"(
+                    CREATE TABLE application_alias(
+                        application_id INTEGER NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
+                        position INTEGER NOT NULL, name TEXT NOT NULL,
+                        PRIMARY KEY(application_id,position));
+                    CREATE TABLE saved_filter(
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+                        query TEXT NOT NULL, section TEXT NOT NULL, tag TEXT NOT NULL,
+                        sort_mode INTEGER NOT NULL CHECK(sort_mode BETWEEN 0 AND 4),
+                        sort_order INTEGER NOT NULL CHECK(sort_order IN (0,1)));
+                )");
                 break;
             default:
                 throw std::runtime_error("Missing profile migration");

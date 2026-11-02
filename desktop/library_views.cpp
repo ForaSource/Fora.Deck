@@ -29,6 +29,8 @@
 #include "localization.h"
 #include "notification_banner.h"
 #include "profile_view.h"
+#include "search_results.h"
+#include "search_tools.h"
 #include "selection_button.h"
 #include "ui_helpers.h"
 
@@ -244,6 +246,10 @@ QWidget *navigation(const ui_context &context, QWidget *parent) {
     }
     layout->addSpacing(20);
     layout->addWidget(label(QCoreApplication::translate("XLibrary", "My tags"), "muted"));
+    auto *tag_search = new QLineEdit;
+    tag_search->setPlaceholderText(QCoreApplication::translate("XLibrary", "Search tags"));
+    tag_search->setAccessibleName(tag_search->placeholderText());
+    layout->addWidget(tag_search);
     auto *tags = new QListWidget;
     tags->setObjectName("tag_list");
     tags->setProperty("panel", true);
@@ -251,16 +257,25 @@ QWidget *navigation(const ui_context &context, QWidget *parent) {
     layout->addWidget(tags, 1);
     auto rebuild = [=] {
         const QSignalBlocker blocker(tags);
-        const auto current = tags->currentItem() ? tags->currentItem()->text() : QString{};
+        const auto current = service->tag();
         tags->clear();
         for (const auto &tag : service->catalog().tags) {
-            auto *item = new QListWidgetItem('#' + tag, tags);
+            qsizetype usage = 0;
+            for (const auto &record : service->catalog().applications)
+                usage += has_tag(record.tags, tag);
+            auto *item = new QListWidgetItem(QString("#%1 (%2)").arg(tag, QString::number(usage)), tags);
             item->setData(Qt::UserRole, tag);
+            item->setHidden(!tag.contains(tag_search->text().trimmed(), Qt::CaseInsensitive));
             item->setSizeHint({100, appearance::scaled(*context.settings, 36)});
-            if (item->text() == current)
+            if (tag == current)
                 tags->setCurrentItem(item);
         }
     };
+    QObject::connect(tag_search, &QLineEdit::textChanged, widget, [=](const QString &text) {
+        for (int row = 0; row < tags->count(); ++row)
+            tags->item(row)->setHidden(
+                !tags->item(row)->data(Qt::UserRole).toString().contains(text.trimmed(), Qt::CaseInsensitive));
+    });
     QObject::connect(service, &DesktopService::catalog_changed, widget, rebuild);
     QObject::connect(service, &DesktopService::navigation_changed, widget, [=] {
         group->setExclusive(false);
@@ -294,9 +309,11 @@ QWidget *navigation(const ui_context &context, QWidget *parent) {
             edit_context.parameters.insert("tag", tag);
             open_dialog("tag_editor", edit_context);
         }
-        if (chosen == remove && confirm(widget, QCoreApplication::translate("XLibrary", "Remove tag"),
-                                        QCoreApplication::translate("XLibrary", "Remove #") + tag +
-                                            QCoreApplication::translate("XLibrary", " from all applications?")))
+        if (chosen == remove &&
+            confirm(widget, QCoreApplication::translate("XLibrary", "Remove tag"),
+                    QCoreApplication::translate("XLibrary", "Remove #") + tag +
+                        QCoreApplication::translate(
+                            "XLibrary", " from all applications? Saved filters will also stop using this tag.")))
             service->remove_tag(tag);
     });
     layout->addWidget(action_button(context.actions.value("add_tag"), true));
@@ -309,13 +326,19 @@ QWidget *navigation(const ui_context &context, QWidget *parent) {
 QWidget *search_bar(const ui_context &context, QWidget *parent) {
     auto *service = static_cast<DesktopService *>(context.service);
     auto *widget = new QWidget(parent);
-    auto *layout = new QHBoxLayout(widget);
+    auto *root = new QVBoxLayout(widget);
+    root->setContentsMargins(0, 0, 0, 0);
+    root->setSpacing(4);
+    auto *layout = new QHBoxLayout;
+    root->addLayout(layout);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(12);
     auto *search = new SearchInput;
+    search->setMaxLength(static_cast<int>(catalog_limits::text_length));
     search->setObjectName("search_input");
-    search->setAccessibleName(QCoreApplication::translate("XLibrary", "Search applications and tags"));
-    search->setPlaceholderText(QCoreApplication::translate("XLibrary", "Find an application or #tag"));
+    search->setAccessibleName(
+        QCoreApplication::translate("XLibrary", "Search applications, calculate or enter a path"));
+    search->setPlaceholderText(QCoreApplication::translate("XLibrary", "Search, calculate or enter a path"));
     search->setClearButtonEnabled(true);
     search->setMinimumHeight(26);
     search->addAction(appearance::icon("search"), QLineEdit::LeadingPosition);
@@ -323,6 +346,12 @@ QWidget *search_bar(const ui_context &context, QWidget *parent) {
     timer->setInterval(35);
     timer->setSingleShot(true);
     QObject::connect(search, &QLineEdit::textChanged, timer, qOverload<>(&QTimer::start));
+    QObject::connect(&service->filter, &LibraryFilter::query_changed, search, [=](const QString &text) {
+        if (search->text() != text) {
+            search->setText(text);
+            timer->stop();
+        }
+    });
     QObject::connect(timer, &QTimer::timeout, widget, [=] { service->filter.set_query(search->text()); });
     QObject::connect(context.actions.value("focus_search"), &QAction::triggered, search, [=] {
         search->setFocus();
@@ -353,6 +382,8 @@ QWidget *search_bar(const ui_context &context, QWidget *parent) {
     settings->setAccessibleName(QCoreApplication::translate("XLibrary", "Settings"));
     settings->setFixedWidth(44);
     layout->addWidget(settings);
+    root->addWidget(new SearchResults(*service, *search, false, widget));
+    root->addWidget(search_tools(*service, *search, widget));
     return widget;
 }
 
@@ -513,7 +544,7 @@ QWidget *library(const ui_context &context, QWidget *parent) {
     view->setUniformRowHeights(true);
     view->setAllColumnsShowFocus(true);
     view->setSelectionBehavior(QAbstractItemView::SelectRows);
-    view->setSelectionMode(QAbstractItemView::SingleSelection);
+    view->setSelectionMode(QAbstractItemView::ExtendedSelection);
     view->setEditTriggers(QAbstractItemView::NoEditTriggers);
     view->setMouseTracking(true);
     view->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
@@ -561,6 +592,13 @@ QWidget *library(const ui_context &context, QWidget *parent) {
     empty_actions_layout->addWidget(action_button(context.actions.value("add_application")));
     empty_actions_layout->addWidget(action_button(context.actions.value("discover")));
     empty_layout->addWidget(empty_actions, 0, Qt::AlignHCenter);
+    auto *reset_filters = button(QCoreApplication::translate("XLibrary", "Clear all filters"));
+    empty_layout->addWidget(reset_filters, 0, Qt::AlignHCenter);
+    QObject::connect(reset_filters, &QPushButton::clicked, widget, [=] {
+        service->clear_filters();
+        if (auto *input = context.window->findChild<QLineEdit *>("search_input"))
+            input->setFocus();
+    });
     hint->setWordWrap(true);
     hint->setTextFormat(Qt::PlainText);
     hint->setTextInteractionFlags(Qt::TextSelectableByMouse);
@@ -629,12 +667,42 @@ QWidget *library(const ui_context &context, QWidget *parent) {
     auto *details = action_button(context.actions.value("details"), true);
     footer->addWidget(details);
     root->addLayout(footer);
+    auto *selection_tools = new QHBoxLayout;
+    auto *selected_count = label({});
+    selection_tools->addWidget(selected_count, 1);
+    auto *clear_selection = button(QCoreApplication::translate("XLibrary", "Clear selection"));
+    selection_tools->addWidget(clear_selection);
+    selection_tools->addWidget(action_button(context.actions.value("bulk_edit")));
+    selection_tools->addWidget(action_button(context.actions.value("undo_removal")));
+    root->addLayout(selection_tools);
+    const auto synchronize_selection = [=] {
+        QVector<qint64> ids;
+        for (const auto &index : view->selectionModel()->selectedRows())
+            ids.append(index.data(LibraryModel::id_role).toLongLong());
+        service->select_applications(ids);
+        const auto current_id = view->currentIndex().data(LibraryModel::id_role).toLongLong();
+        service->select(ids.contains(current_id) ? current_id : ids.value(0));
+        selected_count->setText(QCoreApplication::translate("XLibrary", "Selected applications: %1").arg(ids.size()));
+        clear_selection->setEnabled(!ids.isEmpty());
+    };
+    auto resetting = std::make_shared<bool>(false);
+    QObject::connect(&service->filter, &QAbstractItemModel::modelAboutToBeReset, widget, [=] { *resetting = true; });
+    QObject::connect(view->selectionModel(), &QItemSelectionModel::selectionChanged, widget, [=] {
+        if (!*resetting)
+            synchronize_selection();
+    });
+    QObject::connect(clear_selection, &QPushButton::clicked, widget, [=] {
+        view->selectionModel()->clear();
+        service->select(0);
+        synchronize_selection();
+    });
     auto update = [=] {
         const bool has_rows = service->filter.rowCount() > 0;
         const bool no_apps = service->is_ready() && service->model.rowCount() == 0;
         const auto *previous_page = stack->currentWidget();
         stack->setCurrentWidget(has_rows ? static_cast<QWidget *>(view) : empty);
         empty_actions->setVisible(no_apps);
+        reset_filters->setVisible(service->is_ready() && !no_apps);
         const bool failed = !service->is_ready() && !service->is_opening() && !service->library_error().isEmpty();
         recovery_actions->setVisible(failed || service->restart_required());
         update_recovery();
@@ -662,6 +730,9 @@ QWidget *library(const ui_context &context, QWidget *parent) {
         if (previous_page != stack->currentWidget())
             library_transition->start();
         if (!has_rows) {
+            *resetting = false;
+            view->selectionModel()->clear();
+            synchronize_selection();
             service->select(0);
             return;
         }
@@ -675,14 +746,28 @@ QWidget *library(const ui_context &context, QWidget *parent) {
         }
         if (!target.isValid())
             target = service->filter.index(0, 0);
+        if (*resetting) {
+            const QSignalBlocker blocker(view->selectionModel());
+            for (int row = 0; row < service->filter.rowCount(); ++row) {
+                const auto index = service->filter.index(row, 0);
+                if (service->selections().contains(index.data(LibraryModel::id_role).toLongLong()))
+                    view->selectionModel()->select(index, QItemSelectionModel::Select | QItemSelectionModel::Rows);
+            }
+            *resetting = false;
+        }
         if (view->currentIndex().siblingAtColumn(0) != target)
-            view->setCurrentIndex(target);
+            view->selectionModel()->setCurrentIndex(target, QItemSelectionModel::NoUpdate);
+        if (view->selectionModel()->selectedRows().isEmpty())
+            view->selectionModel()->select(target, QItemSelectionModel::Select | QItemSelectionModel::Rows);
         service->select(target.data(LibraryModel::id_role).toLongLong());
+        synchronize_selection();
     };
     QObject::connect(view->selectionModel(), &QItemSelectionModel::currentChanged, widget,
                      [=](const QModelIndex &index) {
-                         if (index.isValid())
+                         if (index.isValid() && view->selectionModel()->isRowSelected(index.row(), {}))
                              service->select(index.data(LibraryModel::id_role).toLongLong());
+                         else if (!*resetting)
+                             service->select(service->selections().value(0));
                      });
     QObject::connect(view, &QTreeView::doubleClicked, widget, [=](const QModelIndex &index) {
         service->launch(index.data(LibraryModel::id_role).toLongLong());
@@ -691,7 +776,10 @@ QWidget *library(const ui_context &context, QWidget *parent) {
         const auto index = view->indexAt(position);
         if (!index.isValid())
             return;
-        view->setCurrentIndex(index);
+        if (!view->selectionModel()->isRowSelected(index.row(), {}))
+            view->setCurrentIndex(index);
+        else
+            view->selectionModel()->setCurrentIndex(index, QItemSelectionModel::NoUpdate);
         service->select(index.data(LibraryModel::id_role).toLongLong());
         auto *menu_widget = context.registry->create("application_menu", context, view);
         if (auto *menu = qobject_cast<QMenu *>(menu_widget))
@@ -747,6 +835,7 @@ QWidget *details(const ui_context &context, QWidget *parent) {
     root->addSpacing(8);
     root->addWidget(label(QCoreApplication::translate("XLibrary", "Application path"), "muted"));
     auto *path = new QLineEdit;
+    path->setMaxLength(static_cast<int>(catalog_limits::text_length));
     path->setReadOnly(true);
     path->setMinimumWidth(0);
     auto *path_row = new QHBoxLayout;
@@ -764,7 +853,13 @@ QWidget *details(const ui_context &context, QWidget *parent) {
             select_application_replacement(service, *record, contents);
     });
     auto *arguments = label("", "muted");
+    arguments->setTextInteractionFlags(Qt::TextSelectableByMouse);
     root->addWidget(arguments);
+    root->addWidget(action_button(context.actions.value("copy_arguments"), true));
+    auto *source = label({}, "muted");
+    source->setWordWrap(true);
+    source->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    root->addWidget(source);
     root->addSpacing(8);
     auto *launch = action_button(context.actions.value("launch"));
     launch->setProperty("primary", true);
@@ -780,11 +875,17 @@ QWidget *details(const ui_context &context, QWidget *parent) {
         name->setText(record ? record->name : QCoreApplication::translate("XLibrary", "Select an application"));
         status->setText(record ? record->running     ? QCoreApplication::translate("XLibrary", "● Running")
                                  : record->available ? QCoreApplication::translate("XLibrary", "Not running")
-                                                     : QCoreApplication::translate("XLibrary", "File unavailable")
+                                 : record->volume_unavailable
+                                     ? QCoreApplication::translate("XLibrary", "Drive disconnected or unavailable")
+                                     : QCoreApplication::translate("XLibrary", "File unavailable; the entry is kept")
                                : QCoreApplication::translate("XLibrary", "Details will appear here."));
         tags->setText(record && !record->tags.isEmpty() ? '#' + record->tags.join("   #")
                                                         : QCoreApplication::translate("XLibrary", "No tags"));
         path->setText(record ? QDir::toNativeSeparators(record->path) : QString{});
+        source->setText(
+            record && !record->discovery_sources.isEmpty()
+                ? QCoreApplication::translate("XLibrary", "Source: %1").arg(record->discovery_sources.join('\n'))
+                : QCoreApplication::translate("XLibrary", "Source: manually added or imported"));
         path->setCursorPosition(0);
         path->setToolTip(path->text());
         recover_path->setVisible(record && !record->available);
@@ -821,7 +922,8 @@ QWidget *details(const ui_context &context, QWidget *parent) {
 
 QWidget *application_menu(const ui_context &context, QWidget *parent) {
     auto *menu = new QMenu(parent);
-    for (const auto &id : {"launch", "new_instance", "open_folder", "copy_path", "favorite", "edit_application"})
+    for (const auto &id : {"launch", "new_instance", "open_folder", "copy_path", "copy_arguments", "favorite",
+                           "edit_application", "bulk_edit", "undo_removal"})
         menu->addAction(context.actions.value(id));
     auto *service = static_cast<DesktopService *>(context.service);
     if (const auto *record = service->selected(); record && !record->available) {

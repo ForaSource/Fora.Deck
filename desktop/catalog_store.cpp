@@ -12,6 +12,7 @@
 #include "localization.h"
 #include "path_helpers.h"
 #include "ProfileSchema.h"
+#include "search_query.h"
 
 void CatalogStore::validate_application(const app_record &record) {
     if (record.name.trimmed().isEmpty() || record.name.size() > 256 || !QFileInfo(record.path).isAbsolute() ||
@@ -36,6 +37,17 @@ void CatalogStore::validate_application(const app_record &record) {
             QCoreApplication::translate("XLibrary", "Paths and arguments: up to 32768 characters; tags: up to 256.")
                 .toStdString());
     }
+    if (record.aliases.size() > 32)
+        throw std::invalid_argument(
+            QCoreApplication::translate("XLibrary", "Use up to 32 aliases, each on one line with up to 256 characters.")
+                .toStdString());
+    for (const auto &alias : record.aliases)
+        if (alias.trimmed().isEmpty() || alias.size() > 256 || alias.contains(QChar::Null) || alias.contains('\n') ||
+            alias.contains('\r'))
+            throw std::invalid_argument(
+                QCoreApplication::translate("XLibrary",
+                                            "Use up to 32 aliases, each on one line with up to 256 characters.")
+                    .toStdString());
     for (const auto &tag : record.tags) {
         if (!valid_tag_name(tag))
             throw std::invalid_argument(
@@ -225,6 +237,19 @@ catalog_snapshot CatalogStore::read() const {
         rows.insert(record.id, result.applications.size());
         result.applications.append(std::move(record));
     }
+    Statement aliases(connection,
+                      "SELECT application_id,name FROM application_alias ORDER BY application_id,position;");
+    while (aliases.next()) {
+        const auto row = rows.constFind(aliases.number(0));
+        if (row != rows.cend())
+            result.applications[*row].aliases.append(aliases.text(1));
+    }
+    Statement filters(
+        connection,
+        "SELECT id,name,query,section,tag,sort_mode,sort_order FROM saved_filter ORDER BY name COLLATE NOCASE,id;");
+    while (filters.next())
+        result.filters.append({filters.number(0), filters.text(1), filters.text(2), filters.text(3), filters.text(4),
+                               static_cast<int>(filters.number(5)), static_cast<Qt::SortOrder>(filters.number(6))});
     Statement sources(connection, "SELECT a.id,s.source_key FROM applications a JOIN discovery_source s "
                                   "ON s.configuration_id=a.configuration_id ORDER BY s.kind,s.source_key;");
     while (sources.next()) {
@@ -272,17 +297,31 @@ void CatalogStore::write_metadata(qint64 id, const app_record &record) {
     metadata.bind(1, id);
     metadata.bind(2, record.favorite);
     metadata.next();
+    Statement clear_aliases(connection, "DELETE FROM application_alias WHERE application_id=?;");
+    clear_aliases.bind(1, id);
+    clear_aliases.next();
+    for (qsizetype position = 0; position < record.aliases.size(); ++position) {
+        Statement alias(connection, "INSERT INTO application_alias(application_id,position,name) VALUES(?,?,?);");
+        alias.bind(1, id);
+        alias.bind(2, static_cast<qint64>(position));
+        alias.bind(3, record.aliases[position]);
+        alias.next();
+    }
     Statement clear(connection, "DELETE FROM application_tags WHERE application_id = ?;");
     clear.bind(1, id);
     clear.next();
     QHash<QString, QString> known_tags;
+    QSet<QString> existing_tag_names;
     Statement existing_tags(connection, "SELECT name FROM tags;");
     while (existing_tags.next()) {
         const auto name = existing_tags.text(0);
-        known_tags.insert(name.toCaseFolded(), name);
+        known_tags.insert(tag_name_key(name), name);
+        existing_tag_names.insert(name);
     }
     for (const auto &tag : record.tags) {
-        const auto canonical_tag = known_tags.value(tag.toCaseFolded(), tag);
+        const auto key = tag_name_key(tag);
+        // Preserve exact assignments in older profiles that already contain equivalent spellings.
+        const auto canonical_tag = existing_tag_names.contains(tag) ? tag : known_tags.value(key, tag);
         Statement create(connection, "INSERT OR IGNORE INTO tags(name) VALUES(?);");
         create.bind(1, canonical_tag);
         create.next();
@@ -290,7 +329,8 @@ void CatalogStore::write_metadata(qint64 id, const app_record &record) {
         link.bind(1, id);
         link.bind(2, canonical_tag);
         link.next();
-        known_tags.insert(tag.toCaseFolded(), canonical_tag);
+        known_tags.insert(key, canonical_tag);
+        existing_tag_names.insert(canonical_tag);
     }
 }
 
@@ -341,9 +381,197 @@ qint64 CatalogStore::save_application(const app_record &record) {
 }
 
 void CatalogStore::remove_application(qint64 id) {
-    Statement statement(database.get_connection(), "DELETE FROM applications WHERE id = ?;");
-    statement.bind(1, id);
-    statement.next();
+    remove_applications({id});
+}
+
+void CatalogStore::remove_applications(const QVector<qint64> &ids) {
+    const QSet<qint64> selected(ids.cbegin(), ids.cend());
+    if (selected.isEmpty())
+        return;
+    auto *connection = database.get_connection();
+    Transaction transaction(connection);
+    auto backup = read();
+    QHash<qint64, qint64> configurations;
+    for (const auto &record : backup.applications)
+        configurations.insert(record.id, record.configuration_id);
+    backup.applications.erase(std::remove_if(backup.applications.begin(), backup.applications.end(),
+                                             [&](const app_record &record) { return !selected.contains(record.id); }),
+                              backup.applications.end());
+    if (backup.applications.size() != selected.size())
+        throw std::invalid_argument(
+            QCoreApplication::translate("XLibrary", "The selection changed. Select applications again.").toStdString());
+    backup.scenarios.erase(std::remove_if(backup.scenarios.begin(), backup.scenarios.end(),
+                                          [&](const scenario_record &record) {
+                                              return std::none_of(record.steps.cbegin(), record.steps.cend(),
+                                                                  [&](const scenario_step &step) {
+                                                                      return selected.contains(step.application_id);
+                                                                  });
+                                          }),
+                           backup.scenarios.end());
+    for (const auto id : selected) {
+        Statement statement(connection, "DELETE FROM applications WHERE id=?;");
+        statement.bind(1, id);
+        statement.next();
+    }
+    transaction.commit();
+    last_removal = std::move(backup);
+    removal_configurations = std::move(configurations);
+}
+
+void CatalogStore::undo_removal() {
+    if (!can_undo_removal())
+        return;
+    auto *connection = database.get_connection();
+    Transaction transaction(connection);
+    const auto current = read();
+    QSet<qint64> deleted_ids;
+    for (const auto &record : last_removal.applications)
+        deleted_ids.insert(record.id);
+    const auto fail = [] {
+        throw std::invalid_argument(
+            QCoreApplication::translate("XLibrary",
+                                        "The library or a linked scenario changed. Undo would overwrite changes.")
+                .toStdString());
+    };
+    for (const auto &before : last_removal.scenarios) {
+        const auto now = std::find_if(current.scenarios.cbegin(), current.scenarios.cend(),
+                                      [&](const scenario_record &record) { return record.id == before.id; });
+        if (now == current.scenarios.cend())
+            fail();
+        qsizetype index = 0;
+        for (const auto &step : before.steps) {
+            if (deleted_ids.contains(step.application_id))
+                continue;
+            if (index >= now->steps.size())
+                fail();
+            const auto &other = now->steps[index++];
+            if (step.application_id != other.application_id || step.delay_ms != other.delay_ms ||
+                step.enabled != other.enabled)
+                fail();
+        }
+        if (index != now->steps.size())
+            fail();
+    }
+    for (const auto &record : last_removal.applications) {
+        Statement conflict(connection, "SELECT id FROM applications WHERE id=? OR configuration_id=?;");
+        conflict.bind(1, record.id);
+        conflict.bind(2, record.configuration_id);
+        while (conflict.next())
+            if (conflict.number(0) == record.id ||
+                removal_configurations.value(conflict.number(0)) != record.configuration_id)
+                fail();
+        Statement insert(connection, "INSERT INTO applications(id,name,configuration_id) VALUES(?,?,?);");
+        insert.bind(1, record.id);
+        insert.bind(2, record.name);
+        insert.bind(3, record.configuration_id);
+        insert.next();
+        write_metadata(record.id, record);
+        Statement history(connection, "UPDATE desktop_application SET last_launch=? WHERE application_id=?;");
+        history.bind(1, record.last_launch);
+        history.bind(2, record.id);
+        history.next();
+    }
+    for (const auto &scenario : last_removal.scenarios) {
+        Statement clear(connection, "DELETE FROM desktop_scenario_step WHERE scenario_id=?;");
+        clear.bind(1, scenario.id);
+        clear.next();
+        for (qsizetype index = 0; index < scenario.steps.size(); ++index) {
+            const auto &step = scenario.steps[index];
+            Statement insert(connection, "INSERT INTO desktop_scenario_step VALUES(?,?,?,?,?);");
+            insert.bind(1, scenario.id);
+            insert.bind(2, index);
+            insert.bind(3, step.application_id);
+            insert.bind(4, step.delay_ms);
+            insert.bind(5, step.enabled);
+            insert.next();
+        }
+    }
+    transaction.commit();
+    last_removal = {};
+    removal_configurations.clear();
+}
+
+void CatalogStore::update_metadata(const QVector<qint64> &ids, const QStringList &add_tags,
+                                   const QStringList &remove_tags, int favorite) {
+    const QSet<qint64> selected(ids.cbegin(), ids.cend());
+    if (selected.isEmpty())
+        return;
+    Transaction transaction(database.get_connection());
+    const auto current = read();
+    qsizetype updated_count = 0;
+    for (auto record : current.applications) {
+        if (!selected.contains(record.id))
+            continue;
+        for (const auto &tag : remove_tags)
+            record.tags.removeIf([&](const QString &name) { return tag_name_key(name) == tag_name_key(tag); });
+        for (const auto &tag : add_tags)
+            if (!has_tag(record.tags, tag))
+                record.tags.append(tag);
+        if (favorite >= 0)
+            record.favorite = favorite != 0;
+        validate_application(record);
+        write_metadata(record.id, record);
+        ++updated_count;
+    }
+    if (updated_count != selected.size())
+        throw std::invalid_argument(
+            QCoreApplication::translate("XLibrary", "The selection changed. Select applications again.").toStdString());
+    transaction.commit();
+}
+
+void CatalogStore::save_filter(const saved_filter &record) {
+    if (record.name.trimmed().isEmpty() || record.name.size() > 128 || record.name.contains(QChar::Null) ||
+        record.query.size() > catalog_limits::text_length || record.query.contains(QChar::Null) ||
+        (record.section != "library" && record.section != "favorites" && record.section != "running") ||
+        (!record.tag.isEmpty() && !valid_tag_name(record.tag)) || record.sort_mode < 0 || record.sort_mode > 4 ||
+        (record.sort_order != Qt::AscendingOrder && record.sort_order != Qt::DescendingOrder))
+        throw std::invalid_argument(QCoreApplication::translate("XLibrary", "Invalid saved filter.").toStdString());
+    Transaction transaction(database.get_connection());
+    Statement names(database.get_connection(), "SELECT id,name FROM saved_filter;");
+    while (names.next())
+        if (names.number(0) != record.id && names.text(1).toCaseFolded() == record.name.toCaseFolded())
+            throw std::invalid_argument(
+                QCoreApplication::translate("XLibrary", "A filter with this name already exists.").toStdString());
+    Statement write(database.get_connection(),
+                    record.id
+                        ? "UPDATE saved_filter SET name=?,query=?,section=?,tag=?,sort_mode=?,sort_order=? WHERE id=?;"
+                        : "INSERT INTO saved_filter(name,query,section,tag,sort_mode,sort_order) VALUES(?,?,?,?,?,?);");
+    write.bind(1, record.name);
+    write.bind(2, record.query);
+    write.bind(3, record.section);
+    write.bind(4, record.tag);
+    write.bind(5, record.sort_mode);
+    write.bind(6, static_cast<int>(record.sort_order));
+    if (record.id)
+        write.bind(7, record.id);
+    write.next();
+    transaction.commit();
+}
+
+void CatalogStore::remove_filter(qint64 id) {
+    Statement remove(database.get_connection(), "DELETE FROM saved_filter WHERE id=?;");
+    remove.bind(1, id);
+    remove.next();
+}
+
+void CatalogStore::update_filter_tags(const QString &old_name, const QString &new_name) {
+    if (old_name.isEmpty())
+        return;
+    Statement filters(database.get_connection(), "SELECT id,query,tag FROM saved_filter;");
+    while (filters.next()) {
+        const auto query = search_query::rewrite_tag(filters.text(1), old_name, new_name);
+        if (query.size() > catalog_limits::text_length)
+            throw std::invalid_argument(
+                QCoreApplication::translate("XLibrary", "Renaming this tag would make a saved filter query too long "
+                                                        "(maximum 32768 characters).")
+                    .toStdString());
+        const auto tag = tag_name_key(filters.text(2)) == tag_name_key(old_name) ? new_name : filters.text(2);
+        Statement update(database.get_connection(), "UPDATE saved_filter SET query=?,tag=? WHERE id=?;");
+        update.bind(1, query);
+        update.bind(2, tag);
+        update.bind(3, filters.number(0));
+        update.next();
+    }
 }
 
 void CatalogStore::save_tag(const QString &old_name, const QString &new_name) {
@@ -352,7 +580,7 @@ void CatalogStore::save_tag(const QString &old_name, const QString &new_name) {
     Transaction transaction(database.get_connection());
     Statement existing(database.get_connection(), "SELECT name FROM tags;");
     while (existing.next()) {
-        if (existing.text(0) != old_name && existing.text(0).compare(new_name, Qt::CaseInsensitive) == 0) {
+        if (existing.text(0) != old_name && tag_name_key(existing.text(0)) == tag_name_key(new_name)) {
             throw std::invalid_argument(
                 QCoreApplication::translate("XLibrary", "A tag with this name already exists.").toStdString());
         }
@@ -364,13 +592,17 @@ void CatalogStore::save_tag(const QString &old_name, const QString &new_name) {
         statement.bind(2, old_name);
     }
     statement.next();
+    update_filter_tags(old_name, new_name);
     transaction.commit();
 }
 
 void CatalogStore::remove_tag(const QString &name) {
+    Transaction transaction(database.get_connection());
     Statement statement(database.get_connection(), "DELETE FROM tags WHERE name = ?;");
     statement.bind(1, name);
     statement.next();
+    update_filter_tags(name, {});
+    transaction.commit();
 }
 
 qint64 CatalogStore::save_scenario(const scenario_record &record) {
@@ -436,7 +668,7 @@ void CatalogStore::clear_history() {
 
 catalog_import_result CatalogStore::import_records(const QVector<app_record> &records, discovery_control *control,
                                                    const std::function<void(qsizetype, qsizetype)> &progress,
-                                                   QVector<discovery_issue> *issues) {
+                                                   QVector<discovery_issue> *issues, import_conflict_policy policy) {
     QVector<const app_record *> candidates;
     candidates.reserve(records.size());
     for (const auto &record : records) {
@@ -467,6 +699,16 @@ catalog_import_result CatalogStore::import_records(const QVector<app_record> &re
         Statement duplicate(database.get_connection(), "SELECT id FROM applications WHERE configuration_id=? LIMIT 1;");
         duplicate.bind(1, configuration_id);
         if (duplicate.next()) {
+            if (policy == import_conflict_policy::replace_metadata) {
+                const auto id = duplicate.number(0);
+                Statement update(database.get_connection(), "UPDATE applications SET name=? WHERE id=?;");
+                update.bind(1, record.name);
+                update.bind(2, id);
+                update.next();
+                write_metadata(id, record);
+                ++result.updated;
+                continue;
+            }
             ++result.duplicates;
             if (issues)
                 issues->append(discovery_issue{

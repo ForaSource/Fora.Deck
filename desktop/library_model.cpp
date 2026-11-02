@@ -1,7 +1,6 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QFutureWatcher>
-#include <QRegularExpression>
 #include <QtConcurrent/QtConcurrentRun>
 #include <QTimer>
 
@@ -74,9 +73,10 @@ QVariant LibraryModel::data(const QModelIndex &index, int requested_role) const 
             return record.name;
         if (index.column() == 1)
             return record.tags.join(", ");
-        return record.running     ? QCoreApplication::translate("XLibrary", "Running")
-               : record.available ? QCoreApplication::translate("XLibrary", "Not running")
-                                  : QCoreApplication::translate("XLibrary", "Unavailable");
+        return record.running              ? QCoreApplication::translate("XLibrary", "Running")
+               : record.available          ? QCoreApplication::translate("XLibrary", "Not running")
+               : record.volume_unavailable ? QCoreApplication::translate("XLibrary", "Drive unavailable")
+                                           : QCoreApplication::translate("XLibrary", "Unavailable");
     case Qt::ToolTipRole:
         return record.name + '\n' + QDir::toNativeSeparators(record.path);
     case Qt::DecorationRole:
@@ -152,9 +152,11 @@ void LibraryModel::update_state(const QVector<app_record> &applications) {
         auto &record = records[row];
         const auto *state = states.value(record.id);
         if (state && (record.running != state->running || record.available != state->available ||
+                      record.volume_unavailable != state->volume_unavailable ||
                       record.new_instance_error != state->new_instance_error)) {
             record.running = state->running;
             record.available = state->available;
+            record.volume_unavailable = state->volume_unavailable;
             record.new_instance_error = state->new_instance_error;
             emit dataChanged(index(row, 0), index(row, 2),
                              {Qt::DisplayRole, running_role, available_role, record_role});
@@ -177,15 +179,36 @@ LibraryFilter::LibraryFilter(QObject *parent) : QSortFilterProxyModel(parent) {
 }
 
 void LibraryFilter::set_query(const QString &query) {
-#if QT_VERSION >= QT_VERSION_CHECK(6, 10, 0)
-    beginFilterChange();
-#endif
-    terms = query.toCaseFolded().split(QRegularExpression("\\s+"), Qt::SkipEmptyParts);
-#if QT_VERSION >= QT_VERSION_CHECK(6, 10, 0)
-    endFilterChange(Direction::Rows);
-#else
-    invalidateFilter();
-#endif
+    if (query_text == query) {
+        emit query_changed(query_text);
+        return;
+    }
+    query_text = query;
+    this->query = SearchQuery(query);
+    query_ranks.clear();
+    // Relevance can change even when the set of accepted rows stays the same.
+    invalidate();
+    emit query_changed(query_text);
+}
+
+void LibraryFilter::setSourceModel(QAbstractItemModel *model) {
+    disconnect(reset_connection);
+    query_ranks.clear();
+    if (model)
+        reset_connection =
+            connect(model, &QAbstractItemModel::modelAboutToBeReset, this, [this] { query_ranks.clear(); });
+    QSortFilterProxyModel::setSourceModel(model);
+}
+
+int LibraryFilter::query_rank(int row) const {
+    const auto *model = static_cast<const LibraryModel *>(sourceModel());
+    if (query_ranks.size() != model->rowCount())
+        query_ranks.fill(-2, model->rowCount());
+    auto &rank = query_ranks[row];
+    if (rank == -2)
+        rank =
+            query.rank(model->search_name(row), model->search_path(row), model->at(row).tags, model->at(row).aliases);
+    return rank;
 }
 
 void LibraryFilter::set_section(const QString &value, const QString &tag) {
@@ -229,26 +252,21 @@ bool LibraryFilter::filterAcceptsRow(int row, const QModelIndex &parent) const {
         return false;
     if (section == "running" && !record.running)
         return false;
-    if (!selected_tag.isEmpty() && !record.tags.contains(selected_tag, Qt::CaseInsensitive))
+    if (!selected_tag.isEmpty() && !has_tag(record.tags, selected_tag))
         return false;
-    for (const auto &term : terms) {
-        if (term.startsWith("-#")) {
-            if (record.tags.contains(term.mid(2), Qt::CaseInsensitive))
-                return false;
-        } else if (term.startsWith('#')) {
-            if (!record.tags.contains(term.mid(1), Qt::CaseInsensitive))
-                return false;
-        } else if (!model->search_name(row).contains(term) && !model->search_path(row).contains(term)) {
-            return false;
-        }
-    }
-    return true;
+    return query_rank(row) >= 0;
 }
 
 bool LibraryFilter::lessThan(const QModelIndex &left, const QModelIndex &right) const {
     const auto *model = static_cast<const LibraryModel *>(sourceModel());
     const auto &a = model->at(left.row());
     const auto &b = model->at(right.row());
+    if (query.has_text()) {
+        const auto a_rank = query_rank(left.row());
+        const auto b_rank = query_rank(right.row());
+        if (a_rank != b_rank)
+            return sortOrder() == Qt::AscendingOrder ? a_rank < b_rank : a_rank > b_rank;
+    }
     if (sort_mode == 3) {
         const auto &a_tags = model->tag_names(left.row());
         const auto &b_tags = model->tag_names(right.row());

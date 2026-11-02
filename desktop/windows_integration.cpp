@@ -8,6 +8,7 @@
 #include <QDesktopServices>
 #include <QDirIterator>
 #include <QFileInfo>
+#include <QRegularExpression>
 #include <QSettings>
 #include <QUrl>
 #include <QWidget>
@@ -129,6 +130,10 @@ public:
 }
 
 QString desktop_platform::default_global_shortcut() {
+    return "Ctrl+Alt+Shift+Space";
+}
+
+QString desktop_platform::default_overlay_shortcut() {
     return "Ctrl+Alt+Space";
 }
 
@@ -259,6 +264,16 @@ QImage desktop_platform::application_icon(const QString &path) {
 }
 
 app_record desktop_platform::resolve_application(const QString &path) {
+    const auto supported_target = [](const QString &value) {
+        const auto suffix = QFileInfo(value).suffix().toLower();
+        if (suffix != "exe" && suffix != "bat" && suffix != "cmd" && suffix != "lnk")
+            throw std::invalid_argument(
+                QCoreApplication::translate("XLibrary", "Supported files: .exe, .lnk, .bat, .cmd.").toStdString());
+        if (!QFileInfo(value).isFile())
+            throw std::invalid_argument(
+                QCoreApplication::translate("XLibrary", "The application file is unavailable.").toStdString());
+    };
+    supported_target(path);
     const ComScope com;
     app_record result;
     result.discovery_source = path;
@@ -308,6 +323,7 @@ app_record desktop_platform::resolve_application(const QString &path) {
                     .toStdString());
         }
     }
+    supported_target(result.path);
     const Application application(std::filesystem::path(result.path.toStdWString()));
     result.name = QFileInfo(path).suffix().compare("lnk", Qt::CaseInsensitive) == 0
                       ? QFileInfo(path).completeBaseName()
@@ -445,6 +461,7 @@ GlobalHotkey::GlobalHotkey(QObject *parent) : QObject(parent) {
 }
 
 GlobalHotkey::~GlobalHotkey() {
+    qApp->removeNativeEventFilter(this);
     if (current_id) {
         UnregisterHotKey(nullptr, current_id);
     }
@@ -486,6 +503,10 @@ bool GlobalHotkey::set_sequence(const QKeySequence &value, QString &error) {
         error = QCoreApplication::translate("XLibrary", "Add Ctrl, Alt, or Win to the global shortcut.");
         return false;
     }
+    if (modifiers & ~(Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier | Qt::ShiftModifier)) {
+        error = QCoreApplication::translate("XLibrary", "The shortcut contains an unsupported modifier.");
+        return false;
+    }
     UINT flags = MOD_NOREPEAT;
     if (modifiers & Qt::ControlModifier)
         flags |= MOD_CONTROL;
@@ -495,6 +516,10 @@ bool GlobalHotkey::set_sequence(const QKeySequence &value, QString &error) {
         flags |= MOD_SHIFT;
     if (modifiers & Qt::MetaModifier)
         flags |= MOD_WIN;
+    if (next_id > 0xbfff) {
+        error = QCoreApplication::translate("XLibrary", "Restart XLibrary before changing the shortcut again.");
+        return false;
+    }
     const auto new_id = next_id++;
     if (!RegisterHotKey(nullptr, new_id, flags, virtual_key)) {
         error = QCoreApplication::translate("XLibrary", "The shortcut is in use by Windows or another application.");
@@ -511,7 +536,9 @@ bool GlobalHotkey::set_sequence(const QKeySequence &value, QString &error) {
 bool GlobalHotkey::nativeEventFilter(const QByteArray &, void *message, qintptr *result) {
     const auto *event = static_cast<MSG *>(message);
     if (event->message == WM_HOTKEY && event->wParam == static_cast<WPARAM>(current_id) && current_id) {
-        *result = 0;
+        // Qt passes a null result for messages handled by the thread's event loop.
+        if (result)
+            *result = 0;
         emit activated();
         return true;
     }

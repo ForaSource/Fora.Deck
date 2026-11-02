@@ -46,6 +46,7 @@ constexpr int x11_success = Success;
 #include <QLocale>
 #include <QProcess>
 #include <QProcessEnvironment>
+#include <QRegularExpression>
 #include <QSaveFile>
 #include <QSocketNotifier>
 #include <QStandardPaths>
@@ -421,11 +422,15 @@ struct process_identity {
     bool script = false;
 };
 
-process_identity application_identity(const QString &path) {
+process_identity application_identity(const app_record &record) {
     process_identity result;
+    const auto &path = record.path;
+    auto directory = record.working_directory;
     QStringList command{path};
     if (QFileInfo(path).suffix() == "desktop") {
         const auto entry = read_entry(path);
+        if (directory.isEmpty())
+            directory = entry.values.value("Path");
         const auto service = dbus_service(entry);
         if (!service.isEmpty()) {
             if (auto *interface = QDBusConnection::sessionBus().interface()) {
@@ -445,21 +450,49 @@ process_identity application_identity(const QString &path) {
                 return result;
             throw;
         }
+    } else if (directory.isEmpty()) {
+        directory = QFileInfo(path).absolutePath();
     }
+    command.append(user_arguments(record.arguments));
     if (QFileInfo(command.front()).fileName() == "env") {
         command.removeFirst();
+        bool options = true;
+        bool directory_changed = false;
+        QString env_directory;
         while (!command.isEmpty()) {
             const auto argument = command.front();
-            if (argument == "-u" || argument == "--unset") {
+            if (options && (argument == "--" || argument == "-")) {
+                options = false;
+                command.removeFirst();
+            } else if (options && (argument == "-C" || argument == "--chdir")) {
+                if (command.size() < 2)
+                    return {};
+                command.removeFirst();
+                env_directory = command.takeFirst();
+                directory_changed = true;
+            } else if (options && (argument.startsWith("--chdir=") || argument.startsWith("-C"))) {
+                env_directory = argument.mid(argument.startsWith("--chdir=") ? 8 : 2);
+                directory_changed = true;
+                command.removeFirst();
+            } else if (options && (argument == "-u" || argument == "--unset")) {
                 if (command.size() < 2)
                     return {};
                 command.removeFirst();
                 command.removeFirst();
-            } else if (argument.startsWith('-') || argument.contains('=')) {
+            } else if (options && argument.startsWith('-')) {
+                command.removeFirst();
+            } else if (argument.contains('=')) {
+                options = false;
                 command.removeFirst();
             } else {
                 break;
             }
+        }
+        if (directory_changed) {
+            if (env_directory.isEmpty())
+                return {};
+            // GNU env applies the final -C once, relative to its launch directory.
+            directory = QDir(directory.isEmpty() ? QDir::currentPath() : directory).absoluteFilePath(env_directory);
         }
     }
     if (command.isEmpty())
@@ -471,6 +504,15 @@ process_identity application_identity(const QString &path) {
         result.executable = canonical_path(result.executable);
     }
     result.arguments = command.mid(1);
+    // Resolve file arguments in the same directory used at launch, not XLibrary's directory.
+    const QDir working_directory(directory.isEmpty() ? QDir::currentPath() : directory);
+    for (auto &argument : result.arguments) {
+        if (argument.isEmpty() || argument.startsWith('-') || QFileInfo(argument).isAbsolute())
+            continue;
+        const QFileInfo candidate(working_directory.filePath(argument));
+        if (candidate.isFile())
+            argument = canonical_path(candidate.absoluteFilePath());
+    }
     const auto program = QFileInfo(command.front()).fileName();
     if (program == "flatpak" && result.flatpak_id.isEmpty()) {
         const auto run = command.indexOf("run");
@@ -701,11 +743,10 @@ public:
 };
 
 bool desktop_platform::activate_window(const app_record &record) {
-    const auto &path = record.path;
     if (wayland_session())
         return false;
 #ifdef XLIBRARY_HAVE_X11
-    const auto processes = matching_processes(application_identity(path));
+    const auto processes = matching_processes(application_identity(record));
     if (processes.isEmpty())
         return false;
     const std::lock_guard lock(x11_mutex);
@@ -912,7 +953,7 @@ QSet<QString> desktop_platform::running_paths(const QVector<app_record> &applica
     QVector<QPair<QString, process_identity>> identities;
     for (const auto &application : applications) {
         try {
-            identities.append({absolute_path(application.path), application_identity(application.path)});
+            identities.append({absolute_path(application.path), application_identity(application)});
         } catch (const std::exception &) {
             // A deleted or corrupted entry must not prevent monitoring the other applications.
         }
@@ -1068,7 +1109,10 @@ app_record desktop_platform::resolve_application(const QString &path) {
     } else {
         if (!info.isExecutable())
             throw std::invalid_argument(
-                QCoreApplication::translate("XLibrary", "The file is not executable.").toStdString());
+                QCoreApplication::translate("XLibrary",
+                                            "The file is not executable. Use a .desktop shortcut, executable file, "
+                                            "AppImage or script with executable permission.")
+                    .toStdString());
         result.name = info.completeBaseName();
     }
     return result;
@@ -1179,6 +1223,10 @@ bool desktop_platform::animations_enabled() {
 }
 
 QString desktop_platform::default_global_shortcut() {
+    return default_overlay_shortcut().isEmpty() ? QString{} : QStringLiteral("Ctrl+Alt+Shift+Space");
+}
+
+QString desktop_platform::default_overlay_shortcut() {
 #ifdef XLIBRARY_HAVE_X11
     if (!wayland_session() && QGuiApplication::platformName() == "xcb")
         return "Ctrl+Alt+Space";

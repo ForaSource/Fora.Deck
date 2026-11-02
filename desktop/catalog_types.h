@@ -3,7 +3,6 @@
 
 #include <atomic>
 #include <QMetaType>
-#include <QRegularExpression>
 #include <QStringList>
 #include <QVector>
 #include <stdexcept>
@@ -16,8 +15,24 @@ inline constexpr qsizetype tags_per_application = 256;
 }
 
 inline bool valid_tag_name(const QString &tag) {
-    return !tag.isEmpty() && tag.size() <= 64 && !tag.contains(QChar::Null) &&
-           !tag.contains(QRegularExpression("[\\s,#]"));
+    if (tag.isEmpty() || tag.size() > 64)
+        return false;
+    for (const auto character : tag)
+        if (character.isNull() || character.isSpace() || character == ',' || character == '#')
+            return false;
+    return true;
+}
+
+inline QString tag_name_key(const QString &tag) {
+    return tag.normalized(QString::NormalizationForm_C).toCaseFolded();
+}
+
+inline bool has_tag(const QStringList &tags, const QString &tag) {
+    const auto key = tag_name_key(tag);
+    for (const auto &name : tags)
+        if (tag_name_key(name) == key)
+            return true;
+    return false;
 }
 
 struct app_record {
@@ -29,8 +44,10 @@ struct app_record {
     QString arguments;
     QString working_directory;
     QStringList tags;
+    QStringList aliases;
     bool favorite = false;
     bool available = true;
+    bool volume_unavailable = false;
     bool running = false;
     QString new_instance_error;
     QString discovery_source;
@@ -56,7 +73,10 @@ struct discovery_issue {
 struct catalog_import_result {
     qsizetype added = 0;
     qsizetype duplicates = 0;
+    qsizetype updated = 0;
 };
+
+enum class import_conflict_policy { skip, replace_metadata };
 
 enum class discovery_phase { running, cancelling, committing };
 
@@ -82,10 +102,21 @@ struct scenario_record {
     QVector<scenario_step> steps;
 };
 
+struct saved_filter {
+    qint64 id = 0;
+    QString name;
+    QString query;
+    QString section = "library";
+    QString tag;
+    int sort_mode = 0;
+    Qt::SortOrder sort_order = Qt::AscendingOrder;
+};
+
 struct catalog_snapshot {
     QVector<app_record> applications;
     QStringList tags;
     QVector<scenario_record> scenarios;
+    QVector<saved_filter> filters;
 };
 
 struct path_relocation {
@@ -100,6 +131,8 @@ struct path_relocation {
 };
 
 Q_DECLARE_METATYPE(app_record)
+Q_DECLARE_METATYPE(QVector<app_record>)
+Q_DECLARE_METATYPE(QVector<discovery_issue>)
 Q_DECLARE_METATYPE(scenario_record)
 Q_DECLARE_METATYPE(catalog_snapshot)
 Q_DECLARE_METATYPE(path_relocation)

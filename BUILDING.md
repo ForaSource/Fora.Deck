@@ -342,7 +342,7 @@ Windows ZIP и Inno Setup, интерактивные сценарии уста�
 
 ## GitHub pre-release
 
-1. Дождитесь всех checks PR, включая CodeQL, clang-format, actionlint, Windows install smoke test и Linux package job. Просмотрите diff и `build-info.json` Linux-пакетов; Windows-пакеты соберите и проверьте отдельно.
+1. Дождитесь всех checks PR, включая clang-format, actionlint, Windows install smoke test и Linux package job. Просмотрите diff и `build-info.json` Linux-пакетов; Windows-пакеты соберите и проверьте отдельно.
 2. Выполните ручную проверку выше для ZIP и установщика, включая обновление существующей установки. Сохраните результаты и проверьте отсутствие секретов, сертификатов и локальных путей.
 3. С чистого дерева нужного commit соберите публичные файлы выбранного toolchain, сохраните ZIP, setup.exe и SHA256SUMS.txt. CI artifacts — тестовые пакеты, они не публикуются автоматически.
 4. После отдельного решения о выпуске создайте тег полной версии и GitHub Release

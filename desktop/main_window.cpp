@@ -3,14 +3,18 @@
 #include <QClipboard>
 #include <QCloseEvent>
 #include <QDir>
+#include <QDragEnterEvent>
+#include <QDropEvent>
 #include <QFileInfo>
 #include <QJsonObject>
 #include <QLineEdit>
 #include <QMenu>
+#include <QMimeData>
 #include <QStackedWidget>
 #include <QStyleHints>
 
 #include "appearance.h"
+#include "catalog_review.h"
 #include "editors.h"
 #include "github_token_store.h"
 #include "library_splitter.h"
@@ -48,6 +52,13 @@ QWidget *shell(const ui_context &context, QWidget *parent) {
     const auto show_notice = [=](const QString &text) { notice->show_message(text); };
     QObject::connect(service, &DesktopService::message, notice, show_notice);
     QObject::connect(service, &DesktopService::scenario_changed, notice, show_notice);
+    QObject::connect(service, &DesktopService::undo_removal_changed, notice, [=] {
+        if (service->can_undo_removal()) {
+            notice->activated = [=] { service->undo_removal(); };
+            notice->show_message(QCoreApplication::translate("XLibrary", "Applications removed from the library."), {},
+                                 QCoreApplication::translate("XLibrary", "Undo"));
+        }
+    });
     auto *update_notice = new NotificationBanner(*context.settings, 20);
     body->addWidget(update_notice);
     QObject::connect(service, &DesktopService::appearance_changed, update_notice,
@@ -92,7 +103,15 @@ QWidget *shell(const ui_context &context, QWidget *parent) {
 }
 }
 
-MainWindow::MainWindow(DesktopService &service) : service(service), hotkey(this), tray(this) {
+MainWindow::MainWindow(DesktopService &service)
+    : service(service), hotkey(this), overlay_hotkey(this), overlay(std::make_unique<SearchOverlay>(service)),
+      tray(this) {
+    if (!service.settings.contains("shortcuts/overlay")) {
+        // The previous default now belongs to quick search; preserve other user assignments.
+        if (service.settings.value("shortcuts/global").toString() == "Ctrl+Alt+Space")
+            service.settings.setValue("shortcuts/global", desktop_platform::default_global_shortcut());
+        service.settings.setValue("shortcuts/overlay", desktop_platform::default_overlay_shortcut());
+    }
     setWindowTitle("XLibrary");
     setWindowIcon(appearance::logo());
     const auto available = screen()->availableGeometry().size() - QSize(32, 64);
@@ -105,7 +124,10 @@ MainWindow::MainWindow(DesktopService &service) : service(service), hotkey(this)
     context.registry = &registry;
     context.window = this;
     context.parameters.insert("hotkey", QVariant::fromValue(static_cast<QObject *>(&hotkey)));
+    context.parameters.insert("overlay_hotkey", QVariant::fromValue(static_cast<QObject *>(&overlay_hotkey)));
     register_editors(registry);
+    setAcceptDrops(true);
+    connect(&service, &DesktopService::catalog_preview_ready, this, [this] { show_catalog_review(context); });
     register_library_views(registry);
     register_settings_views(registry);
     registry.add_default("shell", shell);
@@ -129,6 +151,13 @@ MainWindow::MainWindow(DesktopService &service) : service(service), hotkey(this)
             show_library();
     });
     connect(&hotkey, &GlobalHotkey::activated, this, &MainWindow::show_library);
+    connect(&overlay_hotkey, &GlobalHotkey::activated, overlay.get(), &SearchOverlay::toggle);
+    connect(overlay.get(), &SearchOverlay::open_library, this, [this](const QString &query) {
+        show_library();
+        this->service.navigate("library");
+        if (auto *search = findChild<QLineEdit *>("search_input"))
+            search->setText(query);
+    });
     connect(&service, &DesktopService::selection_changed, this, &MainWindow::refresh_actions);
     connect(&service, &DesktopService::catalog_changed, this, &MainWindow::refresh_actions);
     connect(&service, &DesktopService::profile_state_changed, this, &MainWindow::refresh_actions);
@@ -213,12 +242,13 @@ void MainWindow::create_actions() {
         const auto *record = service.selected();
         if (!record)
             return;
-        const auto id = record->id;
-        const auto name = record->name;
+        const auto ids = service.selections().isEmpty() ? QVector<qint64>{record->id} : service.selections();
         if (confirm(this, QCoreApplication::translate("XLibrary", "Remove application"),
-                    QCoreApplication::translate("XLibrary", "Remove “") + name +
-                        QCoreApplication::translate("XLibrary", "” from the library? Application files will be kept.")))
-            service.remove_application(id);
+                    QCoreApplication::translate("XLibrary",
+                                                "Remove %1 applications from the library? Application files will be "
+                                                "kept. Linked scenario steps will be removed; Undo can restore them.")
+                        .arg(ids.size())))
+            service.remove_applications(ids);
     });
     context.actions.value("remove_application")
         ->setToolTip(QCoreApplication::translate(
@@ -236,6 +266,16 @@ void MainWindow::create_actions() {
         if (const auto *record = service.selected())
             QApplication::clipboard()->setText(QDir::toNativeSeparators(record->path));
     });
+    add("copy_arguments", QCoreApplication::translate("XLibrary", "Copy arguments"), "copy", [this] {
+        if (const auto *record = service.selected())
+            QApplication::clipboard()->setText(record->arguments);
+    });
+    add("bulk_edit", QCoreApplication::translate("XLibrary", "Edit selected applications"), "settings",
+        [this] { show_bulk_editor(context); });
+    add("undo_removal", QCoreApplication::translate("XLibrary", "Undo removal"), "refresh",
+        [this] { service.undo_removal(); });
+    connect(&service, &DesktopService::undo_removal_changed, this, &MainWindow::refresh_actions);
+    connect(&service, &DesktopService::selections_changed, this, &MainWindow::refresh_actions);
     for (const auto &id : {"launch", "new_instance", "open_folder", "copy_path", "remove_application"})
         context.actions.value(id)->setAutoRepeat(false);
     add("discover", QCoreApplication::translate("XLibrary", "Find installed applications"), "refresh", [this] {
@@ -268,7 +308,7 @@ void MainWindow::refresh_actions() {
     const auto *record = service.selected();
     const bool profile_available = !service.profile_busy() && !service.restart_required();
     for (const auto &id : {"launch", "new_instance", "edit_application", "remove_application", "favorite",
-                           "open_folder", "copy_path", "details"})
+                           "open_folder", "copy_path", "copy_arguments", "details"})
         context.actions.value(id)->setEnabled(profile_available && record != nullptr &&
                                               service.section() != "scenarios");
     auto *new_instance = context.actions.value("new_instance");
@@ -281,6 +321,10 @@ void MainWindow::refresh_actions() {
             : QCoreApplication::translate(
                   "XLibrary", "Runs the launch command directly. The application may reuse an existing window."));
     context.actions.value("add_application")->setEnabled(profile_available && service.is_ready());
+    context.actions.value("bulk_edit")
+        ->setEnabled(profile_available && service.is_ready() && !service.selections().isEmpty());
+    context.actions.value("undo_removal")
+        ->setEnabled(profile_available && service.can_undo_removal() && !service.is_scenario_active());
     context.actions.value("add_tag")->setEnabled(profile_available && service.is_ready());
     context.actions.value("add_scenario")
         ->setEnabled(profile_available && service.is_ready() && service.model.rowCount() > 0);
@@ -305,6 +349,12 @@ void MainWindow::apply_settings() {
     if (!hotkey.set_sequence(
             QKeySequence::fromString(
                 service.settings.value("shortcuts/global", desktop_platform::default_global_shortcut()).toString(),
+                QKeySequence::PortableText),
+            error))
+        service.notify(error);
+    if (!overlay_hotkey.set_sequence(
+            QKeySequence::fromString(
+                service.settings.value("shortcuts/overlay", desktop_platform::default_overlay_shortcut()).toString(),
                 QKeySequence::PortableText),
             error))
         service.notify(error);
@@ -370,6 +420,7 @@ void MainWindow::update_layout() {
 }
 
 void MainWindow::show_library() {
+    overlay->hide();
     if (isMinimized())
         showNormal();
     else
@@ -377,6 +428,10 @@ void MainWindow::show_library() {
     raise();
     activateWindow();
     context.actions.value("focus_search")->trigger();
+}
+
+void MainWindow::show_overlay() {
+    overlay->show_search();
 }
 
 void MainWindow::start() {
@@ -387,7 +442,10 @@ void MainWindow::start() {
         });
     const bool background = QCoreApplication::arguments().contains("--background") ||
                             service.settings.value("behavior/startup", "show").toString() == "tray";
-    if (service.safe_mode() || !background || !tray.isVisible())
+    if (QCoreApplication::arguments().contains("--overlay") &&
+        !QCoreApplication::arguments().contains("--check-startup"))
+        show_overlay();
+    else if (service.safe_mode() || !background || !tray.isVisible())
         show_library();
     if (!QCoreApplication::arguments().contains("--check-startup")) {
         QTimer::singleShot(0, this, [this] {
@@ -421,4 +479,25 @@ void MainWindow::closeEvent(QCloseEvent *event) {
 void MainWindow::resizeEvent(QResizeEvent *event) {
     QMainWindow::resizeEvent(event);
     update_layout();
+}
+
+void MainWindow::dragEnterEvent(QDragEnterEvent *event) {
+    if (event->mimeData()->hasUrls() && service.is_ready() && !service.is_discovering() && !service.profile_busy() &&
+        !service.restart_required()) {
+        for (const auto &url : event->mimeData()->urls())
+            if (!url.isLocalFile())
+                return;
+        event->acceptProposedAction();
+    }
+}
+
+void MainWindow::dropEvent(QDropEvent *event) {
+    QStringList paths;
+    for (const auto &url : event->mimeData()->urls())
+        if (url.isLocalFile())
+            paths.append(url.toLocalFile());
+    if (!paths.isEmpty()) {
+        service.preview_files(paths);
+        event->acceptProposedAction();
+    }
 }

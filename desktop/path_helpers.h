@@ -35,4 +35,11 @@ inline constexpr Qt::CaseSensitivity path_case_sensitivity =
     Qt::CaseSensitive;
 #endif
 
+inline QString launch_configuration_key(const QString &path, const QString &arguments, const QString &directory) {
+    // Length prefixes keep arguments containing separators unambiguous.
+    const auto part = [](const QString &value) { return QString::number(value.size()) + ':' + value; };
+    return part(normalized_path(path)) + part(arguments) +
+           part(directory.isEmpty() ? QString{} : normalized_path(directory));
+}
+
 #endif

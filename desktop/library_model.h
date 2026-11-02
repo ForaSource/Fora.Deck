@@ -9,6 +9,7 @@
 #include <QThreadPool>
 
 #include "catalog_types.h"
+#include "search_query.h"
 
 class LibraryModel : public QAbstractTableModel {
     Q_OBJECT
@@ -44,7 +45,11 @@ public:
 class LibraryFilter : public QSortFilterProxyModel {
     Q_OBJECT
 private:
-    QStringList terms;
+    SearchQuery query;
+    QString query_text;
+    mutable QVector<int> query_ranks;
+    QMetaObject::Connection reset_connection;
+    int query_rank(int row) const;
     QString section = "library";
     QString selected_tag;
     int sort_mode = 0;
@@ -55,12 +60,16 @@ protected:
 
 public:
     explicit LibraryFilter(QObject *parent = nullptr);
+    void setSourceModel(QAbstractItemModel *model) override;
+    QString text() const { return query_text; }
+    int sort_mode_value() const { return sort_mode; }
     void set_query(const QString &query);
     void set_section(const QString &value, const QString &tag = {});
     void set_sort_mode(int value, Qt::SortOrder order = Qt::AscendingOrder);
     void sort(int column, Qt::SortOrder order = Qt::AscendingOrder) override;
 
 signals:
+    void query_changed(const QString &text);
     void sort_changed(int mode, Qt::SortOrder order);
 };
 

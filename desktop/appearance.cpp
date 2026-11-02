@@ -20,6 +20,13 @@ QIcon appearance::icon(const QString &name, const QColor &color) {
     } else if (name == "search") {
         painter.drawEllipse(QRectF(4, 4, 12, 12));
         painter.drawLine(QPointF(15, 15), QPointF(21, 21));
+    } else if (name == "external") {
+        painter.drawPolyline(QPolygonF{QPointF(13, 3), QPointF(21, 3), QPointF(21, 11)});
+        painter.drawLine(QPointF(21, 3), QPointF(10, 14));
+        painter.drawPolyline(QPolygonF{QPointF(9, 5), QPointF(3, 5), QPointF(3, 21), QPointF(19, 21), QPointF(19, 15)});
+    } else if (name == "file") {
+        painter.drawPolyline(QPolygonF{QPointF(14, 3), QPointF(14, 9), QPointF(20, 9)});
+        painter.drawPolygon(QPolygonF{QPointF(4, 3), QPointF(14, 3), QPointF(20, 9), QPointF(20, 21), QPointF(4, 21)});
     } else if (name == "library") {
         for (int x : {4, 14})
             for (int y : {4, 14})
@@ -194,6 +201,10 @@ void appearance::apply(QSettings &settings, const QString &additional_style) {
         QLineEdit[invalid="true"] { border-color: #C88888; }
         QLineEdit QToolButton { background: transparent; border: none; border-radius: 0; padding: 0; min-height: 0; }
         QComboBox::drop-down { border: none; width: 24px; }
+        QTabBar#shortcut_tabs::tab { background: transparent; color: %4; border: 1px solid transparent; border-radius: 8px; padding: 8px 12px; margin-right: 8px; min-height: %10px; }
+        QTabBar#shortcut_tabs::tab:last { margin-right: 0; }
+        QTabBar#shortcut_tabs::tab:hover { background: %5; border-color: %6; }
+        QTabBar#shortcut_tabs::tab:selected { color: %1; background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 %17, stop:1 %7); border-color: %16; }
         QAbstractItemView { background: %2; border: none; outline: none; selection-background-color: %7; }
         QAbstractItemView::item { padding: 6px; border: 1px solid transparent; border-radius: 10px; }
         QAbstractItemView::item:selected { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 %17, stop:1 %7); border-color: %16; color: %1; }
