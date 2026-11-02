@@ -46,8 +46,10 @@ try {
         throw "Windows package version/source does not match the validated checkout. Expected version=$Version, source_commit=$SourceCommit, source_dirty=false, qt_version=6.8.3. Actual metadata: $actual_metadata"
     }
     $setup = "$directory/$base-setup.exe"
-    if ((Get-Item -LiteralPath $setup).VersionInfo.ProductVersion -cne $Version) {
-        throw 'Installer product version mismatch.'
+    # Inno Setup pads the textual PE version field with spaces.
+    $installer_product_version = ([string](Get-Item -LiteralPath $setup).VersionInfo.ProductVersion).TrimEnd(' ')
+    if ($installer_product_version -cne $Version) {
+        throw "Installer product version mismatch. Expected '$Version', actual '$installer_product_version'."
     }
     invoke_installer $setup "/VERYSILENT /SUPPRESSMSGBOXES /SP- /NORESTART /DIR=`"$installed`" /LOG=`"$scratch/install.log`""
     if (Test-Path -LiteralPath "$installed/portable.flag") { throw 'Installer enabled portable mode.' }
