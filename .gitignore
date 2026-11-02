@@ -37,6 +37,9 @@
 #Local documents
 local-docs/*
 
+# aqtinstall writes its diagnostic log in the checkout during Qt setup.
+/aqtinstall.log
+
 # CMake output
 build/
 dist/
