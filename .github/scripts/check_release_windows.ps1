@@ -42,7 +42,8 @@ try {
     $metadata = Get-Content -LiteralPath "$portable/build-info.json" -Raw | ConvertFrom-Json
     if ($metadata.version -cne $Version -or $metadata.source_commit -cne $SourceCommit -or
         $metadata.source_dirty -isnot [bool] -or $metadata.source_dirty -or $metadata.qt_version -cne '6.8.3') {
-        throw 'Windows package version/source does not match the validated checkout.'
+        $actual_metadata = $metadata | ConvertTo-Json -Depth 4 -Compress
+        throw "Windows package version/source does not match the validated checkout. Expected version=$Version, source_commit=$SourceCommit, source_dirty=false, qt_version=6.8.3. Actual metadata: $actual_metadata"
     }
     $setup = "$directory/$base-setup.exe"
     if ((Get-Item -LiteralPath $setup).VersionInfo.ProductVersion -cne $Version) {
