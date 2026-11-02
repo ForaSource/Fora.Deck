@@ -69,6 +69,12 @@ jobs:
           tools: tools_mingw1310,qt.tools.win64_mingw1310
           cache: true
 
+      - name: Cache verified Qt source archives
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: build/windows-packaging-cache/*.tar.xz
+          key: qt-sources-windows-v1-${{ hashFiles('packaging/qt_sources.json') }}
+
       - name: Install Inno Setup
         run: |
           choco install innosetup --version=6.3.3 --yes --no-progress --allow-downgrade

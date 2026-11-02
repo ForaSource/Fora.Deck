@@ -212,13 +212,19 @@ try {
             }
             Write-Output "Using verified Qt source cache: $cached_archive"
         } else {
+            # Use the Windows executable, not a PowerShell alias. curl bounds the entire transfer.
+            $curl = (Get-Command curl.exe -CommandType Application -ErrorAction Stop).Source
             # An incomplete download must not become a reusable archive.
             $download_path = "$cached_archive.$([guid]::NewGuid().ToString('N')).download"
             try {
                 for ($attempt = 1; $attempt -le 3; ++$attempt) {
                     try {
-                        Write-Output "Downloading Qt source ($attempt/3): $url"
-                        Invoke-WebRequest -Uri $url -OutFile $download_path -TimeoutSec 300
+                        Write-Output "Downloading Qt source ($attempt/3, timeout 300s): $url"
+                        & $curl --fail --location --proto '=https' --proto-redir '=https' `
+                            --connect-timeout 20 --max-time 300 --speed-limit 1024 --speed-time 30 `
+                            --silent --show-error --output $download_path `
+                            --write-out 'Qt source transfer: %{size_download} bytes in %{time_total}s (%{speed_download} bytes/s)\n' $url
+                        if ($LASTEXITCODE -ne 0) { throw "curl failed with exit code $LASTEXITCODE." }
                         break
                     } catch {
                         if ($attempt -eq 3) {
