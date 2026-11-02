@@ -213,7 +213,7 @@ try {
             Write-Output "Using verified Qt source cache: $cached_archive"
         } else {
             # Use the Windows executable, not a PowerShell alias. curl bounds the entire transfer.
-            $curl = (Get-Command curl.exe -CommandType Application -ErrorAction Stop).Source
+            $curl = (Get-Command curl.exe -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
             # An incomplete download must not become a reusable archive.
             $download_path = "$cached_archive.$([guid]::NewGuid().ToString('N')).download"
             try {
