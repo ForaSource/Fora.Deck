@@ -71,6 +71,11 @@ Inno Setup 6.3+ ищется в `PATH` и стандартных папках у
 загрузки исходников можно заранее положить в кэш соответствующие
 `qtbase-everywhere-src-<Qt-версия>.tar.xz`, `qtsvg-...` и архивы других
 фактически используемых модулей из `packaging/qt_sources.json`.
+После загрузки упаковщик отдельно сообщает о проверке SHA256, копировании
+архива и извлечении лицензий. Лицензии извлекаются через настроенный CMake
+(`cmake -E tar`), без выбора `tar` из `PATH`, с лимитом 120 секунд на архив.
+Диагностика извлечения сохраняется в `build_path/packaging-release.log`;
+при ошибке staging остаётся для разбора.
 `-ReleaseNotes путь.md` добавляет предоставленный файл как `RELEASE_NOTES.md`
 и включает его в манифест. Требования платформенных упаковщиков сохраняются,
 включая сетевой доступ для загрузки зависимостей и исходников Qt.
@@ -220,7 +225,7 @@ python3 packaging/build_release.py --build-path cmake-build-debian13-release \
 только при наличии prerelease-суффикса. После изменения `VERSION` следующая сборка
 автоматически повторяет конфигурацию.
 
-CI использует Qt **6.8.3**, MSVC 2022 x64 и MinGW **13.1.0** из Qt Online Installer. Для MinGW выбирайте комплект Qt `mingw_64` и соответствующий ему MinGW; для MSVC — `msvc2022_64` и Visual Studio 2022 / Build Tools с Desktop development with C++. Не смешивайте ABI или архитектуры. Скрипты упаковки и проверки требуют **PowerShell 7** (`pwsh`), а не Windows PowerShell 5.1. Упаковка использует `tar.exe` из Windows.
+CI использует Qt **6.8.3**, MSVC 2022 x64 и MinGW **13.1.0** из Qt Online Installer. Для MinGW выбирайте комплект Qt `mingw_64` и соответствующий ему MinGW; для MSVC — `msvc2022_64` и Visual Studio 2022 / Build Tools с Desktop development with C++. Не смешивайте ABI или архитектуры. Скрипты упаковки и проверки требуют **PowerShell 7** (`pwsh`), а не Windows PowerShell 5.1. Упаковка извлекает лицензии через `cmake -E tar` настроенного CMake.
 
 ## Debug в CLion
 

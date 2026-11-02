@@ -43,6 +43,45 @@ function invoke_cmake([string]$step, [string[]]$command_arguments) {
     }
 }
 
+function extract_qt_licenses([string]$archive, [string]$member, [string]$destination) {
+    "Extracting Qt licenses from $archive with $cmake (timeout 120s)" | Tee-Object -FilePath $log -Append
+    $start_info = [Diagnostics.ProcessStartInfo]::new()
+    $start_info.FileName = $cmake
+    $start_info.WorkingDirectory = $destination
+    $start_info.UseShellExecute = $false
+    $start_info.CreateNoWindow = $true
+    $start_info.RedirectStandardOutput = $true
+    $start_info.RedirectStandardError = $true
+    foreach ($argument in @('-E', 'tar', 'xf', $archive, '--', $member)) {
+        $start_info.ArgumentList.Add($argument)
+    }
+    $process = [Diagnostics.Process]::new()
+    $process.StartInfo = $start_info
+    $started = $false
+    try {
+        $started = $process.Start()
+        if (-not $started) { throw 'Cannot start Qt license extraction.' }
+        # Drain both streams while waiting so a full pipe cannot block the child.
+        $stdout = $process.StandardOutput.ReadToEndAsync()
+        $stderr = $process.StandardError.ReadToEndAsync()
+        $finished = $process.WaitForExit(120000)
+        if (-not $finished) {
+            $process.Kill($true)
+            $process.WaitForExit()
+        }
+        foreach ($output_task in @($stdout, $stderr)) {
+            $output_text = $output_task.GetAwaiter().GetResult()
+            if ($output_text) { $output_text | Tee-Object -FilePath $log -Append }
+        }
+        if (-not $finished) { throw "Qt license extraction timed out after 120 seconds. See $log. Staging: $destination" }
+        if ($process.ExitCode -ne 0) { throw "Cannot extract Qt licenses (exit $($process.ExitCode)). See $log." }
+        'Qt license extraction completed.' | Tee-Object -FilePath $log -Append
+    } finally {
+        if ($started -and -not $process.HasExited) { $process.Kill($true) }
+        $process.Dispose()
+    }
+}
+
 # Check EXE access before rebuilding: a running application prevents the linker from replacing it.
 $runtime_directory = Read-Cache 'CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE' -Optional
 if (-not $runtime_directory) {
@@ -207,6 +246,7 @@ try {
         $archive = Join-Path $sources $archive_name
         $cached_archive = Join-Path $source_cache $archive_name
         if (Test-Path -LiteralPath $cached_archive -PathType Leaf) {
+            "Verifying cached Qt source SHA256: $archive_name" | Tee-Object -FilePath $log -Append
             if ((Get-FileHash -LiteralPath $cached_archive -Algorithm SHA256).Hash -ne $hash) {
                 throw "Qt source cache checksum mismatch. Remove or replace this file: $cached_archive"
             }
@@ -234,6 +274,7 @@ try {
                         Start-Sleep -Seconds (2 * $attempt)
                     }
                 }
+                "Verifying downloaded Qt source SHA256: $archive_name" | Tee-Object -FilePath $log -Append
                 if ((Get-FileHash -LiteralPath $download_path -Algorithm SHA256).Hash -ne $hash) {
                     throw "Qt source checksum mismatch: $archive_name"
                 }
@@ -242,9 +283,9 @@ try {
                 if (Test-Path -LiteralPath $download_path) { Remove-Item -LiteralPath $download_path -Force }
             }
         }
+        "Copying verified Qt source into package: $archive_name" | Tee-Object -FilePath $log -Append
         Copy-Item -LiteralPath $cached_archive -Destination $archive
-        & tar -xf $archive -C $stage "$module-everywhere-src-$qt_version/LICENSES"
-        if ($LASTEXITCODE -ne 0) { throw "Cannot extract $module licenses." }
+        extract_qt_licenses -archive $archive -member "$module-everywhere-src-$qt_version/LICENSES" -destination $stage
         Copy-Item -LiteralPath "$stage/$module-everywhere-src-$qt_version/LICENSES" -Destination "$licenses/$module" -Recurse
         $sbom_files = @(Get-ChildItem -Path "$qt/sbom/$module*.spdx*" -File -ErrorAction SilentlyContinue)
         foreach ($sbom in $sbom_files) { Copy-Item -LiteralPath $sbom.FullName -Destination $licenses }
