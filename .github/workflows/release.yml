@@ -1,0 +1,279 @@
+name: Prepare Release Draft
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Serialize all versions and reruns, including the tag/Draft creation window.
+concurrency:
+  group: xlibrary-release
+  cancel-in-progress: false
+
+jobs:
+  validation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+      source_sha: ${{ github.sha }}
+    steps:
+      - name: Require main
+        env:
+          SOURCE_REF: ${{ github.ref }}
+        run: test "$SOURCE_REF" = refs/heads/main
+
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Validate VERSION
+        id: version
+        run: python3 .github/scripts/release.py version
+
+      - name: Require unused tag
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          status=0
+          git ls-remote --exit-code --refs origin "refs/tags/$RELEASE_TAG" || status=$?
+          if [ "$status" -ne 2 ]; then
+            echo "Tag already exists or the remote check failed (exit $status). Inspect the tag and Draft before retrying."
+            exit 1
+          fi
+
+  windows:
+    needs: validation
+    runs-on: windows-2022
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.validation.outputs.source_sha }}
+          persist-credentials: false
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@b344308e4483fc892e0d27b3cd1b173ebdd95f06 # v4.5.0
+        with:
+          version: '6.8.3'
+          arch: win64_mingw
+          tools: tools_mingw1310,qt.tools.win64_mingw1310
+          cache: true
+
+      - name: Install Inno Setup
+        run: |
+          choco install innosetup --version=6.3.3 --yes --no-progress --allow-downgrade
+          if ($LASTEXITCODE -ne 0) { throw 'Inno Setup installation failed.' }
+          $iscc = "${env:ProgramFiles(x86)}/Inno Setup 6/ISCC.exe"
+          if (-not (Test-Path -LiteralPath $iscc -PathType Leaf)) { throw 'ISCC.exe is missing.' }
+
+      - name: Configure portable Release
+        run: |
+          $toolchain = Join-Path $env:IQTA_TOOLS 'mingw1310_64/bin'
+          cmake -S . -B build/release-mingw -G Ninja -DCMAKE_BUILD_TYPE=Release -DXLIBRARY_NATIVE_CPU=OFF `
+            "-DCMAKE_C_COMPILER=$toolchain/gcc.exe" "-DCMAKE_CXX_COMPILER=$toolchain/g++.exe"
+          if ($LASTEXITCODE -ne 0) { throw 'Release configuration failed.' }
+
+      - name: Build and package Windows
+        run: |
+          ./packaging/build_release.ps1 -BuildPath build/release-mingw -OutputPath release/windows -Installer `
+            -InnoCompiler "${env:ProgramFiles(x86)}/Inno Setup 6/ISCC.exe"
+
+      - name: Check ZIP and installed setup
+        env:
+          RELEASE_VERSION: ${{ needs.validation.outputs.version }}
+          SOURCE_SHA: ${{ needs.validation.outputs.source_sha }}
+        run: |
+          ./.github/scripts/check_release_windows.ps1 -PackageDirectory release/windows `
+            -Version $env:RELEASE_VERSION -SourceCommit $env:SOURCE_SHA
+
+      - name: Upload verified Windows packages
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-windows
+          path: |
+            release/windows/*-portable.zip
+            release/windows/*-setup.exe
+            release/windows/SHA256SUMS.txt
+            release/windows/build-info.json
+          if-no-files-found: error
+          compression-level: 0
+          overwrite: true
+          retention-days: 14
+
+  linux:
+    needs: validation
+    runs-on: ubuntu-24.04
+    container: debian:13
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Install Debian 13 Qt and packaging tools
+        run: |
+          sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/debian.sources
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates git build-essential cmake ninja-build python3 curl file dpkg-dev pkg-config \
+            qt6-base-dev qt6-wayland qt6-tools-dev qt6-l10n-tools libx11-dev libsecret-1-dev desktop-file-utils xvfb xauth dbus-x11
+
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.validation.outputs.source_sha }}
+          persist-credentials: false
+
+      - name: Allow packaging to read checkout metadata
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Configure Release with distribution Qt
+        run: cmake --preset linux-release -DCMAKE_PREFIX_PATH=/usr -DXLIBRARY_NATIVE_CPU=OFF
+
+      - name: Build and verify AppImage and DEB
+        run: python3 packaging/build_release.py --output-path release/linux
+
+      - name: Check AppImage on X11 and embedded metadata
+        env:
+          SOURCE_SHA: ${{ needs.validation.outputs.source_sha }}
+        run: |
+          images=(release/linux/XLibrary-*-linux-x86_64.AppImage)
+          test "${#images[@]}" -eq 1
+          image=$(realpath "${images[0]}")
+          APPIMAGE_EXTRACT_AND_RUN=1 QT_QPA_PLATFORM=xcb timeout 45s xvfb-run -a dbus-run-session -- "$image" --check-startup
+          scratch=$(mktemp -d)
+          (cd "$scratch" && "$image" --appimage-extract usr/share/XLibrary/build-info.json)
+          cmp "$scratch/squashfs-root/usr/share/XLibrary/build-info.json" release/linux/build-info.json
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import sys
+          sys.path.insert(0, '.github/scripts')
+          from release import check_info, read_version
+          info = json.loads(Path('release/linux/build-info.json').read_text())
+          check_info(info, read_version(Path('VERSION'))[0], os.environ['SOURCE_SHA'], 'linux')
+          PY
+          cd release/linux
+          sha256sum --check SHA256SUMS.txt
+
+      - name: Install, run and remove DEB
+        run: |
+          packages=(release/linux/xlibrary_*_amd64.deb)
+          test "${#packages[@]}" -eq 1
+          apt-get install -y "./${packages[0]}"
+          QT_QPA_PLATFORM=offscreen timeout 45s /usr/bin/XLibrary --check-startup
+          apt-get remove -y xlibrary
+          test ! -e /usr/bin/XLibrary
+
+      - name: Upload verified Linux packages
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-linux
+          path: |
+            release/linux/*.AppImage
+            release/linux/*.deb
+            release/linux/SHA256SUMS.txt
+            release/linux/build-info.json
+          if-no-files-found: error
+          compression-level: 0
+          overwrite: true
+          retention-days: 14
+
+  draft:
+    needs: [validation, windows, linux]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      SOURCE_SHA: ${{ needs.validation.outputs.source_sha }}
+      RELEASE_TAG: ${{ needs.validation.outputs.tag }}
+      PRERELEASE: ${{ needs.validation.outputs.prerelease }}
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.validation.outputs.source_sha }}
+          persist-credentials: false
+
+      - name: Download Windows packages from this run
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: release-windows
+          path: artifacts/windows
+
+      - name: Download Linux packages from this run
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: release-linux
+          path: artifacts/linux
+
+      - name: Verify all packages and assemble upload files
+        run: |
+          python3 .github/scripts/release.py assemble
+          cd release-upload
+          sha256sum --check SHA256SUMS.txt
+
+      - name: Generate GitHub release notes before creating tag
+        run: |
+          gh api --method POST "repos/$GH_REPO/releases/generate-notes" \
+            -f tag_name="$RELEASE_TAG" -f target_commitish="$SOURCE_SHA" --jq .body > "$RUNNER_TEMP/release-notes.md"
+          cat >> "$RUNNER_TEMP/release-notes.md" <<'NOTES'
+
+          Windows x64: MinGW portable ZIP and Inno Setup installer. Back up the profile and exit XLibrary before upgrading. Portable profiles are separate from installed profiles.
+
+          Linux x86_64: AppImage and DEB, built on Debian 13 with system Qt 6.8.2 / glibc 2.41. SHA256SUMS.txt includes all four packages and both build metadata files. Binaries are unsigned.
+          NOTES
+
+      - name: Create source tag and Draft only
+        run: |
+          # An existing tag is an error, including after a partial prior attempt.
+          gh api --method POST "repos/$GH_REPO/git/refs" -f ref="refs/tags/$RELEASE_TAG" -f sha="$SOURCE_SHA"
+          flags=()
+          if [ "$PRERELEASE" = true ]; then flags+=(--prerelease); fi
+          gh release create "$RELEASE_TAG" --verify-tag --draft "${flags[@]}" \
+            --target "$SOURCE_SHA" --title "XLibrary $RELEASE_TAG" --notes-file "$RUNNER_TEMP/release-notes.md" release-upload/*
+
+      - name: Verify Draft state and uploaded files
+        run: |
+          # The REST lookup by tag only finds published releases; gh also resolves Drafts.
+          release_api=$(gh release view "$RELEASE_TAG" --json apiUrl --jq .apiUrl)
+          gh api "$release_api" > "$RUNNER_TEMP/release.json"
+          test "$(gh api "repos/$GH_REPO/git/ref/tags/$RELEASE_TAG" --jq .object.sha)" = "$SOURCE_SHA"
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          data = json.loads((Path(os.environ['RUNNER_TEMP']) / 'release.json').read_text())
+          assert data['draft'] is True, 'Release must remain a Draft'
+          assert data['prerelease'] == (os.environ['PRERELEASE'] == 'true'), 'Wrong prerelease flag'
+          assert data['tag_name'] == os.environ['RELEASE_TAG'], 'Wrong release tag'
+          files = {p.name: p for p in Path('release-upload').iterdir()}
+          assets = data['assets']
+          assert len(assets) == len(files) and {a['name'] for a in assets} == set(files), 'Wrong asset list'
+          for asset in assets:
+              path = files[asset['name']]
+              assert asset['state'] == 'uploaded' and asset['size'] == path.stat().st_size, path.name
+              with path.open('rb') as stream:
+                  expected = 'sha256:' + hashlib.file_digest(stream, 'sha256').hexdigest()
+              assert asset['digest'] == expected, f'Uploaded digest mismatch: {path.name}'
+          PY
+          printf 'Draft prepared: %s\nSource: %s\nPublish release must be performed manually.\n' \
+            "$RELEASE_TAG" "$SOURCE_SHA" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Explain recovery after a failed Draft job
+        if: failure()
+        run: |
+          echo 'Draft preparation failed. A source tag and a partial Draft may already exist. Nothing was published automatically. Inspect Releases and tags; see BUILDING.md before retrying.' >> "$GITHUB_STEP_SUMMARY"
