@@ -13,13 +13,13 @@
 #include <QStackedWidget>
 #include <QStyleHints>
 
-#include "Appearance.h"
+#include "appearance.h"
 #include "CatalogReview.h"
-#include "Editors.h"
+#include "editors.h"
 #include "GithubTokenStore.h"
 #include "LibrarySplitter.h"
 #include "LibraryViews.h"
-#include "Localization.h"
+#include "localization.h"
 #include "MainWindow.h"
 #include "NotificationBanner.h"
 #include "SettingsView.h"

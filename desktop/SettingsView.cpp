@@ -15,7 +15,7 @@
 
 #include "DesktopService.h"
 #include "GithubTokenStore.h"
-#include "Localization.h"
+#include "localization.h"
 #include "PlatformIntegration.h"
 #include "ProfileView.h"
 #include "SelectionButton.h"

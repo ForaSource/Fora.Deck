@@ -1,6 +1,6 @@
 #include "LaunchArguments.h"
 #include "Linux/LinuxProcessor.h"
-#include "Localization.h"
+#include "localization.h"
 #ifdef XLIBRARY_HAVE_X11
 #include <X11/keysym.h>
 #include <X11/Xatom.h>

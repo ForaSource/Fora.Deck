@@ -9,7 +9,7 @@
 #include <QtConcurrent/QtConcurrentRun>
 #include <QUrl>
 
-#include "Appearance.h"
+#include "appearance.h"
 #include "DesktopService.h"
 #include "PathHelpers.h"
 #include "PlatformIntegration.h"

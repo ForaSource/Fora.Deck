@@ -23,10 +23,10 @@
 #include <QStyledItemDelegate>
 #include <QTreeView>
 
-#include "Appearance.h"
+#include "appearance.h"
 #include "DesktopService.h"
 #include "LibraryViews.h"
-#include "Localization.h"
+#include "localization.h"
 #include "NotificationBanner.h"
 #include "ProfileView.h"
 #include "SearchResults.h"

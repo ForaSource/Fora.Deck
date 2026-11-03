@@ -1,6 +1,6 @@
 #include <QLocale>
 
-#include "Localization.h"
+#include "localization.h"
 
 QString Localization::ShortcutTranslator::translate(const char *const context, const char *const source_text,
                                                     const char *, int) const {

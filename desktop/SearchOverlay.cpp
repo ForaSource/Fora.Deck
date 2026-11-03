@@ -12,7 +12,7 @@
 #include <QVariantAnimation>
 #include <QVBoxLayout>
 
-#include "Appearance.h"
+#include "appearance.h"
 #include "DesktopService.h"
 #include "NotificationBanner.h"
 #include "PlatformIntegration.h"

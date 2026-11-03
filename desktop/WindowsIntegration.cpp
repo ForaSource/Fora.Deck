@@ -17,7 +17,7 @@
 
 #include "ApplicationPaths.h"
 #include "Heartbeat.h"
-#include "Localization.h"
+#include "localization.h"
 #include "PlatformIntegration.h"
 #include "WindowManager.h"
 #include "Windows/RegistryScan.h"

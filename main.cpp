@@ -12,9 +12,9 @@
 #include <QTimer>
 
 #include "Database.h"
-#include "desktop/Appearance.h"
+#include "desktop/appearance.h"
 #include "desktop/DesktopService.h"
-#include "desktop/Localization.h"
+#include "desktop/localization.h"
 #include "desktop/MainWindow.h"
 #include "desktop/PlatformIntegration.h"
 #include "src/ApplicationPaths.h"

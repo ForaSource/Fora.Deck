@@ -2,9 +2,9 @@
 #include <QScrollArea>
 #include <QScrollBar>
 
-#include "Appearance.h"
+#include "appearance.h"
 #include "LibrarySplitter.h"
-#include "Localization.h"
+#include "localization.h"
 
 LibrarySplitter::LibrarySplitter(QSettings &settings, QWidget *const navigation, QWidget *const center,
                                  QWidget *const details, QWidget *const parent, std::function<bool()> can_save_layout)
@@ -41,8 +41,9 @@ void LibrarySplitter::update_layout(const bool show_details) {
     const auto center_min = qMin(appearance::scaled(settings, 280), qMax(200, width() / 2));
     auto details_min = appearance::scaled(settings, 264);
     if (const auto *details = qobject_cast<QScrollArea *>(widget(2)); details && details->widget()) {
-        details_min = qMax(details_min, details->widget()->minimumSizeHint().width() +
-                                           details->verticalScrollBar()->sizeHint().width() + details->frameWidth() * 2);
+        details_min =
+            qMax(details_min, details->widget()->minimumSizeHint().width() +
+                                  details->verticalScrollBar()->sizeHint().width() + details->frameWidth() * 2);
     }
     widget(0)->setMinimumWidth(navigation_min);
     widget(0)->setMaximumWidth(qMax(navigation_min, appearance::scaled(settings, 420)));
@@ -51,13 +52,14 @@ void LibrarySplitter::update_layout(const bool show_details) {
     widget(2)->setMaximumWidth(qMax(details_min, appearance::scaled(settings, 640)));
     const bool visible = details_requested && width() >= navigation_min + center_min + details_min + 80;
     widget(2)->setVisible(visible);
-    const auto navigation_width = qMax(
-        navigation_min,
-        appearance::scaled(settings, qBound(176, settings.value("window/navigation_width", 208).toInt(), 420)));
+    const auto navigation_width =
+        qMax(navigation_min,
+             appearance::scaled(settings, qBound(176, settings.value("window/navigation_width", 208).toInt(), 420)));
     const auto details_width =
-        visible ? qMax(details_min, appearance::scaled(
-                                       settings, qBound(264, settings.value("window/details_width", 304).toInt(), 640)))
-                : 0;
+        visible
+            ? qMax(details_min,
+                   appearance::scaled(settings, qBound(264, settings.value("window/details_width", 304).toInt(), 640)))
+            : 0;
     setSizes({navigation_width, qMax(center_min, width() - navigation_width - details_width - handleWidth() * 2),
               details_width});
     applying_layout = false;

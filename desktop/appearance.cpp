@@ -5,7 +5,7 @@
 #include <QPalette>
 #include <QStyleHints>
 
-#include "Appearance.h"
+#include "appearance.h"
 #include "WindowManager.h"
 
 QIcon appearance::icon(const QString &name, const QColor &color) {

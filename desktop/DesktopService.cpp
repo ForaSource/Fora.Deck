@@ -18,7 +18,7 @@
 #include "ApplicationPaths.h"
 #include "DesktopService.h"
 #include "GithubTokenStore.h"
-#include "Localization.h"
+#include "localization.h"
 #include "Manager.h"
 #include "PathHelpers.h"
 #include "PlatformIntegration.h"
@@ -214,10 +214,9 @@ void DesktopService::publish_result(const operation_result &result) {
             settings.setValue("sources/excluded_configurations", exclusions);
             settings.sync();
             if (settings.status() != QSettings::NoError) {
-                last_failure = {
-                    QCoreApplication::translate(
-                        "XLibrary", "Import completed, but discovery exclusions could not be saved."),
-                    "QSettings sync failed for discovery exclusions", operation_error_source::filesystem};
+                last_failure = {QCoreApplication::translate(
+                                    "XLibrary", "Import completed, but discovery exclusions could not be saved."),
+                                "QSettings sync failed for discovery exclusions", operation_error_source::filesystem};
                 emit message(last_failure.user_message);
             }
         }

@@ -167,18 +167,18 @@ qt_add_executable(XLibrary WIN32
         desktop/CatalogReview.h desktop/CatalogReview.cpp
         desktop/ProfileView.h desktop/ProfileView.cpp
         desktop/PlatformIntegration.h
-        desktop/Localization.h desktop/Localization.cpp
+        desktop/localization.h desktop/localization.cpp
         desktop/LibraryModel.h desktop/LibraryModel.cpp
         desktop/SearchTools.h desktop/SearchTools.cpp
         desktop/SearchResults.h desktop/SearchResults.cpp
         desktop/SearchOverlay.h desktop/SearchOverlay.cpp
         desktop/DesktopService.h desktop/DesktopService.cpp
-        desktop/Appearance.h desktop/Appearance.cpp
+        desktop/appearance.h desktop/appearance.cpp
         desktop/SelectionButton.h desktop/SelectionButton.cpp
         desktop/LibrarySplitter.h desktop/LibrarySplitter.cpp
         desktop/UiRegistry.h desktop/UiHelpers.h
         desktop/NotificationBanner.h desktop/NotificationBanner.cpp
-        desktop/Editors.h desktop/Editors.cpp
+        desktop/editors.h desktop/editors.cpp
         desktop/LibraryViews.h desktop/LibraryViews.cpp
         desktop/SettingsView.h desktop/SettingsView.cpp
         desktop/GithubTokenStore.h desktop/GithubTokenStore.cpp

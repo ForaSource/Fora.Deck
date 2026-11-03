@@ -15,8 +15,8 @@
 #include <QTextDocument>
 
 #include "DesktopService.h"
-#include "Editors.h"
-#include "Localization.h"
+#include "editors.h"
+#include "localization.h"
 #include "UiHelpers.h"
 
 namespace {

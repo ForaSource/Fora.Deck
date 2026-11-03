@@ -14,8 +14,8 @@
 #include <QVariantAnimation>
 #include <QVBoxLayout>
 
-#include "Appearance.h"
-#include "Localization.h"
+#include "appearance.h"
+#include "localization.h"
 #include "PlatformIntegration.h"
 #include "UiRegistry.h"
 

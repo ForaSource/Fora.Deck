@@ -5,7 +5,7 @@
 #include <QTimer>
 
 #include "LibraryModel.h"
-#include "Localization.h"
+#include "localization.h"
 #include "PathHelpers.h"
 #include "PlatformIntegration.h"
 
