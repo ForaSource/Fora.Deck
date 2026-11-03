@@ -123,15 +123,30 @@ void LibraryModel::replace(QVector<app_record> applications) {
     search_names.clear();
     search_paths.clear();
     search_tags.clear();
+    name_sort_keys.clear();
+    tag_sort_keys.clear();
     search_names.reserve(records.size());
     search_paths.reserve(records.size());
     search_tags.reserve(records.size());
+    name_sort_keys.reserve(records.size());
+    tag_sort_keys.reserve(records.size());
+    const QCollator collator;
     for (const auto &record : records) {
         search_names.append(record.name.toCaseFolded());
         search_paths.append(QFileInfo(record.path).fileName().toCaseFolded());
         search_tags.append(record.tags.join(", ").toCaseFolded());
+        name_sort_keys.append(collator.sortKey(search_names.back()));
+        tag_sort_keys.append(collator.sortKey(search_tags.back()));
     }
     endResetModel();
+}
+
+int LibraryModel::compare_names(const int left_row, const int right_row) const {
+    return name_sort_keys[left_row].compare(name_sort_keys[right_row]);
+}
+
+int LibraryModel::compare_tags(const int left_row, const int right_row) const {
+    return tag_sort_keys[left_row].compare(tag_sort_keys[right_row]);
 }
 
 QHash<int, QByteArray> LibraryModel::roleNames() const {
@@ -149,6 +164,8 @@ void LibraryModel::update_state(const QVector<app_record> &applications) {
     QHash<qint64, const app_record *> states;
     for (const auto &record : applications)
         states.insert(record.id, &record);
+    int first_changed = -1;
+    int last_changed = -1;
     for (int row = 0; row < records.size(); ++row) {
         auto &record = records[row];
         const auto *state = states.value(record.id);
@@ -159,10 +176,15 @@ void LibraryModel::update_state(const QVector<app_record> &applications) {
             record.available = state->available;
             record.volume_unavailable = state->volume_unavailable;
             record.new_instance_error = state->new_instance_error;
-            emit dataChanged(index(row, 0), index(row, 2),
-                             {Qt::DisplayRole, running_role, available_role, record_role});
+            if (first_changed < 0)
+                first_changed = row;
+            last_changed = row;
         }
     }
+    // Let the proxy update ordering once, after the entire state snapshot has been applied.
+    if (first_changed >= 0)
+        emit dataChanged(index(first_changed, 0), index(last_changed, 2),
+                         {Qt::DisplayRole, running_role, available_role, record_role});
 }
 
 const app_record *LibraryModel::find(const qint64 id) const {
@@ -262,6 +284,9 @@ bool LibraryFilter::lessThan(const QModelIndex &left, const QModelIndex &right) 
     const auto *model = static_cast<const LibraryModel *>(sourceModel());
     const auto &a = model->at(left.row());
     const auto &b = model->at(right.row());
+    // The proxy reverses comparisons for descending order; keep favorites pinned in both directions.
+    if (a.favorite != b.favorite)
+        return sortOrder() == Qt::AscendingOrder ? a.favorite : b.favorite;
     if (query.has_text()) {
         const auto a_rank = query_rank(left.row());
         const auto b_rank = query_rank(right.row());
@@ -273,7 +298,7 @@ bool LibraryFilter::lessThan(const QModelIndex &left, const QModelIndex &right) 
         const auto &b_tags = model->tag_names(right.row());
         if (a_tags.isEmpty() != b_tags.isEmpty())
             return !a_tags.isEmpty();
-        const auto comparison = QString::localeAwareCompare(a_tags, b_tags);
+        const auto comparison = model->compare_tags(left.row(), right.row());
         if (comparison != 0)
             return comparison < 0;
     }
@@ -285,9 +310,6 @@ bool LibraryFilter::lessThan(const QModelIndex &left, const QModelIndex &right) 
     }
     if (sort_mode == 1 && a.last_launch != b.last_launch)
         return a.last_launch > b.last_launch;
-    if (sort_mode == 2 && a.favorite != b.favorite)
-        return a.favorite;
-    const auto comparison =
-        QString::localeAwareCompare(model->search_name(left.row()), model->search_name(right.row()));
+    const auto comparison = model->compare_names(left.row(), right.row());
     return comparison == 0 ? a.id < b.id : comparison < 0;
 }

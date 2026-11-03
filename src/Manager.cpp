@@ -601,7 +601,10 @@ void Manager::apply_catalog_preview(const QVector<app_record> &applications, QVe
             count.added, issues,
             QCoreApplication::translate("XLibrary", "Import complete. Updated: %1.").arg(count.updated));
         emit this->discovery_report_ready(discovery_details(message, issues));
-        emit this->notification(message);
+        emit this->notification(
+            QCoreApplication::translate("XLibrary", "Import complete. Added: %1. Already in the library: %2.")
+                .arg(count.added)
+                .arg(count.duplicates + count.updated));
         this->refresh();
     } catch (const DiscoveryCancelled &) {
         const auto message = QCoreApplication::translate("XLibrary", "Import cancelled; changes were not saved.");

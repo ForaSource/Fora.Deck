@@ -558,13 +558,17 @@ QWidget *library(const ui_context &context, QWidget *const parent) {
     view->header()->setSortIndicatorShown(true);
     view->header()->setSortIndicator(service->filter.sortColumn(), service->filter.sortOrder());
     view->header()->setCursor(Qt::PointingHandCursor);
-    QObject::connect(view->header(), &QHeaderView::sectionClicked, widget, [=](const int column) {
+    const auto sort_column = [=](const int column) {
+        if (column < 0 || column >= service->filter.columnCount())
+            return;
         const auto mode = column == 1 ? 3 : column == 2 ? 4 : 0;
         const auto direction = sort->currentIndex() == mode && service->filter.sortOrder() == Qt::AscendingOrder
                                    ? Qt::DescendingOrder
                                    : Qt::AscendingOrder;
         service->filter.set_sort_mode(mode, direction);
-    });
+    };
+    QObject::connect(view->header(), &QHeaderView::sectionClicked, widget, sort_column);
+    QObject::connect(view->header(), &QHeaderView::sectionDoubleClicked, widget, sort_column);
     QObject::connect(&service->filter, &LibraryFilter::sort_changed, widget,
                      [=](const int mode, const Qt::SortOrder direction) {
                          const QSignalBlocker blocker(sort);

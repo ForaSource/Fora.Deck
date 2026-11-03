@@ -2096,6 +2096,10 @@ Technical reason: %3</source>
         <translation>Импорт отменён; изменения не сохранены.</translation>
     </message>
     <message>
+        <source>Import complete. Added: %1. Already in the library: %2.</source>
+        <translation>Импорт завершён. Добавлено: %1. Уже в библиотеке: %2.</translation>
+    </message>
+    <message>
         <source>Import complete. Updated: %1.</source>
         <translation>Импорт завершён. Обновлено: %1.</translation>
     </message>

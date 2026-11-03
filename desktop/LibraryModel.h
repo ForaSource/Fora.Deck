@@ -3,6 +3,7 @@
 
 #include <QAbstractTableModel>
 #include <QCache>
+#include <QCollator>
 #include <QIcon>
 #include <QSet>
 #include <QSortFilterProxyModel>
@@ -18,6 +19,8 @@ private:
     QStringList search_names;
     QStringList search_paths;
     QStringList search_tags;
+    QVector<QCollatorSortKey> name_sort_keys;
+    QVector<QCollatorSortKey> tag_sort_keys;
     mutable QCache<QString, QIcon> icons{256};
     mutable QSet<QString> pending_icons;
     QThreadPool icon_pool;
@@ -39,6 +42,8 @@ public:
     const QString &search_name(const int row) const { return search_names[row]; }
     const QString &search_path(const int row) const { return search_paths[row]; }
     const QString &tag_names(const int row) const { return search_tags[row]; }
+    int compare_names(int left_row, int right_row) const;
+    int compare_tags(int left_row, int right_row) const;
     const QVector<app_record> &applications() const { return records; }
 };
 
