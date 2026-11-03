@@ -1034,16 +1034,12 @@ Applications: %1</source>
         <translation>После запуска приложения</translation>
     </message>
     <message>
-        <source>Keep the window open</source>
-        <translation>Оставить окно открытым</translation>
+        <source>Keep the window open in the background</source>
+        <translation>Оставить окно открытым на заднем плане</translation>
     </message>
     <message>
         <source>Minimize the window</source>
         <translation>Свернуть окно</translation>
-    </message>
-    <message>
-        <source>Hide to tray</source>
-        <translation>Скрыть в трей</translation>
     </message>
     <message>
         <source>Launch again</source>

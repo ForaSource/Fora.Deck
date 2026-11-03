@@ -76,6 +76,13 @@ read or copy it. The summary separates additions, duplicates, skipped entries, a
 Repeated launch configurations are skipped; existing entries keep their metadata and collect
 discovery sources. Names may repeat, and one EXE may have multiple argument/working-directory
 profiles. Symlinks share a canonical target while retaining their invocation paths.
+On Windows, an omitted working directory and the executable's own folder describe the same
+launch configuration. Discovery prefers a Start menu shortcut over an App Paths entry with
+the same name and executable, keeping the shortcut's arguments. Reimporting that shortcut
+also consolidates existing same-name cards with equivalent launch configurations, preserving
+tags, aliases, favorites, launch history, sources, and scenario steps. Cards stay separate if
+their combined metadata exceeds catalog limits. Different arguments or effective working
+directories remain separate profiles. Manual addition rejects a configuration already in the library.
 Cancelling discovery before its transaction is committed rolls back all additions. Once commit
 starts, cancellation is unavailable. JSON import and discovery never launch applications.
 

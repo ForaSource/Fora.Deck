@@ -89,14 +89,13 @@ SearchOverlay::SearchOverlay(DesktopService &service, QWidget *const parent)
     connect(height_animation, &QVariantAnimation::finished, this,
             [this] { resize(width(), qMin(qRound(surface_height) + 16, screen()->availableGeometry().height())); });
     refresh_appearance();
-    ensurePolished();
     hide();
 }
 
 void SearchOverlay::refresh_appearance() {
     notice->refresh_appearance();
     inset = appearance::scaled(service.settings, 16);
-    header_height = appearance::scaled(service.settings, 64);
+    header_height = appearance::scaled(service.settings, 40);
     input->setFixedHeight(header_height);
     open_button->setFixedSize(appearance::scaled(service.settings, 40), appearance::scaled(service.settings, 40));
     auto font = input->font();
@@ -104,21 +103,28 @@ void SearchOverlay::refresh_appearance() {
     input->setFont(font);
     setStyleSheet(
         QStringLiteral("QWidget#search_overlay, QWidget#overlay_contents { background: transparent; }"
-                       "QLineEdit#overlay_search_input { background: transparent; border: none; padding: 0 8px; }"
+                       "QLineEdit#overlay_search_input { background: transparent; border: none; padding: 0 8px; "
+                       "min-height: %1px; max-height: %1px; }"
                        "QListView#search_results { background: transparent; border: none; }"
                        "QToolButton { border: none; border-radius: 10px; background: transparent; }"
-                       "QToolButton:hover { background: rgba(135,140,150,35); }"));
+                       "QToolButton:hover { background: rgba(135,140,150,35); }")
+            .arg(header_height));
     update_height();
 }
 
 void SearchOverlay::update_height() {
-    const qreal target = contents->layout()->sizeHint().height() + inset * 2;
+    // Resolve stylesheet constraints before measuring, including on the first show.
+    contents->ensurePolished();
+    contents->layout()->activate();
+    const int content_height = contents->layout()->sizeHint().height();
+    // The painted surface starts 8 px below the window; keep both inner insets equal.
+    const qreal target = content_height + (inset - 8) * 2;
     const auto available = screen()->availableGeometry();
     const int desired_height = qMin(qRound(target) + 16, available.height());
     const bool animate =
         isVisible() && desktop_platform::animations_enabled() && progress >= 1 && surface_height != target;
     resize(width(), animate ? qMax(desired_height, height()) : desired_height);
-    contents->setGeometry(inset, inset, qMax(1, width() - inset * 2), qRound(target) - inset * 2);
+    contents->setGeometry(inset, inset, qMax(1, width() - inset * 2), content_height);
     height_animation->stop();
     if (animate) {
         height_animation->setStartValue(surface_height);

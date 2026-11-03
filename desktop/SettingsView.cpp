@@ -69,9 +69,8 @@ QWidget *general(const ui_context &context, QWidget *) {
              QCoreApplication::translate("XLibrary", "Minimize to tray on close"), true);
     choices(widget, settings, "behavior/after_launch",
             QCoreApplication::translate("XLibrary", "After launching an application"),
-            {{QCoreApplication::translate("XLibrary", "Keep the window open"), "keep"},
-             {QCoreApplication::translate("XLibrary", "Minimize the window"), "minimize"},
-             {QCoreApplication::translate("XLibrary", "Hide to tray"), "hide"}},
+            {{QCoreApplication::translate("XLibrary", "Keep the window open in the background"), "keep"},
+             {QCoreApplication::translate("XLibrary", "Minimize the window"), "minimize"}},
             "keep");
     choices(widget, settings, "behavior/relaunch", QCoreApplication::translate("XLibrary", "Launch again"),
             {{QCoreApplication::translate("XLibrary", "Switch to the open window"), "activate"},

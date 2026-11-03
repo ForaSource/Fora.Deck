@@ -152,9 +152,12 @@ std::uint32_t Application::launch(const std::wstring &arguments, const std::file
 #include <QDir>
 #include <QDirIterator>
 #include <QFileInfo>
+#include <QHash>
 #include <QRegularExpression>
+#include <QSet>
 #include <shlobj.h>
 
+#include "PathHelpers.h"
 #include "Windows/RegistryScan.h"
 namespace {
 bool is_system_application(const QString &path) {
@@ -394,8 +397,37 @@ QVector<app_record> Application::discover(const bool registry, const bool start_
     }
     if (cancelled.load())
         return {};
+    QSet<QString> shortcut_applications;
+    for (const auto &record : std::as_const(result)) {
+        if (!record.discovery_source.isEmpty())
+            shortcut_applications.insert(normalized_path(record.path) + QChar::Null +
+                                         record.name.normalized(QString::NormalizationForm_C).toCaseFolded());
+    }
+    QHash<QString, qsizetype> configurations;
+    QVector<app_record> unique;
+    unique.reserve(result.size());
+    for (auto &record : result) {
+        const auto name_key = normalized_path(record.path) + QChar::Null +
+                              record.name.normalized(QString::NormalizationForm_C).toCaseFolded();
+        const auto key = launch_configuration_key(record.path, record.arguments, record.working_directory);
+        const auto existing = configurations.constFind(key);
+        // App Paths has no launch parameters; the named shortcut is authoritative.
+        const bool duplicate = (record.discovery_source.isEmpty() && shortcut_applications.contains(name_key)) ||
+                               existing != configurations.cend();
+        if (duplicate) {
+            issues.append(
+                {record.discovery_source.isEmpty() ? record.path : record.discovery_source,
+                 QCoreApplication::translate("XLibrary", "This launch configuration is already in the library."),
+                 discovery_issue_kind::duplicate});
+            if (existing != configurations.cend() && !record.discovery_source.isEmpty())
+                unique[*existing].discovery_sources.append(record.discovery_source);
+        } else {
+            configurations.insert(key, unique.size());
+            unique.append(std::move(record));
+        }
+    }
     report(total, total, QCoreApplication::translate("XLibrary", "Application checks complete"));
-    return result;
+    return unique;
 }
 
 xlibrary::ComScope::ComScope() : result(CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED)) {

@@ -503,7 +503,13 @@ void DesktopService::present_catalog_preview(QVector<app_record> records, QVecto
         const auto exclusions = settings.value("sources/excluded_configurations").toStringList();
         records.removeIf([&](const app_record &record) {
             const auto key = launch_configuration_key(record.path, record.arguments, record.working_directory);
-            if (!exclusions.contains(key))
+            auto excluded = exclusions.contains(key);
+#ifdef Q_OS_WIN
+            // Keep exclusions saved before empty and default directories became equivalent.
+            if (!excluded && key == launch_configuration_key(record.path, record.arguments, {}))
+                excluded = exclusions.contains(launch_configuration_key(record.path, record.arguments, {}, false));
+#endif
+            if (!excluded)
                 return false;
             issues.append({record.discovery_source, QCoreApplication::translate("XLibrary", "Excluded by the user."),
                            discovery_issue_kind::skipped});

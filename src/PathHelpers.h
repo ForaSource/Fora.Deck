@@ -3,6 +3,7 @@
 
 #include <filesystem>
 #include <QDir>
+#include <QFileInfo>
 #include <QString>
 
 inline std::filesystem::path filesystem_path(const QString &path) {
@@ -35,11 +36,19 @@ inline constexpr Qt::CaseSensitivity path_case_sensitivity =
     Qt::CaseSensitive;
 #endif
 
-inline QString launch_configuration_key(const QString &path, const QString &arguments, const QString &directory) {
+inline QString launch_configuration_key(const QString &path, const QString &arguments, const QString &directory,
+                                        const bool use_default_directory = true) {
     // Length prefixes keep arguments containing separators unambiguous.
     const auto part = [](const QString &value) { return QString::number(value.size()) + ':' + value; };
+    auto effective_directory = directory;
+#ifdef Q_OS_WIN
+    if (effective_directory.isEmpty() && use_default_directory)
+        effective_directory = QFileInfo(path).absolutePath();
+#else
+    Q_UNUSED(use_default_directory)
+#endif
     return part(normalized_path(path)) + part(arguments) +
-           part(directory.isEmpty() ? QString{} : normalized_path(directory));
+           part(effective_directory.isEmpty() ? QString{} : normalized_path(effective_directory));
 }
 
 #endif

@@ -54,6 +54,27 @@ sqlite3_int64 xlibrary::ensure_launch_configuration(sqlite3 *const connection, c
         arguments.find('\0') != std::string::npos)
         throw std::invalid_argument("Launch configuration contains a null character");
     const auto invocation = path_identity(path, false);
+#ifdef _WIN32
+    const auto effective_directory = working_directory.empty() ? path.parent_path() : working_directory;
+    const auto directory_key = path_identity(effective_directory);
+    {
+        // Older catalogs distinguish an omitted directory from the EXE's own folder.
+        SqliteStatement existing(connection, "SELECT c.id,c.path,c.working_directory FROM launch_configuration c "
+                                             "WHERE c.invocation_key=? AND c.arguments=? "
+                                             "ORDER BY EXISTS(SELECT 1 FROM applications a "
+                                             "WHERE a.configuration_id=c.id) DESC,c.id;");
+        existing.bind(1, invocation);
+        existing.bind(2, arguments);
+        while (existing.next()) {
+            const auto stored_directory = utf8_path(existing.text(2));
+            if (path_identity(stored_directory.empty() ? utf8_path(existing.text(1)).parent_path()
+                                                       : stored_directory) == directory_key)
+                return existing.number(0);
+        }
+    }
+#else
+    const auto directory_key = working_directory.empty() ? std::string{} : path_identity(working_directory);
+#endif
     {
         // Исчезнувший или переназначенный симлинк не меняет идентичность при сохранении тегов карточки.
         SqliteStatement existing(connection, "SELECT id FROM launch_configuration WHERE invocation_key=? "
@@ -65,7 +86,6 @@ sqlite3_int64 xlibrary::ensure_launch_configuration(sqlite3 *const connection, c
             return existing.number(0);
     }
     const auto key = path_identity(path);
-    const auto directory_key = working_directory.empty() ? std::string{} : path_identity(working_directory);
     const std::string kind = path.extension() == ".desktop" ? "desktop" : "executable";
     SqliteStatement create_target(connection, "INSERT INTO launch_target(kind,identity_key) VALUES(?,?) "
                                               "ON CONFLICT(kind,identity_key) DO NOTHING;");

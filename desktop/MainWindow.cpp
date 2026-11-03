@@ -175,12 +175,9 @@ MainWindow::MainWindow(DesktopService &service)
         const auto behavior = this->service.settings.value("behavior/after_launch", "keep").toString();
         if (behavior == "minimize")
             showMinimized();
-        if (behavior == "hide") {
-            if (tray.isVisible())
-                hide();
-            else
-                showMinimized();
-        }
+        // The old hide-to-tray preference now keeps the library available in the taskbar.
+        else if (isVisible() && !isMinimized())
+            lower();
     });
     if (!restoreGeometry(service.settings.value("window/geometry").toByteArray()))
         resize(QSize(1280, 800).boundedTo(available));
