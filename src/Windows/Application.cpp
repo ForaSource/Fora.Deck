@@ -221,16 +221,6 @@ bool should_import_application(const app_record &record) {
            !uninstall_argument.match(record.arguments).hasMatch();
 }
 
-class ComScope {
-    HRESULT result = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
-
-public:
-    ~ComScope() {
-        if (SUCCEEDED(result)) {
-            CoUninitialize();
-        }
-    }
-};
 }
 
 QString Application::new_instance_error(const app_record &) {
@@ -238,7 +228,7 @@ QString Application::new_instance_error(const app_record &) {
 }
 
 void Application::launch_application(const app_record &record, launch_mode mode) {
-    const ComScope com;
+    const xlibrary::ComScope com;
     Application application(record.name.toStdString(), std::filesystem::path(record.path.toStdWString()));
     const auto directory =
         record.working_directory.isEmpty() ? QFileInfo(record.path).absolutePath() : record.working_directory;
@@ -256,7 +246,7 @@ app_record Application::resolve_application(const QString &path) {
                 QCoreApplication::translate("XLibrary", "The application file is unavailable.").toStdString());
     };
     supported_target(path);
-    const ComScope com;
+    const xlibrary::ComScope com;
     app_record result;
     result.discovery_source = path;
     result.path = QFileInfo(path).absoluteFilePath();
@@ -406,4 +396,11 @@ QVector<app_record> Application::discover(bool registry, bool start_menu, QVecto
         return {};
     report(total, total, QCoreApplication::translate("XLibrary", "Application checks complete"));
     return result;
+}
+
+xlibrary::ComScope::ComScope() : result(CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED)) {
+}
+xlibrary::ComScope::~ComScope() {
+    if (SUCCEEDED(result))
+        CoUninitialize();
 }

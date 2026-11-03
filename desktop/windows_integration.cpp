@@ -23,7 +23,6 @@
 #include "Windows/RegistryScan.h"
 
 namespace {
-using unique_handle = std::unique_ptr<void, decltype(&CloseHandle)>;
 
 struct window_search {
     QString path;
@@ -44,16 +43,6 @@ BOOL CALLBACK find_window(HWND window, LPARAM parameter) {
     return TRUE;
 }
 
-class ComScope {
-    HRESULT result = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
-
-public:
-    ~ComScope() {
-        if (SUCCEEDED(result)) {
-            CoUninitialize();
-        }
-    }
-};
 }
 
 QString desktop_platform::default_global_shortcut() {
@@ -83,7 +72,7 @@ bool WindowManager::activate_window(const app_record &record) {
 }
 
 void desktop_platform::open_folder(const QString &path) {
-    const ComScope com;
+    const xlibrary::ComScope com;
     const auto directory = QDir::toNativeSeparators(QFileInfo(path).absolutePath()).toStdWString();
     const auto result = reinterpret_cast<INT_PTR>(
         ShellExecuteW(nullptr, L"explore", directory.c_str(), nullptr, nullptr, SW_SHOWNORMAL));

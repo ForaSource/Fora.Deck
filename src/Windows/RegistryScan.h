@@ -11,6 +11,14 @@
 
 namespace xlibrary {
 
+class ComScope {
+    std::int32_t result;
+
+public:
+    ComScope();
+    ~ComScope();
+};
+
 enum class registry_scope { current_user, local_machine };
 
 struct registry_source {
