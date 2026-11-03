@@ -1,11 +1,17 @@
 #ifndef XLIBRARY_APPLICATION_H
 #define XLIBRARY_APPLICATION_H
 
+#include <atomic>
 #include <cstdint>
 #include <filesystem>
+#include <functional>
 #include <iosfwd>
 #include <memory>
+#include <QProcessEnvironment>
+#include <QSet>
 #include <string>
+
+#include "catalog_types.h"
 
 class Application {
 private:
@@ -21,6 +27,19 @@ private:
     }
 
 public:
+    enum class launch_mode { launch, activate, new_instance };
+    static void launch_application(const app_record &record, launch_mode mode);
+    static QString new_instance_error(const app_record &record);
+    static app_record resolve_application(const QString &path);
+    static QVector<app_record> discover(bool system, bool user, QVector<discovery_issue> &issues,
+                                        const std::atomic_bool &cancelled,
+                                        const std::function<void(const discovery_progress &)> &progress = {});
+#ifdef __linux__
+    static QProcessEnvironment environment();
+    static QString icon_name(const QString &path);
+    static QSet<quint32> matching_processes(const app_record &record);
+    static bool set_autostart(bool enabled, QString &error);
+#endif
     std::uint32_t get_pid() const noexcept;
     std::string get_file_title() const { return this->file_title; }
     std::filesystem::path get_file_path() const { return this->file_path; }

@@ -22,20 +22,15 @@ class LinuxHotkeyState;
 namespace desktop_platform {
 QString default_global_shortcut();
 QString default_overlay_shortcut();
-QSet<QString> running_paths(const QVector<app_record> &applications);
-enum class launch_mode { launch, activate, new_instance };
-bool activate_window(const app_record &record);
+using launch_mode = Application::launch_mode;
 void launch_application(const app_record &record, launch_mode mode);
-QString new_instance_error(const app_record &record);
+
 void open_folder(const QString &path);
 bool open_url(const QUrl &url);
 bool installed_for_updates();
 bool start_update_installer(const QString &path, QString &error);
 QImage application_icon(const QString &path);
-app_record resolve_application(const QString &path);
-QVector<app_record> discover(bool registry, bool start_menu, QVector<discovery_issue> &issues,
-                             const std::atomic_bool &cancelled,
-                             const std::function<void(const discovery_progress &)> &progress = {});
+
 bool set_autostart(bool enabled, QString &error);
 bool animations_enabled();
 void apply_backdrop(QWidget *window, bool dark, bool glass);

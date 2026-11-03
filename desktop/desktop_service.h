@@ -12,7 +12,7 @@
 #include "profile_backup.h"
 #include "update_checker.h"
 
-class CatalogWorker;
+class Manager;
 
 class DesktopService : public QObject {
     Q_OBJECT
@@ -22,7 +22,7 @@ class DesktopService : public QObject {
 private:
     std::shared_ptr<std::atomic<quint64>> request_sequence = std::make_shared<std::atomic<quint64>>(0);
     QThread worker_thread;
-    CatalogWorker *worker;
+    Manager *worker;
     QThreadPool discovery_pool;
     QTimer scenario_timer;
     QVector<scenario_step> pending_steps;
@@ -60,7 +60,7 @@ private:
     catalog_snapshot snapshot;
     quint64 begin_operation(const QString &operation);
     void publish_result(const operation_result &result);
-    quint64 enqueue(const QString &operation, std::function<void(CatalogWorker &)> task,
+    quint64 enqueue(const QString &operation, std::function<void(Manager &)> task,
                     operation_error_source source = operation_error_source::sqlite, quint64 request_id = 0);
     void finish_scenario(operation_state state, const operation_error &error = {});
     void next_scenario_step();

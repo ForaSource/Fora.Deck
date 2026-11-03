@@ -3,8 +3,7 @@
 
 #pragma once
 
-// Совместимый общий заголовок прежнего API. GUI работает через CatalogStore и
-// desktop_platform; этот заголовок не задаёт отдельные правила каталога или запуска.
+// Backend entry point shared by desktop integration and other consumers.
 
 #include "Application.h"
 #include "Database.h"

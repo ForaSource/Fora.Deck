@@ -1,8 +1,11 @@
 #ifndef XLIBRARY_WINDOWMANAGER_H
 #define XLIBRARY_WINDOWMANAGER_H
 
-// Устаревший совместимый API оценки темы по яркости экрана. GUI применяет тему
-// через desktop/appearance и desktop_platform, не используя этот класс.
+#include <QString>
+
+#include "catalog_types.h"
+
+// Theme policy and native activation; drawing remains in the desktop integration.
 class WindowManager {
 private:
     bool dark_theme = true;
@@ -13,6 +16,8 @@ private:
 
 public:
     void update_theme();
+    void update_theme(const QString &preference, bool system_light);
+    static bool activate_window(const app_record &record);
     int get_theme() const { return this->dark_theme; }
 };
 

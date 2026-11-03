@@ -7,8 +7,6 @@
 #include <QString>
 #include <stdexcept>
 
-#include "localization.h"
-
 namespace application_paths {
 inline bool portable_mode() {
     return QFileInfo(QCoreApplication::applicationDirPath() + "/portable.flag").isFile();

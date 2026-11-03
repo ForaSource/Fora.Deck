@@ -2,6 +2,7 @@
 #define XLIBRARY_SQLITE_HELPERS_H
 
 #include <memory>
+#include <QString>
 #include <sqlite3.h>
 #include <stdexcept>
 #include <string>
@@ -33,6 +34,17 @@ public:
     void bind(int index, sqlite3_int64 value) {
         if (sqlite3_bind_int64(statement.get(), index, value) != SQLITE_OK)
             throw std::runtime_error(sqlite3_errmsg(connection));
+    }
+    void bind(int index, const char *value) { bind(index, std::string_view(value)); }
+    void bind(int index, const QString &value) {
+        const auto bytes = value.toUtf8();
+        bind(index, std::string_view(bytes.constData(), static_cast<std::size_t>(bytes.size())));
+    }
+    QString qtext(int column) const {
+        const auto *value = sqlite3_column_text(statement.get(), column);
+        return value ? QString::fromUtf8(reinterpret_cast<const char *>(value),
+                                         sqlite3_column_bytes(statement.get(), column))
+                     : QString{};
     }
     bool next() {
         const auto status = sqlite3_step(statement.get());
