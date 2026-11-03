@@ -594,6 +594,7 @@ QWidget *library(const ui_context &context, QWidget *const parent) {
     empty_actions_layout->addWidget(action_button(context.actions.value("discover")));
     empty_layout->addWidget(empty_actions, 0, Qt::AlignHCenter);
     auto *reset_filters = button(QCoreApplication::translate("XLibrary", "Clear all filters"));
+    reset_filters->setEnabled(false);
     empty_layout->addWidget(reset_filters, 0, Qt::AlignHCenter);
     QObject::connect(reset_filters, &QPushButton::clicked, widget, [=] {
         service->clear_filters();
@@ -703,7 +704,7 @@ QWidget *library(const ui_context &context, QWidget *const parent) {
         const auto *previous_page = stack->currentWidget();
         stack->setCurrentWidget(has_rows ? static_cast<QWidget *>(view) : empty);
         empty_actions->setVisible(no_apps);
-        reset_filters->setVisible(service->is_ready() && !no_apps);
+        reset_filters->hide();
         const bool failed = !service->is_ready() && !service->is_opening() && !service->library_error().isEmpty();
         recovery_actions->setVisible(failed || service->restart_required());
         update_recovery();

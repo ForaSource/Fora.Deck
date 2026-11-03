@@ -57,6 +57,9 @@ void edit_filter(DesktopService &service, QLineEdit &input, QWidget *const paren
 QWidget *search_tools(DesktopService &service, QLineEdit &input, QWidget *const parent) {
     auto *widget = new QWidget(parent);
     widget->setObjectName("search_tools");
+    // Keep filter controls wired for future use, but unavailable in the current UI.
+    widget->setEnabled(false);
+    widget->hide();
     auto *root = new QVBoxLayout(widget);
     root->setContentsMargins(0, 0, 0, 0);
     root->setSpacing(4);
