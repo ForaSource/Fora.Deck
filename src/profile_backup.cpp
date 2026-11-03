@@ -17,7 +17,7 @@
 #include <QUuid>
 #include <stdexcept>
 
-#include "catalog_store.h"
+#include "Database.h"
 #include "path_helpers.h"
 #include "profile_backup.h"
 #include "profile_settings.h"
@@ -294,7 +294,7 @@ void validate_staged_database(const QString &path) {
             throw InvalidDatabase("This profile database requires a newer XLibrary version");
     }
     try {
-        CatalogStore store(path);
+        Database store(path);
         (void)store.read();
         Connection connection(path);
         xlibrary::validate_profile(connection.get());
@@ -378,7 +378,7 @@ staged_profile prepare_backup(const QString &source, const QString &staged_datab
     staged_profile result;
     {
         Connection connection(staged_database);
-        // Версии проверяются до CatalogStore: его конструктор имеет право мигрировать только staging.
+        // Версии проверяются до Database: его конструктор имеет право мигрировать только staging.
         result.manifest = read_manifest(connection.get());
         integrity_check(connection.get());
         result.settings = read_settings(connection.get());

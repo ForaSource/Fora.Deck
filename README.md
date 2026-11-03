@@ -137,13 +137,14 @@ Recover moved folder…** previews replacements for a moved directory before app
 valid entries together. Card IDs, tags, favorites, history, arguments, and scenario references
 are preserved.
 
-Storage migrations and launch identity belong to `xlibrary_core`; `CatalogStore` manages
-cards and their relations. `DesktopService` owns operation states and request IDs, while
-`desktop_platform` owns discovery, launch, activation, and process monitoring. Linux user
-arguments share one core parser; freedesktop `Exec` retains its separate standard format.
-The older `Manager`, `Heartbeat`, and `WindowManager` interfaces remain compatible legacy
-APIs; the GUI uses the service/platform contract and reuses Windows `Application` and
-`RegistryScan` and Linux process helpers.
+Backend code lives in `src/` and is built into `xlibrary_core`. `Database` owns the
+connection, schema migrations, cards and their relations. `Manager` owns the catalog,
+worker operations, request results and launch history. `Application` handles discovery,
+resolution and launch on both platforms; `Heartbeat` monitors running applications.
+`WindowManager` provides theme policy and native window activation. The desktop layer
+owns widgets, models, UI state, scenario timers and native interface integration, and
+connects these to the backend through `DesktopService`. Linux user arguments share
+one core parser; freedesktop `Exec` retains its separate standard format.
 
 ## Updates
 

@@ -13,13 +13,13 @@
 
 #include "Database.h"
 #include "desktop/appearance.h"
-#include "desktop/application_paths.h"
 #include "desktop/desktop_service.h"
 #include "desktop/localization.h"
 #include "desktop/main_window.h"
-#include "desktop/path_helpers.h"
 #include "desktop/platform_integration.h"
-#include "desktop/profile_backup.h"
+#include "src/application_paths.h"
+#include "src/path_helpers.h"
+#include "src/profile_backup.h"
 
 int main(int argc, char *argv[]) {
     QApplication application(argc, argv);

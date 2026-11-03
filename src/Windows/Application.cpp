@@ -147,3 +147,260 @@ std::uint32_t Application::launch(const std::wstring &arguments, const std::file
     this->pid = process_id;
     return process_id;
 }
+
+#include <QCoreApplication>
+#include <QDir>
+#include <QDirIterator>
+#include <QFileInfo>
+#include <QRegularExpression>
+#include <shlobj.h>
+
+#include "Windows/RegistryScan.h"
+namespace {
+bool is_system_application(const QString &path) {
+    const auto normalized_path = QDir::cleanPath(QDir::fromNativeSeparators(path));
+    wchar_t windows_directory[32768]{};
+    const auto length = GetWindowsDirectoryW(windows_directory, static_cast<UINT>(std::size(windows_directory)));
+    if (length > 0 && length < std::size(windows_directory)) {
+        const auto prefix = QDir::fromNativeSeparators(QString::fromWCharArray(windows_directory, length)) + '/';
+        if (normalized_path.startsWith(prefix, Qt::CaseInsensitive))
+            return true;
+    }
+
+    // WindowsApps also contains regular Microsoft applications; the publisher alone does not imply an OS component.
+    for (const auto *folder :
+         {&FOLDERID_ProgramFiles, &FOLDERID_ProgramFilesX86, &FOLDERID_ProgramFilesX64, &FOLDERID_LocalAppData}) {
+        PWSTR raw_path = nullptr;
+        if (FAILED(SHGetKnownFolderPath(*folder, 0, nullptr, &raw_path)))
+            continue;
+        const auto root = QDir::fromNativeSeparators(QString::fromWCharArray(raw_path));
+        CoTaskMemFree(raw_path);
+        const bool local = IsEqualGUID(*folder, FOLDERID_LocalAppData);
+        if (!local) {
+            // Windows components may also reside outside the OS directory.
+            for (const auto *directory : {"Internet Explorer/", "Windows Mail/", "Windows Media Player/",
+                                          "Windows Photo Viewer/", "Windows Defender/", "Windows NT/", "WSL/"}) {
+                if (normalized_path.startsWith(root + '/' + directory, Qt::CaseInsensitive))
+                    return true;
+            }
+        }
+        const auto prefix = root + (local ? "/Microsoft/WindowsApps/" : "/WindowsApps/");
+        if (!normalized_path.startsWith(prefix, Qt::CaseInsensitive))
+            continue;
+        const auto relative_path = normalized_path.mid(prefix.size());
+        if (relative_path.startsWith("Microsoft.Windows", Qt::CaseInsensitive) ||
+            relative_path.startsWith("MicrosoftWindows.", Qt::CaseInsensitive) ||
+            relative_path.startsWith("Microsoft.DesktopAppInstaller_", Qt::CaseInsensitive) ||
+            relative_path.startsWith("MicrosoftCorporationII.WindowsSubsystemForLinux_", Qt::CaseInsensitive) ||
+            (local && relative_path.compare("winget.exe", Qt::CaseInsensitive) == 0))
+            return true;
+    }
+    for (const auto *folder :
+         {&FOLDERID_ProgramFilesCommon, &FOLDERID_ProgramFilesCommonX86, &FOLDERID_ProgramFilesCommonX64}) {
+        PWSTR raw_path = nullptr;
+        if (FAILED(SHGetKnownFolderPath(*folder, 0, nullptr, &raw_path)))
+            continue;
+        const auto prefix = QDir::fromNativeSeparators(QString::fromWCharArray(raw_path)) + "/microsoft shared/ink/";
+        CoTaskMemFree(raw_path);
+        if (normalized_path.startsWith(prefix, Qt::CaseInsensitive))
+            return true;
+    }
+    return false;
+}
+
+bool should_import_application(const app_record &record) {
+    if (is_system_application(record.path))
+        return false;
+    // Shortcut names may be localized, and uninstall commands may run the main EXE with an argument.
+    static const QRegularExpression uninstaller_name("^(?:uninstall|uninst|unins[0-9]*)\\.exe$",
+                                                     QRegularExpression::CaseInsensitiveOption);
+    static const QRegularExpression uninstall_argument(
+        "(?:^|\\s)(?:--start-uninstaller|[-/]uninstall(?:remove)?|[-/]removeonly)(?=\\s|$)",
+        QRegularExpression::CaseInsensitiveOption);
+    return !uninstaller_name.match(QFileInfo(record.path).fileName()).hasMatch() &&
+           !uninstall_argument.match(record.arguments).hasMatch();
+}
+
+}
+
+QString Application::new_instance_error(const app_record &) {
+    return {};
+}
+
+void Application::launch_application(const app_record &record, launch_mode mode) {
+    const xlibrary::ComScope com;
+    Application application(record.name.toStdString(), std::filesystem::path(record.path.toStdWString()));
+    const auto directory =
+        record.working_directory.isEmpty() ? QFileInfo(record.path).absolutePath() : record.working_directory;
+    application.launch(record.arguments.toStdWString(), std::filesystem::path(directory.toStdWString()));
+}
+
+app_record Application::resolve_application(const QString &path) {
+    const auto supported_target = [](const QString &value) {
+        const auto suffix = QFileInfo(value).suffix().toLower();
+        if (suffix != "exe" && suffix != "bat" && suffix != "cmd" && suffix != "lnk")
+            throw std::invalid_argument(
+                QCoreApplication::translate("XLibrary", "Supported files: .exe, .lnk, .bat, .cmd.").toStdString());
+        if (!QFileInfo(value).isFile())
+            throw std::invalid_argument(
+                QCoreApplication::translate("XLibrary", "The application file is unavailable.").toStdString());
+    };
+    supported_target(path);
+    const xlibrary::ComScope com;
+    app_record result;
+    result.discovery_source = path;
+    result.path = QFileInfo(path).absoluteFilePath();
+    if (QFileInfo(path).suffix().compare("lnk", Qt::CaseInsensitive) == 0) {
+        IShellLinkW *raw_link = nullptr;
+        if (FAILED(CoCreateInstance(CLSID_ShellLink, nullptr, CLSCTX_INPROC_SERVER, IID_IShellLinkW,
+                                    reinterpret_cast<void **>(&raw_link)))) {
+            throw std::runtime_error(
+                QCoreApplication::translate("XLibrary", "Could not read the shortcut.").toStdString());
+        }
+        const auto release_link = [](IShellLinkW *value) { value->Release(); };
+        const std::unique_ptr<IShellLinkW, decltype(release_link)> link(raw_link, release_link);
+        IPersistFile *raw_file = nullptr;
+        if (FAILED(link->QueryInterface(IID_IPersistFile, reinterpret_cast<void **>(&raw_file)))) {
+            throw std::runtime_error(
+                QCoreApplication::translate("XLibrary", "Could not open the shortcut.").toStdString());
+        }
+        const auto release_file = [](IPersistFile *value) { value->Release(); };
+        const std::unique_ptr<IPersistFile, decltype(release_file)> file(raw_file, release_file);
+        if (FAILED(file->Load(path.toStdWString().c_str(), STGM_READ))) {
+            throw std::runtime_error(
+                QCoreApplication::translate("XLibrary", "Could not load the shortcut.").toStdString());
+        }
+        wchar_t buffer[32768]{};
+        if (FAILED(link->GetPath(buffer, static_cast<int>(std::size(buffer)), nullptr, 0)) || buffer[0] == L'\0') {
+            throw std::runtime_error(
+                QCoreApplication::translate("XLibrary", "The shortcut has no path to a regular application.")
+                    .toStdString());
+        }
+        result.path = QString::fromWCharArray(buffer);
+        buffer[0] = L'\0';
+        if (FAILED(link->GetArguments(buffer, static_cast<int>(std::size(buffer)))))
+            throw std::runtime_error(
+                QCoreApplication::translate("XLibrary", "Could not read the shortcut arguments.").toStdString());
+        result.arguments = QString::fromWCharArray(buffer);
+        buffer[0] = L'\0';
+        if (FAILED(link->GetWorkingDirectory(buffer, static_cast<int>(std::size(buffer)))))
+            throw std::runtime_error(
+                QCoreApplication::translate("XLibrary", "Could not read the shortcut working directory.")
+                    .toStdString());
+        result.working_directory = QString::fromWCharArray(buffer);
+        // Skip unusable shortcuts during discovery, before the shared import transaction.
+        if (!result.working_directory.isEmpty() && !QFileInfo(result.working_directory).isAbsolute()) {
+            throw std::invalid_argument(
+                QCoreApplication::translate("XLibrary", "The working directory must be an absolute path.")
+                    .toStdString());
+        }
+    }
+    supported_target(result.path);
+    const Application application(std::filesystem::path(result.path.toStdWString()));
+    result.name = QFileInfo(path).suffix().compare("lnk", Qt::CaseInsensitive) == 0
+                      ? QFileInfo(path).completeBaseName()
+                      : QString::fromUtf8(application.get_file_title());
+    result.path = QDir::fromNativeSeparators(result.path);
+    result.available = QFileInfo(result.path).isFile();
+    return result;
+}
+
+QVector<app_record> Application::discover(bool registry, bool start_menu, QVector<discovery_issue> &issues,
+                                          const std::atomic_bool &cancelled,
+                                          const std::function<void(const discovery_progress &)> &progress) {
+    QVector<app_record> result;
+    QStringList shortcuts;
+    // Build the queue first so its size stays fixed while reading shortcuts and EXE metadata.
+    if (progress)
+        progress({-1, 0, 0, QCoreApplication::translate("XLibrary", "Preparing the application list…")});
+    if (start_menu) {
+        for (const auto *folder : {&FOLDERID_Programs, &FOLDERID_CommonPrograms}) {
+            if (cancelled.load())
+                return {};
+            PWSTR raw_path = nullptr;
+            if (FAILED(SHGetKnownFolderPath(*folder, 0, nullptr, &raw_path))) {
+                issues.append(discovery_issue{
+                    "Start Menu", QCoreApplication::translate("XLibrary", "The Start menu folder is unavailable.")});
+                continue;
+            }
+            const QString directory = QString::fromWCharArray(raw_path);
+            CoTaskMemFree(raw_path);
+            QDirIterator files(directory, {"*.lnk"}, QDir::Files, QDirIterator::Subdirectories);
+            while (files.hasNext()) {
+                if (cancelled.load())
+                    return {};
+                shortcuts.append(files.next());
+            }
+        }
+    }
+    qsizetype registry_count = 0;
+    const auto report = [&](qsizetype processed, qsizetype total, const QString &stage) {
+        if (progress)
+            progress({total > 0 ? static_cast<int>(90.0 * processed / total) : 90, processed, total, stage});
+    };
+    if (registry && !cancelled.load()) {
+        std::vector<xlibrary::scan_issue> registry_issues;
+        const auto applications =
+            xlibrary::scan_registry_applications(&registry_issues, [&](std::size_t processed, std::size_t total) {
+                registry_count = static_cast<qsizetype>(total);
+                report(static_cast<qsizetype>(processed), registry_count + shortcuts.size(),
+                       QCoreApplication::translate("XLibrary", "Checking the Windows registry"));
+                return !cancelled.load();
+            });
+        for (const auto &application : applications) {
+            if (cancelled.load())
+                return {};
+            app_record record;
+            record.name = QString::fromUtf8(application.get_file_title());
+            record.path = QDir::fromNativeSeparators(QString::fromStdWString(application.get_file_path().wstring()));
+            if (should_import_application(record))
+                result.append(std::move(record));
+            else
+                issues.append(discovery_issue{
+                    record.path, QCoreApplication::translate("XLibrary", "System component or uninstaller."),
+                    discovery_issue_kind::skipped});
+        }
+        for (const auto &issue : registry_issues) {
+            const auto root = issue.source.scope == xlibrary::registry_scope::current_user ? "HKCU" : "HKLM";
+            issues.append(discovery_issue{
+                QString("%1\\%2 [%3]")
+                    .arg(root, QString::fromStdWString(issue.source.key))
+                    .arg(issue.source.view == KEY_WOW64_32KEY ? 32 : 64),
+                QString("%1: Win32 %2").arg(QString::fromStdWString(issue.operation)).arg(issue.error)});
+        }
+    }
+    const auto total = registry_count + shortcuts.size();
+    for (qsizetype index = 0; index < shortcuts.size(); ++index) {
+        if (cancelled.load())
+            return {};
+        report(registry_count + index, total, QCoreApplication::translate("XLibrary", "Checking Start menu shortcuts"));
+        const auto &path = shortcuts[index];
+        try {
+            const auto record = resolve_application(path);
+            if (record.available && QFileInfo(record.path).suffix().compare("exe", Qt::CaseInsensitive) == 0 &&
+                should_import_application(record))
+                result.append(record);
+            else
+                issues.append(discovery_issue{
+                    path,
+                    !record.available ? QCoreApplication::translate("XLibrary", "The target file is missing.")
+                    : QFileInfo(record.path).suffix().compare("exe", Qt::CaseInsensitive) != 0
+                        ? QCoreApplication::translate("XLibrary", "The shortcut target is not an EXE.")
+                        : QCoreApplication::translate("XLibrary", "System component or uninstaller."),
+                    discovery_issue_kind::skipped});
+        } catch (const std::exception &error) {
+            issues.append(discovery_issue{path, QString::fromUtf8(error.what())});
+        }
+    }
+    if (cancelled.load())
+        return {};
+    report(total, total, QCoreApplication::translate("XLibrary", "Application checks complete"));
+    return result;
+}
+
+xlibrary::ComScope::ComScope() : result(CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED)) {
+}
+xlibrary::ComScope::~ComScope() {
+    if (SUCCEEDED(result))
+        CoUninitialize();
+}

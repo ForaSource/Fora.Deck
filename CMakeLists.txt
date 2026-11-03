@@ -99,6 +99,16 @@ target_link_libraries(sqlite3 PUBLIC
 # ------------------------------------------------------------
 
 add_library(xlibrary_core STATIC
+        src/catalog_types.h
+        src/operation_types.h
+        src/path_helpers.h
+        src/application_paths.h
+        src/search_query.h
+        src/search_query.cpp
+        src/profile_backup.h
+        src/profile_backup.cpp
+        src/profile_settings.h
+        src/profile_settings.cpp
 
         src/ProfileSchema.h src/ProfileSchema.cpp
         src/LaunchIdentity.h src/LaunchIdentity.cpp
@@ -133,7 +143,7 @@ if(WIN32)
             src/Windows/RegistryScan.cpp src/Windows/RegistryScan.h
     )
     target_compile_definitions(xlibrary_core PUBLIC NOMINMAX WIN32_LEAN_AND_MEAN)
-    target_link_libraries(xlibrary_core PUBLIC version shell32 gdi32 advapi32)
+    target_link_libraries(xlibrary_core PUBLIC version shell32 gdi32 advapi32 ole32 uuid)
 else()
     target_sources(xlibrary_core PRIVATE
             src/Linux/Application.cpp
@@ -144,7 +154,9 @@ else()
     )
 endif()
 target_include_directories(xlibrary_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
+set_target_properties(xlibrary_core PROPERTIES AUTOMOC ON)
 target_link_libraries(xlibrary_core PUBLIC
+        Qt6::Core Qt6::Gui
         sqlite3
         Threads::Threads
 
@@ -152,19 +164,11 @@ target_link_libraries(xlibrary_core PUBLIC
 
 qt_add_executable(XLibrary WIN32
         main.cpp
-        desktop/catalog_types.h
-        desktop/catalog_store.h desktop/catalog_store.cpp
         desktop/catalog_review.h desktop/catalog_review.cpp
-        desktop/profile_backup.h desktop/profile_backup.cpp
-        desktop/profile_settings.h desktop/profile_settings.cpp
         desktop/profile_view.h desktop/profile_view.cpp
-        desktop/operation_types.h
         desktop/platform_integration.h
-        desktop/path_helpers.h
-        desktop/application_paths.h
         desktop/localization.h desktop/localization.cpp
         desktop/library_model.h desktop/library_model.cpp
-        desktop/search_query.h desktop/search_query.cpp
         desktop/search_tools.h desktop/search_tools.cpp
         desktop/search_results.h desktop/search_results.cpp
         desktop/search_overlay.h desktop/search_overlay.cpp
@@ -201,7 +205,7 @@ if(WIN32)
     endif()
 else()
     target_sources(XLibrary PRIVATE desktop/linux_integration.cpp)
-    target_link_libraries(XLibrary PRIVATE Qt6::DBus)
+    target_link_libraries(xlibrary_core PUBLIC Qt6::DBus)
     if(X11_FOUND)
         target_link_libraries(XLibrary PRIVATE X11::X11)
         target_compile_definitions(XLibrary PRIVATE XLIBRARY_HAVE_X11=1)

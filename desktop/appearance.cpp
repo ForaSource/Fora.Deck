@@ -6,6 +6,7 @@
 #include <QStyleHints>
 
 #include "appearance.h"
+#include "WindowManager.h"
 
 QIcon appearance::icon(const QString &name, const QColor &color) {
     QPixmap pixmap(64, 64);
@@ -119,8 +120,10 @@ QIcon appearance::logo() {
 }
 
 bool appearance::is_dark(QSettings &settings) {
-    const auto theme = settings.value("appearance/theme", "dark").toString();
-    return theme == "dark" || (theme == "system" && qApp->styleHints()->colorScheme() != Qt::ColorScheme::Light);
+    WindowManager manager;
+    manager.update_theme(settings.value("appearance/theme", "dark").toString(),
+                         qApp->styleHints()->colorScheme() == Qt::ColorScheme::Light);
+    return manager.get_theme();
 }
 
 int appearance::scaled(QSettings &settings, int size) {

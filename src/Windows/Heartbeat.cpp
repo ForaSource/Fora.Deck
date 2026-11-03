@@ -123,3 +123,47 @@ Heartbeat::make_process_checker(std::uint32_t process_id, const std::filesystem:
 
     return check_process;
 }
+
+#include <QCoreApplication>
+#include <QDir>
+#include <QFileInfo>
+QString xlibrary::windows_process_path(quint32 process_id) {
+    const unique_handle process(OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, process_id), &CloseHandle);
+    if (!process) {
+        return {};
+    }
+    wchar_t path[32768]{};
+    DWORD length = static_cast<DWORD>(std::size(path));
+    return QueryFullProcessImageNameW(process.get(), 0, path, &length) ? QString::fromWCharArray(path, length)
+                                                                       : QString{};
+}
+
+QSet<QString> Heartbeat::running_paths(const QVector<app_record> &applications) {
+    QSet<QString> names;
+    QSet<QString> paths;
+    for (const auto &application : applications) {
+        names.insert(QFileInfo(application.path).fileName().toCaseFolded());
+    }
+    if (names.isEmpty()) {
+        return paths;
+    }
+    const auto raw_snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (raw_snapshot == INVALID_HANDLE_VALUE) {
+        throw std::runtime_error(
+            QCoreApplication::translate("XLibrary", "Could not retrieve the Windows process list.").toStdString());
+    }
+    const unique_handle snapshot(raw_snapshot, &CloseHandle);
+    PROCESSENTRY32W entry{};
+    entry.dwSize = sizeof(entry);
+    if (Process32FirstW(snapshot.get(), &entry)) {
+        do {
+            if (names.contains(QString::fromWCharArray(entry.szExeFile).toCaseFolded())) {
+                const auto path = xlibrary::windows_process_path(entry.th32ProcessID);
+                if (!path.isEmpty()) {
+                    paths.insert(QDir::fromNativeSeparators(path).toCaseFolded());
+                }
+            }
+        } while (Process32NextW(snapshot.get(), &entry));
+    }
+    return paths;
+}
