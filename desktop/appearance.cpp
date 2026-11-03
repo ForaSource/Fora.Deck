@@ -5,7 +5,7 @@
 #include <QPalette>
 #include <QStyleHints>
 
-#include "appearance.h"
+#include "Appearance.h"
 #include "WindowManager.h"
 
 QIcon appearance::icon(const QString &name, const QColor &color) {
@@ -119,18 +119,18 @@ QIcon appearance::logo() {
     return result;
 }
 
-bool appearance::is_dark(QSettings &settings) {
+bool appearance::is_dark(const QSettings &settings) {
     WindowManager manager;
     manager.update_theme(settings.value("appearance/theme", "dark").toString(),
                          qApp->styleHints()->colorScheme() == Qt::ColorScheme::Light);
     return manager.get_theme();
 }
 
-int appearance::scaled(QSettings &settings, int size) {
+int appearance::scaled(const QSettings &settings, const int size) {
     return qRound(size * qBound(100, settings.value("appearance/text_scale", 100).toInt(), 200) / 100.0);
 }
 
-void appearance::paint_selection(QPainter &painter, const QRectF &rect, const QPalette &palette, qreal radius) {
+void appearance::paint_selection(QPainter &painter, const QRectF &rect, const QPalette &palette, const qreal radius) {
     QLinearGradient gradient(rect.topLeft(), rect.bottomLeft());
     gradient.setColorAt(0, palette.color(QPalette::Light));
     gradient.setColorAt(1, palette.color(QPalette::Highlight));
@@ -139,7 +139,7 @@ void appearance::paint_selection(QPainter &painter, const QRectF &rect, const QP
     painter.drawRoundedRect(rect, radius, radius);
 }
 
-void appearance::apply(QSettings &settings, const QString &additional_style) {
+void appearance::apply(const QSettings &settings, const QString &additional_style) {
     const bool dark = is_dark(settings);
     const QColor base(dark ? "#242528" : "#F3F3F4");
     const QColor panel(dark ? "#2A2B2E" : "#EBECEE");

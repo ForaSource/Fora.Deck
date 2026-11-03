@@ -11,7 +11,7 @@
 #include <QSet>
 #include <string>
 
-#include "catalog_types.h"
+#include "CatalogTypes.h"
 
 class Application {
 private:

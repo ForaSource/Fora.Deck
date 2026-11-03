@@ -9,7 +9,7 @@
 #include <vector>
 
 #include "Application.h"
-#include "catalog_types.h"
+#include "CatalogTypes.h"
 
 class Database {
 private:

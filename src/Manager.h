@@ -11,9 +11,9 @@
 #include "Application.h"
 #include "Database.h"
 #include "Heartbeat.h"
-#include "operation_types.h"
-#include "path_helpers.h"
-#include "profile_backup.h"
+#include "OperationTypes.h"
+#include "PathHelpers.h"
+#include "ProfileBackup.h"
 #include "ProfileSchema.h"
 
 // Owns the catalog and its worker-thread lifecycle for both the backend API and GUI.
@@ -72,17 +72,17 @@ private:
     static std::string to_lower(std::string data);
 
 public:
-    void save_application(app_record record);
+    void save_application(const app_record &record);
     void resolve_application(const QString &path);
     void remove_applications(const QVector<qint64> &ids);
     void undo_removal();
     void update_metadata(const QVector<qint64> &ids, const QStringList &add_tags, const QStringList &remove_tags,
                          int favorite);
-    void save_filter(saved_filter record);
+    void save_filter(const saved_filter &record);
     void remove_filter(qint64 id);
     void save_tag(const QString &old_name, const QString &new_name);
     void remove_tag(const QString &name);
-    void save_scenario(scenario_record record);
+    void save_scenario(const scenario_record &record);
     void remove_scenario(qint64 id);
     void export_catalog(const QString &path);
     void import_catalog(const QString &path);
@@ -114,8 +114,8 @@ public:
     void add_application(const Application &application);
     void add_applications(const std::vector<Application> &applications);
 
-    std::uint32_t launch(const std::string title);
-    Heartbeat heartbeat(const std::string title, std::uint32_t process_id) const;
+    std::uint32_t launch(const std::string &title) const;
+    Heartbeat heartbeat(const std::string &title, std::uint32_t process_id) const;
 
     std::vector<Application> get_apps() const;
     std::vector<std::string> get_names() const;

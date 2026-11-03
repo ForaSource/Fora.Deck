@@ -17,7 +17,7 @@ std::filesystem::path xlibrary::utf8_path(const std::string &path) {
     return std::filesystem::path(std::u8string(reinterpret_cast<const char8_t *>(path.data()), path.size()));
 }
 
-std::string xlibrary::path_identity(const std::filesystem::path &path, bool resolve_links) {
+std::string xlibrary::path_identity(const std::filesystem::path &path, const bool resolve_links) {
     if (path.empty() || !path.is_absolute())
         throw std::invalid_argument("Launch path must be absolute");
     auto normalized = path.lexically_normal();
@@ -45,7 +45,7 @@ std::string xlibrary::path_identity(const std::filesystem::path &path, bool reso
     return path_utf8(normalized);
 }
 
-sqlite3_int64 xlibrary::ensure_launch_configuration(sqlite3 *connection, const std::filesystem::path &path,
+sqlite3_int64 xlibrary::ensure_launch_configuration(sqlite3 *const connection, const std::filesystem::path &path,
                                                     const std::string &arguments,
                                                     const std::filesystem::path &working_directory) {
     const auto launch_path = path_utf8(path);

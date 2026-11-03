@@ -14,10 +14,10 @@
 #include <QTableWidget>
 #include <QTextDocument>
 
-#include "desktop_service.h"
-#include "editors.h"
-#include "localization.h"
-#include "ui_helpers.h"
+#include "DesktopService.h"
+#include "Editors.h"
+#include "Localization.h"
+#include "UiHelpers.h"
 
 namespace {
 using namespace ui_helpers;
@@ -34,7 +34,7 @@ QStringList parse_tags(const QString &input) {
     return result;
 }
 
-QDialog *application_editor(const ui_context &context, QWidget *parent) {
+QDialog *application_editor(const ui_context &context, QWidget *const parent) {
     auto *service = static_cast<DesktopService *>(context.service);
     const auto record = context.parameters.value("record").value<app_record>();
     auto *dialog = new QDialog(parent);
@@ -101,7 +101,7 @@ QDialog *application_editor(const ui_context &context, QWidget *parent) {
         for (int row = 0; row < tag_list->count(); ++row)
             tag_list->item(row)->setHidden(!tag_list->item(row)->text().contains(text.trimmed(), Qt::CaseInsensitive));
     });
-    QObject::connect(tag_list, &QListWidget::itemChanged, dialog, [=](QListWidgetItem *item) {
+    QObject::connect(tag_list, &QListWidget::itemChanged, dialog, [=](QListWidgetItem *const item) {
         auto names = parse_tags(tags->text());
         const auto name = item->data(Qt::UserRole).toString();
         names.removeIf([&](const QString &tag) { return tag_name_key(tag) == tag_name_key(name); });
@@ -149,7 +149,7 @@ QDialog *application_editor(const ui_context &context, QWidget *parent) {
         }
     });
     QObject::connect(service, &DesktopService::application_resolved, dialog,
-                     [=](quint64 request_id, const QString &requested_path, const app_record &resolved) {
+                     [=](const quint64 request_id, const QString &requested_path, const app_record &resolved) {
                          if (request_id != dialog->property("resolve_request_id").toULongLong())
                              return;
                          if (QDir::cleanPath(path->text()) != QDir::cleanPath(requested_path))
@@ -228,7 +228,7 @@ QDialog *application_editor(const ui_context &context, QWidget *parent) {
     return dialog;
 }
 
-QDialog *tag_editor(const ui_context &context, QWidget *parent) {
+QDialog *tag_editor(const ui_context &context, QWidget *const parent) {
     auto *service = static_cast<DesktopService *>(context.service);
     const auto old_name = context.parameters.value("tag").toString();
     auto *dialog = new QDialog(parent);
@@ -281,7 +281,7 @@ QDialog *tag_editor(const ui_context &context, QWidget *parent) {
     return dialog;
 }
 
-QDialog *scenario_editor(const ui_context &context, QWidget *parent) {
+QDialog *scenario_editor(const ui_context &context, QWidget *const parent) {
     auto *service = static_cast<DesktopService *>(context.service);
     const auto record = context.parameters.value("scenario").value<scenario_record>();
     auto *dialog = new QDialog(parent);
@@ -371,7 +371,7 @@ QDialog *scenario_editor(const ui_context &context, QWidget *parent) {
         if (table->currentRow() >= 0)
             table->removeRow(table->currentRow());
     });
-    auto move_step = [=](int offset) {
+    auto move_step = [=](const int offset) {
         const auto row = table->currentRow();
         if (row < 0 || row + offset < 0 || row + offset >= table->rowCount())
             return;
@@ -395,7 +395,7 @@ QDialog *scenario_editor(const ui_context &context, QWidget *parent) {
     root->addWidget(save_and_run);
     root->addWidget(buttons);
     QObject::connect(buttons, &QDialogButtonBox::rejected, dialog, &QDialog::reject);
-    auto save_scenario = [=](bool run) {
+    auto save_scenario = [=](const bool run) {
         scenario_record updated{record.id, name->text().trimmed(), read_steps()};
         if (updated.name.isEmpty() || updated.steps.isEmpty()) {
             error->setText(QCoreApplication::translate("XLibrary", "Enter a name and add an application."));
@@ -409,7 +409,7 @@ QDialog *scenario_editor(const ui_context &context, QWidget *parent) {
     };
     QObject::connect(buttons, &QDialogButtonBox::accepted, dialog, [=] { save_scenario(false); });
     QObject::connect(save_and_run, &QPushButton::clicked, dialog, [=] { save_scenario(true); });
-    QObject::connect(service, &DesktopService::scenario_saved, dialog, [=](quint64 request_id, qint64 id) {
+    QObject::connect(service, &DesktopService::scenario_saved, dialog, [=](const quint64 request_id, const qint64 id) {
         if (request_id == dialog->property("save_request_id").toULongLong() &&
             dialog->property("run_after_save").toBool())
             service->run_scenario(id);

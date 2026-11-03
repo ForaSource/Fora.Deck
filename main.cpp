@@ -12,14 +12,14 @@
 #include <QTimer>
 
 #include "Database.h"
-#include "desktop/appearance.h"
-#include "desktop/desktop_service.h"
-#include "desktop/localization.h"
-#include "desktop/main_window.h"
-#include "desktop/platform_integration.h"
-#include "src/application_paths.h"
-#include "src/path_helpers.h"
-#include "src/profile_backup.h"
+#include "desktop/Appearance.h"
+#include "desktop/DesktopService.h"
+#include "desktop/Localization.h"
+#include "desktop/MainWindow.h"
+#include "desktop/PlatformIntegration.h"
+#include "src/ApplicationPaths.h"
+#include "src/PathHelpers.h"
+#include "src/ProfileBackup.h"
 
 int main(int argc, char *argv[]) {
     QApplication application(argc, argv);

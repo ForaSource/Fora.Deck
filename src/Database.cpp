@@ -6,7 +6,7 @@
 #include "ProfileSchema.h"
 #include "SqliteHelpers.h"
 
-void Database::execute(const char *sql) const {
+void Database::execute(const char *const sql) const {
     if (sqlite3_exec(get_connection(), sql, nullptr, nullptr, nullptr) != SQLITE_OK)
         throw std::runtime_error(std::string("Database initialization failed: ") + sqlite3_errmsg(get_connection()));
 }
@@ -19,7 +19,7 @@ void Database::initialize() const {
 Database::Database() : Database({}, true) {
 }
 
-Database::Database(const std::filesystem::path &path, bool drop_on_add_error)
+Database::Database(const std::filesystem::path &path, const bool drop_on_add_error)
     : drop_on_add_error(drop_on_add_error), file_path(path.empty() ? get_database_path() : path) {
     if (!this->file_path.is_absolute())
         throw std::invalid_argument("Database path must be absolute");
@@ -163,9 +163,9 @@ std::vector<Application> Database::get_applications() const {
 
 #include "Database.h"
 #include "LaunchIdentity.h"
-#include "path_helpers.h"
+#include "PathHelpers.h"
 #include "ProfileSchema.h"
-#include "search_query.h"
+#include "SearchQuery.h"
 
 void Database::validate_application(const app_record &record) {
     if (record.name.trimmed().isEmpty() || record.name.size() > 256 || !QFileInfo(record.path).isAbsolute() ||
@@ -216,7 +216,7 @@ class Transaction {
     bool committed = false;
 
 public:
-    explicit Transaction(sqlite3 *connection) : connection(connection) {
+    explicit Transaction(sqlite3 *const connection) : connection(connection) {
         if (sqlite3_exec(connection, "SAVEPOINT desktop_write;", nullptr, nullptr, nullptr) != SQLITE_OK) {
             throw std::runtime_error(sqlite3_errmsg(connection));
         }
@@ -398,7 +398,7 @@ catalog_snapshot Database::read() const {
     return result;
 }
 
-void Database::write_metadata(qint64 id, const app_record &record) {
+void Database::write_metadata(const qint64 id, const app_record &record) {
     auto *connection = get_connection();
     xlibrary::SqliteStatement metadata(connection, R"(
         INSERT INTO desktop_application(application_id, favorite) VALUES(?,?)
@@ -446,7 +446,7 @@ void Database::write_metadata(qint64 id, const app_record &record) {
     }
 }
 
-void Database::write_source(qint64 configuration_id, const app_record &record) {
+void Database::write_source(const qint64 configuration_id, const app_record &record) {
     if (record.discovery_source.isEmpty())
         return;
     xlibrary::SqliteStatement source(
@@ -492,7 +492,7 @@ qint64 Database::save_application(const app_record &record) {
     return id;
 }
 
-void Database::remove_application(qint64 id) {
+void Database::remove_application(const qint64 id) {
     remove_applications({id});
 }
 
@@ -606,7 +606,7 @@ void Database::undo_removal() {
 }
 
 void Database::update_metadata(const QVector<qint64> &ids, const QStringList &add_tags, const QStringList &remove_tags,
-                               int favorite) {
+                               const int favorite) {
     const QSet<qint64> selected(ids.cbegin(), ids.cend());
     if (selected.isEmpty())
         return;
@@ -662,7 +662,7 @@ void Database::save_filter(const saved_filter &record) {
     transaction.commit();
 }
 
-void Database::remove_filter(qint64 id) {
+void Database::remove_filter(const qint64 id) {
     xlibrary::SqliteStatement remove(get_connection(), "DELETE FROM saved_filter WHERE id=?;");
     remove.bind(1, id);
     remove.next();
@@ -758,13 +758,13 @@ qint64 Database::save_scenario(const scenario_record &record) {
     return id;
 }
 
-void Database::remove_scenario(qint64 id) {
+void Database::remove_scenario(const qint64 id) {
     xlibrary::SqliteStatement statement(get_connection(), "DELETE FROM desktop_scenario WHERE id = ?;");
     statement.bind(1, id);
     statement.next();
 }
 
-void Database::record_launch(qint64 id) {
+void Database::record_launch(const qint64 id) {
     xlibrary::SqliteStatement statement(get_connection(),
                                         "INSERT INTO desktop_application(application_id,last_launch) VALUES(?,?) ON "
                                         "CONFLICT(application_id) DO UPDATE SET last_launch=excluded.last_launch;");
@@ -781,9 +781,10 @@ void Database::clear_history() {
     xlibrary::sqlite_execute(get_connection(), "UPDATE desktop_application SET last_launch = 0;");
 }
 
-catalog_import_result Database::import_records(const QVector<app_record> &records, discovery_control *control,
+catalog_import_result Database::import_records(const QVector<app_record> &records, discovery_control *const control,
                                                const std::function<void(qsizetype, qsizetype)> &progress,
-                                               QVector<discovery_issue> *issues, import_conflict_policy policy) {
+                                               QVector<discovery_issue> *const issues,
+                                               const import_conflict_policy policy) {
     QVector<const app_record *> candidates;
     candidates.reserve(records.size());
     for (const auto &record : records) {

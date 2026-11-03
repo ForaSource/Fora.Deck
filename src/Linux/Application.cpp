@@ -5,7 +5,7 @@
 #include "Application.h"
 #include "LaunchArguments.h"
 #include "LinuxProcessor.h"
-#include "path_helpers.h"
+#include "PathHelpers.h"
 
 std::uint32_t Application::get_pid() const noexcept {
     if (!this->process_handle) {
@@ -52,7 +52,7 @@ std::uint32_t Application::launch(const std::wstring &arguments, const std::file
 #include <QSaveFile>
 #include <QStandardPaths>
 
-#include "application_paths.h"
+#include "ApplicationPaths.h"
 #include "Heartbeat.h"
 
 namespace {
@@ -95,7 +95,7 @@ QString canonical_path(const QString &path) {
     return canonical.isEmpty() ? absolute_path(path) : canonical;
 }
 
-QString xdg_home(const char *variable, const QString &fallback) {
+QString xdg_home(const char *const variable, const QString &fallback) {
     const auto value = qEnvironmentVariable(variable);
     return QFileInfo(value).isAbsolute() ? QDir::cleanPath(value) : QDir::homePath() + fallback;
 }
@@ -684,7 +684,7 @@ QString Application::new_instance_error(const app_record &record) {
     return {};
 }
 
-void Application::launch_application(const app_record &record, launch_mode mode) {
+void Application::launch_application(const app_record &record, const launch_mode mode) {
     QStringList command;
     QString directory = record.working_directory;
     if (QFileInfo(record.path).suffix() == "desktop") {
@@ -750,7 +750,7 @@ app_record Application::resolve_application(const QString &path) {
     return result;
 }
 
-QVector<app_record> Application::discover(bool system_applications, bool user_applications,
+QVector<app_record> Application::discover(const bool system_applications, const bool user_applications,
                                           QVector<discovery_issue> &issues, const std::atomic_bool &cancelled,
                                           const std::function<void(const discovery_progress &)> &progress) {
     if (progress)
@@ -817,7 +817,7 @@ QVector<app_record> Application::discover(bool system_applications, bool user_ap
     return cancelled.load() ? QVector<app_record>{} : result;
 }
 
-bool Application::set_autostart(bool enabled, QString &error) {
+bool Application::set_autostart(const bool enabled, QString &error) {
     QString executable;
     if (enabled) {
         try {

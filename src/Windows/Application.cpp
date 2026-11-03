@@ -29,7 +29,7 @@ std::string Application::read_application_name(const std::filesystem::path &exec
 
     auto extension = executable_path.extension().wstring();
     std::ranges::transform(extension, extension.begin(),
-                           [](wchar_t character) { return static_cast<wchar_t>(std::towlower(character)); });
+                           [](const wchar_t character) { return static_cast<wchar_t>(std::towlower(character)); });
     if (extension.empty()) {
         throw std::invalid_argument("Invalid app path");
     }
@@ -227,7 +227,7 @@ QString Application::new_instance_error(const app_record &) {
     return {};
 }
 
-void Application::launch_application(const app_record &record, launch_mode mode) {
+void Application::launch_application(const app_record &record, const launch_mode mode) {
     const xlibrary::ComScope com;
     Application application(record.name.toStdString(), std::filesystem::path(record.path.toStdWString()));
     const auto directory =
@@ -257,14 +257,14 @@ app_record Application::resolve_application(const QString &path) {
             throw std::runtime_error(
                 QCoreApplication::translate("XLibrary", "Could not read the shortcut.").toStdString());
         }
-        const auto release_link = [](IShellLinkW *value) { value->Release(); };
+        const auto release_link = [](IShellLinkW *const value) { value->Release(); };
         const std::unique_ptr<IShellLinkW, decltype(release_link)> link(raw_link, release_link);
         IPersistFile *raw_file = nullptr;
         if (FAILED(link->QueryInterface(IID_IPersistFile, reinterpret_cast<void **>(&raw_file)))) {
             throw std::runtime_error(
                 QCoreApplication::translate("XLibrary", "Could not open the shortcut.").toStdString());
         }
-        const auto release_file = [](IPersistFile *value) { value->Release(); };
+        const auto release_file = [](IPersistFile *const value) { value->Release(); };
         const std::unique_ptr<IPersistFile, decltype(release_file)> file(raw_file, release_file);
         if (FAILED(file->Load(path.toStdWString().c_str(), STGM_READ))) {
             throw std::runtime_error(
@@ -305,7 +305,7 @@ app_record Application::resolve_application(const QString &path) {
     return result;
 }
 
-QVector<app_record> Application::discover(bool registry, bool start_menu, QVector<discovery_issue> &issues,
+QVector<app_record> Application::discover(const bool registry, const bool start_menu, QVector<discovery_issue> &issues,
                                           const std::atomic_bool &cancelled,
                                           const std::function<void(const discovery_progress &)> &progress) {
     QVector<app_record> result;
@@ -334,14 +334,14 @@ QVector<app_record> Application::discover(bool registry, bool start_menu, QVecto
         }
     }
     qsizetype registry_count = 0;
-    const auto report = [&](qsizetype processed, qsizetype total, const QString &stage) {
+    const auto report = [&](const qsizetype processed, const qsizetype total, const QString &stage) {
         if (progress)
             progress({total > 0 ? static_cast<int>(90.0 * processed / total) : 90, processed, total, stage});
     };
     if (registry && !cancelled.load()) {
         std::vector<xlibrary::scan_issue> registry_issues;
-        const auto applications =
-            xlibrary::scan_registry_applications(&registry_issues, [&](std::size_t processed, std::size_t total) {
+        const auto applications = xlibrary::scan_registry_applications(
+            &registry_issues, [&](const std::size_t processed, const std::size_t total) {
                 registry_count = static_cast<qsizetype>(total);
                 report(static_cast<qsizetype>(processed), registry_count + shortcuts.size(),
                        QCoreApplication::translate("XLibrary", "Checking the Windows registry"));

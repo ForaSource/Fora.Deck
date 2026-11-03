@@ -12,7 +12,7 @@ struct Heartbeat::State {
     std::atomic<std::uint32_t> error_code{0};
 };
 
-Heartbeat::Heartbeat(std::uint32_t process_id, const std::filesystem::path &executable_path)
+Heartbeat::Heartbeat(const std::uint32_t process_id, const std::filesystem::path &executable_path)
     : state(std::make_shared<State>()) {
     auto check_process = make_process_checker(process_id, executable_path);
 
@@ -25,8 +25,8 @@ Heartbeat::Heartbeat(std::uint32_t process_id, const std::filesystem::path &exec
         return;
     }
 
-    worker =
-        std::jthread([state = state, check_process = std::move(check_process)](std::stop_token stop_token) mutable {
+    worker = std::jthread(
+        [state = state, check_process = std::move(check_process)](const std::stop_token stop_token) mutable {
             std::mutex wait_mutex;
             std::condition_variable_any wake;
             std::unique_lock wait_lock(wait_mutex);

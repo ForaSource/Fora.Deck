@@ -3,7 +3,7 @@
 
 #include <QString>
 
-#include "catalog_types.h"
+#include "CatalogTypes.h"
 
 // Theme policy and native activation; drawing remains in the desktop integration.
 class WindowManager {

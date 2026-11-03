@@ -9,7 +9,7 @@
 #include "Manager.h"
 
 std::string Manager::to_lower(std::string data) {
-    std::ranges::transform(data, data.begin(), [](unsigned char c) { return std::tolower(c); });
+    std::ranges::transform(data, data.begin(), [](const unsigned char c) { return std::tolower(c); });
     return data;
 }
 
@@ -38,8 +38,7 @@ void Manager::add_applications(const std::vector<Application> &applications) {
     }
 }
 
-std::uint32_t Manager::launch(const std::string title) {
-    this->get_apps();
+std::uint32_t Manager::launch(const std::string &title) const {
     for (auto &app : applications) {
         if (this->to_lower(app.get_file_title()) == this->to_lower(title)) {
             return app.launch();
@@ -48,7 +47,7 @@ std::uint32_t Manager::launch(const std::string title) {
     throw std::invalid_argument(title + " is not in this manager");
 }
 
-Heartbeat Manager::heartbeat(const std::string title, std::uint32_t process_id) const {
+Heartbeat Manager::heartbeat(const std::string &title, const std::uint32_t process_id) const {
     for (const auto &app : this->get_apps()) {
         if (this->to_lower(app.get_file_title()) == this->to_lower(title)) {
             return Heartbeat(process_id, app.get_file_path());
@@ -61,7 +60,7 @@ std::vector<Application> Manager::get_apps() const {
     std::vector<Application> result;
     result.reserve(catalog.applications.size());
     for (const auto &record : catalog.applications) {
-        const auto found = std::find_if(applications.cbegin(), applications.cend(), [&](const auto &app) {
+        const auto found = std::ranges::find_if(std::as_const(applications), [&](const auto &app) {
             return app.get_file_title() == record.name.toStdString() &&
                    app.get_file_path() == filesystem_path(record.path);
         });
@@ -90,7 +89,7 @@ std::vector<std::filesystem::path> Manager::get_paths() const {
     return result;
 }
 
-void Manager::initialize(quint64 id) {
+void Manager::initialize(const quint64 id) {
     try {
         if (monitor) {
             monitor->stop();
@@ -126,7 +125,7 @@ void Manager::initialize(quint64 id) {
     }
 }
 
-void Manager::restore(quint64 id, const QString &path) {
+void Manager::restore(const quint64 id, const QString &path) {
     try {
         if (database_path.isEmpty())
             database_path = path_text(Database::get_database_path());
@@ -153,7 +152,7 @@ void Manager::refresh() {
     poll(true);
 }
 
-void Manager::poll(bool force) {
+void Manager::poll(const bool force) {
     QSet<QString> unavailable;
     QSet<QString> missing_volumes;
     const auto previous_roots = known_volume_roots;
@@ -161,8 +160,7 @@ void Manager::poll(bool force) {
     auto paths = last_running;
     try {
         for (auto &record : catalog.applications) {
-            const auto error = Application::new_instance_error(record);
-            if (error != record.new_instance_error) {
+            if (const auto error = Application::new_instance_error(record); error != record.new_instance_error) {
                 record.new_instance_error = error;
                 capabilities_changed = true;
             }
@@ -170,28 +168,25 @@ void Manager::poll(bool force) {
             record.volume_unavailable = false;
             if (record.available) {
                 const QStorageInfo volume(record.path);
-                const auto root = QDir::fromNativeSeparators(volume.rootPath());
-                if (volume.isValid() && !root.isEmpty() && root != "/" && !known_volume_roots.contains(root))
+                if (const auto root = QDir::fromNativeSeparators(volume.rootPath());
+                    volume.isValid() && !root.isEmpty() && root != "/" && !known_volume_roots.contains(root))
                     known_volume_roots.append(root);
             } else {
                 auto roots = known_volume_roots;
 #ifdef Q_OS_WIN
-                const auto path = QDir::fromNativeSeparators(record.path);
-                if (path.size() >= 3 && path[1] == ':')
+                if (const auto path = QDir::fromNativeSeparators(record.path); path.size() >= 3 && path[1] == ':')
                     roots.append(path.left(3));
                 else if (path.startsWith("//")) {
-                    const auto end = path.indexOf('/', path.indexOf('/', 2) + 1);
-                    if (end > 2)
+                    if (const auto end = path.indexOf('/', path.indexOf('/', 2) + 1); end > 2)
                         roots.append(path.left(end));
                 }
 #endif
                 for (const auto &root : roots) {
-                    const auto prefix = root.endsWith('/') ? root : root + '/';
-                    if (!record.path.startsWith(prefix, path_case_sensitivity))
+                    if (const auto prefix = root.endsWith('/') ? root : root + '/';
+                        !record.path.startsWith(prefix, path_case_sensitivity))
                         continue;
-                    const QStorageInfo volume(root);
-                    if (!volume.isValid() || !volume.isReady() ||
-                        normalized_path(volume.rootPath()) != normalized_path(root)) {
+                    if (const QStorageInfo volume(root); !volume.isValid() || !volume.isReady() ||
+                                                         normalized_path(volume.rootPath()) != normalized_path(root)) {
                         record.volume_unavailable = true;
                         missing_volumes.insert(normalized_path(record.path));
                         break;
@@ -227,9 +222,9 @@ void Manager::poll(bool force) {
     }
 }
 
-void Manager::save_application(app_record record) {
-    const auto current = std::find_if(this->catalog.applications.cbegin(), this->catalog.applications.cend(),
-                                      [&](const app_record &item) { return item.id == record.id; });
+void Manager::save_application(const app_record &record) {
+    const auto current = std::ranges::find_if(std::as_const(this->catalog.applications),
+                                              [&](const app_record &item) { return item.id == record.id; });
     if (record.id == 0 || (current != this->catalog.applications.cend() && current->path != record.path))
         Application::resolve_application(record.path);
     const auto id = this->store->save_application(record);
@@ -256,17 +251,17 @@ void Manager::undo_removal() {
 }
 
 void Manager::update_metadata(const QVector<qint64> &ids, const QStringList &add_tags, const QStringList &remove_tags,
-                              int favorite) {
+                              const int favorite) {
     this->store->update_metadata(ids, add_tags, remove_tags, favorite);
     this->refresh();
 }
 
-void Manager::save_filter(saved_filter record) {
+void Manager::save_filter(const saved_filter &record) {
     this->store->save_filter(record);
     this->refresh();
 }
 
-void Manager::remove_filter(qint64 id) {
+void Manager::remove_filter(const qint64 id) {
     this->store->remove_filter(id);
     this->refresh();
 }
@@ -283,13 +278,13 @@ void Manager::remove_tag(const QString &name) {
     this->refresh();
 }
 
-void Manager::save_scenario(scenario_record record) {
+void Manager::save_scenario(const scenario_record &record) {
     const auto id = this->store->save_scenario(record);
     this->refresh();
     emit this->scenario_saved(this->request_id, id);
 }
 
-void Manager::remove_scenario(qint64 id) {
+void Manager::remove_scenario(const qint64 id) {
     this->store->remove_scenario(id);
     this->refresh();
 }
@@ -398,7 +393,7 @@ void Manager::import_catalog(const QString &path) {
         if (!value.isObject())
             fail("applications[]", QCoreApplication::translate("XLibrary", "expected an object"));
         const auto object = value.toObject();
-        const auto text = [&](const QString &field, bool required = false) {
+        const auto text = [&](const QString &field, const bool required = false) {
             const auto item = object.value(field);
             if ((!item.isUndefined() || required) && !item.isString())
                 fail(field, QCoreApplication::translate("XLibrary", "expected a string"));
@@ -444,8 +439,7 @@ void Manager::import_catalog(const QString &path) {
                 alias.toString().contains('\r'))
                 fail("aliases", QCoreApplication::translate(
                                     "XLibrary", "Use up to 32 aliases, each on one line with up to 256 characters."));
-            const auto name = alias.toString().trimmed();
-            if (!record.aliases.contains(name, Qt::CaseInsensitive))
+            if (const auto name = alias.toString().trimmed(); !record.aliases.contains(name, Qt::CaseInsensitive))
                 record.aliases.append(name);
         }
         if (record.name.isEmpty() || record.name.size() > 256)
@@ -492,7 +486,7 @@ void Manager::recover_paths(const QVector<path_relocation> &changes) {
         QCoreApplication::translate("XLibrary", "Application paths recovered: %1.").arg(changes.size()));
 }
 
-void Manager::launch_record(qint64 id, Application::launch_mode mode, quint64 generation,
+void Manager::launch_record(const qint64 id, const Application::launch_mode mode, const quint64 generation,
                             const std::shared_ptr<std::atomic<quint64>> &token,
                             const std::function<void(const app_record &, Application::launch_mode)> &launch_action) {
     try {
@@ -538,8 +532,8 @@ void Manager::launch_record(qint64 id, Application::launch_mode mode, quint64 ge
     }
 }
 
-void Manager::execute(quint64 id, const QString &operation, const std::function<void(Manager &)> &task,
-                      operation_error_source source) {
+void Manager::execute(const quint64 id, const QString &operation, const std::function<void(Manager &)> &task,
+                      const operation_error_source source) {
     this->request_id = id;
     this->error_source = source;
     this->task_error = {};
@@ -598,7 +592,8 @@ void Manager::preview_files(const QStringList &paths, const std::shared_ptr<disc
 }
 
 void Manager::apply_catalog_preview(const QVector<app_record> &applications, QVector<discovery_issue> issues,
-                                    const std::shared_ptr<discovery_control> &cancelled, import_conflict_policy policy,
+                                    const std::shared_ptr<discovery_control> &cancelled,
+                                    const import_conflict_policy policy,
                                     const std::function<void(qsizetype, qsizetype)> &report_progress) {
     try {
         const auto count = this->store->import_records(applications, cancelled.get(), report_progress, &issues, policy);
@@ -622,7 +617,7 @@ void Manager::apply_catalog_preview(const QVector<app_record> &applications, QVe
 }
 
 void Manager::backup_profile(const QString &path, const QString &database_path, const QString &settings_path,
-                             bool settings_ok) {
+                             const bool settings_ok) {
     if (!settings_ok)
         throw std::runtime_error(
             QCoreApplication::translate("XLibrary", "Could not save settings before creating a backup.").toStdString());
@@ -631,7 +626,8 @@ void Manager::backup_profile(const QString &path, const QString &database_path, 
 }
 
 void Manager::restore_profile(const QString &path, const QString &database_path, const QString &settings_path,
-                              const QByteArray &fingerprint, bool settings_ok, quint64 library_id, bool old_autostart) {
+                              const QByteArray &fingerprint, const bool settings_ok, const quint64 library_id,
+                              const bool old_autostart) {
     if (this->monitor)
         this->monitor->stop();
     this->store.reset();

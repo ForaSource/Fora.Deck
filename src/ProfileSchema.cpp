@@ -10,7 +10,7 @@ namespace {
 using xlibrary::sqlite_execute;
 using xlibrary::SqliteStatement;
 
-void check_integrity(sqlite3 *connection) {
+void check_integrity(sqlite3 *const connection) {
     SqliteStatement check(connection, "PRAGMA quick_check;");
     if (!check.next() || check.text(0) != "ok" || check.next())
         throw std::runtime_error("Profile database is damaged (quick_check)");
@@ -19,7 +19,7 @@ void check_integrity(sqlite3 *connection) {
         throw std::runtime_error("Profile database contains broken references (foreign_key_check)");
 }
 
-void require_unique(sqlite3 *connection, const char *table, const std::vector<std::string> &columns) {
+void require_unique(sqlite3 *const connection, const char *const table, const std::vector<std::string> &columns) {
     SqliteStatement indexes(connection, ("PRAGMA index_list(" + std::string(table) + ");").c_str());
     while (indexes.next()) {
         if (indexes.number(2) == 0 || indexes.number(4) != 0)
@@ -41,8 +41,8 @@ void require_unique(sqlite3 *connection, const char *table, const std::vector<st
     throw std::runtime_error("Profile schema is missing a uniqueness constraint in " + std::string(table));
 }
 
-void require_reference(sqlite3 *connection, const char *table, const char *column, const char *target,
-                       const char *on_delete) {
+void require_reference(sqlite3 *const connection, const char *const table, const char *const column,
+                       const char *const target, const char *const on_delete) {
     SqliteStatement references(connection, ("PRAGMA foreign_key_list(" + std::string(table) + ");").c_str());
     while (references.next()) {
         if (references.text(2) == target && references.text(3) == column && references.text(4) == "id" &&
@@ -52,7 +52,7 @@ void require_reference(sqlite3 *connection, const char *table, const char *colum
     throw std::runtime_error("Profile schema is missing a reference in " + std::string(table));
 }
 
-void validate_columns(sqlite3 *connection, int version) {
+void validate_columns(sqlite3 *const connection, const int version) {
     SqliteStatement base(connection,
                          version < 3 ? "SELECT a.id,a.name,a.path,t.id,t.name,l.application_id,l.tag_id "
                                        "FROM applications a,tags t,application_tags l LIMIT 0;"
@@ -128,7 +128,7 @@ void validate_columns(sqlite3 *connection, int version) {
     check_integrity(connection);
 }
 
-int infer_legacy_version(sqlite3 *connection) {
+int infer_legacy_version(sqlite3 *const connection) {
     std::set<std::string> tables;
     SqliteStatement schema(connection,
                            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';");
@@ -149,7 +149,7 @@ int infer_legacy_version(sqlite3 *connection) {
     return version;
 }
 
-void migrate_base(sqlite3 *connection) {
+void migrate_base(sqlite3 *const connection) {
     sqlite_execute(connection, R"(
         CREATE TABLE applications(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT NOT NULL,path TEXT);
         CREATE TABLE tags(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT NOT NULL UNIQUE);
@@ -160,7 +160,7 @@ void migrate_base(sqlite3 *connection) {
     )");
 }
 
-void migrate_desktop(sqlite3 *connection) {
+void migrate_desktop(sqlite3 *const connection) {
     sqlite_execute(connection, R"(
         CREATE INDEX desktop_applications_name ON applications(name);
         CREATE INDEX desktop_applications_path ON applications(path);
@@ -177,7 +177,7 @@ void migrate_desktop(sqlite3 *connection) {
     )");
 }
 
-void migrate_identity(sqlite3 *connection) {
+void migrate_identity(sqlite3 *const connection) {
     sqlite_execute(connection, R"(
         CREATE TABLE launch_target(id INTEGER PRIMARY KEY,kind TEXT NOT NULL,identity_key TEXT NOT NULL,
             UNIQUE(kind,identity_key));
@@ -227,21 +227,21 @@ void migrate_identity(sqlite3 *connection) {
 }
 }
 
-int xlibrary::read_schema_version(sqlite3 *connection) {
+int xlibrary::read_schema_version(sqlite3 *const connection) {
     SqliteStatement version(connection, "PRAGMA user_version;");
     if (!version.next())
         throw std::runtime_error("Cannot read profile schema version");
     return static_cast<int>(version.number(0));
 }
 
-void xlibrary::validate_profile(sqlite3 *connection) {
+void xlibrary::validate_profile(sqlite3 *const connection) {
     const auto version = read_schema_version(connection);
     if (version != profile_schema_version)
         throw std::runtime_error("Unsupported profile schema version " + std::to_string(version));
     validate_columns(connection, version);
 }
 
-void xlibrary::backup_database(sqlite3 *connection, const std::filesystem::path &destination) {
+void xlibrary::backup_database(sqlite3 *const connection, const std::filesystem::path &destination) {
     if (std::filesystem::exists(destination))
         throw std::runtime_error("Backup destination already exists");
     auto partial = destination;
@@ -275,7 +275,7 @@ void xlibrary::backup_database(sqlite3 *connection, const std::filesystem::path 
     }
 }
 
-void xlibrary::migrate_profile(sqlite3 *connection, const std::filesystem::path &path) {
+void xlibrary::migrate_profile(sqlite3 *const connection, const std::filesystem::path &path) {
     const auto recorded = read_schema_version(connection);
     if (recorded < 0 || recorded > profile_schema_version)
         throw std::runtime_error("Profile schema " + std::to_string(recorded) + " is newer than supported schema " +

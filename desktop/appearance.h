@@ -10,9 +10,9 @@ class QPainter;
 namespace appearance {
 QIcon icon(const QString &name, const QColor &color = QColor("#AAB4C1"));
 QIcon logo();
-void apply(QSettings &settings, const QString &additional_style = {});
-bool is_dark(QSettings &settings);
-int scaled(QSettings &settings, int size);
+void apply(const QSettings &settings, const QString &additional_style = {});
+bool is_dark(const QSettings &settings);
+int scaled(const QSettings &settings, int size);
 void paint_selection(QPainter &painter, const QRectF &rect, const QPalette &palette, qreal radius = 10);
 }
 
