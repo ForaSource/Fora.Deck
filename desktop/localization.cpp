@@ -2,8 +2,8 @@
 
 #include "localization.h"
 
-QString Localization::ShortcutTranslator::translate(const char *context, const char *source_text, const char *,
-                                                    int) const {
+QString Localization::ShortcutTranslator::translate(const char *const context, const char *const source_text,
+                                                    const char *, int) const {
     // Change only the Qt label; key codes and PortableText in settings remain unchanged.
     if (qstrcmp(context, "QShortcut") == 0 && qstrcmp(source_text, "Return") == 0)
         return QStringLiteral("Enter");

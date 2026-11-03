@@ -119,18 +119,18 @@ QIcon appearance::logo() {
     return result;
 }
 
-bool appearance::is_dark(QSettings &settings) {
+bool appearance::is_dark(const QSettings &settings) {
     WindowManager manager;
     manager.update_theme(settings.value("appearance/theme", "dark").toString(),
                          qApp->styleHints()->colorScheme() == Qt::ColorScheme::Light);
     return manager.get_theme();
 }
 
-int appearance::scaled(QSettings &settings, int size) {
+int appearance::scaled(const QSettings &settings, const int size) {
     return qRound(size * qBound(100, settings.value("appearance/text_scale", 100).toInt(), 200) / 100.0);
 }
 
-void appearance::paint_selection(QPainter &painter, const QRectF &rect, const QPalette &palette, qreal radius) {
+void appearance::paint_selection(QPainter &painter, const QRectF &rect, const QPalette &palette, const qreal radius) {
     QLinearGradient gradient(rect.topLeft(), rect.bottomLeft());
     gradient.setColorAt(0, palette.color(QPalette::Light));
     gradient.setColorAt(1, palette.color(QPalette::Highlight));
@@ -139,7 +139,7 @@ void appearance::paint_selection(QPainter &painter, const QRectF &rect, const QP
     painter.drawRoundedRect(rect, radius, radius);
 }
 
-void appearance::apply(QSettings &settings, const QString &additional_style) {
+void appearance::apply(const QSettings &settings, const QString &additional_style) {
     const bool dark = is_dark(settings);
     const QColor base(dark ? "#242528" : "#F3F3F4");
     const QColor panel(dark ? "#2A2B2E" : "#EBECEE");
@@ -173,10 +173,12 @@ void appearance::apply(QSettings &settings, const QString &additional_style) {
     qApp->setFont(font);
     QString style = R"(
         QWidget { color: %1; font-family: "Segoe UI"; font-size: %11px; }
-        QMainWindow, QDialog { background: %2; }
+        QMainWindow { background: %3; }
+        QDialog { background: %2; }
+        QFrame#shell, QSplitter#library_splitter { background: %3; border: none; }
+        QFrame#library_workspace { background: %2; border: 1px solid %6; border-radius: 14px; }
         QFrame[panel="true"], QWidget[panel="true"] { background: %3; }
-        QFrame#navigation { border: none; border-right: 1px solid %6; }
-        QScrollArea#details { border: none; border-left: 1px solid %6; }
+        QFrame#navigation, QScrollArea#details { background: %3; border: none; }
         QLabel[muted="true"] { color: %4; }
         QLabel[heading="true"] { font-size: %8px; font-weight: 600; }
         QLabel[subheading="true"] { font-size: %9px; font-weight: 600; }
@@ -258,6 +260,9 @@ void appearance::apply(QSettings &settings, const QString &additional_style) {
         QProgressBar#discovery_bar::chunk { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #68717C, stop:1 #9AA6B4); border-radius: 4px; }
         QSplitter::handle { background: %3; }
         QSplitter::handle:hover, QSplitter::handle:pressed { background: %16; }
+        QSplitter#library_splitter::handle { background: transparent; border: none; margin: 14px 2px; border-radius: 1px; }
+        QSplitter#library_splitter::handle:hover { background: %16; }
+        QSplitter#library_splitter::handle:pressed { background: %4; }
         QGroupBox { border: none; margin-top: 24px; font-weight: 600; }
         QGroupBox::title { subcontrol-origin: margin; }
     )";

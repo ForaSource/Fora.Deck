@@ -12,7 +12,7 @@
 namespace {
 using unique_handle = std::unique_ptr<void, decltype(&CloseHandle)>;
 
-std::pair<bool, DWORD> check_process_handle(HANDLE process_handle, const std::wstring &expected_path) {
+std::pair<bool, DWORD> check_process_handle(const HANDLE process_handle, const std::wstring &expected_path) {
     const auto wait_result = WaitForSingleObject(process_handle, 0);
     if (wait_result == WAIT_OBJECT_0) {
         return {false, 0};
@@ -45,7 +45,7 @@ std::pair<bool, DWORD> check_process_handle(HANDLE process_handle, const std::ws
 }
 
 std::move_only_function<std::pair<bool, std::uint32_t>()>
-Heartbeat::make_process_checker(std::uint32_t process_id, const std::filesystem::path &executable_path) {
+Heartbeat::make_process_checker(const std::uint32_t process_id, const std::filesystem::path &executable_path) {
     const auto expected_name = executable_path.filename().wstring();
     if (process_id == 0 || expected_name.empty()) {
         throw std::invalid_argument("Heartbeat requires a nonzero PID and an executable name");
@@ -127,7 +127,7 @@ Heartbeat::make_process_checker(std::uint32_t process_id, const std::filesystem:
 #include <QCoreApplication>
 #include <QDir>
 #include <QFileInfo>
-QString xlibrary::windows_process_path(quint32 process_id) {
+QString xlibrary::windows_process_path(const quint32 process_id) {
     const unique_handle process(OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, process_id), &CloseHandle);
     if (!process) {
         return {};

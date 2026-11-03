@@ -5,7 +5,7 @@
 #include "LinuxProcessor.h"
 
 std::move_only_function<std::pair<bool, std::uint32_t>()>
-Heartbeat::make_process_checker(std::uint32_t process_id, const std::filesystem::path &executable_path) {
+Heartbeat::make_process_checker(const std::uint32_t process_id, const std::filesystem::path &executable_path) {
     if (process_id == 0 || executable_path.filename().empty()) {
         throw std::invalid_argument("Heartbeat requires a nonzero PID and an executable name");
     }

@@ -1034,16 +1034,12 @@ Applications: %1</source>
         <translation>После запуска приложения</translation>
     </message>
     <message>
-        <source>Keep the window open</source>
-        <translation>Оставить окно открытым</translation>
+        <source>Keep the window open in the background</source>
+        <translation>Оставить окно открытым на заднем плане</translation>
     </message>
     <message>
         <source>Minimize the window</source>
         <translation>Свернуть окно</translation>
-    </message>
-    <message>
-        <source>Hide to tray</source>
-        <translation>Скрыть в трей</translation>
     </message>
     <message>
         <source>Launch again</source>
@@ -2064,6 +2060,10 @@ Technical reason: %3</source>
         <translation>Исключения обнаружения сброшены.</translation>
     </message>
     <message>
+        <source>Import completed, but discovery exclusions could not be saved.</source>
+        <translation>Импорт завершён, но не удалось сохранить исключения обнаружения.</translation>
+    </message>
+    <message>
         <source>Do not offer unchecked applications in future scans</source>
         <translation>Не предлагать неотмеченные приложения при следующих сканированиях</translation>
     </message>
@@ -2090,6 +2090,10 @@ Technical reason: %3</source>
     <message>
         <source>Import cancelled; changes were not saved.</source>
         <translation>Импорт отменён; изменения не сохранены.</translation>
+    </message>
+    <message>
+        <source>Import complete. Added: %1. Already in the library: %2.</source>
+        <translation>Импорт завершён. Добавлено: %1. Уже в библиотеке: %2.</translation>
     </message>
     <message>
         <source>Import complete. Updated: %1.</source>

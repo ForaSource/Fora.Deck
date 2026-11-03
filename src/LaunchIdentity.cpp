@@ -17,7 +17,7 @@ std::filesystem::path xlibrary::utf8_path(const std::string &path) {
     return std::filesystem::path(std::u8string(reinterpret_cast<const char8_t *>(path.data()), path.size()));
 }
 
-std::string xlibrary::path_identity(const std::filesystem::path &path, bool resolve_links) {
+std::string xlibrary::path_identity(const std::filesystem::path &path, const bool resolve_links) {
     if (path.empty() || !path.is_absolute())
         throw std::invalid_argument("Launch path must be absolute");
     auto normalized = path.lexically_normal();
@@ -45,7 +45,7 @@ std::string xlibrary::path_identity(const std::filesystem::path &path, bool reso
     return path_utf8(normalized);
 }
 
-sqlite3_int64 xlibrary::ensure_launch_configuration(sqlite3 *connection, const std::filesystem::path &path,
+sqlite3_int64 xlibrary::ensure_launch_configuration(sqlite3 *const connection, const std::filesystem::path &path,
                                                     const std::string &arguments,
                                                     const std::filesystem::path &working_directory) {
     const auto launch_path = path_utf8(path);
@@ -54,6 +54,27 @@ sqlite3_int64 xlibrary::ensure_launch_configuration(sqlite3 *connection, const s
         arguments.find('\0') != std::string::npos)
         throw std::invalid_argument("Launch configuration contains a null character");
     const auto invocation = path_identity(path, false);
+#ifdef _WIN32
+    const auto effective_directory = working_directory.empty() ? path.parent_path() : working_directory;
+    const auto directory_key = path_identity(effective_directory);
+    {
+        // Older catalogs distinguish an omitted directory from the EXE's own folder.
+        SqliteStatement existing(connection, "SELECT c.id,c.path,c.working_directory FROM launch_configuration c "
+                                             "WHERE c.invocation_key=? AND c.arguments=? "
+                                             "ORDER BY EXISTS(SELECT 1 FROM applications a "
+                                             "WHERE a.configuration_id=c.id) DESC,c.id;");
+        existing.bind(1, invocation);
+        existing.bind(2, arguments);
+        while (existing.next()) {
+            const auto stored_directory = utf8_path(existing.text(2));
+            if (path_identity(stored_directory.empty() ? utf8_path(existing.text(1)).parent_path()
+                                                       : stored_directory) == directory_key)
+                return existing.number(0);
+        }
+    }
+#else
+    const auto directory_key = working_directory.empty() ? std::string{} : path_identity(working_directory);
+#endif
     {
         // Исчезнувший или переназначенный симлинк не меняет идентичность при сохранении тегов карточки.
         SqliteStatement existing(connection, "SELECT id FROM launch_configuration WHERE invocation_key=? "
@@ -65,7 +86,6 @@ sqlite3_int64 xlibrary::ensure_launch_configuration(sqlite3 *connection, const s
             return existing.number(0);
     }
     const auto key = path_identity(path);
-    const auto directory_key = working_directory.empty() ? std::string{} : path_identity(working_directory);
     const std::string kind = path.extension() == ".desktop" ? "desktop" : "executable";
     SqliteStatement create_target(connection, "INSERT INTO launch_target(kind,identity_key) VALUES(?,?) "
                                               "ON CONFLICT(kind,identity_key) DO NOTHING;");

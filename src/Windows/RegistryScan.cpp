@@ -39,11 +39,11 @@ struct RegistryKey {
     }
 };
 
-bool absent(LSTATUS status) {
+bool absent(const LSTATUS status) {
     return status == ERROR_FILE_NOT_FOUND || status == ERROR_PATH_NOT_FOUND;
 }
 
-std::wstring read_string(HKEY key, const wchar_t *name, const registry_source &source,
+std::wstring read_string(const HKEY key, const wchar_t *const name, const registry_source &source,
                          std::vector<scan_issue> &issues) {
     // RegGetValue automatically expands variables in REG_EXPAND_SZ.
     constexpr DWORD flags = RRF_RT_REG_SZ | RRF_RT_REG_EXPAND_SZ;
@@ -90,7 +90,8 @@ std::wstring read_string(HKEY key, const wchar_t *name, const registry_source &s
 }
 
 template <class Visitor>
-void visit_subkeys(registry_scope scope, const wchar_t *branch, std::vector<scan_issue> &issues, Visitor visitor) {
+void visit_subkeys(const registry_scope scope, const wchar_t *const branch, std::vector<scan_issue> &issues,
+                   const Visitor &visitor) {
     const HKEY root = scope == registry_scope::current_user ? HKEY_CURRENT_USER : HKEY_LOCAL_MACHINE;
     // These flags are ignored on 32-bit Windows, so duplicate entries are possible.
     for (REGSAM view : {KEY_WOW64_64KEY, KEY_WOW64_32KEY}) {
@@ -154,9 +155,9 @@ void append_unique(std::vector<discovered_application> &target, discovered_appli
         target.push_back(std::move(entry));
 }
 
-void scan_app_paths(registry_scope scope, scan_result<discovered_application> &result) {
+void scan_app_paths(const registry_scope scope, scan_result<discovered_application> &result) {
     visit_subkeys(scope, app_paths_key, result.issues,
-                  [&](HKEY key, const std::wstring &, const registry_source &source) {
+                  [&](const HKEY key, const std::wstring &, const registry_source &source) {
                       auto value = trim_path(read_string(key, nullptr, source, result.issues));
                       if (value.empty())
                           return;
@@ -181,11 +182,13 @@ void scan_app_paths(registry_scope scope, scan_result<discovered_application> &r
                   });
 }
 
-scan_result<uninstall_entry> scan_uninstall(registry_scope scope) {
+scan_result<uninstall_entry> scan_uninstall(const registry_scope scope) {
     scan_result<uninstall_entry> result;
     visit_subkeys(
-        scope, uninstall_key, result.issues, [&](HKEY key, const std::wstring &, const registry_source &source) {
-            const auto read = [&](const wchar_t *field) { return read_string(key, field, source, result.issues); };
+        scope, uninstall_key, result.issues, [&](const HKEY key, const std::wstring &, const registry_source &source) {
+            const auto read = [&](const wchar_t *const field) {
+                return read_string(key, field, source, result.issues);
+            };
             uninstall_entry entry{read(L"DisplayName"),
                                   read(L"DisplayVersion"),
                                   read(L"Publisher"),
@@ -211,14 +214,15 @@ scan_result<uninstall_entry> scan_uninstall(registry_scope scope) {
     return result;
 }
 
-template <class T> void append_issues(scan_result<T> &scan, std::vector<scan_issue> *issues) {
+template <class T> void append_issues(scan_result<T> &scan, std::vector<scan_issue> *const issues) {
     if (issues) {
         issues->insert(issues->end(), std::make_move_iterator(scan.issues.begin()),
                        std::make_move_iterator(scan.issues.end()));
     }
 }
 
-std::vector<::Application> make_applications(scan_result<discovered_application> scan, std::vector<scan_issue> *issues,
+std::vector<::Application> make_applications(scan_result<discovered_application> scan,
+                                             std::vector<scan_issue> *const issues,
                                              const registry_progress &progress = {}) {
     append_issues(scan, issues);
     std::vector<::Application> applications;
@@ -236,31 +240,31 @@ std::vector<::Application> make_applications(scan_result<discovered_application>
 
 } // namespace detail
 
-std::vector<::Application> scan_app_paths_current_user(std::vector<scan_issue> *issues) {
+std::vector<::Application> scan_app_paths_current_user(std::vector<scan_issue> *const issues) {
     detail::scan_result<detail::discovered_application> scan;
     detail::scan_app_paths(registry_scope::current_user, scan);
     return detail::make_applications(std::move(scan), issues);
 }
 
-std::vector<::Application> scan_app_paths_local_machine(std::vector<scan_issue> *issues) {
+std::vector<::Application> scan_app_paths_local_machine(std::vector<scan_issue> *const issues) {
     detail::scan_result<detail::discovered_application> scan;
     detail::scan_app_paths(registry_scope::local_machine, scan);
     return detail::make_applications(std::move(scan), issues);
 }
 
-std::vector<uninstall_entry> scan_uninstall_current_user(std::vector<scan_issue> *issues) {
+std::vector<uninstall_entry> scan_uninstall_current_user(std::vector<scan_issue> *const issues) {
     auto scan = detail::scan_uninstall(registry_scope::current_user);
     detail::append_issues(scan, issues);
     return std::move(scan.entries);
 }
 
-std::vector<uninstall_entry> scan_uninstall_local_machine(std::vector<scan_issue> *issues) {
+std::vector<uninstall_entry> scan_uninstall_local_machine(std::vector<scan_issue> *const issues) {
     auto scan = detail::scan_uninstall(registry_scope::local_machine);
     detail::append_issues(scan, issues);
     return std::move(scan.entries);
 }
 
-std::vector<::Application> scan_registry_applications(std::vector<scan_issue> *issues,
+std::vector<::Application> scan_registry_applications(std::vector<scan_issue> *const issues,
                                                       const registry_progress &progress) {
     detail::scan_result<detail::discovered_application> scan;
     detail::scan_app_paths(registry_scope::current_user, scan);

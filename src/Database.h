@@ -9,7 +9,7 @@
 #include <vector>
 
 #include "Application.h"
-#include "catalog_types.h"
+#include "CatalogTypes.h"
 
 class Database {
 private:
@@ -18,6 +18,7 @@ private:
     void write_metadata(qint64 id, const app_record &record);
     void update_filter_tags(const QString &old_name, const QString &new_name);
     void write_source(qint64 configuration_id, const app_record &record);
+    void consolidate_discovered_application(qint64 configuration_id, const app_record &record);
 
     bool drop_on_add_error = true;
     std::filesystem::path file_path;

@@ -39,7 +39,7 @@ std::string read_process_file(const std::filesystem::path &path, std::error_code
     return contents;
 }
 
-std::string utf8_arguments(std::wstring_view arguments) {
+std::string utf8_arguments(const std::wstring_view arguments) {
     std::string result;
     for (const auto character : arguments) {
         const auto code = static_cast<std::uint32_t>(character);
@@ -74,14 +74,14 @@ class ChildReaper {
 
 public:
     ChildReaper()
-        : worker([this](std::stop_token stop_token) {
+        : worker([this](const std::stop_token stop_token) {
               std::unique_lock lock(mutex);
               while (!stop_token.stop_requested()) {
                   wake.wait(lock, stop_token, [this] { return !children.empty(); });
                   if (stop_token.stop_requested()) {
                       break;
                   }
-                  std::erase_if(children, [](pid_t process_id) {
+                  std::erase_if(children, [](const pid_t process_id) {
                       pid_t result;
                       do {
                           result = waitpid(process_id, nullptr, WNOHANG);
@@ -98,7 +98,7 @@ public:
         return lock;
     }
 
-    void watch(pid_t process_id) {
+    void watch(const pid_t process_id) {
         children.push_back(process_id);
         wake.notify_all();
     }
@@ -123,7 +123,7 @@ public:
 
 } // namespace
 
-bool xlibrary::script_process_matches(std::uint32_t process_id, const std::filesystem::path &expected_path) {
+bool xlibrary::script_process_matches(const std::uint32_t process_id, const std::filesystem::path &expected_path) {
     std::ifstream script(expected_path, std::ios::binary);
     char prefix[2]{};
     if (!script.read(prefix, sizeof(prefix)) || prefix[0] != '#' || prefix[1] != '!')
@@ -245,7 +245,7 @@ bool xlibrary::script_process_matches(std::uint32_t process_id, const std::files
     return std::filesystem::equivalent(argument_path, expected_path, error);
 }
 
-std::optional<xlibrary::process_identity> xlibrary::read_process_identity(std::uint32_t process_id,
+std::optional<xlibrary::process_identity> xlibrary::read_process_identity(const std::uint32_t process_id,
                                                                           std::error_code &error) {
     const auto contents =
         read_process_file(std::filesystem::path("/proc") / std::to_string(process_id) / "stat", error);

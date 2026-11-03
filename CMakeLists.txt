@@ -99,16 +99,16 @@ target_link_libraries(sqlite3 PUBLIC
 # ------------------------------------------------------------
 
 add_library(xlibrary_core STATIC
-        src/catalog_types.h
-        src/operation_types.h
-        src/path_helpers.h
-        src/application_paths.h
-        src/search_query.h
-        src/search_query.cpp
-        src/profile_backup.h
-        src/profile_backup.cpp
-        src/profile_settings.h
-        src/profile_settings.cpp
+        src/CatalogTypes.h
+        src/OperationTypes.h
+        src/PathHelpers.h
+        src/ApplicationPaths.h
+        src/SearchQuery.h
+        src/SearchQuery.cpp
+        src/ProfileBackup.h
+        src/ProfileBackup.cpp
+        src/ProfileSettings.h
+        src/ProfileSettings.cpp
 
         src/ProfileSchema.h src/ProfileSchema.cpp
         src/LaunchIdentity.h src/LaunchIdentity.cpp
@@ -164,26 +164,26 @@ target_link_libraries(xlibrary_core PUBLIC
 
 qt_add_executable(XLibrary WIN32
         main.cpp
-        desktop/catalog_review.h desktop/catalog_review.cpp
-        desktop/profile_view.h desktop/profile_view.cpp
-        desktop/platform_integration.h
+        desktop/CatalogReview.h desktop/CatalogReview.cpp
+        desktop/ProfileView.h desktop/ProfileView.cpp
+        desktop/PlatformIntegration.h
         desktop/localization.h desktop/localization.cpp
-        desktop/library_model.h desktop/library_model.cpp
-        desktop/search_tools.h desktop/search_tools.cpp
-        desktop/search_results.h desktop/search_results.cpp
-        desktop/search_overlay.h desktop/search_overlay.cpp
-        desktop/desktop_service.h desktop/desktop_service.cpp
+        desktop/LibraryModel.h desktop/LibraryModel.cpp
+        desktop/SearchTools.h desktop/SearchTools.cpp
+        desktop/SearchResults.h desktop/SearchResults.cpp
+        desktop/SearchOverlay.h desktop/SearchOverlay.cpp
+        desktop/DesktopService.h desktop/DesktopService.cpp
         desktop/appearance.h desktop/appearance.cpp
-        desktop/selection_button.h desktop/selection_button.cpp
-        desktop/library_splitter.h desktop/library_splitter.cpp
-        desktop/ui_registry.h desktop/ui_helpers.h
-        desktop/notification_banner.h desktop/notification_banner.cpp
+        desktop/SelectionButton.h desktop/SelectionButton.cpp
+        desktop/LibrarySplitter.h desktop/LibrarySplitter.cpp
+        desktop/UiRegistry.h desktop/UiHelpers.h
+        desktop/NotificationBanner.h desktop/NotificationBanner.cpp
         desktop/editors.h desktop/editors.cpp
-        desktop/library_views.h desktop/library_views.cpp
-        desktop/settings_view.h desktop/settings_view.cpp
-        desktop/github_token_store.h desktop/github_token_store.cpp
-        desktop/update_checker.h desktop/update_checker.cpp
-        desktop/main_window.h desktop/main_window.cpp
+        desktop/LibraryViews.h desktop/LibraryViews.cpp
+        desktop/SettingsView.h desktop/SettingsView.cpp
+        desktop/GithubTokenStore.h desktop/GithubTokenStore.cpp
+        desktop/UpdateChecker.h desktop/UpdateChecker.cpp
+        desktop/MainWindow.h desktop/MainWindow.cpp
 )
 set_target_properties(XLibrary PROPERTIES AUTOMOC ON)
 qt_add_lrelease(XLibrary TS_FILES translations/xlibrary_ru.ts translations/qt_widgets_ru.ts
@@ -194,7 +194,7 @@ qt_add_resources(XLibrary application_translations
         FILES ${xlibrary_qm_files}
 )
 if(WIN32)
-    target_sources(XLibrary PRIVATE desktop/windows_integration.cpp assets/application_icon.rc)
+    target_sources(XLibrary PRIVATE desktop/WindowsIntegration.cpp assets/application_icon.rc)
     target_include_directories(XLibrary PRIVATE "$<$<COMPILE_LANGUAGE:RC>:${CMAKE_CURRENT_SOURCE_DIR}>")
     set_source_files_properties(assets/application_icon.rc PROPERTIES
             OBJECT_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/assets/xlibrary.ico"
@@ -204,7 +204,7 @@ if(WIN32)
         set_property(SOURCE assets/application_icon.rc APPEND PROPERTY COMPILE_OPTIONS --use-temp-file)
     endif()
 else()
-    target_sources(XLibrary PRIVATE desktop/linux_integration.cpp)
+    target_sources(XLibrary PRIVATE desktop/LinuxIntegration.cpp)
     target_link_libraries(xlibrary_core PUBLIC Qt6::DBus)
     if(X11_FOUND)
         target_link_libraries(XLibrary PRIVATE X11::X11)

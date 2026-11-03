@@ -1,7 +1,7 @@
 #ifndef XLIBRARY_EDITORS_H
 #define XLIBRARY_EDITORS_H
 
-#include "ui_registry.h"
+#include "UiRegistry.h"
 
 void register_editors(UiRegistry &registry);
 

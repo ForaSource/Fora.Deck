@@ -3,7 +3,7 @@
 
 #include "LaunchArguments.h"
 
-std::vector<std::string> xlibrary::split_launch_arguments(std::string_view arguments) {
+std::vector<std::string> xlibrary::split_launch_arguments(const std::string_view arguments) {
     if (arguments.find('\0') != std::string_view::npos) {
         throw std::invalid_argument("Application arguments contain a null character");
     }

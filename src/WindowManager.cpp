@@ -10,6 +10,6 @@ void WindowManager::update_theme() {
     }
 }
 
-void WindowManager::update_theme(const QString &preference, bool system_light) {
+void WindowManager::update_theme(const QString &preference, const bool system_light) {
     dark_theme = preference == "dark" || (preference == "system" && !system_light);
 }

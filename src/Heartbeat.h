@@ -9,7 +9,7 @@
 #include <thread>
 #include <utility>
 
-#include "catalog_types.h"
+#include "CatalogTypes.h"
 
 // Monitors one process or resolves the running paths of the complete catalog.
 class Heartbeat {
