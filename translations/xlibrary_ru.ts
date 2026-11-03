@@ -2064,6 +2064,10 @@ Technical reason: %3</source>
         <translation>Исключения обнаружения сброшены.</translation>
     </message>
     <message>
+        <source>Import completed, but discovery exclusions could not be saved.</source>
+        <translation>Импорт завершён, но не удалось сохранить исключения обнаружения.</translation>
+    </message>
+    <message>
         <source>Do not offer unchecked applications in future scans</source>
         <translation>Не предлагать неотмеченные приложения при следующих сканированиях</translation>
     </message>

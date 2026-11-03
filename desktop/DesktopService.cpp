@@ -204,6 +204,24 @@ quint64 DesktopService::begin_operation(const QString &operation) {
 }
 
 void DesktopService::publish_result(const operation_result &result) {
+    if (pending_exclusions_request_id != 0 && result.id == pending_exclusions_request_id &&
+        (result.state == operation_state::completed || result.state == operation_state::cancelled ||
+         result.state == operation_state::error)) {
+        auto exclusions = std::move(pending_exclusions);
+        pending_exclusions.clear();
+        pending_exclusions_request_id = 0;
+        if (result.state == operation_state::completed) {
+            settings.setValue("sources/excluded_configurations", exclusions);
+            settings.sync();
+            if (settings.status() != QSettings::NoError) {
+                last_failure = {
+                    QCoreApplication::translate(
+                        "XLibrary", "Import completed, but discovery exclusions could not be saved."),
+                    "QSettings sync failed for discovery exclusions", operation_error_source::filesystem};
+                emit message(last_failure.user_message);
+            }
+        }
+    }
     if (result.state == operation_state::error)
         last_failure = result.error;
     if (result.operation.startsWith("profile_")) {
@@ -536,8 +554,8 @@ void DesktopService::apply_catalog_preview(const QVector<int> &rows, const bool 
     }
     if (remember_exclusions && is_scan_preview()) {
         exclusions.removeDuplicates();
-        settings.setValue("sources/excluded_configurations", exclusions);
-        settings.sync();
+        pending_exclusions = std::move(exclusions);
+        pending_exclusions_request_id = discovery_request_id;
     }
     reviewing = false;
     preview_records.clear();

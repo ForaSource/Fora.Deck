@@ -34,6 +34,8 @@ private:
     QSet<qint64> launching;
     operation_state discovery_state = operation_state::ready;
     quint64 discovery_request_id = 0;
+    QStringList pending_exclusions;
+    quint64 pending_exclusions_request_id = 0;
     discovery_progress scan_progress;
     QString scan_report;
     QVector<app_record> preview_records;
