@@ -861,6 +861,13 @@ QWidget *details(const ui_context &context, QWidget *const parent) {
     auto *source = label({}, "muted");
     source->setWordWrap(true);
     source->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    // Long paths and arguments must wrap within the pane, not widen its scroll contents.
+    for (auto *text : {name, status, tags, arguments, source}) {
+        auto policy = text->sizePolicy();
+        policy.setHorizontalPolicy(QSizePolicy::Ignored);
+        text->setSizePolicy(policy);
+        text->setMinimumWidth(0);
+    }
     root->addWidget(source);
     root->addSpacing(8);
     auto *launch = action_button(context.actions.value("launch"));

@@ -173,10 +173,12 @@ void appearance::apply(const QSettings &settings, const QString &additional_styl
     qApp->setFont(font);
     QString style = R"(
         QWidget { color: %1; font-family: "Segoe UI"; font-size: %11px; }
-        QMainWindow, QDialog { background: %2; }
+        QMainWindow { background: %3; }
+        QDialog { background: %2; }
+        QFrame#shell, QSplitter#library_splitter { background: %3; border: none; }
+        QFrame#library_workspace { background: %2; border: 1px solid %6; border-radius: 14px; }
         QFrame[panel="true"], QWidget[panel="true"] { background: %3; }
-        QFrame#navigation { border: none; border-right: 1px solid %6; }
-        QScrollArea#details { border: none; border-left: 1px solid %6; }
+        QFrame#navigation, QScrollArea#details { background: %3; border: none; }
         QLabel[muted="true"] { color: %4; }
         QLabel[heading="true"] { font-size: %8px; font-weight: 600; }
         QLabel[subheading="true"] { font-size: %9px; font-weight: 600; }
@@ -258,6 +260,9 @@ void appearance::apply(const QSettings &settings, const QString &additional_styl
         QProgressBar#discovery_bar::chunk { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #68717C, stop:1 #9AA6B4); border-radius: 4px; }
         QSplitter::handle { background: %3; }
         QSplitter::handle:hover, QSplitter::handle:pressed { background: %16; }
+        QSplitter#library_splitter::handle { background: transparent; border: none; margin: 14px 2px; border-radius: 1px; }
+        QSplitter#library_splitter::handle:hover { background: %16; }
+        QSplitter#library_splitter::handle:pressed { background: %4; }
         QGroupBox { border: none; margin-top: 24px; font-weight: 600; }
         QGroupBox::title { subcontrol-origin: margin; }
     )";

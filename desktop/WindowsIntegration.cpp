@@ -159,8 +159,25 @@ bool desktop_platform::animations_enabled() {
 
 void desktop_platform::apply_backdrop(QWidget *const window, const bool dark, const bool glass) {
     const auto handle = reinterpret_cast<HWND>(window->winId());
+    // Keep compatibility with MinGW headers predating the Windows 11 DWM attributes.
+    constexpr DWORD immersive_dark_mode_attribute = 20;
+    constexpr DWORD corner_preference_attribute = 33;
+    constexpr DWORD border_color_attribute = 34;
+    constexpr DWORD caption_color_attribute = 35;
+    constexpr DWORD text_color_attribute = 36;
     const BOOL dark_value = dark;
-    DwmSetWindowAttribute(handle, 20, &dark_value, sizeof(dark_value));
+    DwmSetWindowAttribute(handle, immersive_dark_mode_attribute, &dark_value, sizeof(dark_value));
+    const auto palette = window->palette();
+    const auto native_color = [](const QColor &color) { return RGB(color.red(), color.green(), color.blue()); };
+    const COLORREF caption_color = native_color(palette.color(QPalette::AlternateBase));
+    const COLORREF text_color = native_color(palette.color(QPalette::WindowText));
+    const COLORREF border_color = native_color(palette.color(QPalette::Mid));
+    // Windows 11 honors these attributes; older Windows keeps its native frame.
+    DwmSetWindowAttribute(handle, caption_color_attribute, &caption_color, sizeof(caption_color));
+    DwmSetWindowAttribute(handle, text_color_attribute, &text_color, sizeof(text_color));
+    DwmSetWindowAttribute(handle, border_color_attribute, &border_color, sizeof(border_color));
+    const int round_corners = 2; // DWMWCP_ROUND
+    DwmSetWindowAttribute(handle, corner_preference_attribute, &round_corners, sizeof(round_corners));
     const int backdrop = glass ? 2 : 1;
     DwmSetWindowAttribute(handle, 38, &backdrop, sizeof(backdrop));
 }

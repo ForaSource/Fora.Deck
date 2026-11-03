@@ -30,12 +30,13 @@ using namespace ui_helpers;
 
 QWidget *shell(const ui_context &context, QWidget *const parent) {
     auto *service = static_cast<DesktopService *>(context.service);
-    auto *widget = new QWidget(parent);
+    auto *widget = new QFrame(parent);
     auto *root = new QHBoxLayout(widget);
-    root->setContentsMargins(0, 0, 0, 0);
+    root->setContentsMargins(8, 6, 8, 8);
     root->setSpacing(0);
     auto *navigation = context.registry->create("navigation", context, widget);
-    auto *center = new QWidget;
+    auto *center = new QFrame;
+    center->setObjectName("library_workspace");
     auto *body = new QVBoxLayout(center);
     body->setContentsMargins(20, 16, 20, 16);
     body->setSpacing(0);
