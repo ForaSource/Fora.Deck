@@ -120,22 +120,20 @@ QVariant LibraryModel::headerData(const int section, const Qt::Orientation orien
 void LibraryModel::replace(QVector<app_record> applications) {
     beginResetModel();
     records = std::move(applications);
-    search_names.clear();
-    search_paths.clear();
+    searchable_records.clear();
     search_tags.clear();
     name_sort_keys.clear();
     tag_sort_keys.clear();
-    search_names.reserve(records.size());
-    search_paths.reserve(records.size());
+    searchable_records.reserve(records.size());
     search_tags.reserve(records.size());
     name_sort_keys.reserve(records.size());
     tag_sort_keys.reserve(records.size());
     const QCollator collator;
     for (const auto &record : records) {
-        search_names.append(record.name.toCaseFolded());
-        search_paths.append(QFileInfo(record.path).fileName().toCaseFolded());
+        searchable_records.append(
+            SearchQuery::prepare(record.name, QFileInfo(record.path).fileName(), record.tags, record.aliases));
         search_tags.append(record.tags.join(", ").toCaseFolded());
-        name_sort_keys.append(collator.sortKey(search_names.back()));
+        name_sort_keys.append(collator.sortKey(searchable_records.back().names.front().text));
         tag_sort_keys.append(collator.sortKey(search_tags.back()));
     }
     endResetModel();
@@ -229,8 +227,7 @@ int LibraryFilter::query_rank(const int row) const {
         query_ranks.fill(-2, model->rowCount());
     auto &rank = query_ranks[row];
     if (rank == -2)
-        rank =
-            query.rank(model->search_name(row), model->search_path(row), model->at(row).tags, model->at(row).aliases);
+        rank = query.rank(model->search_data(row));
     return rank;
 }
 
@@ -284,15 +281,15 @@ bool LibraryFilter::lessThan(const QModelIndex &left, const QModelIndex &right) 
     const auto *model = static_cast<const LibraryModel *>(sourceModel());
     const auto &a = model->at(left.row());
     const auto &b = model->at(right.row());
-    // The proxy reverses comparisons for descending order; keep favorites pinned in both directions.
-    if (a.favorite != b.favorite)
-        return sortOrder() == Qt::AscendingOrder ? a.favorite : b.favorite;
     if (query.has_text()) {
         const auto a_rank = query_rank(left.row());
         const auto b_rank = query_rank(right.row());
         if (a_rank != b_rank)
             return sortOrder() == Qt::AscendingOrder ? a_rank < b_rank : a_rank > b_rank;
     }
+    // The proxy reverses comparisons for descending order; keep favorites pinned within each relevance rank.
+    if (a.favorite != b.favorite)
+        return sortOrder() == Qt::AscendingOrder ? a.favorite : b.favorite;
     if (sort_mode == 3) {
         const auto &a_tags = model->tag_names(left.row());
         const auto &b_tags = model->tag_names(right.row());
