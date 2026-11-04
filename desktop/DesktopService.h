@@ -3,6 +3,7 @@
 
 #include <atomic>
 #include <functional>
+#include <map>
 #include <QSettings>
 #include <QThread>
 #include <QThreadPool>
@@ -11,6 +12,7 @@
 #include "Application.h"
 #include "LibraryModel.h"
 #include "OperationTypes.h"
+#include "PlatformIntegration.h"
 #include "ProfileBackup.h"
 #include "UpdateChecker.h"
 
@@ -52,6 +54,16 @@ private:
     QVector<app_record> preview_records;
     QVector<discovery_issue> preview_issues;
     QString preview_operation;
+    std::map<QString, std::unique_ptr<GlobalHotkey>> target_hotkeys;
+    QMap<QString, QKeySequence> registered_target_shortcuts;
+    QMap<QString, QString> target_shortcut_errors;
+    quint64 pending_shortcut_request = 0;
+    QString pending_shortcut_key;
+    QKeySequence previous_target_shortcut;
+    std::unique_ptr<GlobalHotkey> previous_target_hotkey;
+    void sync_target_hotkeys();
+    bool validate_shortcut_configuration(const QVariantMap &values, const QString &ignore_target,
+                                         const QKeySequence &candidate, QString &error) const;
     bool reviewing = false;
     bool undo_available = false;
     QVector<qint64> selected_ids;
@@ -167,12 +179,17 @@ public:
     void apply_filter(const saved_filter &record);
     void clear_filters();
     void clear_history();
+    QKeySequence target_shortcut(bool scenario, qint64 id) const;
+    bool validate_target_shortcut(bool scenario, qint64 id, const QKeySequence &sequence, QString &error) const;
+    bool set_target_shortcut(bool scenario, qint64 id, const QKeySequence &sequence, QString &error);
+    bool validate_shortcuts(const QVariantMap &values, QString &error) const;
     void notify(const QString &message);
 
 signals:
     void library_open_requested(quint64 request_id);
     void library_restore_requested(quint64 request_id, const QString &path);
     void catalog_changed();
+    void target_shortcuts_changed();
     void launch_profiles_changed(const QString &path);
     void selection_changed();
     void selections_changed();

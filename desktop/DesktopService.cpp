@@ -39,6 +39,26 @@ DesktopService::DesktopService(QObject *const parent, const QString &profile_pat
     qRegisterMetaType<operation_result>();
     qRegisterMetaType<profile_manifest>();
     qRegisterMetaType<QVector<path_relocation>>();
+    connect(this, &DesktopService::catalog_changed, this, &DesktopService::sync_target_hotkeys);
+    connect(this, &DesktopService::appearance_changed, this, &DesktopService::sync_target_hotkeys);
+    connect(this, &DesktopService::operation_changed, this, [this](const operation_result &result) {
+        if (!pending_shortcut_request || result.id != pending_shortcut_request ||
+            result.state == operation_state::loading)
+            return;
+        if (result.state != operation_state::completed) {
+            // Keep the old OS registration until persistence succeeds, so rollback cannot lose it.
+            target_hotkeys[pending_shortcut_key] = std::move(previous_target_hotkey);
+            if (previous_target_shortcut.isEmpty())
+                registered_target_shortcuts.remove(pending_shortcut_key);
+            else
+                registered_target_shortcuts.insert(pending_shortcut_key, previous_target_shortcut);
+        }
+        previous_target_hotkey.reset();
+        pending_shortcut_request = 0;
+        pending_shortcut_key.clear();
+        sync_target_hotkeys();
+        emit target_shortcuts_changed();
+    });
     library_request_id = begin_operation("library");
     worker->known_volume_roots = settings.value("availability/volume_roots").toStringList();
     filter.setSourceModel(&model);
@@ -866,6 +886,249 @@ void DesktopService::restart_application() {
         return;
     }
     QCoreApplication::quit();
+}
+
+namespace {
+QString shortcut_target_key(const bool scenario, const qint64 id) {
+    return (scenario ? QStringLiteral("scenario/") : QStringLiteral("application/")) + QString::number(id);
+}
+
+QMap<QString, QString> builtin_shortcut_defaults() {
+    return {{"shortcuts/global", desktop_platform::default_global_shortcut()},
+            {"shortcuts/overlay", desktop_platform::default_overlay_shortcut()},
+            {"shortcuts/search", "Ctrl+K"},
+            {"shortcuts/settings", "Ctrl+,"},
+            {"shortcuts/add", "Ctrl+N"},
+            {"shortcuts/launch", "Return"},
+            {"shortcuts/new_instance", "Ctrl+Return"},
+            {"shortcuts/open_folder", "Alt+Return"},
+            {"shortcuts/copy_path", "Ctrl+Shift+C"},
+            {"shortcuts/remove", "Delete"}};
+}
+
+QList<QKeySequence> shortcut_aliases(const QKeySequence &sequence) {
+    if (sequence.isEmpty())
+        return {};
+    QList<QKeySequence> result{sequence};
+    if (sequence.count() == 1) {
+        const auto key = sequence[0];
+        if (key.key() == Qt::Key_Return || key.key() == Qt::Key_Enter)
+            result.append(QKeySequence(QKeyCombination(key.keyboardModifiers(),
+                                                       key.key() == Qt::Key_Return ? Qt::Key_Enter : Qt::Key_Return)));
+    }
+    return result;
+}
+
+QSet<QString> reserved_shortcut_sequences() {
+    QSet<QString> result;
+    const auto add = [&](const QKeySequence &sequence) {
+        result.insert(sequence.toString(QKeySequence::PortableText));
+    };
+    add(QKeySequence(Qt::Key_Escape));
+    add(QKeySequence(Qt::Key_Tab));
+    add(QKeySequence(Qt::Key_Backtab));
+    for (const auto key : {Qt::Key_Up, Qt::Key_Down, Qt::Key_Left, Qt::Key_Right, Qt::Key_Home, Qt::Key_End,
+                           Qt::Key_PageUp, Qt::Key_PageDown})
+        for (const auto modifiers : {Qt::KeyboardModifiers{}, Qt::KeyboardModifiers(Qt::ShiftModifier),
+                                     Qt::KeyboardModifiers(Qt::ControlModifier),
+                                     Qt::KeyboardModifiers(Qt::ControlModifier | Qt::ShiftModifier)})
+            add(QKeySequence(QKeyCombination(modifiers, key)));
+    for (const auto key : {QKeySequence::Copy, QKeySequence::Cut, QKeySequence::Paste, QKeySequence::Undo,
+                           QKeySequence::Redo, QKeySequence::SelectAll})
+        for (const auto &sequence : QKeySequence::keyBindings(key))
+            add(sequence);
+    return result;
+}
+}
+
+QKeySequence DesktopService::target_shortcut(const bool scenario, const qint64 id) const {
+    const auto key = shortcut_target_key(scenario, id);
+    if (pending_shortcut_request && key == pending_shortcut_key)
+        return registered_target_shortcuts.value(key);
+    for (const auto &binding : snapshot.target_shortcuts)
+        if (binding.scenario == scenario && binding.target_id == id)
+            return QKeySequence::fromString(binding.sequence, QKeySequence::PortableText);
+    return {};
+}
+
+bool DesktopService::validate_shortcut_configuration(const QVariantMap &values, const QString &ignore_target,
+                                                     const QKeySequence &candidate, QString &error) const {
+    auto sequences = reserved_shortcut_sequences();
+    const auto add = [&](const QKeySequence &sequence) {
+        if (sequence.isEmpty())
+            return true;
+        if (sequence.count() != 1 || sequence[0].key() == Qt::Key_unknown) {
+            error = QCoreApplication::translate("XLibrary", "Use a single key combination.");
+            return false;
+        }
+        const auto aliases = shortcut_aliases(sequence);
+        for (const auto &alias : aliases)
+            if (sequences.contains(alias.toString(QKeySequence::PortableText))) {
+                error = QCoreApplication::translate("XLibrary", "The shortcut %1 is already assigned to another action "
+                                                                "or reserved for text editing and search.")
+                            .arg(sequence.toString(QKeySequence::NativeText));
+                return false;
+            }
+        for (const auto &alias : aliases)
+            sequences.insert(alias.toString(QKeySequence::PortableText));
+        return true;
+    };
+    const auto defaults = builtin_shortcut_defaults();
+    for (auto it = defaults.cbegin(); it != defaults.cend(); ++it) {
+        const auto value = values.contains(it.key()) ? values.value(it.key()) : settings.value(it.key(), it.value());
+        if (!add(QKeySequence::fromString(value.toString(), QKeySequence::PortableText)))
+            return false;
+    }
+    QSet<QString> visited;
+    for (const auto &binding : snapshot.target_shortcuts) {
+        const auto key = shortcut_target_key(binding.scenario, binding.target_id);
+        visited.insert(key);
+        const auto sequence = pending_shortcut_request && key == pending_shortcut_key
+                                  ? registered_target_shortcuts.value(key)
+                                  : QKeySequence::fromString(binding.sequence, QKeySequence::PortableText);
+        if (key != ignore_target && !add(sequence))
+            return false;
+    }
+    // A newly assigned shortcut may not have reached the catalog worker yet.
+    if (pending_shortcut_request && !visited.contains(pending_shortcut_key) && pending_shortcut_key != ignore_target &&
+        !add(registered_target_shortcuts.value(pending_shortcut_key)))
+        return false;
+    if (pending_shortcut_request && !previous_target_shortcut.isEmpty() &&
+        previous_target_shortcut != registered_target_shortcuts.value(pending_shortcut_key) &&
+        !add(previous_target_shortcut))
+        return false;
+    return add(candidate);
+}
+
+bool DesktopService::validate_shortcuts(const QVariantMap &values, QString &error) const {
+    return validate_shortcut_configuration(values, {}, {}, error);
+}
+
+bool DesktopService::validate_target_shortcut(const bool scenario, const qint64 id, const QKeySequence &sequence,
+                                              QString &error) const {
+    if (!sequence.isEmpty()) {
+        if (sequence.count() != 1) {
+            error = QCoreApplication::translate("XLibrary", "Use a single key combination.");
+            return false;
+        }
+        const auto combination = sequence[0];
+        const auto key = combination.key();
+        if (!((key >= Qt::Key_A && key <= Qt::Key_Z) || (key >= Qt::Key_0 && key <= Qt::Key_9) ||
+              (key >= Qt::Key_F1 && key <= Qt::Key_F24) || key == Qt::Key_Space)) {
+            error = QCoreApplication::translate("XLibrary", "Use a letter, digit, F1–F24, or Space.");
+            return false;
+        }
+        const auto modifiers = combination.keyboardModifiers();
+        if (!(modifiers & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier)) ||
+            (modifiers & ~(Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier | Qt::ShiftModifier))) {
+            error = QCoreApplication::translate("XLibrary", "Add Ctrl, Alt, or Super to the global shortcut.");
+            return false;
+        }
+    }
+    return validate_shortcut_configuration({}, shortcut_target_key(scenario, id), sequence, error);
+}
+
+bool DesktopService::set_target_shortcut(const bool scenario, const qint64 id, const QKeySequence &sequence,
+                                         QString &error) {
+    if (!is_ready() || profile_busy() || restart_pending || pending_shortcut_request) {
+        error = QCoreApplication::translate("XLibrary", "Wait for the current library operation to finish.");
+        return false;
+    }
+    const auto exists = scenario ? std::any_of(snapshot.scenarios.cbegin(), snapshot.scenarios.cend(),
+                                               [id](const auto &record) { return record.id == id; })
+                                 : model.find(id) != nullptr;
+    if (id <= 0 || !exists) {
+        error = QCoreApplication::translate("XLibrary", "The shortcut target no longer exists.");
+        return false;
+    }
+    if (!validate_target_shortcut(scenario, id, sequence, error))
+        return false;
+    const auto previous = target_shortcut(scenario, id);
+    const auto key = shortcut_target_key(scenario, id);
+    if (previous == sequence && (sequence.isEmpty() || registered_target_shortcuts.value(key) == sequence))
+        return true;
+    auto candidate = std::make_unique<GlobalHotkey>();
+    connect(candidate.get(), &GlobalHotkey::activated, this, [this, scenario, id] {
+        if (!is_ready() || profile_busy() || restart_pending)
+            return;
+        if (scenario)
+            run_scenario(id);
+        else
+            launch(id);
+    });
+    if (!candidate->set_sequence(sequence, error))
+        return false;
+    previous_target_hotkey = std::move(target_hotkeys[key]);
+    target_hotkeys[key] = std::move(candidate);
+    previous_target_shortcut = registered_target_shortcuts.value(key);
+    pending_shortcut_key = key;
+    registered_target_shortcuts.insert(key, sequence);
+    pending_shortcut_request = begin_operation("target_shortcut");
+    enqueue(
+        "target_shortcut",
+        [scenario, id, text = sequence.toString(QKeySequence::PortableText)](Manager &manager) {
+            manager.store->save_target_shortcut(scenario, id, text);
+            manager.refresh();
+        },
+        operation_error_source::sqlite, pending_shortcut_request);
+    emit target_shortcuts_changed();
+    return true;
+}
+
+void DesktopService::sync_target_hotkeys() {
+    if (pending_shortcut_request)
+        return;
+    QSet<QString> desired;
+    for (const auto &binding : snapshot.target_shortcuts)
+        desired.insert(shortcut_target_key(binding.scenario, binding.target_id));
+    for (auto it = target_hotkeys.begin(); it != target_hotkeys.end();) {
+        if (!desired.contains(it->first)) {
+            registered_target_shortcuts.remove(it->first);
+            target_shortcut_errors.remove(it->first);
+            it = target_hotkeys.erase(it);
+        } else {
+            ++it;
+        }
+    }
+    for (const auto &binding : snapshot.target_shortcuts) {
+        const auto key = shortcut_target_key(binding.scenario, binding.target_id);
+        const auto sequence = QKeySequence::fromString(binding.sequence, QKeySequence::PortableText);
+        if (target_hotkeys.contains(key) && target_hotkeys.at(key) &&
+            registered_target_shortcuts.value(key) == sequence)
+            continue;
+        QString error;
+        const auto report_error = [&](const QString &text) {
+            const auto signature = binding.sequence + QChar::Null + text;
+            if (target_shortcut_errors.value(key) != signature) {
+                target_shortcut_errors.insert(key, signature);
+                notify(text);
+            }
+        };
+        if (!validate_target_shortcut(binding.scenario, binding.target_id, sequence, error)) {
+            report_error(error);
+            continue;
+        }
+        auto &hotkey = target_hotkeys[key];
+        if (!hotkey) {
+            hotkey = std::make_unique<GlobalHotkey>();
+            connect(hotkey.get(), &GlobalHotkey::activated, this,
+                    [this, scenario = binding.scenario, id = binding.target_id] {
+                        if (!is_ready() || profile_busy() || restart_pending)
+                            return;
+                        if (scenario)
+                            run_scenario(id);
+                        else
+                            launch(id);
+                    });
+        }
+        if (hotkey->set_sequence(sequence, error)) {
+            registered_target_shortcuts.insert(key, sequence);
+            target_shortcut_errors.remove(key);
+        } else {
+            report_error(error);
+        }
+    }
+    emit target_shortcuts_changed();
 }
 
 namespace {

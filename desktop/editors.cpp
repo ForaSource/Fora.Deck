@@ -132,6 +132,12 @@ QDialog *application_editor(const ui_context &context, QWidget *const parent) {
     QObject::connect(target_type, &QComboBox::currentIndexChanged, dialog, update_target_fields);
     QObject::connect(path, &QLineEdit::editingFinished, dialog, refresh_profiles);
     update_target_fields();
+    auto *shortcut = new QKeySequenceEdit(service->target_shortcut(false, record.id));
+    shortcut->setMaximumSequenceLength(1);
+    shortcut->setObjectName("application_hotkey");
+    field(layout, QCoreApplication::translate("XLibrary", "Global hotkey"), shortcut);
+    if (record.id > 0)
+        layout->addWidget(label(QString("XLibrary --launch-id %1").arg(record.id), "muted"));
     auto *tags = new QLineEdit(record.tags.join(", "));
     tags->setObjectName("application_tags");
     tags->setPlaceholderText(QCoreApplication::translate("XLibrary", "development, work"));
@@ -253,6 +259,11 @@ QDialog *application_editor(const ui_context &context, QWidget *const parent) {
             error->setText(QString::fromUtf8(failure.what()));
             return;
         }
+        QString shortcut_error;
+        if (!service->validate_target_shortcut(false, updated.id, shortcut->keySequence(), shortcut_error)) {
+            error->setText(shortcut_error);
+            return;
+        }
         if (!updated.working_directory.isEmpty() && !QFileInfo(updated.working_directory).isAbsolute()) {
             error->setText(QCoreApplication::translate("XLibrary", "The working directory must be an absolute path."));
             return;
@@ -281,6 +292,20 @@ QDialog *application_editor(const ui_context &context, QWidget *const parent) {
             dialog->setProperty("saved_application_id", id);
     });
     QObject::connect(service, &DesktopService::operation_changed, dialog, [=](const operation_result &result) {
+        if (result.operation == "target_shortcut" && dialog->property("waiting_shortcut").toBool()) {
+            if (result.state == operation_state::loading)
+                dialog->setProperty("shortcut_request_id", QVariant::fromValue(result.id));
+            else if (result.id == dialog->property("shortcut_request_id").toULongLong()) {
+                dialog->setProperty("waiting_shortcut", false);
+                if (result.state == operation_state::completed)
+                    dialog->accept();
+                else {
+                    save->setEnabled(true);
+                    error->setText(result.error.user_message);
+                }
+            }
+            return;
+        }
         if (result.state == operation_state::loading)
             return;
         if (result.id == dialog->property("resolve_request_id").toULongLong()) {
@@ -292,7 +317,18 @@ QDialog *application_editor(const ui_context &context, QWidget *const parent) {
         if (result.id == dialog->property("save_request_id").toULongLong()) {
             dialog->setProperty("save_request_id", {});
             if (result.state == operation_state::completed) {
-                dialog->accept();
+                QString shortcut_error;
+                const auto id = dialog->property("saved_application_id").toLongLong();
+                const bool changed = service->target_shortcut(false, id) != shortcut->keySequence();
+                dialog->setProperty("waiting_shortcut", changed);
+                if (service->set_target_shortcut(false, id, shortcut->keySequence(), shortcut_error)) {
+                    if (!changed)
+                        dialog->accept();
+                } else {
+                    dialog->setProperty("waiting_shortcut", false);
+                    save->setEnabled(true);
+                    error->setText(shortcut_error);
+                }
             } else {
                 save->setEnabled(true);
                 error->setText(result.error.user_message);
@@ -376,6 +412,12 @@ QDialog *scenario_editor(const ui_context &context, QWidget *const parent) {
     form_layout->addSpacing(16);
     form_layout->addWidget(
         label(QCoreApplication::translate("XLibrary", "Applications · delay before launch"), "muted"));
+    auto *shortcut = new QKeySequenceEdit(service->target_shortcut(true, record.id));
+    shortcut->setMaximumSequenceLength(1);
+    shortcut->setObjectName("scenario_hotkey");
+    field(form_layout, QCoreApplication::translate("XLibrary", "Global hotkey"), shortcut);
+    if (record.id > 0)
+        form_layout->addWidget(label(QString("XLibrary --scenario-id %1").arg(record.id), "muted"));
     auto *table = new QTableWidget(0, 4);
     table->setHorizontalHeaderLabels({QCoreApplication::translate("XLibrary", "Enabled"),
                                       QCoreApplication::translate("XLibrary", "Application"),
@@ -504,6 +546,11 @@ QDialog *scenario_editor(const ui_context &context, QWidget *const parent) {
                                     ? dialog->property("saved_scenario_id").toLongLong()
                                     : record.id,
                                 name->text().trimmed(), read_steps()};
+        QString shortcut_error;
+        if (!service->validate_target_shortcut(true, updated.id, shortcut->keySequence(), shortcut_error)) {
+            error->setText(shortcut_error);
+            return;
+        }
         if (updated.name.isEmpty() || updated.steps.isEmpty()) {
             error->setText(QCoreApplication::translate("XLibrary", "Enter a name and add an application."));
             return;
@@ -521,13 +568,43 @@ QDialog *scenario_editor(const ui_context &context, QWidget *const parent) {
             dialog->setProperty("saved_scenario_id", id);
     });
     QObject::connect(service, &DesktopService::operation_changed, dialog, [=](const operation_result &result) {
+        if (result.operation == "target_shortcut" && dialog->property("waiting_shortcut").toBool()) {
+            if (result.state == operation_state::loading)
+                dialog->setProperty("shortcut_request_id", QVariant::fromValue(result.id));
+            else if (result.id == dialog->property("shortcut_request_id").toULongLong()) {
+                dialog->setProperty("waiting_shortcut", false);
+                if (result.state == operation_state::completed) {
+                    if (dialog->property("run_after_save").toBool())
+                        service->run_scenario(dialog->property("saved_scenario_id").toLongLong());
+                    dialog->accept();
+                } else {
+                    buttons->button(QDialogButtonBox::Save)->setEnabled(true);
+                    save_and_run->setEnabled(true);
+                    error->setText(result.error.user_message);
+                }
+            }
+            return;
+        }
         if (result.id == dialog->property("save_request_id").toULongLong() &&
             result.state != operation_state::loading) {
             dialog->setProperty("save_request_id", {});
             if (result.state == operation_state::completed) {
-                if (dialog->property("run_after_save").toBool())
-                    service->run_scenario(dialog->property("saved_scenario_id").toLongLong());
-                dialog->accept();
+                QString shortcut_error;
+                const auto id = dialog->property("saved_scenario_id").toLongLong();
+                const bool changed = service->target_shortcut(true, id) != shortcut->keySequence();
+                dialog->setProperty("waiting_shortcut", changed);
+                if (service->set_target_shortcut(true, id, shortcut->keySequence(), shortcut_error)) {
+                    if (!changed) {
+                        if (dialog->property("run_after_save").toBool())
+                            service->run_scenario(id);
+                        dialog->accept();
+                    }
+                } else {
+                    dialog->setProperty("waiting_shortcut", false);
+                    buttons->button(QDialogButtonBox::Save)->setEnabled(true);
+                    save_and_run->setEnabled(true);
+                    error->setText(shortcut_error);
+                }
             } else {
                 buttons->button(QDialogButtonBox::Save)->setEnabled(true);
                 save_and_run->setEnabled(true);

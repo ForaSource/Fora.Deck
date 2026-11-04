@@ -11,6 +11,7 @@
 #include <QRegularExpressionValidator>
 #include <QStackedWidget>
 #include <QTabBar>
+#include <QTreeWidget>
 #include <QUrl>
 
 #include "DesktopService.h"
@@ -164,6 +165,88 @@ QWidget *hotkeys(const ui_context &context, QWidget *) {
                                             "On Wayland, assign a desktop shortcut to the XLibrary command. It opens "
                                             "the running library. The built-in global shortcut is available on X11."),
                 "muted"));
+#endif
+        layout->addStretch();
+        pages->addWidget(contents);
+    }
+    auto *service = static_cast<DesktopService *>(context.service);
+    for (const auto scenario : {false, true}) {
+        tabs->addTab(scenario ? QCoreApplication::translate("XLibrary", "Scenarios")
+                              : QCoreApplication::translate("XLibrary", "Applications"));
+        auto *contents = new QWidget;
+        auto *layout = new QVBoxLayout(contents);
+        layout->setContentsMargins(0, 0, 0, 0);
+        layout->setSpacing(12);
+        layout->addWidget(
+            label(QCoreApplication::translate(
+                      "XLibrary",
+                      "Assign a global shortcut in the application or scenario editor. An empty shortcut disables it."),
+                  "muted"));
+        auto *targets = new QTreeWidget;
+        targets->setRootIsDecorated(false);
+        targets->setHeaderLabels({QCoreApplication::translate("XLibrary", "Name"),
+                                  QCoreApplication::translate("XLibrary", "Keyboard shortcuts")});
+        targets->setMinimumHeight(240);
+        targets->setUniformRowHeights(true);
+        layout->addWidget(targets);
+        auto *edit = button(QCoreApplication::translate("XLibrary", "Edit"), "quiet");
+        layout->addWidget(edit, 0, Qt::AlignRight);
+        const auto open_editor = [=] {
+            if (!targets->currentItem())
+                return;
+            const auto id = targets->currentItem()->data(0, Qt::UserRole).toLongLong();
+            auto edit_context = context;
+            edit_context.window = contents->window();
+            if (scenario) {
+                for (const auto &record : service->catalog().scenarios)
+                    if (record.id == id) {
+                        edit_context.parameters.insert("scenario", QVariant::fromValue(record));
+                        open_dialog("scenario_editor", edit_context);
+                        break;
+                    }
+            } else if (const auto *record = service->model.find(id)) {
+                edit_context.parameters.insert("record", QVariant::fromValue(*record));
+                open_dialog("application_editor", edit_context);
+            }
+        };
+        QObject::connect(edit, &QPushButton::clicked, contents, open_editor);
+        QObject::connect(targets, &QTreeWidget::itemActivated, contents,
+                         [=](QTreeWidgetItem *, int) { open_editor(); });
+        QObject::connect(targets, &QTreeWidget::itemSelectionChanged, contents,
+                         [=] { edit->setEnabled(targets->currentItem() != nullptr); });
+        const auto rebuild = [=] {
+            const auto selected =
+                targets->currentItem() ? targets->currentItem()->data(0, Qt::UserRole).toLongLong() : 0;
+            targets->clear();
+            const auto add_target = [=](const qint64 id, const QString &name) {
+                const auto sequence = service->target_shortcut(scenario, id);
+                auto *item = new QTreeWidgetItem(
+                    targets, {name, sequence.isEmpty() ? QCoreApplication::translate("XLibrary", "Not assigned")
+                                                       : sequence.toString(QKeySequence::NativeText)});
+                item->setData(0, Qt::UserRole, id);
+                item->setToolTip(0, QStringLiteral("XLibrary ") +
+                                        (scenario ? QStringLiteral("--scenario-id ") : QStringLiteral("--launch-id ")) +
+                                        QString::number(id));
+                if (id == selected)
+                    targets->setCurrentItem(item);
+            };
+            if (scenario) {
+                for (const auto &record : service->catalog().scenarios)
+                    add_target(record.id, record.name);
+            } else {
+                for (const auto &record : service->catalog().applications)
+                    add_target(record.id, record.name);
+            }
+            edit->setEnabled(targets->currentItem() != nullptr);
+        };
+        QObject::connect(service, &DesktopService::catalog_changed, contents, rebuild);
+        QObject::connect(service, &DesktopService::target_shortcuts_changed, contents, rebuild);
+        rebuild();
+#ifdef Q_OS_LINUX
+        layout->addWidget(
+            label(QCoreApplication::translate("XLibrary", "On Wayland, configure a desktop shortcut for XLibrary "
+                                                          "--launch-id <id> or XLibrary --scenario-id <id>."),
+                  "muted"));
 #endif
         layout->addStretch();
         pages->addWidget(contents);
@@ -650,7 +733,6 @@ QDialog *settings_dialog(const ui_context &context, QWidget *const parent) {
             return;
         }
         QVariantMap values;
-        QSet<QString> sequences{QKeySequence(Qt::Key_Escape).toString(QKeySequence::PortableText)};
         for (auto *control : dialog->findChildren<QWidget *>()) {
             const auto key = control->property("setting_key").toString();
             if (key.isEmpty())
@@ -661,26 +743,14 @@ QDialog *settings_dialog(const ui_context &context, QWidget *const parent) {
                 values.insert(key, combo->currentData());
             if (auto *edit = qobject_cast<QKeySequenceEdit *>(control)) {
                 const auto value = edit->keySequence().toString(QKeySequence::PortableText);
-                const auto aliases = shortcut_sequences(edit->keySequence());
-                for (const auto &sequence : aliases) {
-                    if (sequences.contains(sequence.toString(QKeySequence::PortableText))) {
-                        show_error(QCoreApplication::translate(
-                            "XLibrary", "The shortcut is already assigned to another action or reserved for search."));
-                        categories->button(2)->click();
-                        if (auto *shortcut_pages = dialog->findChild<QStackedWidget *>("shortcut_pages"))
-                            for (int index = 0; index < shortcut_pages->count(); ++index)
-                                if (shortcut_pages->widget(index)->isAncestorOf(edit)) {
-                                    shortcut_pages->setCurrentIndex(index);
-                                    break;
-                                }
-                        edit->setFocus();
-                        return;
-                    }
-                }
-                for (const auto &sequence : aliases)
-                    sequences.insert(sequence.toString(QKeySequence::PortableText));
                 values.insert(key, value);
             }
+        }
+        QString shortcut_error;
+        if (!service->validate_shortcuts(values, shortcut_error)) {
+            show_error(shortcut_error);
+            categories->button(2)->click();
+            return;
         }
         QStringList enabled;
         for (auto *box : dialog->findChildren<QCheckBox *>()) {
