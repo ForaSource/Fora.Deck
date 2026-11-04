@@ -705,7 +705,8 @@ void Application::launch_application(const app_record &record, const launch_mode
     if (QFileInfo(record.path).suffix() == "desktop") {
         const auto entry = read_entry(record.path);
         validate_entry(entry);
-        if (mode != launch_mode::new_instance && record.arguments.isEmpty() && record.working_directory.isEmpty() &&
+        if (mode != launch_mode::new_instance && !requires_fresh_launch(record) &&
+            record.arguments.isEmpty() && record.working_directory.isEmpty() &&
             activate_dbus(entry))
             return;
         command = entry_command(entry);

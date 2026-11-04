@@ -4,10 +4,21 @@
 #include <QtConcurrent/QtConcurrentRun>
 #include <QTimer>
 
+#include "appearance.h"
 #include "LibraryModel.h"
 #include "localization.h"
 #include "PathHelpers.h"
 #include "PlatformIntegration.h"
+
+namespace {
+QString icon_cache_key(const app_record &record) {
+    if (!record.icon_path.isEmpty() && QFileInfo(record.icon_path).isAbsolute())
+        return "image:" + Application::target_kind(record) + ':' + record.icon_path;
+    if (Application::file_target(record) && QFileInfo(record.path).isAbsolute())
+        return "file:" + record.path;
+    return "kind:" + Application::target_kind(record);
+}
+}
 
 LibraryModel::LibraryModel(QObject *const parent) : QAbstractTableModel(parent) {
     icon_pool.setMaxThreadCount(2);
@@ -27,38 +38,56 @@ int LibraryModel::columnCount(const QModelIndex &parent) const {
     return parent.isValid() ? 0 : 3;
 }
 
-void LibraryModel::request_icon(const QString &path) const {
-    if (pending_icons.contains(path) || pending_icons.size() >= 32 || path.isEmpty()) {
+QIcon LibraryModel::fallback_icon(const app_record &record) const {
+    const auto kind = Application::target_kind(record);
+    const auto key = "kind:" + kind;
+    if (const auto *icon = icons.object(key))
+        return *icon;
+    const auto icon = kind == "steam"        ? QIcon::fromTheme("steam", appearance::icon("library"))
+                      : kind == "system_uri" ? QIcon::fromTheme("preferences-system", appearance::icon("settings"))
+                      : kind == "aumid" || Application::file_target(record) ? appearance::icon("app")
+                                                                            : appearance::icon("external");
+    icons.insert(key, new QIcon(icon));
+    return icon;
+}
+
+void LibraryModel::request_icon(const app_record &record) const {
+    const auto key = icon_cache_key(record);
+    if (key.startsWith("kind:") || pending_icons.contains(key) || pending_icons.size() >= 32) {
         return;
     }
-    pending_icons.insert(path);
+    const auto image_file = key.startsWith("image:");
+    const auto path = image_file ? record.icon_path : record.path;
+    const auto fallback = fallback_icon(record);
+    pending_icons.insert(key);
     auto *self = const_cast<LibraryModel *>(this);
 #ifdef Q_OS_LINUX
     // System icon engines use QPixmap and must run on the GUI thread.
-    QTimer::singleShot(0, self, [self, path] {
-        const auto image = desktop_platform::application_icon(path);
-        self->pending_icons.remove(path);
-        self->icons.insert(path, new QIcon(image.isNull() ? QIcon{} : QIcon(QPixmap::fromImage(image))));
+    QTimer::singleShot(0, self, [self, key, path, image_file, fallback] {
+        const auto image = image_file ? QImage(path) : desktop_platform::application_icon(path);
+        self->pending_icons.remove(key);
+        self->icons.insert(key, new QIcon(image.isNull() ? fallback : QIcon(QPixmap::fromImage(image))));
         for (int row = 0; row < self->records.size(); ++row) {
-            if (self->records[row].path == path)
+            if (icon_cache_key(self->records[row]) == key)
                 emit self->dataChanged(self->index(row, 0), self->index(row, 0), {Qt::DecorationRole});
         }
     });
 #else
     auto *watcher = new QFutureWatcher<QImage>(self);
-    connect(watcher, &QFutureWatcher<QImage>::finished, self, [self, watcher, path] {
+    connect(watcher, &QFutureWatcher<QImage>::finished, self, [self, watcher, key, fallback] {
         const auto image = watcher->result();
-        self->pending_icons.remove(path);
-        self->icons.insert(path, new QIcon(image.isNull() ? QIcon{} : QIcon(QPixmap::fromImage(image))));
+        self->pending_icons.remove(key);
+        self->icons.insert(key, new QIcon(image.isNull() ? fallback : QIcon(QPixmap::fromImage(image))));
         watcher->deleteLater();
         for (int row = 0; row < self->records.size(); ++row) {
-            if (self->records[row].path == path) {
+            if (icon_cache_key(self->records[row]) == key) {
                 emit self->dataChanged(self->index(row, 0), self->index(row, 0), {Qt::DecorationRole});
             }
         }
     });
-    watcher->setFuture(
-        QtConcurrent::run(&self->icon_pool, [path] { return desktop_platform::application_icon(path); }));
+    watcher->setFuture(QtConcurrent::run(&self->icon_pool, [path, image_file] {
+        return image_file ? QImage(path) : desktop_platform::application_icon(path);
+    }));
 #endif
 }
 
@@ -78,12 +107,14 @@ QVariant LibraryModel::data(const QModelIndex &index, const int requested_role) 
                : record.volume_unavailable ? QCoreApplication::translate("XLibrary", "Drive unavailable")
                                            : QCoreApplication::translate("XLibrary", "Unavailable");
     case Qt::ToolTipRole:
-        return record.name + '\n' + QDir::toNativeSeparators(record.path);
+        return record.name + '\n' +
+               (Application::file_target(record) ? QDir::toNativeSeparators(record.path) : record.path);
     case Qt::DecorationRole:
         if (index.column() == 0) {
-            if (const auto *icon = icons.object(record.path))
+            if (const auto *icon = icons.object(icon_cache_key(record)))
                 return *icon;
-            request_icon(record.path);
+            request_icon(record);
+            return fallback_icon(record);
         }
         return {};
     case id_role:
@@ -130,8 +161,8 @@ void LibraryModel::replace(QVector<app_record> applications) {
     tag_sort_keys.reserve(records.size());
     const QCollator collator;
     for (const auto &record : records) {
-        searchable_records.append(
-            SearchQuery::prepare(record.name, QFileInfo(record.path).fileName(), record.tags, record.aliases));
+        const auto file_name = Application::file_target(record) ? QFileInfo(record.path).fileName() : record.path;
+        searchable_records.append(SearchQuery::prepare(record.name, file_name, record.tags, record.aliases));
         search_tags.append(record.tags.join(", ").toCaseFolded());
         name_sort_keys.append(collator.sortKey(searchable_records.back().names.front().text));
         tag_sort_keys.append(collator.sortKey(search_tags.back()));

@@ -42,6 +42,9 @@ DesktopService::DesktopService(QObject *const parent, const QString &profile_pat
     library_request_id = begin_operation("library");
     worker->known_volume_roots = settings.value("availability/volume_roots").toStringList();
     filter.setSourceModel(&model);
+    launch_profile_pool.setMaxThreadCount(1);
+    launch_profile_pool.setExpiryTimeout(5000);
+    connect(this, &DesktopService::catalog_changed, this, &DesktopService::warm_launch_profiles);
     discovery_pool.setMaxThreadCount(1);
     discovery_pool.setExpiryTimeout(5000);
     worker->moveToThread(&worker_thread);
@@ -158,7 +161,11 @@ DesktopService::DesktopService(QObject *const parent, const QString &profile_pat
     });
     connect(&scenario_timer, &QTimer::timeout, this, [this] {
         if (is_scenario_active() && step_index < pending_steps.size()) {
-            launch(pending_steps[step_index].application_id, false, true);
+            const auto &step = pending_steps[step_index];
+            if (step.launch_profile.isEmpty())
+                launch(step.application_id, false, true);
+            else
+                request_launch_mode(step.application_id, Application::launch_mode::launch, true, step.launch_profile);
         }
     });
     worker_thread.setObjectName("catalog_worker");
@@ -173,6 +180,8 @@ DesktopService::~DesktopService() {
     scenario_timer.stop();
     discovery_pool.clear();
     discovery_pool.waitForDone();
+    launch_profile_queue.clear();
+    launch_profile_pool.waitForDone();
     worker_thread.quit();
     worker_thread.wait();
 }
@@ -298,6 +307,8 @@ quint64 DesktopService::enqueue(const QString &operation, std::function<void(Man
 void DesktopService::select(const qint64 id) {
     if (selected_id != id) {
         selected_id = id;
+        if (const auto *record = model.find(id))
+            launch_profiles(*record);
         emit selection_changed();
     }
 }
@@ -393,6 +404,19 @@ void DesktopService::launch(const qint64 id, const bool new_instance, const bool
 }
 
 quint64 DesktopService::request_launch(const qint64 id, const bool new_instance, const bool scenario) {
+    const auto mode = new_instance ? desktop_platform::launch_mode::new_instance
+                      : settings.value("behavior/relaunch", "activate").toString() == "activate"
+                          ? desktop_platform::launch_mode::activate
+                          : desktop_platform::launch_mode::launch;
+    return request_launch_mode(id, mode, scenario);
+}
+
+quint64 DesktopService::request_launch_profile(const qint64 id, const QString &profile) {
+    return request_launch_mode(id, Application::launch_mode::launch, false, profile);
+}
+
+quint64 DesktopService::request_launch_mode(const qint64 id, const Application::launch_mode mode, const bool scenario,
+                                            const QString &profile) {
     if (!is_ready() || !id || profile_busy() || restart_pending)
         return 0;
     if (launching.contains(id)) {
@@ -405,22 +429,21 @@ quint64 DesktopService::request_launch(const qint64 id, const bool new_instance,
     }
     launching.insert(id);
     const auto generation = scenario ? scenario_generation->load() : 0;
-    const auto mode = new_instance ? desktop_platform::launch_mode::new_instance
-                      : settings.value("behavior/relaunch", "activate").toString() == "activate"
-                          ? desktop_platform::launch_mode::activate
-                          : desktop_platform::launch_mode::launch;
     return enqueue(
         "launch",
-        [id, mode, generation, token = scenario_generation](Manager &worker) {
-            worker.launch_record(id, mode, generation, token, desktop_platform::launch_application);
+        [id, mode, generation, token = scenario_generation, profile](Manager &worker) {
+            worker.launch_record(id, mode, generation, token, desktop_platform::launch_application, profile);
         },
         operation_error_source::platform);
 }
 
 void DesktopService::open_folder(const qint64 id) {
-    if (const auto *record = model.find(id))
+    if (const auto *record = model.find(id);
+        record && (Application::file_target(*record) || !record->installation_directory.isEmpty()))
         enqueue(
-            "folder", [path = record->path](Manager &) { desktop_platform::open_folder(path); },
+            "folder",
+            [path = record->installation_directory.isEmpty() ? record->path : record->installation_directory + "/."](
+                Manager &) { desktop_platform::open_folder(path); },
             operation_error_source::platform);
 }
 
@@ -843,4 +866,87 @@ void DesktopService::restart_application() {
         return;
     }
     QCoreApplication::quit();
+}
+
+namespace {
+QString launch_profile_key(const app_record &record) {
+    return Application::target_kind(record) + QChar::Null + record.path;
+}
+constexpr qsizetype launch_profile_cache_limit = 64;
+}
+
+QVector<launch_profile> DesktopService::launch_profiles(const app_record &record) {
+    const auto modes = Application::launch_modes(record);
+    if (modes.isEmpty())
+        return {};
+    const auto found = launch_profile_cache.constFind(launch_profile_key(record));
+    if (found != launch_profile_cache.cend())
+        return *found;
+    queue_launch_profiles(record, true);
+    return modes;
+}
+
+void DesktopService::queue_launch_profiles(const app_record &record, const bool priority) {
+    const auto key = launch_profile_key(record);
+    if (launch_profile_cache.contains(key) || active_launch_profile == key)
+        return;
+    if (pending_launch_profiles.contains(key)) {
+        if (priority) {
+            launch_profile_queue.removeAll(key);
+            launch_profile_queue.prepend(key);
+        }
+        return;
+    }
+    if (pending_launch_profiles.size() >= launch_profile_cache_limit) {
+        if (!priority)
+            return;
+        pending_launch_profiles.remove(launch_profile_queue.takeLast());
+    }
+    pending_launch_profiles.insert(key, record);
+    if (priority)
+        launch_profile_queue.prepend(key);
+    else
+        launch_profile_queue.append(key);
+    next_launch_profiles();
+}
+
+void DesktopService::next_launch_profiles() {
+    if (!active_launch_profile.isEmpty() || launch_profile_queue.isEmpty())
+        return;
+    const auto key = launch_profile_queue.takeFirst();
+    const auto record = pending_launch_profiles.take(key);
+    active_launch_profile = key;
+    auto *watcher = new QFutureWatcher<QVector<launch_profile>>(this);
+    connect(watcher, &QFutureWatcherBase::finished, this, [this, watcher, key, path = record.path] {
+        auto profiles = watcher->result();
+        watcher->deleteLater();
+        // The GUI uses themed icons; profile image files remain on the worker side.
+        for (auto &profile : profiles)
+            profile.icon_path.clear();
+        while (launch_profile_cache.size() >= launch_profile_cache_limit)
+            launch_profile_cache.remove(launch_profile_order.takeFirst());
+        launch_profile_cache.insert(key, std::move(profiles));
+        launch_profile_order.append(key);
+        active_launch_profile.clear();
+        emit launch_profiles_changed(path);
+        next_launch_profiles();
+    });
+    watcher->setFuture(QtConcurrent::run(&launch_profile_pool, [record] {
+        try {
+            return Application::launch_profiles(record);
+        } catch (const std::exception &) {
+            return Application::launch_modes(record);
+        }
+    }));
+}
+
+void DesktopService::warm_launch_profiles() {
+    qsizetype count = 0;
+    for (const auto &record : snapshot.applications) {
+        if (Application::launch_modes(record).isEmpty())
+            continue;
+        queue_launch_profiles(record, false);
+        if (++count >= launch_profile_cache_limit)
+            break;
+    }
 }

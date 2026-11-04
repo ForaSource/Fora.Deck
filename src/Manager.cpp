@@ -501,7 +501,7 @@ void Manager::recover_paths(const QVector<path_relocation> &changes) {
 void Manager::launch_record(const qint64 id, const Application::launch_mode mode, const quint64 generation,
                             const std::shared_ptr<std::atomic<quint64>> &token,
                             const std::function<void(const app_record &, Application::launch_mode)> &launch_action,
-                            const QString &) {
+                            const QString &profile) {
     try {
         if (generation && token->load() != generation) {
             throw DiscoveryCancelled();
@@ -511,7 +511,12 @@ void Manager::launch_record(const qint64 id, const Application::launch_mode mode
         if (it == this->catalog.applications.cend())
             throw std::invalid_argument(
                 QCoreApplication::translate("XLibrary", "The application was not found in the library.").toStdString());
-        launch_action(*it, mode);
+        const auto selected_profile = profile.isEmpty() ? it->default_launch_profile : profile;
+        const auto record = Application::with_launch_profile(*it, selected_profile);
+        const auto effective_mode = mode == Application::launch_mode::activate &&
+            ((!selected_profile.isEmpty() && selected_profile != "configured") || Application::requires_fresh_launch(record))
+                ? Application::launch_mode::launch : mode;
+        launch_action(record, effective_mode);
         // Ошибка истории не должна превращать успешный запуск в неуспешный или повторный.
         emit this->launched(id, {this->request_id, "launch", operation_state::completed, {}}, generation);
         try {

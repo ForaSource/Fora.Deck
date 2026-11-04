@@ -24,7 +24,9 @@
 #include <QTreeView>
 
 #include "appearance.h"
+#include "Application.h"
 #include "DesktopService.h"
+#include "editors.h"
 #include "LibraryViews.h"
 #include "localization.h"
 #include "NotificationBanner.h"
@@ -877,6 +879,30 @@ QWidget *details(const ui_context &context, QWidget *const parent) {
     auto *launch = action_button(context.actions.value("launch"));
     launch->setProperty("primary", true);
     root->addWidget(launch);
+    auto *profile_actions = new QWidget;
+    auto *profile_layout = new QVBoxLayout(profile_actions);
+    profile_layout->setContentsMargins(0, 0, 0, 0);
+    auto *profiles = new QComboBox;
+    profiles->setAccessibleName(QCoreApplication::translate("XLibrary", "Browser launch profile"));
+    profile_layout->addWidget(profiles);
+    auto *launch_selected_profile = button(QCoreApplication::translate("XLibrary", "Launch selected profile"));
+    profile_layout->addWidget(launch_selected_profile);
+    auto *default_profile = button(QCoreApplication::translate("XLibrary", "Set as default"));
+    profile_layout->addWidget(default_profile);
+    root->addWidget(profile_actions);
+    QObject::connect(launch_selected_profile, &QPushButton::clicked, contents, [=] {
+        if (const auto *record = service->selected())
+            service->request_launch_profile(record->id, profiles->currentData().toString().isEmpty()
+                                                            ? QString("configured")
+                                                            : profiles->currentData().toString());
+    });
+    QObject::connect(default_profile, &QPushButton::clicked, contents, [=] {
+        if (const auto *record = service->selected()) {
+            auto updated = *record;
+            updated.default_launch_profile = profiles->currentData().toString();
+            service->save_application(std::move(updated));
+        }
+    });
     root->addWidget(action_button(context.actions.value("edit_application")));
     root->addWidget(action_button(context.actions.value("favorite")));
     auto *remove = action_button(context.actions.value("remove_application"));
@@ -901,7 +927,28 @@ QWidget *details(const ui_context &context, QWidget *const parent) {
                 : QCoreApplication::translate("XLibrary", "Source: manually added or imported"));
         path->setCursorPosition(0);
         path->setToolTip(path->text());
-        recover_path->setVisible(record && !record->available);
+        recover_path->setVisible(record && Application::file_target(*record) && !record->available);
+        const QSignalBlocker profile_blocker(profiles);
+        const auto selected_profile = record && profiles->property("application_id").toLongLong() == record->id
+                                          ? profiles->currentData().toString()
+                                      : record ? record->default_launch_profile
+                                               : QString{};
+        profiles->setProperty("application_id", record ? record->id : 0);
+        profiles->clear();
+        const auto browser_profiles = record ? service->launch_profiles(*record) : QVector<launch_profile>{};
+        profile_actions->setVisible(!browser_profiles.isEmpty());
+        profiles->addItem(QCoreApplication::translate("XLibrary", "Configured launch arguments"), QString{});
+        for (const auto &profile : browser_profiles)
+            profiles->addItem(profile.icon_path.isEmpty() ? appearance::icon(profile.kind == "private" ? "lock" : "app")
+                                                          : QIcon(profile.icon_path),
+                              profile.name, profile.id);
+        if (!selected_profile.isEmpty() && profiles->findData(selected_profile) < 0)
+            profiles->addItem(QCoreApplication::translate("XLibrary", "Unavailable profile: %1").arg(selected_profile),
+                              selected_profile);
+        profiles->setCurrentIndex(qMax(0, profiles->findData(selected_profile)));
+        const bool can_change = record && !service->profile_busy() && !service->restart_required();
+        launch_selected_profile->setEnabled(can_change && record->available);
+        default_profile->setEnabled(can_change);
         recover_path->setEnabled(record && !service->profile_busy() && !service->restart_required() &&
                                  !service->is_discovering() && !service->is_scenario_active());
         arguments->setText(record && !record->arguments.isEmpty()
@@ -921,6 +968,10 @@ QWidget *details(const ui_context &context, QWidget *const parent) {
             }
         icon->setPixmap(image.pixmap(56, 56));
     };
+    QObject::connect(service, &DesktopService::launch_profiles_changed, contents, [=](const QString &changed_path) {
+        if (const auto *record = service->selected(); record && record->path == changed_path)
+            update();
+    });
     QObject::connect(service, &DesktopService::selection_changed, contents, update);
     QObject::connect(service, &DesktopService::profile_state_changed, contents, update);
     QObject::connect(service, &DesktopService::discovery_changed, contents, update);
@@ -939,7 +990,47 @@ QWidget *application_menu(const ui_context &context, QWidget *const parent) {
                            "edit_application", "bulk_edit", "undo_removal"})
         menu->addAction(context.actions.value(id));
     auto *service = static_cast<DesktopService *>(context.service);
-    if (const auto *record = service->selected(); record && !record->available) {
+    if (const auto *record = service->selected()) {
+        const auto profiles = service->launch_profiles(*record);
+        if (!profiles.isEmpty()) {
+            auto *launch_profiles = menu->addMenu(QCoreApplication::translate("XLibrary", "Browser launch profiles"));
+            auto *defaults =
+                launch_profiles->addMenu(QCoreApplication::translate("XLibrary", "Default launch profile"));
+            const auto application_id = record->id;
+            auto *configured =
+                defaults->addAction(QCoreApplication::translate("XLibrary", "Configured launch arguments"));
+            configured->setCheckable(true);
+            configured->setChecked(record->default_launch_profile.isEmpty());
+            QObject::connect(configured, &QAction::triggered, menu, [=] {
+                if (const auto *current = service->model.find(application_id)) {
+                    auto updated = *current;
+                    updated.default_launch_profile.clear();
+                    service->save_application(std::move(updated));
+                }
+            });
+            for (const auto &profile : profiles) {
+                const auto icon = profile.icon_path.isEmpty()
+                                      ? appearance::icon(profile.kind == "private" ? "lock" : "app")
+                                      : QIcon(profile.icon_path);
+                auto *launch = launch_profiles->addAction(icon, profile.name);
+                launch->setEnabled(record->available && !service->profile_busy() && !service->restart_required());
+                QObject::connect(launch, &QAction::triggered, menu,
+                                 [=] { service->request_launch_profile(application_id, profile.id); });
+                auto *set_default = defaults->addAction(icon, profile.name);
+                set_default->setCheckable(true);
+                set_default->setChecked(record->default_launch_profile == profile.id);
+                QObject::connect(set_default, &QAction::triggered, menu, [=] {
+                    if (const auto *current = service->model.find(application_id)) {
+                        auto updated = *current;
+                        updated.default_launch_profile = profile.id;
+                        service->save_application(std::move(updated));
+                    }
+                });
+            }
+            defaults->setEnabled(!service->profile_busy() && !service->restart_required());
+        }
+    }
+    if (const auto *record = service->selected(); record && Application::file_target(*record) && !record->available) {
         auto *recover = menu->addAction(QCoreApplication::translate("XLibrary", "Locate application…"));
         recover->setEnabled(!service->profile_busy() && !service->restart_required() && !service->is_discovering() &&
                             !service->is_scenario_active());

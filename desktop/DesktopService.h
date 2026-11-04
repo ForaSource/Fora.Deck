@@ -5,8 +5,10 @@
 #include <functional>
 #include <QSettings>
 #include <QThread>
+#include <QThreadPool>
 #include <QTimer>
 
+#include "Application.h"
 #include "LibraryModel.h"
 #include "OperationTypes.h"
 #include "ProfileBackup.h"
@@ -24,6 +26,15 @@ private:
     QThread worker_thread;
     Manager *worker;
     QThreadPool discovery_pool;
+    QThreadPool launch_profile_pool;
+    QHash<QString, QVector<launch_profile>> launch_profile_cache;
+    QHash<QString, app_record> pending_launch_profiles;
+    QStringList launch_profile_queue;
+    QStringList launch_profile_order;
+    QString active_launch_profile;
+    void queue_launch_profiles(const app_record &record, bool priority);
+    void next_launch_profiles();
+    void warm_launch_profiles();
     QTimer scenario_timer;
     QVector<scenario_step> pending_steps;
     QString scenario_name;
@@ -86,6 +97,7 @@ public:
     int schema_version() const { return current_schema_version; }
     bool profile_busy() const { return profile_status == operation_state::loading; }
     bool restart_required() const { return restart_pending; }
+    QVector<launch_profile> launch_profiles(const app_record &record);
     bool safe_mode() const;
     QString diagnostics_text() const;
     quint64 backup_profile(const QString &path);
@@ -146,6 +158,9 @@ public:
     Q_INVOKABLE void import_catalog(const QString &path);
     Q_INVOKABLE void launch(qint64 id, bool new_instance = false, bool scenario = false);
     quint64 request_launch(qint64 id, bool new_instance = false, bool scenario = false);
+    quint64 request_launch_mode(qint64 id, Application::launch_mode mode, bool scenario = false,
+                                const QString &profile = {});
+    quint64 request_launch_profile(qint64 id, const QString &profile);
     Q_INVOKABLE void open_folder(qint64 id);
     quint64 save_filter(saved_filter record);
     void remove_filter(qint64 id);
@@ -158,6 +173,7 @@ signals:
     void library_open_requested(quint64 request_id);
     void library_restore_requested(quint64 request_id, const QString &path);
     void catalog_changed();
+    void launch_profiles_changed(const QString &path);
     void selection_changed();
     void selections_changed();
     void undo_removal_changed();

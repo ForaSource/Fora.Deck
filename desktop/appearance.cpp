@@ -18,6 +18,10 @@ QIcon appearance::icon(const QString &name, const QColor &color) {
     if (name == "add") {
         painter.drawLine(QPointF(12, 5), QPointF(12, 19));
         painter.drawLine(QPointF(5, 12), QPointF(19, 12));
+    } else if (name == "lock" || name == "private") {
+        painter.drawRoundedRect(QRectF(5, 10, 14, 11), 2, 2);
+        painter.drawArc(QRectF(8, 3, 8, 13), 0, 180 * 16);
+        painter.drawLine(QPointF(12, 14), QPointF(12, 17));
     } else if (name == "search") {
         painter.drawEllipse(QRectF(4, 4, 12, 12));
         painter.drawLine(QPointF(15, 15), QPointF(21, 21));
