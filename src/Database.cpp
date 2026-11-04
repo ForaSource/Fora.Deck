@@ -115,8 +115,8 @@ std::vector<Application> Database::get_applications() const {
     int result = sqlite3_prepare_v2(
         this->connection.get(),
         "SELECT a.name,c.path FROM applications a JOIN launch_configuration c ON c.id=a.configuration_id "
-        "JOIN launch_target t ON t.id=c.target_id WHERE t.kind IN ('executable','desktop');", -1,
-        &raw_statement, nullptr);
+        "JOIN launch_target t ON t.id=c.target_id WHERE t.kind IN ('executable','desktop');",
+        -1, &raw_statement, nullptr);
 
     const std::unique_ptr<sqlite3_stmt, decltype(&sqlite3_finalize)> statement(raw_statement, &sqlite3_finalize);
 
@@ -511,8 +511,8 @@ void Database::write_source(const qint64 configuration_id, const app_record &rec
         source.bind(1, configuration_id);
         source.bind(2, !Application::file_target(record) ? Application::target_kind(record)
                        : QFileInfo(path).suffix().compare("desktop", Qt::CaseInsensitive) == 0 ? QString("desktop")
-                       : QFileInfo(path).suffix().compare("lnk", Qt::CaseInsensitive) == 0   ? QString("shortcut")
-                                                                                             : QString("discovery"));
+                       : QFileInfo(path).suffix().compare("lnk", Qt::CaseInsensitive) == 0     ? QString("shortcut")
+                                                                                               : QString("discovery"));
         source.bind(3, path);
         source.next();
     }
@@ -545,8 +545,8 @@ qint64 Database::save_application(const app_record &record) {
                 QCoreApplication::translate("XLibrary", "This launch configuration is already in the library.")
                     .toStdString());
     }
-    xlibrary::SqliteStatement location(connection,
-        "UPDATE launch_configuration SET installation_directory=?,icon_path=? WHERE id=?;");
+    xlibrary::SqliteStatement location(
+        connection, "UPDATE launch_configuration SET installation_directory=?,icon_path=? WHERE id=?;");
     location.bind(1, record.installation_directory);
     location.bind(2, record.icon_path);
     location.bind(3, configuration_id);
@@ -835,7 +835,10 @@ qint64 Database::save_scenario(const scenario_record &record) {
     }
     for (qsizetype index = 0; index < record.steps.size(); ++index) {
         const auto &step = record.steps[index];
-        xlibrary::SqliteStatement insert(connection, "INSERT INTO desktop_scenario_step(scenario_id,position,application_id,delay_ms,enabled,launch_profile) VALUES(?,?,?,?,?,?);");
+        xlibrary::SqliteStatement insert(
+            connection,
+            "INSERT INTO desktop_scenario_step(scenario_id,position,application_id,delay_ms,enabled,launch_profile) "
+            "VALUES(?,?,?,?,?,?);");
         insert.bind(1, id);
         insert.bind(2, index);
         insert.bind(3, step.application_id);

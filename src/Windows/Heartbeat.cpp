@@ -7,8 +7,8 @@
 #include <system_error>
 #include <utility>
 
-#include "Heartbeat.h"
 #include "Application.h"
+#include "Heartbeat.h"
 
 namespace {
 using unique_handle = std::unique_ptr<void, decltype(&CloseHandle)>;

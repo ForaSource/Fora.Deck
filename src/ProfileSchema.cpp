@@ -3,8 +3,8 @@
 #include <set>
 #include <vector>
 
-#include "LaunchIdentity.h"
 #include "Application.h"
+#include "LaunchIdentity.h"
 #include "ProfileSchema.h"
 #include "SqliteHelpers.h"
 
@@ -144,10 +144,12 @@ void validate_columns(sqlite3 *const connection, const int version) {
         SqliteStatement invalid(connection, "SELECT 1 FROM launch_target WHERE kind NOT IN "
                                             "('executable','desktop','system_uri','aumid','steam') LIMIT 1;");
         if (invalid.next())
-            throw std::runtime_error(QCoreApplication::translate("XLibrary", "Profile contains an unsupported launch target type").toStdString());
-        SqliteStatement targets(connection,
-            "SELECT t.kind,c.path,c.arguments,c.working_directory,c.installation_directory,c.icon_path "
-            "FROM launch_configuration c JOIN launch_target t ON t.id=c.target_id;");
+            throw std::runtime_error(
+                QCoreApplication::translate("XLibrary", "Profile contains an unsupported launch target type")
+                    .toStdString());
+        SqliteStatement targets(
+            connection, "SELECT t.kind,c.path,c.arguments,c.working_directory,c.installation_directory,c.icon_path "
+                        "FROM launch_configuration c JOIN launch_target t ON t.id=c.target_id;");
         while (targets.next()) {
             app_record record;
             record.target_kind = targets.qtext(0);
@@ -158,7 +160,9 @@ void validate_columns(sqlite3 *const connection, const int version) {
             for (int column = 4; column <= 5; ++column)
                 if (targets.qtext(column).size() > catalog_limits::text_length ||
                     targets.qtext(column).contains(QChar::Null))
-                    throw std::runtime_error(QCoreApplication::translate("XLibrary", "Profile contains invalid launch target metadata").toStdString());
+                    throw std::runtime_error(
+                        QCoreApplication::translate("XLibrary", "Profile contains invalid launch target metadata")
+                            .toStdString());
         }
     }
     if (version >= 6) {

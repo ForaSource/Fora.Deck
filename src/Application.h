@@ -44,12 +44,13 @@ public:
     static QStringList windows_steam_roots();
 #endif
     static QVector<app_record> discover_system(QVector<discovery_issue> &issues, const std::atomic_bool &cancelled,
-        const std::function<void(const discovery_progress &)> &progress = {});
+                                               const std::function<void(const discovery_progress &)> &progress = {});
     static QVector<app_record> discover_steam(QVector<discovery_issue> &issues, const std::atomic_bool &cancelled,
-        const std::function<void(const discovery_progress &)> &progress = {});
+                                              const std::function<void(const discovery_progress &)> &progress = {});
     // Explicit roots also support portable Steam installations without registry entries.
     static QVector<app_record> discover_steam(const QStringList &roots, QVector<discovery_issue> &issues,
-        const std::atomic_bool &cancelled, const std::function<void(const discovery_progress &)> &progress = {});
+                                              const std::atomic_bool &cancelled,
+                                              const std::function<void(const discovery_progress &)> &progress = {});
     static void launch_application(const app_record &record, launch_mode mode);
     static QString new_instance_error(const app_record &record);
     static app_record resolve_application(const QString &path);

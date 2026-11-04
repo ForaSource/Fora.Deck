@@ -60,7 +60,8 @@ std::vector<Application> Manager::get_apps() const {
     std::vector<Application> result;
     result.reserve(catalog.applications.size());
     for (const auto &record : catalog.applications) {
-        if (!Application::file_target(record)) continue;
+        if (!Application::file_target(record))
+            continue;
         const auto found = std::ranges::find_if(std::as_const(applications), [&](const auto &app) {
             return app.get_file_title() == record.name.toStdString() &&
                    app.get_file_path() == filesystem_path(record.path);
@@ -168,7 +169,8 @@ void Manager::poll(const bool force) {
             record.available = Application::target_available(record);
             record.volume_unavailable = false;
             if (!Application::file_target(record)) {
-                if (!record.available) unavailable.insert(Application::launch_key(record));
+                if (!record.available)
+                    unavailable.insert(Application::launch_key(record));
                 continue;
             }
             if (record.available) {
@@ -514,8 +516,10 @@ void Manager::launch_record(const qint64 id, const Application::launch_mode mode
         const auto selected_profile = profile.isEmpty() ? it->default_launch_profile : profile;
         const auto record = Application::with_launch_profile(*it, selected_profile);
         const auto effective_mode = mode == Application::launch_mode::activate &&
-            ((!selected_profile.isEmpty() && selected_profile != "configured") || Application::requires_fresh_launch(record))
-                ? Application::launch_mode::launch : mode;
+                                            ((!selected_profile.isEmpty() && selected_profile != "configured") ||
+                                             Application::requires_fresh_launch(record))
+                                        ? Application::launch_mode::launch
+                                        : mode;
         launch_action(record, effective_mode);
         // Ошибка истории не должна превращать успешный запуск в неуспешный или повторный.
         emit this->launched(id, {this->request_id, "launch", operation_state::completed, {}}, generation);

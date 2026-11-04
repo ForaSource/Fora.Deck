@@ -63,16 +63,19 @@ void LibraryModel::request_icon(const app_record &record) const {
     auto *self = const_cast<LibraryModel *>(this);
 #ifdef Q_OS_LINUX
     // System icon engines use QPixmap and must run on the GUI thread.
-    QTimer::singleShot(0, self, [self, key, path, image_file, fallback] {
-        const auto image = image_file ? QImage(path) : desktop_platform::application_icon(path);
-        self->pending_icons.remove(key);
-        self->icons.insert(key, new QIcon(image.isNull() ? fallback : QIcon(QPixmap::fromImage(image))));
-        for (int row = 0; row < self->records.size(); ++row) {
-            if (icon_cache_key(self->records[row]) == key)
-                emit self->dataChanged(self->index(row, 0), self->index(row, 0), {Qt::DecorationRole});
-        }
-    });
-#else
+    if (!image_file) {
+        QTimer::singleShot(0, self, [self, key, path, fallback] {
+            const auto image = desktop_platform::application_icon(path);
+            self->pending_icons.remove(key);
+            self->icons.insert(key, new QIcon(image.isNull() ? fallback : QIcon(QPixmap::fromImage(image))));
+            for (int row = 0; row < self->records.size(); ++row) {
+                if (icon_cache_key(self->records[row]) == key)
+                    emit self->dataChanged(self->index(row, 0), self->index(row, 0), {Qt::DecorationRole});
+            }
+        });
+        return;
+    }
+#endif
     auto *watcher = new QFutureWatcher<QImage>(self);
     connect(watcher, &QFutureWatcher<QImage>::finished, self, [self, watcher, key, fallback] {
         const auto image = watcher->result();
@@ -88,7 +91,6 @@ void LibraryModel::request_icon(const app_record &record) const {
     watcher->setFuture(QtConcurrent::run(&self->icon_pool, [path, image_file] {
         return image_file ? QImage(path) : desktop_platform::application_icon(path);
     }));
-#endif
 }
 
 QVariant LibraryModel::data(const QModelIndex &index, const int requested_role) const {

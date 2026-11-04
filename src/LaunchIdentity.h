@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <sqlite3.h>
 #include <string>
+
 #include "CatalogTypes.h"
 
 namespace xlibrary {

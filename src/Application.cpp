@@ -231,7 +231,7 @@ class SteamVdfReader {
         }
     }
 
-  public:
+public:
     SteamVdfReader(QString contents, const std::atomic_bool &cancelled)
         : text(std::move(contents)), cancelled(cancelled) {
         if (text.startsWith(QChar(0xfeff)))
@@ -410,27 +410,40 @@ QVector<app_record> Application::discover_steam(const QStringList &roots, QVecto
 
 namespace {
 QString browser_family(const app_record &record) {
-    if (!Application::file_target(record)) return {};
+    if (!Application::file_target(record))
+        return {};
     const auto filename = QFileInfo(record.path).completeBaseName().toCaseFolded();
-    if (filename == "chrome" || filename.startsWith("google-chrome") || filename == "com.google.chrome") return "chrome";
-    if (filename == "msedge" || filename.startsWith("microsoft-edge") || filename == "com.microsoft.edge") return "edge";
-    if (filename == "brave" || filename.startsWith("brave-browser") || filename == "com.brave.browser") return "brave";
-    if (filename.startsWith("firefox") || filename == "org.mozilla.firefox") return "firefox";
+    if (filename == "chrome" || filename.startsWith("google-chrome") || filename == "com.google.chrome")
+        return "chrome";
+    if (filename == "msedge" || filename.startsWith("microsoft-edge") || filename == "com.microsoft.edge")
+        return "edge";
+    if (filename == "brave" || filename.startsWith("brave-browser") || filename == "com.brave.browser")
+        return "brave";
+    if (filename.startsWith("firefox") || filename == "org.mozilla.firefox")
+        return "firefox";
     return {};
 }
 QString browser_data_root(const QString &family) {
 #ifdef Q_OS_WIN
-    if (family == "firefox") return qEnvironmentVariable("APPDATA") + "/Mozilla/Firefox";
+    if (family == "firefox")
+        return qEnvironmentVariable("APPDATA") + "/Mozilla/Firefox";
     const auto local = qEnvironmentVariable("LOCALAPPDATA");
-    if (family == "chrome") return local + "/Google/Chrome/User Data";
-    if (family == "edge") return local + "/Microsoft/Edge/User Data";
-    if (family == "brave") return local + "/BraveSoftware/Brave-Browser/User Data";
+    if (family == "chrome")
+        return local + "/Google/Chrome/User Data";
+    if (family == "edge")
+        return local + "/Microsoft/Edge/User Data";
+    if (family == "brave")
+        return local + "/BraveSoftware/Brave-Browser/User Data";
 #else
-    if (family == "firefox") return QDir::homePath() + "/.mozilla/firefox";
+    if (family == "firefox")
+        return QDir::homePath() + "/.mozilla/firefox";
     const auto config = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation);
-    if (family == "chrome") return config + "/google-chrome";
-    if (family == "edge") return config + "/microsoft-edge";
-    if (family == "brave") return config + "/BraveSoftware/Brave-Browser";
+    if (family == "chrome")
+        return config + "/google-chrome";
+    if (family == "edge")
+        return config + "/microsoft-edge";
+    if (family == "brave")
+        return config + "/BraveSoftware/Brave-Browser";
 #endif
     return {};
 }
@@ -448,49 +461,65 @@ QString profile_argument(const QString &value) {
 
 QVector<launch_profile> Application::launch_modes(const app_record &record) {
     const auto family = browser_family(record);
-    if (family.isEmpty()) return {};
+    if (family.isEmpty())
+        return {};
     return {{"normal", QCoreApplication::translate("XLibrary", "Normal window"), "normal", {}},
-            {"private", family == "edge" ? QCoreApplication::translate("XLibrary", "InPrivate window")
-                                         : QCoreApplication::translate("XLibrary", "Private window"), "private", {}}};
+            {"private",
+             family == "edge" ? QCoreApplication::translate("XLibrary", "InPrivate window")
+                              : QCoreApplication::translate("XLibrary", "Private window"),
+             "private",
+             {}}};
 }
 
 QVector<launch_profile> Application::launch_profiles(const app_record &record) {
     auto profiles = launch_modes(record);
-    if (profiles.isEmpty()) return {};
+    if (profiles.isEmpty())
+        return {};
     const auto family = browser_family(record);
     const auto root = browser_data_root(family);
     if (family == "firefox") {
         const auto metadata = root + "/profiles.ini";
-        if (QFileInfo(metadata).size() > 8 * 1024 * 1024) return profiles;
+        if (QFileInfo(metadata).size() > 8 * 1024 * 1024)
+            return profiles;
         QSettings settings(metadata, QSettings::IniFormat);
         for (const auto &group : settings.childGroups()) {
-            if (!group.startsWith("Profile")) continue;
+            if (!group.startsWith("Profile"))
+                continue;
             settings.beginGroup(group);
             const auto path = settings.value("Path").toString();
             const auto name = settings.value("Name").toString();
             const bool relative = settings.value("IsRelative", 1).toInt() != 0;
             settings.endGroup();
             const auto directory = relative ? QDir(root).absoluteFilePath(path) : path;
-            if (path.isEmpty() || !QFileInfo(directory).isDir()) continue;
-            if (profiles.size() >= 128) break;
-            profiles.append({"profile:" + directory, name.isEmpty() ? QFileInfo(directory).fileName() : name,
-                             "user", record.icon_path});
+            if (path.isEmpty() || !QFileInfo(directory).isDir())
+                continue;
+            if (profiles.size() >= 128)
+                break;
+            profiles.append({"profile:" + directory, name.isEmpty() ? QFileInfo(directory).fileName() : name, "user",
+                             record.icon_path});
         }
     } else {
         QFile state(root + "/Local State");
         if (state.open(QIODevice::ReadOnly) && state.size() <= 8 * 1024 * 1024) {
-            const auto cache = QJsonDocument::fromJson(state.readAll()).object().value("profile").toObject()
-                                   .value("info_cache").toObject();
+            const auto cache = QJsonDocument::fromJson(state.readAll())
+                                   .object()
+                                   .value("profile")
+                                   .toObject()
+                                   .value("info_cache")
+                                   .toObject();
             for (auto item = cache.begin(); item != cache.end(); ++item) {
                 const auto directory = item.key();
                 // Chromium profile directories are single path components, never arbitrary paths.
                 if (directory.isEmpty() || directory == "." || directory == ".." || directory.contains('/') ||
-                    directory.contains('\\') || !QFileInfo(QDir(root).filePath(directory)).isDir()) continue;
+                    directory.contains('\\') || !QFileInfo(QDir(root).filePath(directory)).isDir())
+                    continue;
                 const auto info = item.value().toObject();
                 const auto name = info.value("name").toString(directory);
                 auto icon = QDir(root).filePath(directory + "/" + info.value("gaia_picture_file_name").toString());
-                if (!QFileInfo(icon).isFile()) icon = record.icon_path;
-                if (profiles.size() >= 128) break;
+                if (!QFileInfo(icon).isFile())
+                    icon = record.icon_path;
+                if (profiles.size() >= 128)
+                    break;
                 profiles.append({"profile:" + directory, name, "user", icon});
             }
         }
@@ -499,39 +528,49 @@ QVector<launch_profile> Application::launch_profiles(const app_record &record) {
 }
 
 bool Application::requires_fresh_launch(const app_record &record) {
-    if (browser_family(record).isEmpty()) return false;
+    if (browser_family(record).isEmpty())
+        return false;
     static const QRegularExpression mode_argument(
-        "(?:^|\\s)[\"']?(?:--(?:incognito|inprivate|private-window|profile-directory|user-data-dir)|-(?:private-window|P|profile|no-remote))(?=[=\\s\"']|$)");
+        "(?:^|\\s)[\"']?(?:--(?:incognito|inprivate|private-window|profile-directory|user-data-dir)|-(?:private-window|"
+        "P|profile|no-remote))(?=[=\\s\"']|$)");
     return mode_argument.match(configured_arguments(record)).hasMatch();
 }
 
 bool Application::valid_launch_profile_id(const QString &profile) {
-    if (profile.size() > catalog_limits::text_length) return false;
+    if (profile.size() > catalog_limits::text_length)
+        return false;
     for (const auto character : profile)
-        if (character.isNull() || character.category() == QChar::Other_Control) return false;
+        if (character.isNull() || character.category() == QChar::Other_Control)
+            return false;
     return profile.isEmpty() || profile == "configured" || profile == "normal" || profile == "private" ||
            (profile.startsWith("profile:") && profile.size() > 8);
 }
 
 app_record Application::with_launch_profile(const app_record &record, const QString &profile) {
     auto result = record;
-    if (profile.isEmpty() || profile == "configured") return result;
+    if (profile.isEmpty() || profile == "configured")
+        return result;
     const auto profiles = launch_profiles(record);
     const auto found = std::ranges::find(profiles, profile, &launch_profile::id);
     if (found == profiles.cend())
-        throw std::invalid_argument(QCoreApplication::translate("XLibrary", "The selected browser profile is unavailable.").toStdString());
+        throw std::invalid_argument(
+            QCoreApplication::translate("XLibrary", "The selected browser profile is unavailable.").toStdString());
     const auto family = browser_family(record);
     // Existing custom mode/profile arguments remain intact unless the user chooses a conflicting mode.
     if (requires_fresh_launch(record))
-        throw std::invalid_argument(QCoreApplication::translate("XLibrary", "This configuration already specifies a browser mode or profile. Use its configured launch or edit its arguments.").toStdString());
+        throw std::invalid_argument(
+            QCoreApplication::translate("XLibrary", "This configuration already specifies a browser mode or profile. "
+                                                    "Use its configured launch or edit its arguments.")
+                .toStdString());
     QString arguments;
     if (profile == "private")
         arguments = family == "firefox" ? "-private-window" : family == "edge" ? "--inprivate" : "--incognito";
     else if (profile.startsWith("profile:")) {
         const auto directory = profile.mid(8);
         arguments = family == "firefox" ? "-no-remote -profile " + profile_argument(directory)
-                                         : "--profile-directory=" + profile_argument(directory);
-    } else arguments = family == "firefox" ? "-new-window about:blank" : "--new-window";
+                                        : "--profile-directory=" + profile_argument(directory);
+    } else
+        arguments = family == "firefox" ? "-new-window about:blank" : "--new-window";
     result.arguments = arguments + (record.arguments.isEmpty() ? QString{} : ' ' + record.arguments);
     result.default_launch_profile.clear();
     return result;

@@ -39,20 +39,23 @@ An app can belong to more than one part of your day. Give your browser both `#wo
 
 | | What you can do |
 | --- | --- |
-| **One application library** | Add apps manually or discover them through the Windows registry and Start menu, or Linux XDG desktop entries. |
+| **One application library** | Discover Windows system apps, registry and Start menu entries, Linux desktop entries, and installed Steam games across local libraries. |
 | **Tags and filters** | Assign multiple tags to an app and combine them with text search and exclusions. |
 | **Favorites and recent launches** | Keep frequently used apps close and sort your library by last launch. |
 | **Running apps** | See what is running, switch to an existing window when available, or open a new instance. |
 | **Launch scenarios** | Open a group of apps in a defined order, with optional delays between steps. |
 | **Quick search** | Open a compact launcher with Ctrl+Alt+Space, calculate expressions, or browse a folder directly. |
-| **Desktop integration** | Use separate global hotkeys for quick search and the full library, keep XLibrary in the system tray, and customize keyboard shortcuts. |
+| **Desktop integration** | Assign global hotkeys to the library, quick search, individual applications, and launch scenarios. |
+| **Browser profiles** | Choose normal, private, or detected local profiles for Chrome, Edge, Firefox and Brave, including in scenarios. |
 | **Appearance** | Choose a light, dark, or system theme and adjust the text size. |
 | **Local storage** | Keep your catalog in SQLite. Import and export application entries, tags, and favorites as JSON. |
 
 ## Import and discovery
 
-JSON format 1 stores application names, absolute paths, launch arguments, working directories,
-favorites, and assigned tags. Linux executable paths do not need a filename extension. Optional
+JSON format 1 stores application names, typed launch targets, launch arguments, working directories,
+browser defaults, aliases, favorites, and assigned tags. Executable targets use absolute paths;
+system URI, AUMID and Steam targets use their own validated identifiers. Older catalogs remain supported.
+Linux executable paths do not need a filename extension. Optional
 fields may be omitted; supplied fields must have the expected JSON types. Import validates the
 entire file before writing and reports the record number, field, and reason on invalid input.
 An import error leaves the catalog unchanged. Files are limited to 32 MiB and 50,000 applications.
@@ -86,8 +89,14 @@ directories remain separate profiles. Manual addition rejects a configuration al
 Cancelling discovery before its transaction is committed rolls back all additions. Once commit
 starts, cancellation is unavailable. JSON import and discovery never launch applications.
 
-JSON export is an application catalog transfer, not a complete profile backup: scenarios,
-unused tags, saved filters, settings, and launch history are not included.
+Windows discovery includes available Settings pages, File Explorer, Calculator, Microsoft Store,
+Task Manager, Control Panel and Windows Terminal. Unavailable components are skipped.
+Steam discovery reads local `libraryfolders.vdf` and `appmanifest_*.acf` files, including additional
+libraries. Games launch through `steam://run/<appid>`; moving a game and rescanning preserves its
+card ID and metadata. Steam files are never changed, and no Web API or login is required.
+
+JSON export transfers application cards. Use a complete `.xlprofile` backup for scenarios,
+global hotkey assignments, unused tags, saved filters, settings, and launch history.
 
 Use Ctrl/Shift to select several library entries. The selection bar shows the count, clears the
 selection, and opens a bulk editor with searchable tags, usage counts, and favorite state.
@@ -103,9 +112,12 @@ mounts are distinguished from missing files; an unknown missing location is kept
 ## Search and saved filters
 
 Search matches names, filenames, and user-defined aliases from **Edit application**.
-Matches are ranked as exact, prefix, then substring, with a stable sort order for ties.
+Ties keep a stable sort order.
 Case, repeated spaces, Unicode normalization, and English/Russian keyboard layout are
-handled by the same search rules in the library and quick launcher. No fuzzy matching is used.
+handled by the same cached search rules in the library and quick launcher. Initials (`vsc`),
+word prefixes (`vscode`) and limited typo correction (`discrod`, `chrme`, `stema`) are supported.
+Exact names and aliases rank first, followed by exact filenames, prefixes, abbreviations,
+substrings, layout correction and fuzzy matches. Tags stay exact, and the entered query is preserved.
 Aliases also travel with JSON catalogs; older catalogs without aliases remain importable.
 
 Use `#tag` to require a tag and `-#tag` to exclude it; every condition must match.
@@ -216,7 +228,11 @@ other custom bindings are preserved. On Wayland, assign `XLibrary --overlay` or 
 in your desktop's shortcut settings; these commands also address an already running instance.
 
 Quick search opens with a 200 ms reveal and shows up to five matching applications.
-Use ↑/↓ and Enter to launch, Escape or the global shortcut again to dismiss, and the
+Use ↑/↓ and Enter to launch. Tab or Shift+F10 opens the selected application's actions;
+↑/↓ and Enter select and run an action, Escape returns to search. Actions include browser profiles,
+new instances, window switching, folder/path operations, favorites, editors, hotkeys and confirmed removal,
+where applicable. Windows executable entries also offer an explicit administrator launch.
+Use Escape or the global shortcut again to dismiss search, and the
 small button on the right to open the full library with the same query. System animation
 preferences are respected. XLibrary must be running for its built-in global shortcuts.
 
@@ -242,6 +258,18 @@ For the selected application:
 | <kbd>Delete</kbd> | Remove the entry from the library after confirmation; application files are kept |
 
 Change or clear these bindings in Settings → Keyboard shortcuts. Switch between the **Global shortcuts**, **Navigation**, and **Application actions** tabs at the top. Both main and numeric keypad Enter are supported. Text editing keys keep their usual behavior in text fields. Use ↑/↓ in search to select an application; Escape clears the search and cannot be reassigned. Duplicate shortcuts are rejected when saving settings, and the tab containing the conflicting field opens automatically.
+
+Application and scenario editors also accept a global hotkey. The **Applications** and **Scenarios**
+keyboard settings tabs list these assignments. Conflicts and OS registration failures preserve the
+previous binding. Deleting a target removes its binding; full profile backups retain assignments.
+On Wayland, use compositor shortcuts for `XLibrary --launch-id ID` or `XLibrary --scenario-id ID`;
+the editor shows the persistent ID command. XLibrary does not intercept unsupported Wayland keys.
+
+Quick search uses normal window-manager activation on Linux. For Plasma/Wayland, assign
+`XLibrary --overlay` directly in System Settings → Keyboard → Shortcuts so the compositor can
+authorize activation. Existing-instance commands forward an available XDG activation token.
+Focus and fullscreen stacking remain subject to compositor policy. A banner explains refused
+Wayland activation; XLibrary does not repeatedly force focus or permanently pin the overlay above windows.
 
 ## Development
 

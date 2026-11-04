@@ -152,12 +152,12 @@ int main(int argc, char *argv[]) {
                 else {
                     auto connection = std::make_shared<QMetaObject::Connection>();
                     *connection = QObject::connect(&service, &DesktopService::catalog_changed, &service,
-                        [&service, connection, run] {
-                            if (service.is_ready()) {
-                                QObject::disconnect(*connection);
-                                run();
-                            }
-                        });
+                                                   [&service, connection, run] {
+                                                       if (service.is_ready()) {
+                                                           QObject::disconnect(*connection);
+                                                           run();
+                                                       }
+                                                   });
                 }
             }
         };

@@ -155,9 +155,9 @@ std::uint32_t Application::launch(const std::wstring &arguments, const std::file
 #include <QHash>
 #include <QRegularExpression>
 #include <QSet>
+#include <QSettings>
 #include <shlobj.h>
 #include <shobjidl.h>
-#include <QSettings>
 
 #include "PathHelpers.h"
 #include "Windows/RegistryScan.h"
@@ -509,14 +509,20 @@ QVector<app_record> Application::discover(const bool registry, const bool start_
             unique.append(std::move(record));
         }
     }
-    if (registry) unique += discover_system(issues, cancelled, progress);
-    if (registry || start_menu) unique += discover_steam(issues, cancelled, progress);
+    if (registry)
+        unique += discover_system(issues, cancelled, progress);
+    if (registry || start_menu)
+        unique += discover_steam(issues, cancelled, progress);
     QVector<app_record> combined;
     QSet<QString> combined_keys;
     for (auto &record : unique) {
-        if (cancelled.load()) return {};
+        if (cancelled.load())
+            return {};
         const auto key = launch_key(record);
-        if (!combined_keys.contains(key)) { combined_keys.insert(key); combined.append(std::move(record)); }
+        if (!combined_keys.contains(key)) {
+            combined_keys.insert(key);
+            combined.append(std::move(record));
+        }
     }
     report(total, total, QCoreApplication::translate("XLibrary", "Application checks complete"));
     return combined;
