@@ -61,6 +61,7 @@ DesktopService::DesktopService(QObject *const parent, const QString &profile_pat
     });
     library_request_id = begin_operation("library");
     worker->known_volume_roots = settings.value("availability/volume_roots").toStringList();
+    worker->verified_locations = settings.value("availability/verified_locations").toMap();
     filter.setSourceModel(&model);
     launch_profile_pool.setMaxThreadCount(1);
     launch_profile_pool.setExpiryTimeout(5000);
@@ -71,6 +72,10 @@ DesktopService::DesktopService(QObject *const parent, const QString &profile_pat
     connect(worker, &Manager::volumes_observed, this, [this](const QStringList &roots) {
         if (!profile_busy() && !restart_pending)
             settings.setValue("availability/volume_roots", roots);
+    });
+    connect(worker, &Manager::locations_observed, this, [this](const QVariantMap &locations) {
+        if (!profile_busy() && !restart_pending)
+            settings.setValue("availability/verified_locations", locations);
     });
     connect(this, &DesktopService::library_open_requested, worker, &Manager::initialize, Qt::QueuedConnection);
     connect(this, &DesktopService::library_restore_requested, worker, &Manager::restore, Qt::QueuedConnection);
@@ -105,6 +110,15 @@ DesktopService::DesktopService(QObject *const parent, const QString &profile_pat
     });
     connect(worker, &Manager::result, this, &DesktopService::publish_result);
     connect(worker, &Manager::notification, this, &DesktopService::message);
+    connect(worker, &Manager::discovery_dismissed, this, [this](const QStringList &dismissed) {
+        auto targets = settings.value("sources/dismissed_targets").toStringList();
+        targets.append(dismissed);
+        targets.removeDuplicates();
+        settings.setValue("sources/dismissed_targets", targets);
+        settings.sync();
+        if (settings.status() != QSettings::NoError)
+            notify(QCoreApplication::translate("XLibrary", "Could not save discovery exclusions."));
+    });
     connect(worker, &Manager::discovery_report_ready, this, [this](const QString &report) {
         scan_report = report;
         emit discovery_report_changed();
@@ -117,6 +131,18 @@ DesktopService::DesktopService(QObject *const parent, const QString &profile_pat
                     publish_result({id, preview_operation, operation_state::cancelled, {}});
                     return;
                 }
+                present_catalog_preview(records, issues);
+            });
+    connect(worker, &Manager::inventory_ready, this,
+            [this](const quint64 id, const QVector<app_record> &records, const QVector<app_record> &removed,
+                   const QVector<discovery_issue> &issues) {
+                if (id != discovery_request_id || !is_discovering())
+                    return;
+                if (discovery_cancelled->requested.load()) {
+                    publish_result({id, preview_operation, operation_state::cancelled, {}});
+                    return;
+                }
+                missing_records = removed;
                 present_catalog_preview(records, issues);
             });
     connect(worker, &Manager::undo_changed, this, [this](const bool available) {
@@ -240,6 +266,8 @@ void DesktopService::publish_result(const operation_result &result) {
         pending_exclusions.clear();
         pending_exclusions_request_id = 0;
         if (result.state == operation_state::completed) {
+            exclusions.append(settings.value("sources/excluded_configurations").toStringList());
+            exclusions.removeDuplicates();
             settings.setValue("sources/excluded_configurations", exclusions);
             settings.sync();
             if (settings.status() != QSettings::NoError) {
@@ -269,6 +297,24 @@ void DesktopService::publish_result(const operation_result &result) {
         library_status = result.state;
         opening_error = result.error;
         emit catalog_changed();
+        if (is_ready() && startup_inventory_pending && !QCoreApplication::arguments().contains("--check-startup")) {
+            QTimer::singleShot(0, this, [this] {
+                if (!startup_inventory_pending)
+                    return;
+                startup_inventory_pending = false;
+                if (!is_discovering())
+                    discover(true);
+            });
+        }
+    }
+    if (result.id == missing_removal_request_id && result.state != operation_state::loading) {
+        missing_removal_request_id = 0;
+        missing_records.clear();
+        reviewing_missing = false;
+        if (result.state == operation_state::completed)
+            continue_inventory_review();
+        else
+            publish_result({discovery_request_id, preview_operation, result.state, {}});
     }
     if (result.id == discovery_request_id) {
         discovery_state = result.state;
@@ -284,6 +330,7 @@ void DesktopService::publish_result(const operation_result &result) {
     emit operation_changed(result);
     // Ошибку запуска уже показывает отдельный результат launch; сценарий сохраняет её для своих подписчиков.
     if (result.state == operation_state::error && result.operation != "run_scenario" &&
+        !(startup_scan && (result.id == discovery_request_id || result.operation == "remove_missing")) &&
         !result.error.user_message.isEmpty())
         emit message(result.error.user_message);
     if (result.state != operation_state::loading)
@@ -361,6 +408,8 @@ void DesktopService::remove_application(const qint64 id) {
 }
 
 void DesktopService::remove_applications(const QVector<qint64> &ids) {
+    if (ids.isEmpty())
+        return;
     if (is_scenario_active()) {
         notify(QCoreApplication::translate("XLibrary", "Stop the scenario before removing applications."));
         return;
@@ -524,13 +573,16 @@ void DesktopService::finish_scenario(const operation_state state, const operatio
     publish_result({scenario_request_id, "run_scenario", state, error});
 }
 
-bool DesktopService::begin_catalog_preview(const QString &operation) {
+bool DesktopService::begin_catalog_preview(const QString &operation, const bool at_startup) {
     if (is_discovering() || !is_ready() || profile_busy() || restart_pending)
         return false;
     preview_operation = operation;
     reviewing = false;
     preview_records.clear();
     preview_issues.clear();
+    missing_records.clear();
+    reviewing_missing = false;
+    startup_scan = at_startup;
     discovery_state = operation_state::loading;
     discovery_request_id = begin_operation(operation);
     discovery_cancelled = std::make_shared<discovery_control>();
@@ -543,9 +595,15 @@ bool DesktopService::begin_catalog_preview(const QString &operation) {
 void DesktopService::present_catalog_preview(QVector<app_record> records, QVector<discovery_issue> issues) {
     if (is_scan_preview()) {
         const auto exclusions = settings.value("sources/excluded_configurations").toStringList();
+        const auto dismissed = settings.value("sources/dismissed_targets").toStringList();
+        QSet<QString> known;
+        for (const auto &record : snapshot.applications)
+            known.insert(Application::launch_key(record));
         records.removeIf([&](const app_record &record) {
+            if (known.contains(Application::launch_key(record)))
+                return true;
             const auto key = launch_configuration_key(record.path, record.arguments, record.working_directory);
-            auto excluded = exclusions.contains(key);
+            auto excluded = exclusions.contains(key) || dismissed.contains(Application::target_key(record));
 #ifdef Q_OS_WIN
             // Keep exclusions saved before empty and default directories became equivalent.
             if (!excluded && key == launch_configuration_key(record.path, record.arguments, {}))
@@ -561,10 +619,53 @@ void DesktopService::present_catalog_preview(QVector<app_record> records, QVecto
     preview_records = std::move(records);
     preview_issues = std::move(issues);
     reviewing = true;
+    if (!missing_records.isEmpty()) {
+        reviewing_missing = true;
+        if (!settings.value("sources/confirm_removal", true).toBool()) {
+            // Let an uninstaller/updater finish before the independent check at commit time.
+            QTimer::singleShot(1500, this, [this, cancelled = discovery_cancelled] {
+                if (cancelled != discovery_cancelled || cancelled->requested.load() || !reviewing_missing)
+                    return;
+                QVector<int> rows;
+                for (int row = 0; row < missing_records.size(); ++row)
+                    rows.append(row);
+                apply_catalog_preview(rows, false);
+            });
+            return;
+        }
+        emit catalog_preview_ready();
+        return;
+    }
+    continue_inventory_review();
+}
+
+void DesktopService::continue_inventory_review() {
+    if (is_scan_preview() && preview_records.isEmpty()) {
+        scan_report =
+            discovery_details(QCoreApplication::translate("XLibrary", "No new applications found."), preview_issues);
+        emit discovery_report_changed();
+        publish_result({discovery_request_id, preview_operation, operation_state::completed, {}});
+        if (!startup_scan)
+            notify(QCoreApplication::translate("XLibrary", "No new applications found."));
+        return;
+    }
+    reviewing = true;
     scan_progress = {90, 0, preview_records.size(),
                      QCoreApplication::translate("XLibrary", "Review applications before import")};
     emit discovery_progress_changed();
     emit catalog_preview_ready();
+}
+
+void DesktopService::keep_missing_applications() {
+    if (!reviewing_missing || missing_removal_request_id)
+        return;
+    reviewing_missing = false;
+    missing_records.clear();
+    // Open the next dialog after the current dialog has processed rejection.
+    QTimer::singleShot(0, this, [this] {
+        if (is_discovering() && !discovery_cancelled->requested.load())
+            continue_inventory_review();
+    });
 }
 
 QString DesktopService::preview_details() const {
@@ -576,6 +677,7 @@ void DesktopService::clear_discovery_exclusions() {
     if (profile_busy() || restart_pending || is_discovering())
         return;
     settings.remove("sources/excluded_configurations");
+    settings.remove("sources/dismissed_targets");
     settings.sync();
     notify(QCoreApplication::translate("XLibrary", "Discovery exclusions cleared."));
 }
@@ -585,11 +687,32 @@ void DesktopService::apply_catalog_preview(const QVector<int> &rows, const bool 
     if (!reviewing || !is_discovering())
         return;
     const QSet<int> selected_rows(rows.cbegin(), rows.cend());
+    if (reviewing_missing) {
+        if (is_scenario_active()) {
+            notify(QCoreApplication::translate("XLibrary", "Stop the scenario before removing applications."));
+            keep_missing_applications();
+            return;
+        }
+        QVector<app_record> removed;
+        for (int row = 0; row < missing_records.size(); ++row)
+            if (selected_rows.contains(row))
+                removed.append(missing_records[row]);
+        reviewing = false;
+        missing_removal_request_id =
+            enqueue("remove_missing", [removed, cancelled = discovery_cancelled](Manager &worker) {
+                worker.remove_missing_applications(removed, cancelled);
+            });
+        emit discovery_changed();
+        return;
+    }
     QVector<app_record> applications;
     auto issues = preview_issues;
     auto exclusions = settings.value("sources/excluded_configurations").toStringList();
+    const auto dismissed = settings.value("sources/dismissed_targets").toStringList();
     for (int row = 0; row < preview_records.size(); ++row) {
         const auto &record = preview_records[row];
+        if (is_scan_preview() && dismissed.contains(Application::target_key(record)))
+            continue;
         if (selected_rows.contains(row)) {
             applications.append(record);
         } else {
@@ -631,8 +754,8 @@ void DesktopService::apply_catalog_preview(const QVector<int> &rows, const bool 
     enqueue(
         preview_operation,
         [applications = std::move(applications), issues = std::move(issues), cancelled = discovery_cancelled, policy,
-         report_progress](Manager &worker) mutable {
-            worker.apply_catalog_preview(applications, std::move(issues), cancelled, policy, report_progress);
+         report_progress, quiet = startup_scan](Manager &worker) mutable {
+            worker.apply_catalog_preview(applications, std::move(issues), cancelled, policy, report_progress, quiet);
         },
         operation_error_source::sqlite, discovery_request_id);
 }
@@ -645,16 +768,16 @@ void DesktopService::preview_files(const QStringList &paths) {
         operation_error_source::platform, discovery_request_id);
 }
 
-void DesktopService::discover() {
+void DesktopService::discover(const bool at_startup) {
     if (is_discovering() || !is_ready() || profile_busy() || restart_pending)
         return;
     const bool registry = settings.value("sources/registry", true).toBool();
     const bool start_menu = settings.value("sources/start_menu", true).toBool();
-    if (!registry && !start_menu) {
+    if (!registry && !start_menu && !at_startup) {
         notify(QCoreApplication::translate("XLibrary", "Select discovery sources in the library settings."));
         return;
     }
-    if (!begin_catalog_preview("discover"))
+    if (!begin_catalog_preview("discover", at_startup))
         return;
     scan_progress = {-1, 0, 0, QCoreApplication::translate("XLibrary", "Preparing the application list…")};
     emit discovery_changed();
@@ -688,18 +811,24 @@ void DesktopService::discover() {
                 scan_report = discovery_details(message, result.second);
                 emit discovery_report_changed();
                 publish_result({discovery_request_id, "discover", operation_state::cancelled, {}});
-                notify(message);
+                if (!startup_scan)
+                    notify(message);
                 watcher->deleteLater();
                 return;
             }
-            present_catalog_preview(std::move(result.first), std::move(result.second));
+            enqueue(
+                "discover",
+                [records = std::move(result.first), issues = std::move(result.second), cancelled = discovery_cancelled](
+                    Manager &worker) { worker.review_inventory(records, issues, cancelled); },
+                operation_error_source::filesystem, discovery_request_id);
         } catch (const DiscoveryCancelled &) {
             const auto message = discovery_summary(
                 0, {}, QCoreApplication::translate("XLibrary", "Scan cancelled; changes were not saved."));
             scan_report = message;
             emit discovery_report_changed();
             publish_result({discovery_request_id, "discover", operation_state::cancelled, {}});
-            notify(message);
+            if (!startup_scan)
+                notify(message);
         } catch (const std::exception &error) {
             const QVector<discovery_issue> issues{{"Discovery", QString::fromUtf8(error.what())}};
             const auto message = discovery_summary(
@@ -722,7 +851,7 @@ void DesktopService::discover() {
 }
 
 void DesktopService::cancel_discovery() {
-    if (!is_discovering())
+    if (!can_cancel_discovery())
         return;
     auto expected = discovery_phase::running;
     if (!discovery_cancelled->phase.compare_exchange_strong(expected, discovery_phase::cancelling))
@@ -731,6 +860,8 @@ void DesktopService::cancel_discovery() {
     if (reviewing) {
         reviewing = false;
         preview_records.clear();
+        missing_records.clear();
+        reviewing_missing = false;
         scan_report = discovery_details(
             QCoreApplication::translate("XLibrary", "Import cancelled; changes were not saved."), preview_issues);
         emit discovery_report_changed();
@@ -739,7 +870,8 @@ void DesktopService::cancel_discovery() {
     }
     scan_progress.stage = QCoreApplication::translate("XLibrary", "Stopping the scan…");
     emit discovery_progress_changed();
-    notify(QCoreApplication::translate("XLibrary", "Stopping application discovery…"));
+    if (!startup_scan)
+        notify(QCoreApplication::translate("XLibrary", "Stopping application discovery…"));
 }
 
 void DesktopService::export_catalog(const QString &path) {

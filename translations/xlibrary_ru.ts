@@ -2180,14 +2180,6 @@ Technical reason: %3</source>
         <translation>Источник</translation>
     </message>
     <message>
-        <source>Source: %1</source>
-        <translation>Источник: %1</translation>
-    </message>
-    <message>
-        <source>Source: manually added or imported</source>
-        <translation>Источник: ручное добавление или импорт</translation>
-    </message>
-    <message>
         <source>Stop the scenario before removing applications.</source>
         <translation>Остановите сценарий перед удалением приложений.</translation>
     </message>
@@ -2658,6 +2650,110 @@ Technical reason: %3</source>
     <message>
         <source>Applications</source>
         <translation>Приложения</translation>
+    </message>
+    <message>
+        <source>Invalid executable metadata path</source>
+        <translation>Некорректный путь к исполняемому файлу в метаданных</translation>
+    </message>
+    <message>
+        <source>Truncated Steam appinfo cache</source>
+        <translation>Кэш appinfo Steam обрезан</translation>
+    </message>
+    <message>
+        <source>Steam appinfo string is too long</source>
+        <translation>Слишком длинная строка в appinfo Steam</translation>
+    </message>
+    <message>
+        <source>Steam appinfo nesting limit exceeded</source>
+        <translation>Превышен предел вложенности appinfo Steam</translation>
+    </message>
+    <message>
+        <source>Steam appinfo node limit exceeded</source>
+        <translation>Превышен предел количества элементов appinfo Steam</translation>
+    </message>
+    <message>
+        <source>Invalid Steam appinfo string index</source>
+        <translation>Некорректный индекс строки в appinfo Steam</translation>
+    </message>
+    <message>
+        <source>Unsupported Steam appinfo value type</source>
+        <translation>Неподдерживаемый тип значения в appinfo Steam</translation>
+    </message>
+    <message>
+        <source>Steam appinfo cache exceeds 128 MiB</source>
+        <translation>Кэш appinfo Steam превышает 128 МиБ</translation>
+    </message>
+    <message>
+        <source>Unsupported Steam appinfo cache version</source>
+        <translation>Неподдерживаемая версия кэша appinfo Steam</translation>
+    </message>
+    <message>
+        <source>Invalid Steam appinfo string table offset</source>
+        <translation>Некорректное смещение таблицы строк appinfo Steam</translation>
+    </message>
+    <message>
+        <source>Invalid Steam appinfo string table size</source>
+        <translation>Некорректный размер таблицы строк appinfo Steam</translation>
+    </message>
+    <message>
+        <source>Invalid Steam appinfo entry size</source>
+        <translation>Некорректный размер записи appinfo Steam</translation>
+    </message>
+    <message>
+        <source>Steam appinfo cache has no footer</source>
+        <translation>Отсутствует завершающая запись кэша appinfo Steam</translation>
+    </message>
+    <message>
+        <source>Uninstalled applications</source>
+        <translation>Удалённые приложения</translation>
+    </message>
+    <message>
+        <source>New applications</source>
+        <translation>Новые приложения</translation>
+    </message>
+    <message>
+        <source>These applications appear to have been uninstalled. Remove the checked entries from the library? Their paths will be checked again before removal.</source>
+        <translation>Эти приложения, вероятно, удалены с компьютера. Убрать отмеченные записи из библиотеки? Перед удалением их пути будут проверены ещё раз.</translation>
+    </message>
+    <message>
+        <source>Remove selected</source>
+        <translation>Убрать выбранные</translation>
+    </message>
+    <message>
+        <source>Add selected</source>
+        <translation>Добавить выбранные</translation>
+    </message>
+    <message>
+        <source>Keep all</source>
+        <translation>Оставить все</translation>
+    </message>
+    <message>
+        <source>Applications are checked in the background at every startup. New applications are offered for selection. Applications removed from the library are not offered again. Changed sources will be used after saving settings.</source>
+        <translation>При каждом запуске приложения проверяются в фоне. Новые приложения предлагаются на выбор. Удалённые из библиотеки больше не предлагаются. Изменённые источники будут использованы после сохранения настроек.</translation>
+    </message>
+    <message>
+        <source>Ask before removing uninstalled applications from the library</source>
+        <translation>Спрашивать перед удалением из библиотеки приложений, удалённых с компьютера</translation>
+    </message>
+    <message>
+        <source>When disabled, confirmed missing applications are removed automatically. Unavailable drives and uncertain targets are kept.</source>
+        <translation>Если выключено, подтверждённо отсутствующие приложения убираются автоматически. Записи на недоступных дисках и сомнительные случаи сохраняются.</translation>
+    </message>
+    <message>
+        <source>Could not save discovery exclusions.</source>
+        <translation>Не удалось сохранить исключения обнаружения.</translation>
+    </message>
+    <message>
+        <source>No new applications found.</source>
+        <translation>Новых приложений не найдено.</translation>
+    </message>
+    <message>
+        <source>Removed uninstalled applications: %1.</source>
+        <translation>Удалено приложений: %1.</translation>
+    </message>
+    <message>
+        <source>Added applications: %1.</source>
+        <translation>Добавлено приложений: %1.</translation>
     </message>
 </context>
 </TS>

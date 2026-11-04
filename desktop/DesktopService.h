@@ -49,6 +49,12 @@ private:
     quint64 discovery_request_id = 0;
     QStringList pending_exclusions;
     quint64 pending_exclusions_request_id = 0;
+    QVector<app_record> missing_records;
+    bool reviewing_missing = false;
+    bool startup_inventory_pending = true;
+    bool startup_scan = false;
+    quint64 missing_removal_request_id = 0;
+    void continue_inventory_review();
     discovery_progress scan_progress;
     QString scan_report;
     QVector<app_record> preview_records;
@@ -89,7 +95,7 @@ private:
                     operation_error_source source = operation_error_source::sqlite, quint64 request_id = 0);
     void finish_scenario(operation_state state, const operation_error &error = {});
     void next_scenario_step();
-    bool begin_catalog_preview(const QString &operation);
+    bool begin_catalog_preview(const QString &operation, bool at_startup = false);
     void present_catalog_preview(QVector<app_record> records, QVector<discovery_issue> issues = {});
 
 public:
@@ -123,11 +129,13 @@ public:
     void open_profile_folder();
     void restore_library(const QString &path);
     bool is_discovering() const { return discovery_state == operation_state::loading; }
+    bool is_startup_scan() const { return startup_scan; }
     bool is_cancelling_discovery() const {
         return is_discovering() && discovery_cancelled->phase.load() == discovery_phase::cancelling;
     }
     bool can_cancel_discovery() const {
-        return is_discovering() && discovery_cancelled->phase.load() == discovery_phase::running;
+        return is_discovering() && !missing_removal_request_id &&
+               discovery_cancelled->phase.load() == discovery_phase::running;
     }
     const discovery_progress &discovery_status() const { return scan_progress; }
     QString discovery_report() const { return scan_report; }
@@ -145,7 +153,9 @@ public:
     bool is_reviewing() const { return reviewing; }
     bool is_json_preview() const { return preview_operation == "import"; }
     bool is_scan_preview() const { return preview_operation == "discover"; }
-    const QVector<app_record> &catalog_preview() const { return preview_records; }
+    bool is_removal_preview() const { return reviewing_missing; }
+    const QVector<app_record> &catalog_preview() const { return reviewing_missing ? missing_records : preview_records; }
+    void keep_missing_applications();
     QString preview_details() const;
     void apply_catalog_preview(const QVector<int> &rows, bool remember_exclusions,
                                import_conflict_policy policy = import_conflict_policy::skip);
@@ -164,7 +174,7 @@ public:
     Q_INVOKABLE void remove_scenario(qint64 id);
     Q_INVOKABLE void run_scenario(qint64 id);
     Q_INVOKABLE void cancel_scenario();
-    Q_INVOKABLE void discover();
+    Q_INVOKABLE void discover(bool at_startup = false);
     Q_INVOKABLE void cancel_discovery();
     Q_INVOKABLE void export_catalog(const QString &path);
     Q_INVOKABLE void import_catalog(const QString &path);

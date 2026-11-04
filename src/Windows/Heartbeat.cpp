@@ -143,9 +143,10 @@ QSet<QString> Heartbeat::running_paths(const QVector<app_record> &applications) 
     QSet<QString> names;
     QSet<QString> paths;
     for (const auto &application : applications) {
-        if (!Application::file_target(application))
+        const auto path = Application::process_path(application);
+        if (path.isEmpty())
             continue;
-        names.insert(QFileInfo(application.path).fileName().toCaseFolded());
+        names.insert(QFileInfo(path).fileName().toCaseFolded());
     }
     if (names.isEmpty()) {
         return paths;

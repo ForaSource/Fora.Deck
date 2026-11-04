@@ -403,6 +403,10 @@ QWidget *discovery_status(const ui_context &context, QWidget *const parent) {
     QObject::connect(service, &DesktopService::appearance_changed, details_notice,
                      &NotificationBanner::refresh_appearance);
     const auto update_details = [=] {
+        if (service->is_startup_scan()) {
+            details_notice->dismiss();
+            return;
+        }
         if (service->is_discovering())
             return;
         if (service->discovery_report().isEmpty()) {
@@ -466,7 +470,7 @@ QWidget *discovery_status(const ui_context &context, QWidget *const parent) {
     layout->addWidget(counter);
     const auto update = [=] {
         const auto &progress = service->discovery_status();
-        const bool active = service->is_discovering();
+        const bool active = service->is_discovering() && !service->is_startup_scan();
         if (!active) {
             panel_reveal->set_expanded(false);
             return;
@@ -864,17 +868,13 @@ QWidget *details(const ui_context &context, QWidget *const parent) {
     arguments->setTextInteractionFlags(Qt::TextSelectableByMouse);
     root->addWidget(arguments);
     root->addWidget(action_button(context.actions.value("copy_arguments"), true));
-    auto *source = label({}, "muted");
-    source->setWordWrap(true);
-    source->setTextInteractionFlags(Qt::TextSelectableByMouse);
     // Long paths and arguments must wrap within the pane, not widen its scroll contents.
-    for (auto *text : {name, status, tags, arguments, source}) {
+    for (auto *text : {name, status, tags, arguments}) {
         auto policy = text->sizePolicy();
         policy.setHorizontalPolicy(QSizePolicy::Ignored);
         text->setSizePolicy(policy);
         text->setMinimumWidth(0);
     }
-    root->addWidget(source);
     root->addSpacing(8);
     auto *launch = action_button(context.actions.value("launch"));
     launch->setProperty("primary", true);
@@ -920,11 +920,7 @@ QWidget *details(const ui_context &context, QWidget *const parent) {
                                : QCoreApplication::translate("XLibrary", "Details will appear here."));
         tags->setText(record && !record->tags.isEmpty() ? '#' + record->tags.join("   #")
                                                         : QCoreApplication::translate("XLibrary", "No tags"));
-        path->setText(record ? QDir::toNativeSeparators(record->path) : QString{});
-        source->setText(
-            record && !record->discovery_sources.isEmpty()
-                ? QCoreApplication::translate("XLibrary", "Source: %1").arg(record->discovery_sources.join('\n'))
-                : QCoreApplication::translate("XLibrary", "Source: manually added or imported"));
+        path->setText(record ? QDir::toNativeSeparators(Application::application_path(*record)) : QString{});
         path->setCursorPosition(0);
         path->setToolTip(path->text());
         recover_path->setVisible(record && Application::file_target(*record) && !record->available);

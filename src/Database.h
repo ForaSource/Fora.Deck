@@ -77,6 +77,7 @@ public:
                                          QVector<discovery_issue> *issues = nullptr,
                                          import_conflict_policy policy = import_conflict_policy::skip);
     QString path() const;
+    void refresh_discovery_metadata(const QVector<app_record> &records, const discovery_control &control);
 };
 
 #endif //XLIBRARY_DATABASE_H

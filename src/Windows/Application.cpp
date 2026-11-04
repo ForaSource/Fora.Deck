@@ -297,9 +297,7 @@ void Application::launch_application(const app_record &record, const launch_mode
         const auto path = QDir::toNativeSeparators(record.path).toStdWString();
         const auto arguments = record.arguments.toStdWString();
         const auto directory =
-            QDir::toNativeSeparators(record.working_directory.isEmpty() ? QFileInfo(record.path).absolutePath()
-                                                                        : record.working_directory)
-                .toStdWString();
+            QDir::toNativeSeparators(effective_working_directory(record.path, record.working_directory)).toStdWString();
         SHELLEXECUTEINFOW info{};
         info.cbSize = sizeof(info);
         info.fMask = SEE_MASK_NOASYNC | SEE_MASK_FLAG_NO_UI;
@@ -316,8 +314,7 @@ void Application::launch_application(const app_record &record, const launch_mode
         return;
     }
     Application application(record.name.toStdString(), std::filesystem::path(record.path.toStdWString()));
-    const auto directory =
-        record.working_directory.isEmpty() ? QFileInfo(record.path).absolutePath() : record.working_directory;
+    const auto directory = effective_working_directory(record.path, record.working_directory);
     application.launch(record.arguments.toStdWString(), std::filesystem::path(directory.toStdWString()));
 }
 
@@ -380,6 +377,8 @@ app_record Application::resolve_application(const QString &path) {
                 QCoreApplication::translate("XLibrary", "The working directory must be an absolute path.")
                     .toStdString());
         }
+        if (!result.working_directory.isEmpty())
+            result.working_directory = effective_working_directory(result.path, result.working_directory);
     }
     supported_target(result.path);
     const Application application(std::filesystem::path(result.path.toStdWString()));

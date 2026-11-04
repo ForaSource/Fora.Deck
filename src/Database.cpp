@@ -330,7 +330,7 @@ catalog_snapshot Database::read() const {
     auto *connection = get_connection();
     xlibrary::SqliteStatement applications(connection, R"(
         SELECT a.id, a.name, c.path, c.arguments, c.working_directory,
-               coalesce(d.favorite,0), coalesce(d.last_launch,0),c.id,c.target_id,t.kind,c.installation_directory,c.icon_path,coalesce(d.default_launch_profile,'')
+               coalesce(d.favorite,0), coalesce(d.last_launch,0),c.id,c.target_id,t.kind,c.installation_directory,c.icon_path,coalesce(d.default_launch_profile,''),c.executable_path
         FROM applications a JOIN launch_configuration c ON c.id=a.configuration_id
         JOIN launch_target t ON t.id=c.target_id
         LEFT JOIN desktop_application d ON a.id = d.application_id ORDER BY a.id;
@@ -351,6 +351,7 @@ catalog_snapshot Database::read() const {
         record.installation_directory = applications.qtext(10);
         record.icon_path = applications.qtext(11);
         record.default_launch_profile = applications.qtext(12);
+        record.executable_path = applications.qtext(13);
         record.available = Application::target_available(record);
         rows.insert(record.id, result.applications.size());
         result.applications.append(std::move(record));
@@ -546,10 +547,12 @@ qint64 Database::save_application(const app_record &record) {
                     .toStdString());
     }
     xlibrary::SqliteStatement location(
-        connection, "UPDATE launch_configuration SET installation_directory=?,icon_path=? WHERE id=?;");
+        connection,
+        "UPDATE launch_configuration SET installation_directory=?,icon_path=?,executable_path=? WHERE id=?;");
     location.bind(1, record.installation_directory);
     location.bind(2, record.icon_path);
-    location.bind(3, configuration_id);
+    location.bind(3, record.executable_path);
+    location.bind(4, configuration_id);
     location.next();
     qint64 id = record.id;
     if (id == 0) {
@@ -954,6 +957,40 @@ void Database::consolidate_discovered_application(const qint64 configuration_id,
     Q_UNUSED(configuration_id)
     Q_UNUSED(record)
 #endif
+}
+
+void Database::refresh_discovery_metadata(const QVector<app_record> &records, const discovery_control &control) {
+    Transaction transaction(get_connection());
+    const auto current = read();
+    QHash<QString, qsizetype> known;
+    for (qsizetype row = 0; row < current.applications.size(); ++row)
+        known.insert(Application::launch_key(current.applications[row]), row);
+    for (const auto &record : records) {
+        if (control.requested.load())
+            throw DiscoveryCancelled();
+        const auto configuration = known.constFind(Application::launch_key(record));
+        if (configuration == known.cend())
+            continue;
+        validate_application(record);
+        const auto &existing = current.applications[*configuration];
+        const bool moved =
+            !record.installation_directory.isEmpty() &&
+            normalized_path(record.installation_directory) != normalized_path(existing.installation_directory);
+        xlibrary::SqliteStatement metadata(
+            get_connection(),
+            "UPDATE launch_configuration SET installation_directory=?,icon_path=?,executable_path=? WHERE id=?;");
+        metadata.bind(1, record.installation_directory.isEmpty() ? existing.installation_directory
+                                                                 : record.installation_directory);
+        metadata.bind(2, !record.icon_path.isEmpty() || moved ? record.icon_path : existing.icon_path);
+        metadata.bind(3,
+                      !record.executable_path.isEmpty() || moved ? record.executable_path : existing.executable_path);
+        metadata.bind(4, existing.configuration_id);
+        metadata.next();
+        write_source(existing.configuration_id, record);
+    }
+    if (control.requested.load())
+        throw DiscoveryCancelled();
+    transaction.commit();
 }
 
 catalog_import_result Database::import_records(const QVector<app_record> &records, discovery_control *const control,

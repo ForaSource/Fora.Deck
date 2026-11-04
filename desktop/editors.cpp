@@ -234,6 +234,11 @@ QDialog *application_editor(const ui_context &context, QWidget *const parent) {
         updated.target_kind = target_type->currentData().toString();
         updated.path =
             Application::file_target(updated) ? QDir::fromNativeSeparators(path->text()) : path->text().trimmed();
+        if (updated.target_kind != Application::target_kind(record) || updated.path != record.path) {
+            updated.installation_directory.clear();
+            updated.executable_path.clear();
+            updated.icon_path.clear();
+        }
         updated.default_launch_profile = profiles->currentData().toString();
         updated.arguments = arguments->isEnabled() ? arguments->text() : QString{};
         updated.working_directory = directory->isEnabled() ? directory->text() : QString{};

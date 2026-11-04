@@ -43,6 +43,7 @@ struct app_record {
     QString path;
     QString target_kind;
     QString installation_directory;
+    QString executable_path;
     QString icon_path;
     QString arguments;
     QString default_launch_profile;

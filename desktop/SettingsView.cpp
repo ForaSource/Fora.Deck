@@ -5,6 +5,7 @@
 #include <QCoreApplication>
 #include <QDialogButtonBox>
 #include <QFileDialog>
+#include <QHeaderView>
 #include <QKeySequenceEdit>
 #include <QLineEdit>
 #include <QProgressBar>
@@ -123,7 +124,7 @@ QWidget *hotkeys(const ui_context &context, QWidget *) {
     pages->setObjectName("shortcut_pages");
     auto *transition = new PageTransition(pages);
     widget->layout()->addWidget(tabs);
-    widget->layout()->addWidget(transition);
+    static_cast<QVBoxLayout *>(widget->layout())->addWidget(transition, 1);
     struct shortcut_group {
         QString title;
         QList<QStringList> values;
@@ -186,9 +187,12 @@ QWidget *hotkeys(const ui_context &context, QWidget *) {
         targets->setRootIsDecorated(false);
         targets->setHeaderLabels({QCoreApplication::translate("XLibrary", "Name"),
                                   QCoreApplication::translate("XLibrary", "Keyboard shortcuts")});
-        targets->setMinimumHeight(240);
+        targets->header()->setStretchLastSection(false);
+        targets->header()->setSectionResizeMode(0, QHeaderView::Stretch);
+        targets->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
+        targets->setMinimumHeight(appearance::scaled(*context.settings, 160));
         targets->setUniformRowHeights(true);
-        layout->addWidget(targets);
+        layout->addWidget(targets, 1);
         auto *edit = button(QCoreApplication::translate("XLibrary", "Edit"), "quiet");
         layout->addWidget(edit, 0, Qt::AlignRight);
         const auto open_editor = [=] {
@@ -248,7 +252,6 @@ QWidget *hotkeys(const ui_context &context, QWidget *) {
                                                           "--launch-id <id> or XLibrary --scenario-id <id>."),
                   "muted"));
 #endif
-        layout->addStretch();
         pages->addWidget(contents);
     }
     QObject::connect(tabs, &QTabBar::currentChanged, pages, &QStackedWidget::setCurrentIndex);
@@ -260,7 +263,6 @@ QWidget *hotkeys(const ui_context &context, QWidget *) {
                                     "selected library entry. Text editing keys keep their usual behavior "
                                     "in text fields. ↑↓ selects a row. Escape clears the search and is reserved."),
         "muted"));
-    static_cast<QVBoxLayout *>(widget->layout())->addStretch();
     return widget;
 }
 
@@ -278,9 +280,19 @@ QWidget *library_settings(const ui_context &context, QWidget *) {
     checkbox(widget, *context.settings, "sources/start_menu",
              QCoreApplication::translate("XLibrary", "Linux user applications"), true);
 #endif
+    widget->layout()->addWidget(label(
+        QCoreApplication::translate(
+            "XLibrary", "Applications are checked in the background at every startup. New applications are offered "
+                        "for selection. Applications removed from the library are not offered again. "
+                        "Changed sources will be used after saving settings."),
+        "muted"));
+    checkbox(widget, *context.settings, "sources/confirm_removal",
+             QCoreApplication::translate("XLibrary", "Ask before removing uninstalled applications from the library"),
+             true);
     widget->layout()->addWidget(
-        label(QCoreApplication::translate(
-                  "XLibrary", "Discovery runs on request. Changed sources will be used after saving settings."),
+        label(QCoreApplication::translate("XLibrary",
+                                          "When disabled, confirmed missing applications are removed automatically. "
+                                          "Unavailable drives and uncertain targets are kept."),
               "muted"));
     widget->layout()->addWidget(action_button(context.actions.value("discover")));
     auto *clear_exclusions = button(QCoreApplication::translate("XLibrary", "Reset discovery exclusions"));
@@ -395,9 +407,9 @@ QWidget *about(const ui_context &context, QWidget *) {
     card_layout->addWidget(github);
     card_layout->addWidget(issues);
     QObject::connect(github, &QPushButton::clicked, widget,
-                     [] { desktop_platform::open_url(QUrl("https://github.com/Lappland-Julia/XLibrary")); });
+                     [] { desktop_platform::open_url(QUrl("https://github.com/lappland-open/XLibrary")); });
     QObject::connect(issues, &QPushButton::clicked, widget,
-                     [] { desktop_platform::open_url(QUrl("https://github.com/Lappland-Julia/XLibrary/issues")); });
+                     [] { desktop_platform::open_url(QUrl("https://github.com/lappland-open/XLibrary/issues")); });
     widget->layout()->addWidget(card);
     widget->layout()->addWidget(
         label(QCoreApplication::translate("XLibrary", "Technologies and licenses"), "subheading"));
@@ -678,9 +690,7 @@ QDialog *settings_dialog(const ui_context &context, QWidget *const parent) {
         auto *page_layout = new QHBoxLayout(holder);
         page_layout->setContentsMargins(0, 0, 0, 0);
         auto *contents = context.registry->create(section.second, context, holder);
-        contents->setMaximumWidth(appearance::scaled(*context.settings, 640));
         page_layout->addWidget(contents, 1);
-        page_layout->addStretch();
         pages->addWidget(scroll(holder));
     }
     navigation_layout->addStretch();

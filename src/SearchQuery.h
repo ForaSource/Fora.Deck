@@ -38,6 +38,7 @@ public:
     int rank(const SearchableData &data) const;
     int rank(const QString &name, const QString &file_name, const QStringList &tags,
              const QStringList &aliases = {}) const;
+    static bool accepts_rank(int rank, int best_rank);
     QString tag_hint(const QStringList &known_tags) const;
     bool has_text() const { return !terms.isEmpty(); }
 };

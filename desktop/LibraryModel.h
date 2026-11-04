@@ -55,6 +55,7 @@ private:
     QString query_text;
     mutable QVector<int> query_ranks;
     QMetaObject::Connection reset_connection;
+    QMetaObject::Connection state_connection;
     int query_rank(int row) const;
     QString section = "library";
     QString selected_tag;

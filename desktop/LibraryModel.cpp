@@ -14,8 +14,8 @@ namespace {
 QString icon_cache_key(const app_record &record) {
     if (!record.icon_path.isEmpty() && QFileInfo(record.icon_path).isAbsolute())
         return "image:" + Application::target_kind(record) + ':' + record.icon_path;
-    if (Application::file_target(record) && QFileInfo(record.path).isAbsolute())
-        return "file:" + record.path;
+    if (const auto path = Application::process_path(record); QFileInfo(path).isAbsolute())
+        return "file:" + path;
     return "kind:" + Application::target_kind(record);
 }
 }
@@ -57,7 +57,7 @@ void LibraryModel::request_icon(const app_record &record) const {
         return;
     }
     const auto image_file = key.startsWith("image:");
-    const auto path = image_file ? record.icon_path : record.path;
+    const auto path = image_file ? record.icon_path : Application::process_path(record);
     const auto fallback = fallback_icon(record);
     pending_icons.insert(key);
     auto *self = const_cast<LibraryModel *>(this);
@@ -109,8 +109,7 @@ QVariant LibraryModel::data(const QModelIndex &index, const int requested_role) 
                : record.volume_unavailable ? QCoreApplication::translate("XLibrary", "Drive unavailable")
                                            : QCoreApplication::translate("XLibrary", "Unavailable");
     case Qt::ToolTipRole:
-        return record.name + '\n' +
-               (Application::file_target(record) ? QDir::toNativeSeparators(record.path) : record.path);
+        return record.name + '\n' + QDir::toNativeSeparators(Application::application_path(record));
     case Qt::DecorationRole:
         if (index.column() == 0) {
             if (const auto *icon = icons.object(icon_cache_key(record)))
@@ -163,7 +162,8 @@ void LibraryModel::replace(QVector<app_record> applications) {
     tag_sort_keys.reserve(records.size());
     const QCollator collator;
     for (const auto &record : records) {
-        const auto file_name = Application::file_target(record) ? QFileInfo(record.path).fileName() : record.path;
+        const auto local_path = Application::process_path(record);
+        const auto file_name = local_path.isEmpty() ? record.path : QFileInfo(local_path).fileName();
         searchable_records.append(SearchQuery::prepare(record.name, file_name, record.tags, record.aliases));
         search_tags.append(record.tags.join(", ").toCaseFolded());
         name_sort_keys.append(collator.sortKey(searchable_records.back().names.front().text));
@@ -247,21 +247,43 @@ void LibraryFilter::set_query(const QString &query) {
 
 void LibraryFilter::setSourceModel(QAbstractItemModel *const model) {
     disconnect(reset_connection);
+    disconnect(state_connection);
     query_ranks.clear();
-    if (model)
+    if (model) {
         reset_connection =
             connect(model, &QAbstractItemModel::modelAboutToBeReset, this, [this] { query_ranks.clear(); });
+        state_connection =
+            connect(model, &QAbstractItemModel::dataChanged, this,
+                    [this](const QModelIndex &, const QModelIndex &, const QList<int> &roles) {
+                        if (section == "running" && (roles.isEmpty() || roles.contains(LibraryModel::running_role))) {
+                            query_ranks.clear();
+                            invalidate();
+                        }
+                    });
+    }
     QSortFilterProxyModel::setSourceModel(model);
 }
 
 int LibraryFilter::query_rank(const int row) const {
     const auto *model = static_cast<const LibraryModel *>(sourceModel());
-    if (query_ranks.size() != model->rowCount())
-        query_ranks.fill(-2, model->rowCount());
-    auto &rank = query_ranks[row];
-    if (rank == -2)
-        rank = query.rank(model->search_data(row));
-    return rank;
+    if (query_ranks.size() != model->rowCount()) {
+        query_ranks.fill(-1, model->rowCount());
+        auto best_rank = -1;
+        for (int index = 0; index < model->rowCount(); ++index) {
+            const auto &record = model->at(index);
+            if ((section == "favorites" && !record.favorite) || (section == "running" && !record.running) ||
+                (!selected_tag.isEmpty() && !has_tag(record.tags, selected_tag)))
+                continue;
+            const auto rank = query.rank(model->search_data(index));
+            query_ranks[index] = rank;
+            if (rank >= 0 && (best_rank < 0 || rank < best_rank))
+                best_rank = rank;
+        }
+        for (auto &rank : query_ranks)
+            if (!SearchQuery::accepts_rank(rank, best_rank))
+                rank = -1;
+    }
+    return query_ranks[row];
 }
 
 void LibraryFilter::set_section(const QString &value, const QString &tag) {
@@ -270,6 +292,7 @@ void LibraryFilter::set_section(const QString &value, const QString &tag) {
 #endif
     section = value;
     selected_tag = tag;
+    query_ranks.clear();
 #if QT_VERSION >= QT_VERSION_CHECK(6, 10, 0)
     endFilterChange(Direction::Rows);
 #else

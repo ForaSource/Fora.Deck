@@ -9,9 +9,9 @@
 <p align="center"><strong>Your apps, organized your way.</strong></p>
 
 <p align="center">
-  <a href="https://github.com/Lappland-Julia/XLibrary/actions/workflows/windows-build.yml"><img src="https://github.com/Lappland-Julia/XLibrary/actions/workflows/windows-build.yml/badge.svg" alt="Windows build"></a>
+  <a href="https://github.com/lappland-open/XLibrary/actions/workflows/windows-build.yml"><img src="https://github.com/lappland-open/XLibrary/actions/workflows/windows-build.yml/badge.svg" alt="Windows build"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-68717C" alt="License: MIT"></a>
-  <a href="https://github.com/Lappland-Julia/XLibrary/actions/workflows/linux-build.yml"><img src="https://github.com/Lappland-Julia/XLibrary/actions/workflows/linux-build.yml/badge.svg" alt="Linux build"></a>
+  <a href="https://github.com/lappland-open/XLibrary/actions/workflows/linux-build.yml"><img src="https://github.com/lappland-open/XLibrary/actions/workflows/linux-build.yml/badge.svg" alt="Linux build"></a>
   <img src="https://img.shields.io/badge/platform-Windows%20%2F%20Linux-68717C" alt="Platform: Windows and Linux">
 </p>
 
@@ -20,7 +20,7 @@
   <a href="#search">Search</a> ·
   <a href="#development">Development</a> ·
   <a href="#contributing">Contributing</a> ·
-  <a href="https://github.com/Lappland-Julia/XLibrary/issues">Feedback</a>
+  <a href="https://github.com/lappland-open/XLibrary/issues">Feedback</a>
 </p>
 
 ## XLibrary
@@ -32,7 +32,7 @@ An app can belong to more than one part of your day. Give your browser both `#wo
 > **Under active development.** Features and interfaces are still evolving. Early feedback and contributions are welcome.
 
 <p align="center">
-  <h3 align="center"><a href="https://github.com/Lappland-Julia/XLibrary/releases">Download Latest Release</a></h3>
+  <h3 align="center"><a href="https://github.com/lappland-open/XLibrary/releases">Download Latest Release</a></h3>
 </p>
 
 ## Features
@@ -65,8 +65,28 @@ search, **Select all**, **Clear selection**, and a selected count. Review names,
 arguments, and working directories before choosing **Import selected**. Select/clear applies to
 visible search results; hidden rows keep their selection. Cancelling the preview imports nothing.
 Windows accepts EXE, LNK, BAT, and CMD files; Linux accepts desktop entries and executable files.
-Rejected files are listed with a reason. Discovery can remember unchecked configurations;
+Rejected files are listed with a reason. Discovery remembers unchecked configurations by default;
 **Settings → Library → Reset discovery exclusions** makes them eligible again.
+
+At every normal startup, installed applications are checked in a background thread using the selected
+sources, without scan progress or scan-result notifications. Only the removal/addition review windows
+open when needed; actual changes produce a short application-count notification. Cancelling or making
+no changes produces no notification. Startup checks and manual discovery share the **New applications** window: names, paths,
+and checkboxes, all checked initially. Existing launch configurations are hidden; their discovered
+locations and sources are refreshed without changing names, tags, favorites, history, or launch options.
+Applications removed manually from the library are remembered and are not offered again, including
+other discovered launch modes for the same target. Resetting discovery exclusions clears this history.
+Cancelling a selection does not remember unchecked applications.
+
+**Settings → Library → Ask before removing uninstalled applications from the library** is enabled by
+default. Review the names and paths, remove the checked entries, or choose **Keep all**. Disable it to
+remove confirmed missing entries automatically. Absence is checked in the background and again before
+removal, against the same local volume where that path was previously seen. Paths that have not yet been
+observed as available, network/removable drives, access errors, broken symlinks, and uncertain shell targets are kept.
+Steam removal requires both its manifest and installation folder to be missing; a missing Linux desktop
+entry also requires its previously recorded executable to be missing. Uncertain cases remain unavailable
+in the library for manual review. Removal supports the existing undo action and does not suppress a
+subsequent reinstall. `--check-startup` does not scan the computer.
 
 JSON conflicts are skipped by default. The explicit replacement policy replaces the matching
 entry's name, search aliases, assigned tags, and favorite while preserving its ID, history,
@@ -80,7 +100,8 @@ Repeated launch configurations are skipped; existing entries keep their metadata
 discovery sources. Names may repeat, and one EXE may have multiple argument/working-directory
 profiles. Symlinks share a canonical target while retaining their invocation paths.
 On Windows, an omitted working directory and the executable's own folder describe the same
-launch configuration. Discovery prefers a Start menu shortcut over an App Paths entry with
+launch configuration. A shortcut that incorrectly uses its target EXE as the working directory
+also uses the executable's folder. Discovery prefers a Start menu shortcut over an App Paths entry with
 the same name and executable, keeping the shortcut's arguments. Reimporting that shortcut
 also consolidates existing same-name cards with equivalent launch configurations, preserving
 tags, aliases, favorites, launch history, sources, and scenario steps. Cards stay separate if
@@ -92,8 +113,12 @@ starts, cancellation is unavailable. JSON import and discovery never launch appl
 Windows discovery includes available Settings pages, File Explorer, Calculator, Microsoft Store,
 Task Manager, Control Panel and Windows Terminal. Unavailable components are skipped.
 Steam discovery reads local `libraryfolders.vdf` and `appmanifest_*.acf` files, including additional
-libraries. Games launch through `steam://run/<appid>`; moving a game and rescanning preserves its
-card ID and metadata. Steam files are never changed, and no Web API or login is required.
+libraries. The local `appcache/appinfo.vdf` supplies the game's executable and cached client icon;
+the executable's icon is used when no cached icon is available. Cards show and copy the executable
+path, and open the installation folder. Games still launch through `steam://run/<appid>`; moving
+a game and rescanning preserves its card ID, tags and favorites. Rescan to enrich existing cards.
+If launch metadata is missing or unsupported, the installation folder is shown without guessing
+between executable files. Steam files are never changed, and no Web API or login is required.
 
 JSON export transfers application cards. Use a complete `.xlprofile` backup for scenarios,
 global hotkey assignments, unused tags, saved filters, settings, and launch history.
@@ -105,7 +130,8 @@ entry count and deletes only catalog entries. **Undo removal** restores the last
 current session, including metadata and scenario steps. It refuses to overwrite changed linked
 scenarios or conflicting new entries. Undo is also offered in the shared notification banner.
 
-Application details show discovery sources and offer path/argument copying. Availability refreshes
+Application details offer path/argument copying. Discovery sources are kept internally for import matching.
+Availability refreshes
 periodically without removing entries. Unavailable Windows drives and previously observed Linux
 mounts are distinguished from missing files; an unknown missing location is kept as unavailable.
 
@@ -115,9 +141,11 @@ Search matches names, filenames, and user-defined aliases from **Edit applicatio
 Ties keep a stable sort order.
 Case, repeated spaces, Unicode normalization, and English/Russian keyboard layout are
 handled by the same cached search rules in the library and quick launcher. Initials (`vsc`),
-word prefixes (`vscode`) and limited typo correction (`discrod`, `chrme`, `stema`) are supported.
-Exact names and aliases rank first, followed by exact filenames, prefixes, abbreviations,
-substrings, layout correction and fuzzy matches. Tags stay exact, and the entered query is preserved.
+word prefixes (`vscode`) and limited typo correction (`discrod`, `dicsor`, `chrme`, `stema`) are supported.
+Whole words rank first, followed by word prefixes, internal or trailing substrings, and abbreviations.
+Within each group, matches closer to the start of the application name rank higher, including after
+keyboard layout correction. If nothing matches directly, only the closest typo suggestions are shown;
+the quick launcher does not pad its five slots with weaker matches. Tags stay exact, and the entered query is preserved.
 Aliases also travel with JSON catalogs; older catalogs without aliases remain importable.
 
 Use `#tag` to require a tag and `-#tag` to exclude it; every condition must match.
@@ -283,8 +311,8 @@ Planned work includes further search improvements and extensibility. These are d
 
 Help shape a library you would want to use every day. Bug reports, interface feedback, documentation improvements, and code contributions are all welcome.
 
-- **Report a bug:** [open an issue](https://github.com/Lappland-Julia/XLibrary/issues/new) with steps to reproduce, your OS and desktop session, and screenshots where useful.
-- **Suggest an improvement:** [share your idea](https://github.com/Lappland-Julia/XLibrary/issues) and describe the workflow it would help with.
+- **Report a bug:** [open an issue](https://github.com/lappland-open/XLibrary/issues/new) with steps to reproduce, your OS and desktop session, and screenshots where useful.
+- **Suggest an improvement:** [share your idea](https://github.com/lappland-open/XLibrary/issues) and describe the workflow it would help with.
 - **Contribute code:** submit a pull request with a focused change. Please discuss larger features in an issue first.
 
 If you would like to follow the project, star the repository or watch it for updates.

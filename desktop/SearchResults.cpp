@@ -251,6 +251,8 @@ void SearchResults::update_applications() {
     }
     QVector<search_entry> entries;
     for (const auto &candidate : best) {
+        if (!SearchQuery::accepts_rank(candidate.second, best.front().second))
+            break;
         const auto &record = service.model.at(candidate.first);
         auto title = record.name;
         if (!record.default_launch_profile.isEmpty()) {
@@ -379,8 +381,7 @@ void SearchResults::show_actions() {
     if (Application::file_target(record) || !record.installation_directory.isEmpty())
         connect(menu->addAction(QCoreApplication::translate("XLibrary", "Copy path")), &QAction::triggered, this,
                 [record] {
-                    QApplication::clipboard()->setText(QDir::toNativeSeparators(
-                        record.installation_directory.isEmpty() ? record.path : record.installation_directory));
+                    QApplication::clipboard()->setText(QDir::toNativeSeparators(Application::application_path(record)));
                 });
     connect(menu->addAction(record.favorite ? QCoreApplication::translate("XLibrary", "Remove from favorites")
                                             : QCoreApplication::translate("XLibrary", "Add to favorites")),

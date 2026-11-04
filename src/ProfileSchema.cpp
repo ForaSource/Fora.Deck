@@ -147,15 +147,18 @@ void validate_columns(sqlite3 *const connection, const int version) {
             throw std::runtime_error(
                 QCoreApplication::translate("XLibrary", "Profile contains an unsupported launch target type")
                     .toStdString());
-        SqliteStatement targets(
-            connection, "SELECT t.kind,c.path,c.arguments,c.working_directory,c.installation_directory,c.icon_path "
-                        "FROM launch_configuration c JOIN launch_target t ON t.id=c.target_id;");
+        auto target_query = std::string("SELECT t.kind,c.path,c.arguments,c.working_directory,"
+                                        "c.installation_directory,c.icon_path,");
+        target_query += version >= 8 ? "c.executable_path " : "'' ";
+        target_query += "FROM launch_configuration c JOIN launch_target t ON t.id=c.target_id;";
+        SqliteStatement targets(connection, target_query.c_str());
         while (targets.next()) {
             app_record record;
             record.target_kind = targets.qtext(0);
             record.path = targets.qtext(1);
             record.arguments = targets.qtext(2);
             record.working_directory = targets.qtext(3);
+            record.executable_path = targets.qtext(6);
             Application::validate_launch_target(record);
             for (int column = 4; column <= 5; ++column)
                 if (targets.qtext(column).size() > catalog_limits::text_length ||
@@ -401,6 +404,10 @@ void xlibrary::migrate_profile(sqlite3 *const connection, const std::filesystem:
                     ALTER TABLE desktop_application ADD COLUMN default_launch_profile TEXT NOT NULL DEFAULT '';
                     ALTER TABLE desktop_scenario_step ADD COLUMN launch_profile TEXT NOT NULL DEFAULT '';
                 )");
+                break;
+            case 7:
+                sqlite_execute(connection,
+                               "ALTER TABLE launch_configuration ADD COLUMN executable_path TEXT NOT NULL DEFAULT '';");
                 break;
             default:
                 throw std::runtime_error("Missing profile migration");

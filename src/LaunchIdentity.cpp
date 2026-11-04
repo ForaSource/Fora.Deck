@@ -7,6 +7,7 @@
 #include <stdexcept>
 
 #include "LaunchIdentity.h"
+#include "PathHelpers.h"
 #include "SqliteHelpers.h"
 
 std::string xlibrary::path_utf8(const std::filesystem::path &path) {
@@ -56,10 +57,11 @@ sqlite3_int64 xlibrary::ensure_launch_configuration(sqlite3 *const connection, c
         throw std::invalid_argument("Launch configuration contains a null character");
     const auto invocation = path_identity(path, false);
 #ifdef _WIN32
-    const auto effective_directory = working_directory.empty() ? path.parent_path() : working_directory;
+    const auto effective_directory =
+        filesystem_path(effective_working_directory(path_text(path), path_text(working_directory)));
     const auto directory_key = path_identity(effective_directory);
     {
-        // Older catalogs distinguish an omitted directory from the EXE's own folder.
+        // Match older catalogs with an omitted directory or the EXE itself as the directory.
         SqliteStatement existing(connection, "SELECT c.id,c.path,c.working_directory FROM launch_configuration c "
                                              "WHERE c.invocation_key=? AND c.arguments=? "
                                              "ORDER BY EXISTS(SELECT 1 FROM applications a "
@@ -67,9 +69,8 @@ sqlite3_int64 xlibrary::ensure_launch_configuration(sqlite3 *const connection, c
         existing.bind(1, invocation);
         existing.bind(2, arguments);
         while (existing.next()) {
-            const auto stored_directory = utf8_path(existing.text(2));
-            if (path_identity(stored_directory.empty() ? utf8_path(existing.text(1)).parent_path()
-                                                       : stored_directory) == directory_key)
+            const auto stored_directory = effective_working_directory(existing.qtext(1), existing.qtext(2));
+            if (path_identity(filesystem_path(stored_directory)) == directory_key)
                 return existing.number(0);
         }
     }
@@ -123,7 +124,6 @@ sqlite3_int64 xlibrary::ensure_launch_configuration(sqlite3 *const connection, c
 }
 
 #include "Application.h"
-#include "PathHelpers.h"
 
 sqlite3_int64 xlibrary::ensure_launch_configuration(sqlite3 *const connection, const app_record &record) {
     Application::validate_launch_target(record);
@@ -166,11 +166,13 @@ sqlite3_int64 xlibrary::ensure_launch_configuration(sqlite3 *const connection, c
         configuration_id = find.number(0);
     }
     // Location is discovery metadata: moving a Steam library must preserve the card and target IDs.
-    SqliteStatement metadata(connection,
-                             "UPDATE launch_configuration SET installation_directory=?,icon_path=? WHERE id=?;");
+    SqliteStatement metadata(
+        connection,
+        "UPDATE launch_configuration SET installation_directory=?,icon_path=?,executable_path=? WHERE id=?;");
     metadata.bind(1, record.installation_directory);
     metadata.bind(2, record.icon_path);
-    metadata.bind(3, configuration_id);
+    metadata.bind(3, record.executable_path);
+    metadata.bind(4, configuration_id);
     metadata.next();
     return configuration_id;
 }

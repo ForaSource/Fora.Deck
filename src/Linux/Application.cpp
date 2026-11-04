@@ -46,6 +46,7 @@ std::uint32_t Application::launch(const std::wstring &arguments, const std::file
 #include <QDBusConnectionInterface>
 #include <QDBusMessage>
 #include <QDirIterator>
+#include <QHash>
 #include <QLocale>
 #include <QProcess>
 #include <QRegularExpression>
@@ -639,12 +640,19 @@ QSet<QString> Heartbeat::running_paths(const QVector<app_record> &applications) 
             QCoreApplication::translate("XLibrary", "The /proc filesystem is unavailable: process state is unknown.")
                 .toStdString());
     QSet<QString> result;
+    QHash<QByteArray, QString> steam_paths;
     QVector<QPair<QString, process_identity>> identities;
     for (const auto &application : applications) {
-        if (!Application::file_target(application))
+        const auto path = Application::process_path(application);
+        if (path.isEmpty())
             continue;
+        if (Application::target_kind(application) == "steam") {
+            steam_paths.insert("SteamAppId=" + application.path.toUtf8(), absolute_path(path));
+            steam_paths.insert("SteamGameId=" + application.path.toUtf8(), absolute_path(path));
+            continue;
+        }
         try {
-            identities.append({absolute_path(application.path), application_identity(application)});
+            identities.append({absolute_path(path), application_identity(application)});
         } catch (const std::exception &) {
             // A deleted or corrupted entry must not prevent monitoring the other applications.
         }
@@ -656,6 +664,17 @@ QSet<QString> Heartbeat::running_paths(const QVector<app_record> &applications) 
         if (!numeric)
             continue;
         const auto directory = proc.filePath(name);
+        // Proton's /proc/exe can name a Wine host; Steam identifies the game in its environment.
+        if (!steam_paths.isEmpty()) {
+            QFile environment_file(directory + "/environ");
+            if (environment_file.open(QIODevice::ReadOnly)) {
+                const auto environment = environment_file.read(64 * 1024);
+                const auto entries = environment.split('\0');
+                for (qsizetype index = 0; index + 1 < entries.size(); ++index)
+                    if (const auto found = steam_paths.constFind(entries[index]); found != steam_paths.cend())
+                        result.insert(*found);
+            }
+        }
         const auto executable = process_executable(directory);
         if (executable.isEmpty())
             continue;
@@ -770,6 +789,8 @@ app_record Application::resolve_application(const QString &path) {
         validate_entry(entry);
         result.name = localized_value(entry, "Name");
         result.working_directory = entry.values.value("Path");
+        if (!entry.values.value("Exec").isEmpty())
+            result.executable_path = executable_path(entry_command(entry).front());
     } else {
         if (!info.isExecutable())
             throw std::invalid_argument(

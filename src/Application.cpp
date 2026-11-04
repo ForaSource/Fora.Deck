@@ -54,8 +54,13 @@ Application::Application(const std::filesystem::path &executable_path) {
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QHash>
 #include <QRegularExpression>
+#include <QStorageInfo>
+#include <QtEndian>
 #ifdef Q_OS_WIN
+#include <windows.h>
+
 #include <QSettings>
 #endif
 #include "PathHelpers.h"
@@ -71,6 +76,19 @@ bool Application::file_target(const app_record &record) {
     return kind == "executable" || kind == "desktop";
 }
 
+QString Application::process_path(const app_record &record) {
+    if (file_target(record))
+        return record.path;
+    return target_kind(record) == "steam" && QFileInfo(record.executable_path).isAbsolute() ? record.executable_path
+                                                                                            : QString{};
+}
+
+QString Application::application_path(const app_record &record) {
+    if (target_kind(record) == "steam")
+        return record.executable_path.isEmpty() ? record.installation_directory : record.executable_path;
+    return record.path;
+}
+
 void Application::validate_launch_target(const app_record &record) {
     const auto kind = target_kind(record);
     if (record.path.isEmpty() || record.path.size() > catalog_limits::text_length ||
@@ -79,6 +97,12 @@ void Application::validate_launch_target(const app_record &record) {
         throw std::invalid_argument(
             QCoreApplication::translate("XLibrary", "Launch target is empty, too long, or contains a null character")
                 .toStdString());
+    // Metadata can travel between Windows and Linux profiles without becoming a launch target.
+    static const QRegularExpression absolute_metadata_path(R"(^(/|[A-Za-z]:[/\\]|\\\\[^\\/]+[/\\][^\\/]+))");
+    if (record.executable_path.size() > catalog_limits::text_length || record.executable_path.contains(QChar::Null) ||
+        (!record.executable_path.isEmpty() && !absolute_metadata_path.match(record.executable_path).hasMatch()))
+        throw std::invalid_argument(
+            QCoreApplication::translate("XLibrary", "Invalid executable metadata path").toStdString());
     if (file_target(record)) {
         if (!QFileInfo(record.path).isAbsolute())
             throw std::invalid_argument(
@@ -123,6 +147,14 @@ QString Application::launch_key(const app_record &record) {
                                 : (kind == "aumid" ? record.path.toCaseFolded() : record.path));
 }
 
+QString Application::target_key(const app_record &record) {
+    const auto kind = target_kind(record);
+    return kind + ':' +
+           (file_target(record) ? normalized_path(record.path)
+            : kind == "aumid"   ? record.path.toCaseFolded()
+                                : record.path);
+}
+
 bool Application::target_available(const app_record &record) {
     try {
         validate_launch_target(record);
@@ -143,6 +175,82 @@ bool Application::target_available(const app_record &record) {
 #else
     return false;
 #endif
+}
+
+bool Application::definitely_removed(const app_record &record, const QStringList &known_volume_roots,
+                                     const QVariantMap &verified_locations) {
+    // Shell activation failures and a missing desktop shortcut alone do not prove an uninstall.
+    const auto kind = target_kind(record);
+    if (kind != "executable" && kind != "steam" && kind != "desktop")
+        return false;
+    const auto absent_on_local_volume = [&](const QString &text) {
+        if (!QFileInfo(text).isAbsolute())
+            return false;
+        const auto clean = normalized_path(text);
+        for (const auto &root : known_volume_roots) {
+            const auto prefix = normalized_path(root.endsWith('/') ? root : root + '/');
+            if (clean == prefix || clean.startsWith(prefix.endsWith('/') ? prefix : prefix + '/')) {
+                const QStorageInfo volume(root);
+                if (!volume.isValid() || !volume.isReady() ||
+                    normalized_path(volume.rootPath()) != normalized_path(root))
+                    return false;
+            }
+        }
+        const QStorageInfo volume(text);
+        if (!volume.isValid() || !volume.isReady())
+            return false;
+        const auto verified = verified_locations.value(clean).toStringList();
+        // The nearest surviving parent can belong to a different disk after an unmount.
+        if (verified.size() != 2 || verified[0] != normalized_path(volume.rootPath()) ||
+            verified[1] != QString::fromLatin1(volume.device().toHex()))
+            return false;
+#ifdef Q_OS_WIN
+        if (GetDriveTypeW(QDir::toNativeSeparators(volume.rootPath()).toStdWString().c_str()) != DRIVE_FIXED)
+            return false;
+#else
+        const auto type = volume.fileSystemType();
+        if (type != "ext4" && type != "ext3" && type != "ext2" && type != "btrfs" && type != "xfs" && type != "zfs" &&
+            type != "f2fs" && type != "ntfs3" && type != "overlay")
+            return false;
+#endif
+        auto path = filesystem_path(text);
+        std::error_code error;
+        const auto status = std::filesystem::symlink_status(path, error);
+        if (status.type() != std::filesystem::file_type::not_found ||
+            (error && error != std::errc::no_such_file_or_directory))
+            return false;
+        // A broken symlink, inaccessible ancestor or unavailable mount must be kept.
+        bool readable_parent = false;
+        for (path = path.parent_path(); !path.empty();) {
+            error.clear();
+            const auto parent_status = std::filesystem::symlink_status(path, error);
+            if (std::filesystem::is_symlink(parent_status) || (error && error != std::errc::no_such_file_or_directory))
+                return false;
+            if (std::filesystem::exists(parent_status)) {
+                if (!std::filesystem::is_directory(parent_status))
+                    return false;
+                if (!readable_parent) {
+                    const std::filesystem::directory_iterator readable(path, error);
+                    if (error)
+                        return false;
+                    readable_parent = true;
+                }
+            }
+            const auto parent = path.parent_path();
+            if (parent == path)
+                break;
+            path = parent;
+        }
+        return readable_parent;
+    };
+    if (kind == "steam") {
+        const auto source = record.discovery_source;
+        return QFileInfo(source).fileName() == "appmanifest_" + record.path + ".acf" &&
+               absent_on_local_volume(source) && absent_on_local_volume(record.installation_directory);
+    }
+    if (kind == "desktop")
+        return absent_on_local_volume(record.path) && absent_on_local_volume(record.executable_path);
+    return absent_on_local_volume(record.path);
 }
 
 namespace {
@@ -256,6 +364,236 @@ QString steam_value(const QVector<steam_node> &nodes, const QString &key) {
         if (node.key.compare(key, Qt::CaseInsensitive) == 0)
             return node.value;
     return {};
+}
+
+const QVector<steam_node> &steam_children(const QVector<steam_node> &nodes, const QString &key) {
+    for (const auto &node : nodes)
+        if (node.key.compare(key, Qt::CaseInsensitive) == 0)
+            return node.children;
+    static const QVector<steam_node> empty;
+    return empty;
+}
+
+// appinfo.vdf versions 39-41 use binary KeyValues; version 41 interns keys in a trailing string table.
+class SteamBinaryReader {
+    QByteArrayView data;
+    const QVector<QString> *keys;
+    const std::atomic_bool &cancelled;
+    qsizetype position = 0;
+    qsizetype node_count = 0;
+
+public:
+    SteamBinaryReader(const QByteArrayView data, const QVector<QString> *keys, const std::atomic_bool &cancelled)
+        : data(data), keys(keys), cancelled(cancelled) {}
+
+    void skip(const qsizetype size) {
+        if (size < 0 || size > data.size() - position)
+            throw std::invalid_argument(
+                QCoreApplication::translate("XLibrary", "Truncated Steam appinfo cache").toStdString());
+        position += size;
+    }
+
+    template <typename T> T number() {
+        const auto start = position;
+        skip(sizeof(T));
+        return qFromLittleEndian<T>(data.data() + start);
+    }
+
+    QString string() {
+        const auto start = position;
+        while (position < data.size() && data[position] != '\0') {
+            if (position - start >= catalog_limits::text_length)
+                throw std::invalid_argument(
+                    QCoreApplication::translate("XLibrary", "Steam appinfo string is too long").toStdString());
+            ++position;
+        }
+        skip(1);
+        return QString::fromUtf8(data.data() + start, position - start - 1);
+    }
+
+    qsizetype offset() const { return position; }
+
+    QVector<steam_node> object(const int depth = 0) {
+        if (depth > 32)
+            throw std::invalid_argument(
+                QCoreApplication::translate("XLibrary", "Steam appinfo nesting limit exceeded").toStdString());
+        QVector<steam_node> nodes;
+        for (;;) {
+            if (cancelled.load())
+                throw DiscoveryCancelled();
+            const auto type = number<quint8>();
+            if (type == 8 || type == 11)
+                return nodes;
+            if (++node_count > 131072)
+                throw std::invalid_argument(
+                    QCoreApplication::translate("XLibrary", "Steam appinfo node limit exceeded").toStdString());
+            steam_node node;
+            if (keys) {
+                const auto index = number<quint32>();
+                if (index >= static_cast<quint64>(keys->size()))
+                    throw std::invalid_argument(
+                        QCoreApplication::translate("XLibrary", "Invalid Steam appinfo string index").toStdString());
+                node.key = (*keys)[index];
+            } else
+                node.key = string();
+            switch (type) {
+            case 0:
+                node.children = object(depth + 1);
+                break;
+            case 1:
+                node.value = string();
+                break;
+            case 2:
+                node.value = QString::number(number<qint32>());
+                break;
+            case 3:
+            case 4:
+            case 6:
+                skip(4);
+                break;
+            case 7:
+            case 10:
+                skip(8);
+                break;
+            default:
+                throw std::invalid_argument(
+                    QCoreApplication::translate("XLibrary", "Unsupported Steam appinfo value type").toStdString());
+            }
+            nodes.append(std::move(node));
+        }
+    }
+};
+
+QHash<QString, QVector<steam_node>> steam_appinfo(const QString &path, const QSet<QString> &app_ids,
+                                                  const std::atomic_bool &cancelled) {
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly))
+        throw std::runtime_error(file.errorString().toStdString());
+    // Read a bounded snapshot: Steam may be updating the cache concurrently.
+    const auto data = file.read(128 * 1024 * 1024 + 1);
+    if (file.error() != QFileDevice::NoError)
+        throw std::runtime_error(file.errorString().toStdString());
+    if (data.size() > 128 * 1024 * 1024)
+        throw std::invalid_argument(
+            QCoreApplication::translate("XLibrary", "Steam appinfo cache exceeds 128 MiB").toStdString());
+    SteamBinaryReader reader(data, nullptr, cancelled);
+    const auto magic = reader.number<quint32>();
+    if (magic < 0x07564427U || magic > 0x07564429U)
+        throw std::invalid_argument(
+            QCoreApplication::translate("XLibrary", "Unsupported Steam appinfo cache version").toStdString());
+    reader.skip(4); // Universe.
+    QVector<QString> keys;
+    auto entries_end = data.size();
+    if (magic == 0x07564429U) {
+        const auto table_offset = reader.number<quint64>();
+        if (table_offset < 16 || table_offset > static_cast<quint64>(data.size()))
+            throw std::invalid_argument(
+                QCoreApplication::translate("XLibrary", "Invalid Steam appinfo string table offset").toStdString());
+        entries_end = static_cast<qsizetype>(table_offset);
+        SteamBinaryReader table(QByteArrayView(data).sliced(entries_end), nullptr, cancelled);
+        const auto count = table.number<quint32>();
+        if (count > 1048576 || count > static_cast<quint64>(data.size() - entries_end - 4))
+            throw std::invalid_argument(
+                QCoreApplication::translate("XLibrary", "Invalid Steam appinfo string table size").toStdString());
+        keys.reserve(count);
+        for (quint32 index = 0; index < count; ++index) {
+            if (cancelled.load())
+                throw DiscoveryCancelled();
+            keys.append(table.string());
+        }
+    }
+    QHash<QString, QVector<steam_node>> result;
+    while (reader.offset() < entries_end) {
+        if (cancelled.load())
+            throw DiscoveryCancelled();
+        const auto app_id = reader.number<quint32>();
+        if (app_id == 0)
+            return result;
+        const auto size = reader.number<quint32>();
+        const qsizetype header_size = magic >= 0x07564428U ? 60 : 40;
+        if (size < header_size || size > static_cast<quint64>(entries_end - reader.offset()))
+            throw std::invalid_argument(
+                QCoreApplication::translate("XLibrary", "Invalid Steam appinfo entry size").toStdString());
+        const auto id = QString::number(app_id);
+        if (app_ids.contains(id)) {
+            SteamBinaryReader entry(QByteArrayView(data).sliced(reader.offset() + header_size, size - header_size),
+                                    magic == 0x07564429U ? &keys : nullptr, cancelled);
+            result.insert(id, entry.object());
+        }
+        reader.skip(size);
+    }
+    throw std::invalid_argument(
+        QCoreApplication::translate("XLibrary", "Steam appinfo cache has no footer").toStdString());
+}
+
+QString steam_local_executable(const app_record &record, const QString &value) {
+    auto relative = value.trimmed();
+    if (relative.startsWith('"') && relative.endsWith('"'))
+        relative = relative.mid(1, relative.size() - 2);
+    relative.replace('\\', '/');
+    if (relative.isEmpty() || relative.contains(QChar::Null) || QDir::isAbsolutePath(relative) ||
+        relative.contains(':'))
+        return {};
+    const auto root = QFileInfo(record.installation_directory).canonicalFilePath();
+    const QFileInfo file(QDir(root).filePath(relative));
+    const auto canonical = file.canonicalFilePath();
+    if (root.isEmpty() || !file.isFile() || !canonical.startsWith(root + '/', path_case_sensitivity))
+        return {};
+#ifdef Q_OS_WIN
+    if (file.suffix().compare("exe", Qt::CaseInsensitive) != 0)
+        return {};
+#else
+    if (!file.isExecutable() && file.suffix().compare("exe", Qt::CaseInsensitive) != 0)
+        return {};
+#endif
+    return canonical;
+}
+
+void steam_apply_metadata(app_record &record, const QVector<steam_node> &tree, const QStringList &roots) {
+    const auto &app = steam_children(tree, "appinfo");
+    const auto &launches = steam_children(steam_children(app, "config"), "launch");
+    int best_score = -1;
+    for (const auto &launch : launches) {
+        const auto &config = steam_children(launch.children, "config");
+        auto os_list = steam_value(config, "oslist").toLower().split(',', Qt::SkipEmptyParts);
+        for (auto &os : os_list)
+            os = os.trimmed();
+        const auto type = steam_value(launch.children, "type");
+        if (!type.isEmpty() && type.compare("default", Qt::CaseInsensitive) != 0)
+            continue;
+        int score = 0;
+#ifdef Q_OS_WIN
+        if (!os_list.isEmpty() && !os_list.contains("windows"))
+            continue;
+        const auto architecture = steam_value(config, "osarch");
+        if (architecture == "64" && sizeof(void *) != 8)
+            continue;
+        score = architecture == "64" ? 1 : 0;
+#else
+        if (!os_list.isEmpty() && !os_list.contains("linux") && !os_list.contains("windows"))
+            continue;
+        // Prefer the native Linux entry, retaining Windows metadata for Proton installations.
+        score = os_list.contains("linux") ? 2 : os_list.isEmpty() ? 1 : 0;
+#endif
+        const auto path = steam_local_executable(record, steam_value(launch.children, "executable"));
+        if (!path.isEmpty() && score > best_score) {
+            record.executable_path = path;
+            best_score = score;
+        }
+    }
+    const auto &common = steam_children(app, "common");
+    for (const auto &root : roots) {
+        // Steam's client icon is a square game icon, unlike library cover art.
+        const auto hash = steam_value(common, "clienticon");
+        static const QRegularExpression icon_hash("^[a-fA-F0-9]{40}$");
+        if (icon_hash.match(hash).hasMatch()) {
+            const auto path = QDir(root).filePath("steam/games/" + hash + ".ico");
+            if (QFileInfo(path).isFile()) {
+                record.icon_path = path;
+                return;
+            }
+        }
+    }
 }
 } // namespace
 
@@ -395,6 +733,26 @@ QVector<app_record> Application::discover_steam(const QStringList &roots, QVecto
             return {};
         } catch (const std::exception &error) {
             issues.append({manifest, QString::fromUtf8(error.what())});
+        }
+    }
+    if (!records.isEmpty()) {
+        for (const auto &root : roots) {
+            const auto path = QDir(root).filePath("appcache/appinfo.vdf");
+            if (!QFileInfo::exists(path))
+                continue;
+            try {
+                const auto metadata = steam_appinfo(path, app_ids, cancelled);
+                for (auto &record : records) {
+                    if (cancelled.load())
+                        return {};
+                    if (const auto entry = metadata.constFind(record.path); entry != metadata.cend())
+                        steam_apply_metadata(record, *entry, roots);
+                }
+            } catch (const DiscoveryCancelled &) {
+                return {};
+            } catch (const std::exception &error) {
+                issues.append({path, QString::fromUtf8(error.what())});
+            }
         }
     }
     if (progress)

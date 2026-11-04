@@ -214,6 +214,8 @@ void appearance::apply(const QSettings &settings, const QString &additional_styl
         QTabBar#shortcut_tabs::tab:last { margin-right: 0; }
         QTabBar#shortcut_tabs::tab:hover { background: %5; border-color: %6; }
         QTabBar#shortcut_tabs::tab:selected { color: %1; background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 %17, stop:1 %7); border-color: %16; }
+        QTabBar#shortcut_tabs::scroller { width: 2em; }
+        QTabBar#shortcut_tabs QToolButton { padding: 0; min-width: 0; min-height: 0; border-radius: 6px; }
         QAbstractItemView { background: %2; border: none; outline: none; selection-background-color: %7; }
         QAbstractItemView::item { padding: 6px; border: 1px solid transparent; border-radius: 10px; }
         QAbstractItemView::item:selected { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 %17, stop:1 %7); border-color: %16; color: %1; }

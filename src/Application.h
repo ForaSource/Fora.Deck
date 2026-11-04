@@ -9,6 +9,7 @@
 #include <memory>
 #include <QProcessEnvironment>
 #include <QSet>
+#include <QVariantMap>
 #include <string>
 
 #include "CatalogTypes.h"
@@ -30,9 +31,14 @@ public:
     enum class launch_mode { launch, activate, new_instance, elevated };
     static QString target_kind(const app_record &record);
     static bool file_target(const app_record &record);
+    static QString process_path(const app_record &record);
+    static QString application_path(const app_record &record);
     static void validate_launch_target(const app_record &record);
     static QString launch_key(const app_record &record);
+    static QString target_key(const app_record &record);
     static bool target_available(const app_record &record);
+    static bool definitely_removed(const app_record &record, const QStringList &known_volume_roots,
+                                   const QVariantMap &verified_locations);
     static bool requires_fresh_launch(const app_record &record);
     static QString configured_arguments(const app_record &record);
     static bool valid_launch_profile_id(const QString &profile);
