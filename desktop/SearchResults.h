@@ -11,6 +11,7 @@
 
 class DesktopService;
 class SearchResultModel;
+class QMenu;
 struct search_entry {
     enum class kind { application, file, directory, calculation, message };
     kind type = kind::file;
@@ -33,11 +34,13 @@ class SearchResults : public QListView {
     bool special = false;
     bool path_busy = false;
     quint64 pending_launch = 0;
+    QMenu *action_menu = nullptr;
     void update_query();
     void update_applications();
     void read_path();
     void replace_entries(QVector<search_entry> entries);
     void activate_current();
+    void show_actions();
 
 protected:
     bool eventFilter(QObject *object, QEvent *event) override;

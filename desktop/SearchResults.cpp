@@ -4,6 +4,8 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QKeyEvent>
+#include <QMenu>
+#include <QMessageBox>
 #include <QPainter>
 #include <QStyledItemDelegate>
 #include <QtConcurrent/QtConcurrentRun>
@@ -11,6 +13,7 @@
 
 #include "appearance.h"
 #include "DesktopService.h"
+#include "editors.h"
 #include "PathHelpers.h"
 #include "PlatformIntegration.h"
 #include "SearchQuery.h"
@@ -151,6 +154,14 @@ SearchResults::SearchResults(DesktopService &service, QLineEdit &input, const bo
     input.installEventFilter(this);
     connect(&input, &QLineEdit::textChanged, this, &SearchResults::update_query);
     connect(this, &QListView::clicked, this, [this] { activate_current(); });
+    setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(this, &QWidget::customContextMenuRequested, this, [this](const QPoint &position) {
+        const auto index = indexAt(position);
+        if (index.isValid()) {
+            setCurrentIndex(index);
+            show_actions();
+        }
+    });
     connect(&service.model, &QAbstractItemModel::dataChanged, viewport(), qOverload<>(&QWidget::update));
     connect(&service, &DesktopService::catalog_changed, this, &SearchResults::update_query);
     connect(&service, &DesktopService::profile_state_changed, this,
@@ -225,8 +236,9 @@ void SearchResults::update_applications() {
     // Keep only the five best matches in O(n), rather than sorting an entire second catalog on each key.
     for (int row = 0; row < service.model.rowCount(); ++row) {
         const auto &record = service.model.at(row);
-        const auto rank =
-            query.rank(service.model.search_name(row), service.model.search_path(row), record.tags, record.aliases);
+        if (input.text().trimmed().isEmpty() && !record.favorite)
+            continue;
+        const auto rank = query.rank(service.model.search_data(row));
         if (rank < 0)
             continue;
         const QPair<int, int> candidate{row, rank};
@@ -240,12 +252,24 @@ void SearchResults::update_applications() {
     QVector<search_entry> entries;
     for (const auto &candidate : best) {
         const auto &record = service.model.at(candidate.first);
-        entries.append({search_entry::kind::application, record.name, record.path, record.id});
+        auto title = record.name;
+        if (!record.default_launch_profile.isEmpty()) {
+            const auto mode = record.default_launch_profile == "private"
+                                  ? QCoreApplication::translate("XLibrary", "Private mode")
+                              : record.default_launch_profile == "normal"
+                                  ? QCoreApplication::translate("XLibrary", "Normal mode")
+                                  : QCoreApplication::translate("XLibrary", "Profile: %1")
+                                        .arg(QFileInfo(record.default_launch_profile.mid(8)).fileName());
+            title += " · " + mode;
+        }
+        entries.append({search_entry::kind::application, title, record.path, record.id});
     }
     replace_entries(std::move(entries));
 }
 
 void SearchResults::update_query() {
+    if (action_menu)
+        action_menu->close();
     pending_launch = 0;
     ++*generation;
     pending_path.clear();
@@ -266,7 +290,7 @@ void SearchResults::update_query() {
             replace_entries({{search_entry::kind::calculation, "= " + number, number, 0}});
         } else
             replace_entries({{search_entry::kind::message, QCoreApplication::translate("XLibrary", "—"), {}, 0}});
-    } else if (compact && !text.isEmpty())
+    } else if (compact)
         update_applications();
     else
         replace_entries({});
@@ -302,11 +326,108 @@ void SearchResults::activate_current() {
         QApplication::clipboard()->setText(entry.path);
 }
 
+void SearchResults::show_actions() {
+    const auto row = currentIndex().row();
+    if (!compact || !isEnabled() || service.profile_busy() || service.restart_required() || row < 0 ||
+        row >= results->entries.size() || results->entries[row].type != search_entry::kind::application)
+        return;
+    const auto id = results->entries[row].application_id;
+    const auto *current = service.model.find(id);
+    if (!current)
+        return;
+    const auto record = *current;
+    if (action_menu)
+        action_menu->close();
+    auto *menu = new QMenu(this);
+    action_menu = menu;
+    menu->setObjectName("quick_actions");
+    menu->setTitle(QCoreApplication::translate("XLibrary", "Application actions"));
+    menu->setAccessibleName(menu->title());
+    const auto launch_action = [this, menu, id](const QString &title, const Application::launch_mode mode) {
+        connect(menu->addAction(title), &QAction::triggered, this,
+                [this, id, mode] { pending_launch = service.request_launch_mode(id, mode); });
+    };
+    launch_action(QCoreApplication::translate("XLibrary", "Launch"), Application::launch_mode::launch);
+    if (record.new_instance_error.isEmpty() && Application::file_target(record))
+        launch_action(QCoreApplication::translate("XLibrary", "New instance"), Application::launch_mode::new_instance);
+    if (record.running && Application::file_target(record))
+        launch_action(QCoreApplication::translate("XLibrary", "Switch to running window"),
+                      Application::launch_mode::activate);
+    const auto profiles = service.launch_profiles(record);
+    if (!profiles.isEmpty()) {
+        auto *profile_menu = menu->addMenu(QCoreApplication::translate("XLibrary", "Browser profile"));
+        for (const auto &profile : profiles) {
+            auto *action =
+                profile_menu->addAction(appearance::icon(profile.kind == "private" ? "lock" : "app"), profile.name);
+            action->setCheckable(true);
+            action->setChecked(record.default_launch_profile == profile.id);
+            connect(action, &QAction::triggered, this, [this, id, profile_id = profile.id] {
+                pending_launch = service.request_launch_profile(id, profile_id);
+            });
+        }
+    }
+#ifdef Q_OS_WIN
+    if (Application::target_kind(record) == "executable" &&
+        QFileInfo(record.path).suffix().compare("exe", Qt::CaseInsensitive) == 0)
+        launch_action(QCoreApplication::translate("XLibrary", "Run as administrator"),
+                      Application::launch_mode::elevated);
+#endif
+    menu->addSeparator();
+    if (Application::file_target(record) || !record.installation_directory.isEmpty())
+        connect(menu->addAction(QCoreApplication::translate("XLibrary", "Open folder")), &QAction::triggered, this,
+                [this, id] { service.open_folder(id); });
+    if (Application::file_target(record) || !record.installation_directory.isEmpty())
+        connect(menu->addAction(QCoreApplication::translate("XLibrary", "Copy path")), &QAction::triggered, this,
+                [record] {
+                    QApplication::clipboard()->setText(QDir::toNativeSeparators(
+                        record.installation_directory.isEmpty() ? record.path : record.installation_directory));
+                });
+    connect(menu->addAction(record.favorite ? QCoreApplication::translate("XLibrary", "Remove from favorites")
+                                            : QCoreApplication::translate("XLibrary", "Add to favorites")),
+            &QAction::triggered, this,
+            [this, id, favorite = record.favorite] { service.update_metadata({id}, {}, {}, favorite ? 0 : 1); });
+    const auto edit_action = [this, menu, id](const QString &text, const QString &focus) {
+        connect(menu->addAction(text), &QAction::triggered, this,
+                [this, id, focus] { edit_application(service, id, window(), focus); });
+    };
+    edit_action(QCoreApplication::translate("XLibrary", "Edit tags"), "application_tags");
+    edit_action(QCoreApplication::translate("XLibrary", "Edit application"), "application_name");
+    edit_action(QCoreApplication::translate("XLibrary", "Assign hotkey"), "application_hotkey");
+    menu->addSeparator();
+    connect(menu->addAction(QCoreApplication::translate("XLibrary", "Remove from library")), &QAction::triggered, this,
+            [this, id, name = record.name] {
+                if (QMessageBox::question(
+                        window(), QCoreApplication::translate("XLibrary", "Remove application"),
+                        QCoreApplication::translate("XLibrary",
+                                                    "Remove “%1” from the library? The application files will be kept.")
+                            .arg(name)) == QMessageBox::Yes)
+                    service.remove_application(id);
+            });
+    connect(menu, &QMenu::aboutToHide, this, [this, menu] {
+        if (action_menu == menu)
+            action_menu = nullptr;
+        input.setFocus();
+        menu->deleteLater();
+    });
+    menu->popup(viewport()->mapToGlobal(visualRect(currentIndex()).bottomLeft()));
+    if (!menu->actions().isEmpty())
+        menu->setActiveAction(menu->actions().first());
+}
+
 bool SearchResults::eventFilter(QObject *const object, QEvent *const event) {
     if (object == &input && (compact || special)) {
         if (event->type() == QEvent::ShortcutOverride || event->type() == QEvent::KeyPress) {
             auto *key = static_cast<QKeyEvent *>(event);
             const bool plain = !(key->modifiers() & ~Qt::KeypadModifier);
+            const bool actions_key = compact && ((plain && key->key() == Qt::Key_Tab) ||
+                                                 (key->key() == Qt::Key_F10 && key->modifiers() == Qt::ShiftModifier));
+            if (actions_key && currentIndex().isValid() &&
+                results->entries[currentIndex().row()].type == search_entry::kind::application) {
+                if (event->type() == QEvent::KeyPress)
+                    show_actions();
+                event->accept();
+                return true;
+            }
             if (plain && (key->key() == Qt::Key_Return || key->key() == Qt::Key_Enter || key->key() == Qt::Key_Up ||
                           key->key() == Qt::Key_Down || key->key() == Qt::Key_Escape)) {
                 if (event->type() == QEvent::KeyPress) {
