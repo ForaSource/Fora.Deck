@@ -48,11 +48,14 @@ constexpr int x11_success = Success;
 #include <QProcessEnvironment>
 #include <QRegularExpression>
 #include <QSaveFile>
+#include <QScopedValueRollback>
 #include <QSocketNotifier>
 #include <QStandardPaths>
 #include <QStyle>
+#include <QtGui/qguiapplication_platform.h>
 #include <QUrl>
 #include <QWidget>
+#include <QWindow>
 #include <stdexcept>
 
 #include "ApplicationPaths.h"
@@ -69,6 +72,7 @@ bool wayland_session() {
 #ifdef XLIBRARY_HAVE_X11
 std::mutex x11_mutex;
 int x11_error_code = 0;
+Time hotkey_activation_time = CurrentTime;
 
 int record_x11_error(Display *, XErrorEvent *const event) {
     x11_error_code = event->error_code;
@@ -219,6 +223,38 @@ GlobalHotkey::GlobalHotkey(QObject *const parent) : QObject(parent) {
 
 GlobalHotkey::~GlobalHotkey() = default;
 
+void desktop_platform::activate_overlay(QWidget *const window) {
+    window->raise();
+#if defined(XLIBRARY_HAVE_X11) && QT_CONFIG(xcb)
+    if (hotkey_activation_time != CurrentTime) {
+        if (const auto *native = qGuiApp->nativeInterface<QNativeInterface::QX11Application>()) {
+            const std::lock_guard lock(x11_mutex);
+            auto *display = native->display();
+            X11ErrorScope errors(display);
+            const auto native_window = static_cast<Window>(window->winId());
+            const auto root = DefaultRootWindow(display);
+            const auto user_time_atom = XInternAtom(display, "_NET_WM_USER_TIME", False);
+            const unsigned long timestamp = hotkey_activation_time;
+            XChangeProperty(display, native_window, user_time_atom, XA_CARDINAL, 32, PropModeReplace,
+                            reinterpret_cast<const unsigned char *>(&timestamp), 1);
+            XEvent event{};
+            event.xclient.type = ClientMessage;
+            event.xclient.window = native_window;
+            event.xclient.message_type = XInternAtom(display, "_NET_ACTIVE_WINDOW", False);
+            event.xclient.format = 32;
+            event.xclient.data.l[0] = 1;
+            event.xclient.data.l[1] = static_cast<long>(timestamp);
+            if (XSendEvent(display, root, False, SubstructureRedirectMask | SubstructureNotifyMask, &event) &&
+                errors.succeeded())
+                return;
+        }
+    }
+#endif
+    // Qt requests xdg-activation on Wayland; the compositor decides whether to grant it.
+    if (auto *handle = window->windowHandle())
+        handle->requestActivate();
+}
+
 bool GlobalHotkey::set_sequence(const QKeySequence &value, QString &error) {
     if (sequence == value)
         return true;
@@ -279,6 +315,7 @@ bool GlobalHotkey::set_sequence(const QKeySequence &value, QString &error) {
             std::make_unique<QSocketNotifier>(ConnectionNumber(state->display.get()), QSocketNotifier::Read);
         connect(state->notifier.get(), &QSocketNotifier::activated, this, [this] {
             bool activate = false;
+            Time activation_time = CurrentTime;
             {
                 const std::lock_guard lock(x11_mutex);
                 while (XPending(linux_state->display.get())) {
@@ -292,18 +329,24 @@ bool GlobalHotkey::set_sequence(const QKeySequence &value, QString &error) {
                                 next.xkey.time == event.xkey.time)
                                 continue;
                         }
+                        if (linux_state->pressed) {
+                            activate = true;
+                            activation_time = event.xkey.time;
+                        }
                         linux_state->pressed = false;
                     } else if (event.type == x11_key_press &&
                                static_cast<int>(event.xkey.keycode) == linux_state->keycode &&
                                (event.xkey.state & 0xffU & ~linux_state->ignored_modifiers) == linux_state->modifiers) {
-                        if (!linux_state->pressed)
-                            activate = true;
                         linux_state->pressed = true;
                     }
                 }
             }
-            if (activate)
+            if (activate) {
+                // The passive keyboard grab ends on release. Focus requests on press race that grab,
+                // and Qt cannot infer this user timestamp from our separate X11 connection.
+                const QScopedValueRollback activation_scope(hotkey_activation_time, activation_time);
                 emit activated();
+            }
         });
         linux_state = std::move(state);
     }

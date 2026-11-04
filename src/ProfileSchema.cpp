@@ -1,7 +1,9 @@
 #include <chrono>
+#include <QCoreApplication>
 #include <set>
 #include <vector>
 
+#include "Application.h"
 #include "LaunchIdentity.h"
 #include "ProfileSchema.h"
 #include "SqliteHelpers.h"
@@ -97,6 +99,16 @@ void validate_columns(sqlite3 *const connection, const int version) {
         if (missing.next())
             throw std::runtime_error("Profile contains a card without a launch configuration");
     }
+    if (version >= 7) {
+        SqliteStatement profiles(connection, "SELECT d.default_launch_profile,p.launch_profile FROM "
+                                             "desktop_application d,desktop_scenario_step p LIMIT 0;");
+        profiles.next();
+        SqliteStatement values(connection, "SELECT default_launch_profile FROM desktop_application "
+                                           "UNION ALL SELECT launch_profile FROM desktop_scenario_step;");
+        while (values.next())
+            if (!Application::valid_launch_profile_id(values.qtext(0)))
+                throw std::runtime_error("Profile contains an invalid browser launch profile");
+    }
     if (version >= 4) {
         SqliteStatement aliases(connection, "SELECT application_id,position,name FROM application_alias LIMIT 0;");
         aliases.next();
@@ -124,6 +136,54 @@ void validate_columns(sqlite3 *const connection, const int version) {
         )");
         if (invalid_aliases.next())
             throw std::runtime_error("Profile contains invalid search aliases");
+    }
+    if (version >= 5) {
+        SqliteStatement metadata(connection,
+                                 "SELECT installation_directory,icon_path FROM launch_configuration LIMIT 0;");
+        metadata.next();
+        SqliteStatement invalid(connection, "SELECT 1 FROM launch_target WHERE kind NOT IN "
+                                            "('executable','desktop','system_uri','aumid','steam') LIMIT 1;");
+        if (invalid.next())
+            throw std::runtime_error(
+                QCoreApplication::translate("XLibrary", "Profile contains an unsupported launch target type")
+                    .toStdString());
+        auto target_query = std::string("SELECT t.kind,c.path,c.arguments,c.working_directory,"
+                                        "c.installation_directory,c.icon_path,");
+        target_query += version >= 8 ? "c.executable_path " : "'' ";
+        target_query += "FROM launch_configuration c JOIN launch_target t ON t.id=c.target_id;";
+        SqliteStatement targets(connection, target_query.c_str());
+        while (targets.next()) {
+            app_record record;
+            record.target_kind = targets.qtext(0);
+            record.path = targets.qtext(1);
+            record.arguments = targets.qtext(2);
+            record.working_directory = targets.qtext(3);
+            record.executable_path = targets.qtext(6);
+            Application::validate_launch_target(record);
+            for (int column = 4; column <= 5; ++column)
+                if (targets.qtext(column).size() > catalog_limits::text_length ||
+                    targets.qtext(column).contains(QChar::Null))
+                    throw std::runtime_error(
+                        QCoreApplication::translate("XLibrary", "Profile contains invalid launch target metadata")
+                            .toStdString());
+        }
+    }
+    if (version >= 6) {
+        SqliteStatement shortcuts(connection,
+                                  "SELECT application_id,scenario_id,sequence FROM target_shortcut LIMIT 0;");
+        shortcuts.next();
+        require_unique(connection, "target_shortcut", {"application_id"});
+        require_unique(connection, "target_shortcut", {"scenario_id"});
+        require_unique(connection, "target_shortcut", {"sequence"});
+        require_reference(connection, "target_shortcut", "application_id", "applications", "CASCADE");
+        require_reference(connection, "target_shortcut", "scenario_id", "desktop_scenario", "CASCADE");
+        SqliteStatement invalid(connection, R"(
+            SELECT 1 FROM target_shortcut WHERE (application_id IS NULL)=(scenario_id IS NULL)
+                OR coalesce(application_id,scenario_id)<=0 OR sequence IS NULL
+                OR length(sequence)=0 OR length(sequence)>128 OR instr(sequence,char(0))>0 LIMIT 1;
+        )");
+        if (invalid.next())
+            throw std::runtime_error("Profile contains an invalid target shortcut");
     }
     check_integrity(connection);
 }
@@ -323,6 +383,31 @@ void xlibrary::migrate_profile(sqlite3 *const connection, const std::filesystem:
                         sort_mode INTEGER NOT NULL CHECK(sort_mode BETWEEN 0 AND 4),
                         sort_order INTEGER NOT NULL CHECK(sort_order IN (0,1)));
                 )");
+                break;
+            case 4:
+                sqlite_execute(connection, R"(
+                    ALTER TABLE launch_configuration ADD COLUMN installation_directory TEXT NOT NULL DEFAULT '';
+                    ALTER TABLE launch_configuration ADD COLUMN icon_path TEXT NOT NULL DEFAULT '';
+                )");
+                break;
+            case 5:
+                sqlite_execute(connection, R"(
+                    CREATE TABLE target_shortcut(
+                        application_id INTEGER UNIQUE REFERENCES applications(id) ON DELETE CASCADE,
+                        scenario_id INTEGER UNIQUE REFERENCES desktop_scenario(id) ON DELETE CASCADE,
+                        sequence TEXT NOT NULL UNIQUE CHECK(length(sequence) BETWEEN 1 AND 128),
+                        CHECK((application_id IS NULL)!=(scenario_id IS NULL)));
+                )");
+                break;
+            case 6:
+                sqlite_execute(connection, R"(
+                    ALTER TABLE desktop_application ADD COLUMN default_launch_profile TEXT NOT NULL DEFAULT '';
+                    ALTER TABLE desktop_scenario_step ADD COLUMN launch_profile TEXT NOT NULL DEFAULT '';
+                )");
+                break;
+            case 7:
+                sqlite_execute(connection,
+                               "ALTER TABLE launch_configuration ADD COLUMN executable_path TEXT NOT NULL DEFAULT '';");
                 break;
             default:
                 throw std::runtime_error("Missing profile migration");

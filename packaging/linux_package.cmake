@@ -41,13 +41,13 @@ install(FILES "${CMAKE_CURRENT_LIST_DIR}/debian/copyright"
 
 set(CPACK_PACKAGE_NAME "xlibrary")
 set(CPACK_PACKAGE_VENDOR "Lappland-Julia")
-set(CPACK_PACKAGE_CONTACT "Lappland-Julia (https://github.com/Lappland-Julia)" CACHE STRING
+set(CPACK_PACKAGE_CONTACT "Lappland-Julia (https://github.com/lappland-open)" CACHE STRING
         "Package maintainer contact (name and email for distribution releases)")
 set(CPACK_PACKAGE_VERSION "${XLIBRARY_RELEASE_VERSION}")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Application launcher and organizer")
 set(CPACK_PACKAGE_DESCRIPTION
         "XLibrary organizes desktop applications, tags and launch scenarios in a Qt interface.")
-set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/Lappland-Julia/XLibrary")
+set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/lappland-open/XLibrary")
 set(CPACK_RESOURCE_FILE_LICENSE "${PROJECT_SOURCE_DIR}/LICENSE")
 set(CPACK_GENERATOR "DEB")
 set(CPACK_PACKAGING_INSTALL_PREFIX "/usr")

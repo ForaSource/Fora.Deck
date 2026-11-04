@@ -9,9 +9,9 @@
 <p align="center"><strong>Your apps, organized your way.</strong></p>
 
 <p align="center">
-  <a href="https://github.com/Lappland-Julia/XLibrary/actions/workflows/windows-build.yml"><img src="https://github.com/Lappland-Julia/XLibrary/actions/workflows/windows-build.yml/badge.svg" alt="Windows build"></a>
+  <a href="https://github.com/lappland-open/XLibrary/actions/workflows/windows-build.yml"><img src="https://github.com/lappland-open/XLibrary/actions/workflows/windows-build.yml/badge.svg" alt="Windows build"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-68717C" alt="License: MIT"></a>
-  <a href="https://github.com/Lappland-Julia/XLibrary/actions/workflows/linux-build.yml"><img src="https://github.com/Lappland-Julia/XLibrary/actions/workflows/linux-build.yml/badge.svg" alt="Linux build"></a>
+  <a href="https://github.com/lappland-open/XLibrary/actions/workflows/linux-build.yml"><img src="https://github.com/lappland-open/XLibrary/actions/workflows/linux-build.yml/badge.svg" alt="Linux build"></a>
   <img src="https://img.shields.io/badge/platform-Windows%20%2F%20Linux-68717C" alt="Platform: Windows and Linux">
 </p>
 
@@ -20,7 +20,7 @@
   <a href="#search">Search</a> ·
   <a href="#development">Development</a> ·
   <a href="#contributing">Contributing</a> ·
-  <a href="https://github.com/Lappland-Julia/XLibrary/issues">Feedback</a>
+  <a href="https://github.com/lappland-open/XLibrary/issues">Feedback</a>
 </p>
 
 ## XLibrary
@@ -32,27 +32,30 @@ An app can belong to more than one part of your day. Give your browser both `#wo
 > **Under active development.** Features and interfaces are still evolving. Early feedback and contributions are welcome.
 
 <p align="center">
-  <h3 align="center"><a href="https://github.com/Lappland-Julia/XLibrary/releases">Download Latest Release</a></h3>
+  <h3 align="center"><a href="https://github.com/lappland-open/XLibrary/releases">Download Latest Release</a></h3>
 </p>
 
 ## Features
 
 | | What you can do |
 | --- | --- |
-| **One application library** | Add apps manually or discover them through the Windows registry and Start menu, or Linux XDG desktop entries. |
+| **One application library** | Discover Windows system apps, registry and Start menu entries, Linux desktop entries, and installed Steam games across local libraries. |
 | **Tags and filters** | Assign multiple tags to an app and combine them with text search and exclusions. |
 | **Favorites and recent launches** | Keep frequently used apps close and sort your library by last launch. |
 | **Running apps** | See what is running, switch to an existing window when available, or open a new instance. |
 | **Launch scenarios** | Open a group of apps in a defined order, with optional delays between steps. |
 | **Quick search** | Open a compact launcher with Ctrl+Alt+Space, calculate expressions, or browse a folder directly. |
-| **Desktop integration** | Use separate global hotkeys for quick search and the full library, keep XLibrary in the system tray, and customize keyboard shortcuts. |
+| **Desktop integration** | Assign global hotkeys to the library, quick search, individual applications, and launch scenarios. |
+| **Browser profiles** | Choose normal, private, or detected local profiles for Chrome, Edge, Firefox and Brave, including in scenarios. |
 | **Appearance** | Choose a light, dark, or system theme and adjust the text size. |
 | **Local storage** | Keep your catalog in SQLite. Import and export application entries, tags, and favorites as JSON. |
 
 ## Import and discovery
 
-JSON format 1 stores application names, absolute paths, launch arguments, working directories,
-favorites, and assigned tags. Linux executable paths do not need a filename extension. Optional
+JSON format 1 stores application names, typed launch targets, launch arguments, working directories,
+browser defaults, aliases, favorites, and assigned tags. Executable targets use absolute paths;
+system URI, AUMID and Steam targets use their own validated identifiers. Older catalogs remain supported.
+Linux executable paths do not need a filename extension. Optional
 fields may be omitted; supplied fields must have the expected JSON types. Import validates the
 entire file before writing and reports the record number, field, and reason on invalid input.
 An import error leaves the catalog unchanged. Files are limited to 32 MiB and 50,000 applications.
@@ -62,8 +65,28 @@ search, **Select all**, **Clear selection**, and a selected count. Review names,
 arguments, and working directories before choosing **Import selected**. Select/clear applies to
 visible search results; hidden rows keep their selection. Cancelling the preview imports nothing.
 Windows accepts EXE, LNK, BAT, and CMD files; Linux accepts desktop entries and executable files.
-Rejected files are listed with a reason. Discovery can remember unchecked configurations;
+Rejected files are listed with a reason. Discovery remembers unchecked configurations by default;
 **Settings → Library → Reset discovery exclusions** makes them eligible again.
+
+At every normal startup, installed applications are checked in a background thread using the selected
+sources, without scan progress or scan-result notifications. Only the removal/addition review windows
+open when needed; actual changes produce a short application-count notification. Cancelling or making
+no changes produces no notification. Startup checks and manual discovery share the **New applications** window: names, paths,
+and checkboxes, all checked initially. Existing launch configurations are hidden; their discovered
+locations and sources are refreshed without changing names, tags, favorites, history, or launch options.
+Applications removed manually from the library are remembered and are not offered again, including
+other discovered launch modes for the same target. Resetting discovery exclusions clears this history.
+Cancelling a selection does not remember unchecked applications.
+
+**Settings → Library → Ask before removing uninstalled applications from the library** is enabled by
+default. Review the names and paths, remove the checked entries, or choose **Keep all**. Disable it to
+remove confirmed missing entries automatically. Absence is checked in the background and again before
+removal, against the same local volume where that path was previously seen. Paths that have not yet been
+observed as available, network/removable drives, access errors, broken symlinks, and uncertain shell targets are kept.
+Steam removal requires both its manifest and installation folder to be missing; a missing Linux desktop
+entry also requires its previously recorded executable to be missing. Uncertain cases remain unavailable
+in the library for manual review. Removal supports the existing undo action and does not suppress a
+subsequent reinstall. `--check-startup` does not scan the computer.
 
 JSON conflicts are skipped by default. The explicit replacement policy replaces the matching
 entry's name, search aliases, assigned tags, and favorite while preserving its ID, history,
@@ -77,7 +100,8 @@ Repeated launch configurations are skipped; existing entries keep their metadata
 discovery sources. Names may repeat, and one EXE may have multiple argument/working-directory
 profiles. Symlinks share a canonical target while retaining their invocation paths.
 On Windows, an omitted working directory and the executable's own folder describe the same
-launch configuration. Discovery prefers a Start menu shortcut over an App Paths entry with
+launch configuration. A shortcut that incorrectly uses its target EXE as the working directory
+also uses the executable's folder. Discovery prefers a Start menu shortcut over an App Paths entry with
 the same name and executable, keeping the shortcut's arguments. Reimporting that shortcut
 also consolidates existing same-name cards with equivalent launch configurations, preserving
 tags, aliases, favorites, launch history, sources, and scenario steps. Cards stay separate if
@@ -86,8 +110,18 @@ directories remain separate profiles. Manual addition rejects a configuration al
 Cancelling discovery before its transaction is committed rolls back all additions. Once commit
 starts, cancellation is unavailable. JSON import and discovery never launch applications.
 
-JSON export is an application catalog transfer, not a complete profile backup: scenarios,
-unused tags, saved filters, settings, and launch history are not included.
+Windows discovery includes available Settings pages, File Explorer, Calculator, Microsoft Store,
+Task Manager, Control Panel and Windows Terminal. Unavailable components are skipped.
+Steam discovery reads local `libraryfolders.vdf` and `appmanifest_*.acf` files, including additional
+libraries. The local `appcache/appinfo.vdf` supplies the game's executable and cached client icon;
+the executable's icon is used when no cached icon is available. Cards show and copy the executable
+path, and open the installation folder. Games still launch through `steam://run/<appid>`; moving
+a game and rescanning preserves its card ID, tags and favorites. Rescan to enrich existing cards.
+If launch metadata is missing or unsupported, the installation folder is shown without guessing
+between executable files. Steam files are never changed, and no Web API or login is required.
+
+JSON export transfers application cards. Use a complete `.xlprofile` backup for scenarios,
+global hotkey assignments, unused tags, saved filters, settings, and launch history.
 
 Use Ctrl/Shift to select several library entries. The selection bar shows the count, clears the
 selection, and opens a bulk editor with searchable tags, usage counts, and favorite state.
@@ -96,16 +130,22 @@ entry count and deletes only catalog entries. **Undo removal** restores the last
 current session, including metadata and scenario steps. It refuses to overwrite changed linked
 scenarios or conflicting new entries. Undo is also offered in the shared notification banner.
 
-Application details show discovery sources and offer path/argument copying. Availability refreshes
+Application details offer path/argument copying. Discovery sources are kept internally for import matching.
+Availability refreshes
 periodically without removing entries. Unavailable Windows drives and previously observed Linux
 mounts are distinguished from missing files; an unknown missing location is kept as unavailable.
 
 ## Search and saved filters
 
 Search matches names, filenames, and user-defined aliases from **Edit application**.
-Matches are ranked as exact, prefix, then substring, with a stable sort order for ties.
+Ties keep a stable sort order.
 Case, repeated spaces, Unicode normalization, and English/Russian keyboard layout are
-handled by the same search rules in the library and quick launcher. No fuzzy matching is used.
+handled by the same cached search rules in the library and quick launcher. Initials (`vsc`),
+word prefixes (`vscode`) and limited typo correction (`discrod`, `dicsor`, `chrme`, `stema`) are supported.
+Whole words rank first, followed by word prefixes, internal or trailing substrings, and abbreviations.
+Within each group, matches closer to the start of the application name rank higher, including after
+keyboard layout correction. If nothing matches directly, only the closest typo suggestions are shown;
+the quick launcher does not pad its five slots with weaker matches. Tags stay exact, and the entered query is preserved.
 Aliases also travel with JSON catalogs; older catalogs without aliases remain importable.
 
 Use `#tag` to require a tag and `-#tag` to exclude it; every condition must match.
@@ -216,7 +256,11 @@ other custom bindings are preserved. On Wayland, assign `XLibrary --overlay` or 
 in your desktop's shortcut settings; these commands also address an already running instance.
 
 Quick search opens with a 200 ms reveal and shows up to five matching applications.
-Use ↑/↓ and Enter to launch, Escape or the global shortcut again to dismiss, and the
+Use ↑/↓ and Enter to launch. Tab or Shift+F10 opens the selected application's actions;
+↑/↓ and Enter select and run an action, Escape returns to search. Actions include browser profiles,
+new instances, window switching, folder/path operations, favorites, editors, hotkeys and confirmed removal,
+where applicable. Windows executable entries also offer an explicit administrator launch.
+Use Escape or the global shortcut again to dismiss search, and the
 small button on the right to open the full library with the same query. System animation
 preferences are respected. XLibrary must be running for its built-in global shortcuts.
 
@@ -243,6 +287,18 @@ For the selected application:
 
 Change or clear these bindings in Settings → Keyboard shortcuts. Switch between the **Global shortcuts**, **Navigation**, and **Application actions** tabs at the top. Both main and numeric keypad Enter are supported. Text editing keys keep their usual behavior in text fields. Use ↑/↓ in search to select an application; Escape clears the search and cannot be reassigned. Duplicate shortcuts are rejected when saving settings, and the tab containing the conflicting field opens automatically.
 
+Application and scenario editors also accept a global hotkey. The **Applications** and **Scenarios**
+keyboard settings tabs list these assignments. Conflicts and OS registration failures preserve the
+previous binding. Deleting a target removes its binding; full profile backups retain assignments.
+On Wayland, use compositor shortcuts for `XLibrary --launch-id ID` or `XLibrary --scenario-id ID`;
+the editor shows the persistent ID command. XLibrary does not intercept unsupported Wayland keys.
+
+Quick search uses normal window-manager activation on Linux. For Plasma/Wayland, assign
+`XLibrary --overlay` directly in System Settings → Keyboard → Shortcuts so the compositor can
+authorize activation. Existing-instance commands forward an available XDG activation token.
+Focus and fullscreen stacking remain subject to compositor policy. A banner explains refused
+Wayland activation; XLibrary does not repeatedly force focus or permanently pin the overlay above windows.
+
 ## Development
 
 XLibrary is built with **C++23**, **Qt 6 Widgets**, and **SQLite**. It targets **Windows 10/11 and Linux**. The interface supports English and Russian. It follows the system's preferred supported language by default and falls back to English. Choose a language in Settings → General and restart XLibrary to apply it. The application translation is embedded in the executable.
@@ -255,8 +311,8 @@ Planned work includes further search improvements and extensibility. These are d
 
 Help shape a library you would want to use every day. Bug reports, interface feedback, documentation improvements, and code contributions are all welcome.
 
-- **Report a bug:** [open an issue](https://github.com/Lappland-Julia/XLibrary/issues/new) with steps to reproduce, your OS and desktop session, and screenshots where useful.
-- **Suggest an improvement:** [share your idea](https://github.com/Lappland-Julia/XLibrary/issues) and describe the workflow it would help with.
+- **Report a bug:** [open an issue](https://github.com/lappland-open/XLibrary/issues/new) with steps to reproduce, your OS and desktop session, and screenshots where useful.
+- **Suggest an improvement:** [share your idea](https://github.com/lappland-open/XLibrary/issues) and describe the workflow it would help with.
 - **Contribute code:** submit a pull request with a focused change. Please discuss larger features in an issue first.
 
 If you would like to follow the project, star the repository or watch it for updates.

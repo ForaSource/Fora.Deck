@@ -7,6 +7,7 @@
 #include <system_error>
 #include <utility>
 
+#include "Application.h"
 #include "Heartbeat.h"
 
 namespace {
@@ -142,7 +143,10 @@ QSet<QString> Heartbeat::running_paths(const QVector<app_record> &applications) 
     QSet<QString> names;
     QSet<QString> paths;
     for (const auto &application : applications) {
-        names.insert(QFileInfo(application.path).fileName().toCaseFolded());
+        const auto path = Application::process_path(application);
+        if (path.isEmpty())
+            continue;
+        names.insert(QFileInfo(path).fileName().toCaseFolded());
     }
     if (names.isEmpty()) {
         return paths;

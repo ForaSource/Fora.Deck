@@ -16,15 +16,15 @@ class LibraryModel : public QAbstractTableModel {
     Q_OBJECT
 private:
     QVector<app_record> records;
-    QStringList search_names;
-    QStringList search_paths;
+    QVector<SearchQuery::SearchableData> searchable_records;
     QStringList search_tags;
     QVector<QCollatorSortKey> name_sort_keys;
     QVector<QCollatorSortKey> tag_sort_keys;
     mutable QCache<QString, QIcon> icons{256};
     mutable QSet<QString> pending_icons;
     QThreadPool icon_pool;
-    void request_icon(const QString &path) const;
+    QIcon fallback_icon(const app_record &record) const;
+    void request_icon(const app_record &record) const;
 
 public:
     enum role { id_role = Qt::UserRole + 1, record_role, tags_role, running_role, favorite_role, available_role };
@@ -39,8 +39,9 @@ public:
     void update_state(const QVector<app_record> &applications);
     const app_record *find(qint64 id) const;
     const app_record &at(const int row) const { return records[row]; }
-    const QString &search_name(const int row) const { return search_names[row]; }
-    const QString &search_path(const int row) const { return search_paths[row]; }
+    const SearchQuery::SearchableData &search_data(const int row) const { return searchable_records[row]; }
+    const QString &search_name(const int row) const { return search_data(row).names.front().text; }
+    const QString &search_path(const int row) const { return search_data(row).file_name.text; }
     const QString &tag_names(const int row) const { return search_tags[row]; }
     int compare_names(int left_row, int right_row) const;
     int compare_tags(int left_row, int right_row) const;
@@ -54,6 +55,7 @@ private:
     QString query_text;
     mutable QVector<int> query_ranks;
     QMetaObject::Connection reset_connection;
+    QMetaObject::Connection state_connection;
     int query_rank(int row) const;
     QString section = "library";
     QString selected_tag;

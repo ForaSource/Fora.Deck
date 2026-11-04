@@ -7,6 +7,7 @@ class DesktopService;
 class QGraphicsOpacityEffect;
 class QLineEdit;
 class QToolButton;
+class QTimer;
 class QVariantAnimation;
 class SearchResults;
 class NotificationBanner;
@@ -22,6 +23,8 @@ class SearchOverlay : public QWidget {
     QGraphicsOpacityEffect *opacity;
     QVariantAnimation *reveal;
     QVariantAnimation *height_animation;
+    QTimer *activation_check;
+    bool dismiss_on_deactivate = false;
     qreal progress = 1;
     qreal surface_height = 0;
     int header_height = 0;
@@ -29,6 +32,8 @@ class SearchOverlay : public QWidget {
     void update_surface();
     void update_height();
     void refresh_appearance();
+    void position_on_screen();
+    void focus_search();
 
 protected:
     void paintEvent(QPaintEvent *event) override;

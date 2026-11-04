@@ -53,6 +53,11 @@ QString desktop_platform::default_overlay_shortcut() {
     return "Ctrl+Alt+Space";
 }
 
+void desktop_platform::activate_overlay(QWidget *const window) {
+    window->raise();
+    window->activateWindow();
+}
+
 bool WindowManager::activate_window(const app_record &record) {
     window_search search{QDir::toNativeSeparators(record.path), nullptr};
     EnumWindows(find_window, reinterpret_cast<LPARAM>(&search));

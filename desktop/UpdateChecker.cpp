@@ -17,7 +17,7 @@ constexpr qint64 metadata_limit = 4 * 1024 * 1024;
 constexpr qint64 installer_limit = 512 * 1024 * 1024;
 constexpr qint64 anonymous_check_interval = 60000;
 constexpr qint64 authenticated_check_interval = 5000;
-constexpr auto repository_path = "/Lappland-Julia/XLibrary/releases/";
+constexpr auto repository_path = "/lappland-open/XLibrary/releases/";
 
 struct release_version {
     QStringList numbers;
@@ -248,7 +248,7 @@ quint64 UpdateChecker::check(const QString &token) {
 void UpdateChecker::request_releases() {
     response.clear();
     auto query =
-        request(QUrl(QString("https://api.github.com/repos/Lappland-Julia/XLibrary/releases?per_page=100&page=%1")
+        request(QUrl(QString("https://api.github.com/repos/lappland-open/XLibrary/releases?per_page=100&page=%1")
                          .arg(++release_page)));
     query.setRawHeader("Accept", "application/vnd.github+json");
     query.setRawHeader("X-GitHub-Api-Version", "2022-11-28");

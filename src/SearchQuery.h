@@ -6,21 +6,39 @@
 #include <QVector>
 
 class SearchQuery {
+public:
+    struct SearchField {
+        QString text;
+        QStringList words;
+        QString initials;
+    };
+    struct SearchableData {
+        QVector<SearchField> names;
+        SearchField file_name;
+        QStringList tags;
+    };
+
+private:
     struct search_term {
         QString literal;
         QString alternate;
+        int maximum_distance = 0;
     };
     QVector<search_term> terms;
     QStringList required_tags;
     QStringList excluded_tags;
     QString phrase;
-    QString alternate_phrase;
     bool incomplete_tag = false;
+    bool abbreviations_enabled = false;
 
 public:
     explicit SearchQuery(const QString &text = {});
+    static SearchableData prepare(const QString &name, const QString &file_name, const QStringList &tags,
+                                  const QStringList &aliases = {});
+    int rank(const SearchableData &data) const;
     int rank(const QString &name, const QString &file_name, const QStringList &tags,
              const QStringList &aliases = {}) const;
+    static bool accepts_rank(int rank, int best_rank);
     QString tag_hint(const QStringList &known_tags) const;
     bool has_text() const { return !terms.isEmpty(); }
 };

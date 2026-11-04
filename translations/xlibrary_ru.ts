@@ -341,7 +341,7 @@
     </message>
     <message>
         <source>expected an absolute path</source>
-        <translation>ожидается абсолютный путь</translation>
+        <translation type="vanished">ожидается абсолютный путь</translation>
     </message>
     <message>
         <source>a Windows target requires a filename extension</source>
@@ -369,7 +369,7 @@
     </message>
     <message>
         <source>Application file or shortcut</source>
-        <translation>Файл приложения или ярлык</translation>
+        <translation type="vanished">Файл приложения или ярлык</translation>
     </message>
     <message>
         <source>Name</source>
@@ -425,7 +425,7 @@
     </message>
     <message>
         <source>Enter a name and an absolute path to the application file.</source>
-        <translation>Укажите название и абсолютный путь к файлу приложения.</translation>
+        <translation type="vanished">Укажите название и абсолютный путь к файлу приложения.</translation>
     </message>
     <message>
         <source>Shortcut loaded. Check its parameters and save again.</source>
@@ -1275,7 +1275,7 @@ XLibrary — MIT
     </message>
     <message>
         <source>The shortcut is already assigned to another action or reserved for search.</source>
-        <translation>Сочетание уже назначено другому действию или зарезервировано для поиска.</translation>
+        <translation type="vanished">Сочетание уже назначено другому действию или зарезервировано для поиска.</translation>
     </message>
     <message>
         <source>Could not save the settings file.</source>
@@ -2180,14 +2180,6 @@ Technical reason: %3</source>
         <translation>Источник</translation>
     </message>
     <message>
-        <source>Source: %1</source>
-        <translation>Источник: %1</translation>
-    </message>
-    <message>
-        <source>Source: manually added or imported</source>
-        <translation>Источник: ручное добавление или импорт</translation>
-    </message>
-    <message>
         <source>Stop the scenario before removing applications.</source>
         <translation>Остановите сценарий перед удалением приложений.</translation>
     </message>
@@ -2278,6 +2270,490 @@ Technical reason: %3</source>
     <message>
         <source>Remove the saved filter “%1”?</source>
         <translation>Удалить сохранённый фильтр «%1»?</translation>
+    </message>
+    <message>
+        <source>The shortcut %1 is already assigned to another action or reserved for text editing and search.</source>
+        <translation>Сочетание %1 уже назначено другому действию или зарезервировано для редактирования текста и поиска.</translation>
+    </message>
+    <message>
+        <source>Wait for the current library operation to finish.</source>
+        <translation>Дождитесь завершения текущей операции с библиотекой.</translation>
+    </message>
+    <message>
+        <source>The shortcut target no longer exists.</source>
+        <translation>Объект, которому назначено сочетание клавиш, больше не существует.</translation>
+    </message>
+    <message>
+        <source>Application file</source>
+        <translation>Файл приложения</translation>
+    </message>
+    <message>
+        <source>Desktop shortcut</source>
+        <translation>Ярлык рабочего стола</translation>
+    </message>
+    <message>
+        <source>Steam game (AppID)</source>
+        <translation>Игра Steam (AppID)</translation>
+    </message>
+    <message>
+        <source>Windows settings URI</source>
+        <translation>URI параметров Windows</translation>
+    </message>
+    <message>
+        <source>Windows application (AUMID)</source>
+        <translation>Приложение Windows (AUMID)</translation>
+    </message>
+    <message>
+        <source>Launch target type</source>
+        <translation>Тип объекта запуска</translation>
+    </message>
+    <message>
+        <source>Launch target</source>
+        <translation>Объект запуска</translation>
+    </message>
+    <message>
+        <source>Configured launch arguments</source>
+        <translation>Настроенные аргументы запуска</translation>
+    </message>
+    <message>
+        <source>Unavailable profile: %1</source>
+        <translation>Недоступный профиль: %1</translation>
+    </message>
+    <message>
+        <source>Default browser launch</source>
+        <translation>Запуск браузера по умолчанию</translation>
+    </message>
+    <message>
+        <source>Global hotkey</source>
+        <translation>Глобальное сочетание клавиш</translation>
+    </message>
+    <message>
+        <source>Launch profile</source>
+        <translation>Профиль запуска</translation>
+    </message>
+    <message>
+        <source>Application default</source>
+        <translation>По умолчанию для приложения</translation>
+    </message>
+    <message>
+        <source>Browser launch profile</source>
+        <translation>Профиль запуска браузера</translation>
+    </message>
+    <message>
+        <source>Launch selected profile</source>
+        <translation>Запустить выбранный профиль</translation>
+    </message>
+    <message>
+        <source>Set as default</source>
+        <translation>Использовать по умолчанию</translation>
+    </message>
+    <message>
+        <source>Browser launch profiles</source>
+        <translation>Профили запуска браузера</translation>
+    </message>
+    <message>
+        <source>Default launch profile</source>
+        <translation>Профиль запуска по умолчанию</translation>
+    </message>
+    <message>
+        <source>Wayland did not activate quick search. Click the search field or assign XLibrary --overlay in the system keyboard settings.</source>
+        <translation>Wayland не передал фокус быстрому поиску. Нажмите на поле поиска или назначьте сочетание для команды XLibrary --overlay в системных настройках клавиатуры.</translation>
+    </message>
+    <message>
+        <source>Private mode</source>
+        <translation>Приватный режим</translation>
+    </message>
+    <message>
+        <source>Normal mode</source>
+        <translation>Обычный режим</translation>
+    </message>
+    <message>
+        <source>Profile: %1</source>
+        <translation>Профиль: %1</translation>
+    </message>
+    <message>
+        <source>Switch to running window</source>
+        <translation>Переключиться на запущенное окно</translation>
+    </message>
+    <message>
+        <source>Browser profile</source>
+        <translation>Профиль браузера</translation>
+    </message>
+    <message>
+        <source>Run as administrator</source>
+        <translation>Запустить от имени администратора</translation>
+    </message>
+    <message>
+        <source>Edit tags</source>
+        <translation>Изменить теги</translation>
+    </message>
+    <message>
+        <source>Assign hotkey</source>
+        <translation>Назначить сочетание клавиш</translation>
+    </message>
+    <message>
+        <source>Remove “%1” from the library? The application files will be kept.</source>
+        <translation>Удалить «%1» из библиотеки? Файлы приложения будут сохранены.</translation>
+    </message>
+    <message>
+        <source>Assign a global shortcut in the application or scenario editor. An empty shortcut disables it.</source>
+        <translation>Назначьте глобальное сочетание клавиш в редакторе приложения или сценария. Чтобы отключить сочетание, оставьте поле пустым.</translation>
+    </message>
+    <message>
+        <source>Not assigned</source>
+        <translation>Не назначено</translation>
+    </message>
+    <message>
+        <source>On Wayland, configure a desktop shortcut for XLibrary --launch-id &lt;id&gt; or XLibrary --scenario-id &lt;id&gt;.</source>
+        <translation>В Wayland назначьте системное сочетание клавиш для команды XLibrary --launch-id &lt;id&gt; или XLibrary --scenario-id &lt;id&gt;.</translation>
+    </message>
+    <message>
+        <source>Checking Steam libraries</source>
+        <translation>Проверка библиотек Steam</translation>
+    </message>
+    <message>
+        <source>Steam checks complete</source>
+        <translation>Проверка Steam завершена</translation>
+    </message>
+    <message>
+        <source>Normal window</source>
+        <translation>Обычное окно</translation>
+    </message>
+    <message>
+        <source>InPrivate window</source>
+        <translation>Окно InPrivate</translation>
+    </message>
+    <message>
+        <source>Private window</source>
+        <translation>Приватное окно</translation>
+    </message>
+    <message>
+        <source>The selected browser profile is unavailable.</source>
+        <translation>Выбранный профиль браузера недоступен.</translation>
+    </message>
+    <message>
+        <source>This configuration already specifies a browser mode or profile. Use its configured launch or edit its arguments.</source>
+        <translation>В этой конфигурации уже задан режим или профиль браузера. Используйте настроенный запуск или измените его аргументы.</translation>
+    </message>
+    <message>
+        <source>This target supports activation only.</source>
+        <translation>Этот объект поддерживает только активацию.</translation>
+    </message>
+    <message>
+        <source>The target is not installed or is unavailable.</source>
+        <translation>Объект не установлен или недоступен.</translation>
+    </message>
+    <message>
+        <source>Checking Windows system applications</source>
+        <translation>Проверка системных приложений Windows</translation>
+    </message>
+    <message>
+        <source>System application checks complete</source>
+        <translation>Проверка системных приложений завершена</translation>
+    </message>
+    <message>
+        <source>Launch target is empty, too long, or contains a null character</source>
+        <translation>Объект запуска пуст, слишком длинный или содержит нулевой символ</translation>
+    </message>
+    <message>
+        <source>Launch path must be absolute</source>
+        <translation>Путь запуска должен быть абсолютным</translation>
+    </message>
+    <message>
+        <source>Desktop files require the desktop target type</source>
+        <translation>Для файлов .desktop требуется тип объекта «Ярлык рабочего стола»</translation>
+    </message>
+    <message>
+        <source>This target type does not accept arguments or a working directory</source>
+        <translation>Этот тип объекта не поддерживает аргументы и рабочую папку</translation>
+    </message>
+    <message>
+        <source>Invalid Steam AppID</source>
+        <translation>Некорректный AppID Steam</translation>
+    </message>
+    <message>
+        <source>Unsupported Windows settings URI</source>
+        <translation>Неподдерживаемый URI параметров Windows</translation>
+    </message>
+    <message>
+        <source>Invalid application user model ID</source>
+        <translation>Некорректный идентификатор модели приложения (AUMID)</translation>
+    </message>
+    <message>
+        <source>Unsupported launch target type</source>
+        <translation>Неподдерживаемый тип объекта запуска</translation>
+    </message>
+    <message>
+        <source>Unexpected end of VDF</source>
+        <translation>Неожиданный конец VDF</translation>
+    </message>
+    <message>
+        <source>Invalid VDF token</source>
+        <translation>Некорректный токен VDF</translation>
+    </message>
+    <message>
+        <source>Unterminated VDF string</source>
+        <translation>Незавершённая строка VDF</translation>
+    </message>
+    <message>
+        <source>VDF nesting limit exceeded</source>
+        <translation>Превышен предел вложенности VDF</translation>
+    </message>
+    <message>
+        <source>Unterminated VDF object</source>
+        <translation>Незавершённый объект VDF</translation>
+    </message>
+    <message>
+        <source>Unexpected VDF closing brace</source>
+        <translation>Неожиданная закрывающая скобка VDF</translation>
+    </message>
+    <message>
+        <source>Steam metadata file exceeds 8 MiB</source>
+        <translation>Размер файла метаданных Steam превышает 8 МиБ</translation>
+    </message>
+    <message>
+        <source>Steam manifest has no AppState</source>
+        <translation>В манифесте Steam отсутствует раздел AppState</translation>
+    </message>
+    <message>
+        <source>Steam AppID does not match manifest filename</source>
+        <translation>AppID Steam не соответствует имени файла манифеста</translation>
+    </message>
+    <message>
+        <source>Steam manifest has invalid name or installation directory</source>
+        <translation>В манифесте Steam указано некорректное название или папка установки</translation>
+    </message>
+    <message>
+        <source>Steam game is not fully installed</source>
+        <translation>Игра Steam установлена не полностью</translation>
+    </message>
+    <message>
+        <source>Steam installation directory is unavailable</source>
+        <translation>Папка установки Steam недоступна</translation>
+    </message>
+    <message>
+        <source>Duplicate Steam AppID</source>
+        <translation>Повторяющийся AppID Steam</translation>
+    </message>
+    <message>
+        <source>Launch target was not saved</source>
+        <translation>Объект запуска не был сохранён</translation>
+    </message>
+    <message>
+        <source>Launch configuration was not saved</source>
+        <translation>Конфигурация запуска не была сохранена</translation>
+    </message>
+    <message>
+        <source>Elevation is only available on Windows</source>
+        <translation>Повышение прав доступно только в Windows</translation>
+    </message>
+    <message>
+        <source>This target is only supported on Windows</source>
+        <translation>Этот объект поддерживается только в Windows</translation>
+    </message>
+    <message>
+        <source>Steam targets support activation only</source>
+        <translation>Объекты Steam поддерживают только активацию</translation>
+    </message>
+    <message>
+        <source>Profile contains an unsupported launch target type</source>
+        <translation>Профиль содержит неподдерживаемый тип объекта запуска</translation>
+    </message>
+    <message>
+        <source>Profile contains invalid launch target metadata</source>
+        <translation>Профиль содержит некорректные метаданные объекта запуска</translation>
+    </message>
+    <message>
+        <source>Unsupported Windows executable target</source>
+        <translation>Неподдерживаемый исполняемый объект Windows</translation>
+    </message>
+    <message>
+        <source>This target supports activation only</source>
+        <translation>Этот объект поддерживает только активацию</translation>
+    </message>
+    <message>
+        <source>Launch target is unavailable</source>
+        <translation>Объект запуска недоступен</translation>
+    </message>
+    <message>
+        <source>Cannot create application activation manager</source>
+        <translation>Не удалось создать диспетчер активации приложений</translation>
+    </message>
+    <message>
+        <source>Application activation failed (Windows error %1).</source>
+        <translation>Не удалось активировать приложение (ошибка Windows %1).</translation>
+    </message>
+    <message>
+        <source>Target activation failed (Windows error %1).</source>
+        <translation>Не удалось активировать объект (ошибка Windows %1).</translation>
+    </message>
+    <message>
+        <source>Elevation requires an available Windows executable</source>
+        <translation>Для повышения прав требуется доступный исполняемый файл Windows</translation>
+    </message>
+    <message>
+        <source>Elevated launch failed (Windows error %1).</source>
+        <translation>Не удалось запустить с повышенными правами (ошибка Windows %1).</translation>
+    </message>
+    <message>
+        <source>File Explorer</source>
+        <translation>Проводник</translation>
+    </message>
+    <message>
+        <source>Task Manager</source>
+        <translation>Диспетчер задач</translation>
+    </message>
+    <message>
+        <source>Control Panel</source>
+        <translation>Панель управления</translation>
+    </message>
+    <message>
+        <source>Bluetooth</source>
+        <translation>Bluetooth</translation>
+    </message>
+    <message>
+        <source>Display</source>
+        <translation>Дисплей</translation>
+    </message>
+    <message>
+        <source>Sound</source>
+        <translation>Звук</translation>
+    </message>
+    <message>
+        <source>Network</source>
+        <translation>Сеть</translation>
+    </message>
+    <message>
+        <source>Installed apps</source>
+        <translation>Установленные приложения</translation>
+    </message>
+    <message>
+        <source>Windows Update</source>
+        <translation>Центр обновления Windows</translation>
+    </message>
+    <message>
+        <source>Calculator</source>
+        <translation>Калькулятор</translation>
+    </message>
+    <message>
+        <source>Microsoft Store</source>
+        <translation>Microsoft Store</translation>
+    </message>
+    <message>
+        <source>Windows Terminal</source>
+        <translation>Терминал Windows</translation>
+    </message>
+    <message>
+        <source>Enter an application name.</source>
+        <translation>Введите название приложения.</translation>
+    </message>
+    <message>
+        <source>Applications</source>
+        <translation>Приложения</translation>
+    </message>
+    <message>
+        <source>Invalid executable metadata path</source>
+        <translation>Некорректный путь к исполняемому файлу в метаданных</translation>
+    </message>
+    <message>
+        <source>Truncated Steam appinfo cache</source>
+        <translation>Кэш appinfo Steam обрезан</translation>
+    </message>
+    <message>
+        <source>Steam appinfo string is too long</source>
+        <translation>Слишком длинная строка в appinfo Steam</translation>
+    </message>
+    <message>
+        <source>Steam appinfo nesting limit exceeded</source>
+        <translation>Превышен предел вложенности appinfo Steam</translation>
+    </message>
+    <message>
+        <source>Steam appinfo node limit exceeded</source>
+        <translation>Превышен предел количества элементов appinfo Steam</translation>
+    </message>
+    <message>
+        <source>Invalid Steam appinfo string index</source>
+        <translation>Некорректный индекс строки в appinfo Steam</translation>
+    </message>
+    <message>
+        <source>Unsupported Steam appinfo value type</source>
+        <translation>Неподдерживаемый тип значения в appinfo Steam</translation>
+    </message>
+    <message>
+        <source>Steam appinfo cache exceeds 128 MiB</source>
+        <translation>Кэш appinfo Steam превышает 128 МиБ</translation>
+    </message>
+    <message>
+        <source>Unsupported Steam appinfo cache version</source>
+        <translation>Неподдерживаемая версия кэша appinfo Steam</translation>
+    </message>
+    <message>
+        <source>Invalid Steam appinfo string table offset</source>
+        <translation>Некорректное смещение таблицы строк appinfo Steam</translation>
+    </message>
+    <message>
+        <source>Invalid Steam appinfo string table size</source>
+        <translation>Некорректный размер таблицы строк appinfo Steam</translation>
+    </message>
+    <message>
+        <source>Invalid Steam appinfo entry size</source>
+        <translation>Некорректный размер записи appinfo Steam</translation>
+    </message>
+    <message>
+        <source>Steam appinfo cache has no footer</source>
+        <translation>Отсутствует завершающая запись кэша appinfo Steam</translation>
+    </message>
+    <message>
+        <source>Uninstalled applications</source>
+        <translation>Удалённые приложения</translation>
+    </message>
+    <message>
+        <source>New applications</source>
+        <translation>Новые приложения</translation>
+    </message>
+    <message>
+        <source>These applications appear to have been uninstalled. Remove the checked entries from the library? Their paths will be checked again before removal.</source>
+        <translation>Эти приложения, вероятно, удалены с компьютера. Убрать отмеченные записи из библиотеки? Перед удалением их пути будут проверены ещё раз.</translation>
+    </message>
+    <message>
+        <source>Remove selected</source>
+        <translation>Убрать выбранные</translation>
+    </message>
+    <message>
+        <source>Add selected</source>
+        <translation>Добавить выбранные</translation>
+    </message>
+    <message>
+        <source>Keep all</source>
+        <translation>Оставить все</translation>
+    </message>
+    <message>
+        <source>Applications are checked in the background at every startup. New applications are offered for selection. Applications removed from the library are not offered again. Changed sources will be used after saving settings.</source>
+        <translation>При каждом запуске приложения проверяются в фоне. Новые приложения предлагаются на выбор. Удалённые из библиотеки больше не предлагаются. Изменённые источники будут использованы после сохранения настроек.</translation>
+    </message>
+    <message>
+        <source>Ask before removing uninstalled applications from the library</source>
+        <translation>Спрашивать перед удалением из библиотеки приложений, удалённых с компьютера</translation>
+    </message>
+    <message>
+        <source>When disabled, confirmed missing applications are removed automatically. Unavailable drives and uncertain targets are kept.</source>
+        <translation>Если выключено, подтверждённо отсутствующие приложения убираются автоматически. Записи на недоступных дисках и сомнительные случаи сохраняются.</translation>
+    </message>
+    <message>
+        <source>Could not save discovery exclusions.</source>
+        <translation>Не удалось сохранить исключения обнаружения.</translation>
+    </message>
+    <message>
+        <source>No new applications found.</source>
+        <translation>Новых приложений не найдено.</translation>
+    </message>
+    <message>
+        <source>Removed uninstalled applications: %1.</source>
+        <translation>Удалено приложений: %1.</translation>
+    </message>
+    <message>
+        <source>Added applications: %1.</source>
+        <translation>Добавлено приложений: %1.</translation>
     </message>
 </context>
 </TS>

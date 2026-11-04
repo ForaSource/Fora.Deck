@@ -46,6 +46,7 @@ std::uint32_t Application::launch(const std::wstring &arguments, const std::file
 #include <QDBusConnectionInterface>
 #include <QDBusMessage>
 #include <QDirIterator>
+#include <QHash>
 #include <QLocale>
 #include <QProcess>
 #include <QRegularExpression>
@@ -639,10 +640,19 @@ QSet<QString> Heartbeat::running_paths(const QVector<app_record> &applications) 
             QCoreApplication::translate("XLibrary", "The /proc filesystem is unavailable: process state is unknown.")
                 .toStdString());
     QSet<QString> result;
+    QHash<QByteArray, QString> steam_paths;
     QVector<QPair<QString, process_identity>> identities;
     for (const auto &application : applications) {
+        const auto path = Application::process_path(application);
+        if (path.isEmpty())
+            continue;
+        if (Application::target_kind(application) == "steam") {
+            steam_paths.insert("SteamAppId=" + application.path.toUtf8(), absolute_path(path));
+            steam_paths.insert("SteamGameId=" + application.path.toUtf8(), absolute_path(path));
+            continue;
+        }
         try {
-            identities.append({absolute_path(application.path), application_identity(application)});
+            identities.append({absolute_path(path), application_identity(application)});
         } catch (const std::exception &) {
             // A deleted or corrupted entry must not prevent monitoring the other applications.
         }
@@ -654,6 +664,17 @@ QSet<QString> Heartbeat::running_paths(const QVector<app_record> &applications) 
         if (!numeric)
             continue;
         const auto directory = proc.filePath(name);
+        // Proton's /proc/exe can name a Wine host; Steam identifies the game in its environment.
+        if (!steam_paths.isEmpty()) {
+            QFile environment_file(directory + "/environ");
+            if (environment_file.open(QIODevice::ReadOnly)) {
+                const auto environment = environment_file.read(64 * 1024);
+                const auto entries = environment.split('\0');
+                for (qsizetype index = 0; index + 1 < entries.size(); ++index)
+                    if (const auto found = steam_paths.constFind(entries[index]); found != steam_paths.cend())
+                        result.insert(*found);
+            }
+        }
         const auto executable = process_executable(directory);
         if (executable.isEmpty())
             continue;
@@ -667,6 +688,8 @@ QSet<QString> Heartbeat::running_paths(const QVector<app_record> &applications) 
 }
 
 QString Application::new_instance_error(const app_record &record) {
+    if (!file_target(record))
+        return QCoreApplication::translate("XLibrary", "This target supports activation only.");
     if (QFileInfo(record.path).suffix() != "desktop")
         return {};
     try {
@@ -685,13 +708,35 @@ QString Application::new_instance_error(const app_record &record) {
 }
 
 void Application::launch_application(const app_record &record, const launch_mode mode) {
+    validate_launch_target(record);
+    if (mode == launch_mode::elevated)
+        throw std::invalid_argument(
+            QCoreApplication::translate("XLibrary", "Elevation is only available on Windows").toStdString());
+    if (!file_target(record)) {
+        if (target_kind(record) != "steam")
+            throw std::invalid_argument(
+                QCoreApplication::translate("XLibrary", "This target is only supported on Windows").toStdString());
+        if (mode == launch_mode::new_instance)
+            throw std::invalid_argument(
+                QCoreApplication::translate("XLibrary", "Steam targets support activation only").toStdString());
+        if (!target_available(record))
+            throw std::runtime_error(
+                QCoreApplication::translate("XLibrary", "Steam installation directory is unavailable").toStdString());
+        QProcess process;
+        process.setProcessEnvironment(application_environment());
+        process.setProgram("xdg-open");
+        process.setArguments({"steam://run/" + record.path});
+        if (!process.startDetached())
+            throw std::runtime_error(process.errorString().toStdString());
+        return;
+    }
     QStringList command;
     QString directory = record.working_directory;
     if (QFileInfo(record.path).suffix() == "desktop") {
         const auto entry = read_entry(record.path);
         validate_entry(entry);
-        if (mode != launch_mode::new_instance && record.arguments.isEmpty() && record.working_directory.isEmpty() &&
-            activate_dbus(entry))
+        if (mode != launch_mode::new_instance && !requires_fresh_launch(record) && record.arguments.isEmpty() &&
+            record.working_directory.isEmpty() && activate_dbus(entry))
             return;
         command = entry_command(entry);
         command.append(user_arguments(record.arguments));
@@ -725,6 +770,12 @@ void Application::launch_application(const app_record &record, const launch_mode
                                      .toStdString());
 }
 
+QString Application::configured_arguments(const app_record &record) {
+    if (target_kind(record) == "desktop")
+        return read_entry(record.path).values.value("Exec") + ' ' + record.arguments;
+    return record.arguments;
+}
+
 app_record Application::resolve_application(const QString &path) {
     app_record result;
     result.discovery_source = path;
@@ -738,6 +789,8 @@ app_record Application::resolve_application(const QString &path) {
         validate_entry(entry);
         result.name = localized_value(entry, "Name");
         result.working_directory = entry.values.value("Path");
+        if (!entry.values.value("Exec").isEmpty())
+            result.executable_path = executable_path(entry_command(entry).front());
     } else {
         if (!info.isExecutable())
             throw std::invalid_argument(
@@ -814,7 +867,14 @@ QVector<app_record> Application::discover(const bool system_applications, const 
     if (progress)
         progress({90, entries.size(), entries.size(),
                   QCoreApplication::translate("XLibrary", "Application checks complete")});
+    if (system_applications || user_applications)
+        result += discover_steam(issues, cancelled, progress);
     return cancelled.load() ? QVector<app_record>{} : result;
+}
+
+QVector<app_record> Application::discover_system(QVector<discovery_issue> &, const std::atomic_bool &,
+                                                 const std::function<void(const discovery_progress &)> &) {
+    return {};
 }
 
 bool Application::set_autostart(const bool enabled, QString &error) {

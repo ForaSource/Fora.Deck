@@ -142,7 +142,11 @@ if(WIN32)
             src/Windows/WindowManager.cpp
             src/Windows/RegistryScan.cpp src/Windows/RegistryScan.h
     )
-    target_compile_definitions(xlibrary_core PUBLIC NOMINMAX WIN32_LEAN_AND_MEAN)
+    # Expose the Windows 10 APIs required by the application, including AUMID activation.
+    target_compile_definitions(xlibrary_core PUBLIC
+            NOMINMAX WIN32_LEAN_AND_MEAN
+            WINVER=0x0A00 _WIN32_WINNT=0x0A00 NTDDI_VERSION=0x0A000000
+    )
     target_link_libraries(xlibrary_core PUBLIC version shell32 gdi32 advapi32 ole32 uuid)
 else()
     target_sources(xlibrary_core PRIVATE

@@ -60,6 +60,8 @@ std::vector<Application> Manager::get_apps() const {
     std::vector<Application> result;
     result.reserve(catalog.applications.size());
     for (const auto &record : catalog.applications) {
+        if (!Application::file_target(record))
+            continue;
         const auto found = std::ranges::find_if(std::as_const(applications), [&](const auto &app) {
             return app.get_file_title() == record.name.toStdString() &&
                    app.get_file_path() == filesystem_path(record.path);
@@ -146,7 +148,7 @@ void Manager::restore(const quint64 id, const QString &path) {
 void Manager::refresh() {
     catalog = store->read();
     for (auto &record : catalog.applications) {
-        record.running = last_running.contains(normalized_path(record.path));
+        record.running = last_running.contains(normalized_path(Application::process_path(record)));
     }
     emit loaded(catalog);
     poll(true);
@@ -156,6 +158,21 @@ void Manager::poll(const bool force) {
     QSet<QString> unavailable;
     QSet<QString> missing_volumes;
     const auto previous_roots = known_volume_roots;
+    bool locations_changed = false;
+    const auto observe_location = [&](const QString &path) {
+        if (!QFileInfo(path).isAbsolute() || !QFileInfo::exists(path))
+            return;
+        const QStorageInfo volume(path);
+        if (!volume.isValid() || !volume.isReady() || volume.device().isEmpty())
+            return;
+        const QStringList location{normalized_path(volume.rootPath()), QString::fromLatin1(volume.device().toHex())};
+        const auto key = normalized_path(path);
+        // Do not replace a known mount with its surviving parent after a disk is disconnected.
+        if (!verified_locations.contains(key)) {
+            verified_locations.insert(key, location);
+            locations_changed = true;
+        }
+    };
     bool capabilities_changed = false;
     auto paths = last_running;
     try {
@@ -164,8 +181,29 @@ void Manager::poll(const bool force) {
                 record.new_instance_error = error;
                 capabilities_changed = true;
             }
-            record.available = QFileInfo(record.path).isFile();
+            record.available = Application::target_available(record);
+            if (Application::file_target(record)) {
+                observe_location(record.path);
+                if (Application::target_kind(record) == "desktop")
+                    observe_location(record.executable_path);
+            } else if (Application::target_kind(record) == "steam") {
+                observe_location(record.installation_directory);
+                for (const auto &source : record.discovery_sources)
+                    observe_location(source);
+                observe_location(record.discovery_source);
+            }
             record.volume_unavailable = false;
+            if (!Application::file_target(record)) {
+                if (Application::target_kind(record) == "steam" && record.available) {
+                    const QStorageInfo volume(record.installation_directory);
+                    const auto root = QDir::fromNativeSeparators(volume.rootPath());
+                    if (volume.isValid() && !root.isEmpty() && root != "/" && !known_volume_roots.contains(root))
+                        known_volume_roots.append(root);
+                }
+                if (!record.available)
+                    unavailable.insert(Application::launch_key(record));
+                continue;
+            }
             if (record.available) {
                 const QStorageInfo volume(record.path);
                 if (const auto root = QDir::fromNativeSeparators(volume.rootPath());
@@ -210,9 +248,11 @@ void Manager::poll(const bool force) {
         return;
     }
     for (auto &record : catalog.applications)
-        record.running = paths.contains(normalized_path(record.path));
+        record.running = paths.contains(normalized_path(Application::process_path(record)));
     if (known_volume_roots != previous_roots)
         emit volumes_observed(known_volume_roots);
+    if (locations_changed)
+        emit locations_observed(verified_locations);
     if (force || capabilities_changed || paths != last_running || unavailable != last_unavailable ||
         missing_volumes != last_missing_volumes) {
         last_running = paths;
@@ -225,7 +265,8 @@ void Manager::poll(const bool force) {
 void Manager::save_application(const app_record &record) {
     const auto current = std::ranges::find_if(std::as_const(this->catalog.applications),
                                               [&](const app_record &item) { return item.id == record.id; });
-    if (record.id == 0 || (current != this->catalog.applications.cend() && current->path != record.path))
+    if (Application::file_target(record) &&
+        (record.id == 0 || (current != this->catalog.applications.cend() && current->path != record.path)))
         Application::resolve_application(record.path);
     const auto id = this->store->save_application(record);
     this->refresh();
@@ -236,8 +277,19 @@ void Manager::resolve_application(const QString &path) {
     emit this->resolved(this->request_id, path, Application::resolve_application(path));
 }
 
-void Manager::remove_applications(const QVector<qint64> &ids) {
+void Manager::remove_applications(const QVector<qint64> &ids, const bool remember) {
+    if (ids.isEmpty())
+        return;
+    QStringList dismissed;
+    if (remember) {
+        const QSet<qint64> selected(ids.cbegin(), ids.cend());
+        for (const auto &record : this->store->read().applications)
+            if (selected.contains(record.id))
+                dismissed.append(Application::target_key(record));
+    }
     this->store->remove_applications(ids);
+    if (!dismissed.isEmpty())
+        emit discovery_dismissed(dismissed);
     emit this->undo_changed(this->store->can_undo_removal());
     this->refresh();
 }
@@ -324,7 +376,12 @@ void Manager::export_catalog(const QString &path) {
         }
         const auto contents = QJsonDocument(QJsonObject{{"name", record.name},
                                                         {"path", record.path},
+                                                        {"target_kind", Application::target_kind(record)},
+                                                        {"installation_directory", record.installation_directory},
+                                                        {"executable_path", record.executable_path},
+                                                        {"icon_path", record.icon_path},
                                                         {"arguments", record.arguments},
+                                                        {"default_launch_profile", record.default_launch_profile},
                                                         {"working_directory", record.working_directory},
                                                         {"favorite", record.favorite},
                                                         {"tags", QJsonArray::fromStringList(record.tags)},
@@ -405,7 +462,12 @@ void Manager::import_catalog(const QString &path) {
         app_record record;
         record.name = text("name", true).trimmed();
         record.path = QDir::fromNativeSeparators(text("path", true));
+        record.target_kind = text("target_kind");
+        record.installation_directory = text("installation_directory");
+        record.executable_path = text("executable_path");
+        record.icon_path = text("icon_path");
         record.arguments = text("arguments");
+        record.default_launch_profile = text("default_launch_profile");
         record.working_directory = text("working_directory");
         if (object.contains("favorite") && !object.value("favorite").isBool())
             fail("favorite", QCoreApplication::translate("XLibrary", "expected a boolean"));
@@ -444,10 +506,8 @@ void Manager::import_catalog(const QString &path) {
         }
         if (record.name.isEmpty() || record.name.size() > 256)
             fail("name", QCoreApplication::translate("XLibrary", "the name must contain 1 to 256 characters"));
-        if (!QFileInfo(record.path).isAbsolute())
-            fail("path", QCoreApplication::translate("XLibrary", "expected an absolute path"));
 #ifdef Q_OS_WIN
-        if (QFileInfo(record.path).suffix().isEmpty())
+        if (Application::file_target(record) && QFileInfo(record.path).suffix().isEmpty())
             fail("path", QCoreApplication::translate("XLibrary", "a Windows target requires a filename extension"));
 #endif
         if (!record.working_directory.isEmpty() && !QFileInfo(record.working_directory).isAbsolute())
@@ -488,7 +548,8 @@ void Manager::recover_paths(const QVector<path_relocation> &changes) {
 
 void Manager::launch_record(const qint64 id, const Application::launch_mode mode, const quint64 generation,
                             const std::shared_ptr<std::atomic<quint64>> &token,
-                            const std::function<void(const app_record &, Application::launch_mode)> &launch_action) {
+                            const std::function<void(const app_record &, Application::launch_mode)> &launch_action,
+                            const QString &profile) {
     try {
         if (generation && token->load() != generation) {
             throw DiscoveryCancelled();
@@ -498,7 +559,14 @@ void Manager::launch_record(const qint64 id, const Application::launch_mode mode
         if (it == this->catalog.applications.cend())
             throw std::invalid_argument(
                 QCoreApplication::translate("XLibrary", "The application was not found in the library.").toStdString());
-        launch_action(*it, mode);
+        const auto selected_profile = profile.isEmpty() ? it->default_launch_profile : profile;
+        const auto record = Application::with_launch_profile(*it, selected_profile);
+        const auto effective_mode = mode == Application::launch_mode::activate &&
+                                            ((!selected_profile.isEmpty() && selected_profile != "configured") ||
+                                             Application::requires_fresh_launch(record))
+                                        ? Application::launch_mode::launch
+                                        : mode;
+        launch_action(record, effective_mode);
         // Ошибка истории не должна превращать успешный запуск в неуспешный или повторный.
         emit this->launched(id, {this->request_id, "launch", operation_state::completed, {}}, generation);
         try {
@@ -591,25 +659,82 @@ void Manager::preview_files(const QStringList &paths, const std::shared_ptr<disc
     emit this->preview_ready(this->request_id, records, issues);
 }
 
+void Manager::review_inventory(const QVector<app_record> &records, const QVector<discovery_issue> &issues,
+                               const std::shared_ptr<discovery_control> &cancelled) {
+    // Refresh locations and sources only for known configurations; additions still require selection.
+    store->refresh_discovery_metadata(records, *cancelled);
+    refresh();
+    QSet<QString> found;
+    for (const auto &record : records)
+        found.insert(Application::launch_key(record));
+    QVector<app_record> removed;
+    const bool complete = std::ranges::none_of(
+        issues, [](const discovery_issue &issue) { return issue.kind == discovery_issue_kind::error; });
+    for (const auto &record : store->read().applications) {
+        if (cancelled->requested.load())
+            throw DiscoveryCancelled();
+        if (complete && monitor_state == operation_state::ready &&
+            !last_running.contains(normalized_path(Application::process_path(record))) &&
+            !found.contains(Application::launch_key(record)) &&
+            Application::definitely_removed(record, known_volume_roots, verified_locations))
+            removed.append(record);
+    }
+    defer_result = true;
+    emit inventory_ready(request_id, records, removed, issues);
+}
+
+void Manager::remove_missing_applications(const QVector<app_record> &records,
+                                          const std::shared_ptr<discovery_control> &cancelled) {
+    const auto current = store->read();
+    const auto running = Heartbeat::running_paths(current.applications);
+    QVector<qint64> ids;
+    for (const auto &record : records) {
+        const auto found = std::ranges::find_if(current.applications, [&](const app_record &item) {
+            return item.id == record.id && Application::launch_key(item) == Application::launch_key(record) &&
+                   item.installation_directory == record.installation_directory &&
+                   item.executable_path == record.executable_path && item.discovery_source == record.discovery_source;
+        });
+        if (found != current.applications.cend() &&
+            !running.contains(normalized_path(Application::process_path(*found))) &&
+            Application::definitely_removed(*found, known_volume_roots, verified_locations))
+            ids.append(found->id);
+    }
+    if (cancelled->requested.load())
+        throw DiscoveryCancelled();
+    if (!ids.isEmpty()) {
+        remove_applications(ids, false);
+        emit notification(
+            QCoreApplication::translate("XLibrary", "Removed uninstalled applications: %1.").arg(ids.size()));
+    }
+}
+
 void Manager::apply_catalog_preview(const QVector<app_record> &applications, QVector<discovery_issue> issues,
                                     const std::shared_ptr<discovery_control> &cancelled,
                                     const import_conflict_policy policy,
-                                    const std::function<void(qsizetype, qsizetype)> &report_progress) {
+                                    const std::function<void(qsizetype, qsizetype)> &report_progress,
+                                    const bool quiet) {
     try {
         const auto count = this->store->import_records(applications, cancelled.get(), report_progress, &issues, policy);
         const auto message = discovery_summary(
             count.added, issues,
             QCoreApplication::translate("XLibrary", "Import complete. Updated: %1.").arg(count.updated));
         emit this->discovery_report_ready(discovery_details(message, issues));
-        emit this->notification(
-            QCoreApplication::translate("XLibrary", "Import complete. Added: %1. Already in the library: %2.")
-                .arg(count.added)
-                .arg(count.duplicates + count.updated));
+        if (quiet) {
+            if (count.added > 0)
+                emit this->notification(
+                    QCoreApplication::translate("XLibrary", "Added applications: %1.").arg(count.added));
+        } else {
+            emit this->notification(
+                QCoreApplication::translate("XLibrary", "Import complete. Added: %1. Already in the library: %2.")
+                    .arg(count.added)
+                    .arg(count.duplicates + count.updated));
+        }
         this->refresh();
     } catch (const DiscoveryCancelled &) {
         const auto message = QCoreApplication::translate("XLibrary", "Import cancelled; changes were not saved.");
         emit this->discovery_report_ready(discovery_details(message, issues));
-        emit this->notification(message);
+        if (!quiet)
+            emit this->notification(message);
         throw;
     } catch (const std::exception &error) {
         issues.append({"SQLite", QString::fromUtf8(error.what())});

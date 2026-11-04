@@ -32,6 +32,7 @@ public:
     QSet<QString> last_unavailable;
     QSet<QString> last_missing_volumes;
     QStringList known_volume_roots;
+    QVariantMap verified_locations;
     operation_state monitor_state = operation_state::ready;
     quint64 monitor_request_id = 0;
     quint64 request_id = 0;
@@ -49,8 +50,11 @@ public:
 signals:
     void loaded(const catalog_snapshot &catalog);
     void preview_ready(quint64 request_id, const QVector<app_record> &records, const QVector<discovery_issue> &issues);
+    void inventory_ready(quint64 request_id, const QVector<app_record> &records, const QVector<app_record> &removed,
+                         const QVector<discovery_issue> &issues);
     void undo_changed(bool available);
     void volumes_observed(const QStringList &roots);
+    void locations_observed(const QVariantMap &locations);
     void location_changed(const QString &path);
     void schema_changed(int version);
     void profile_inspected(quint64 request_id, const QString &path, const profile_manifest &manifest);
@@ -65,6 +69,7 @@ signals:
     void launched(qint64 id, const operation_result &result, quint64 scenario);
     void notification(const QString &message);
     void discovery_report_ready(const QString &report);
+    void discovery_dismissed(const QStringList &targets);
 
 private:
     // Keep Application's shared process handles when the value-based API is used.
@@ -74,7 +79,7 @@ private:
 public:
     void save_application(const app_record &record);
     void resolve_application(const QString &path);
-    void remove_applications(const QVector<qint64> &ids);
+    void remove_applications(const QVector<qint64> &ids, bool remember = true);
     void undo_removal();
     void update_metadata(const QVector<qint64> &ids, const QStringList &add_tags, const QStringList &remove_tags,
                          int favorite);
@@ -92,13 +97,18 @@ public:
     void recover_paths(const QVector<path_relocation> &changes);
     void launch_record(qint64 id, Application::launch_mode mode, quint64 generation,
                        const std::shared_ptr<std::atomic<quint64>> &token,
-                       const std::function<void(const app_record &, Application::launch_mode)> &launch_action);
+                       const std::function<void(const app_record &, Application::launch_mode)> &launch_action,
+                       const QString &profile = {});
     void execute(quint64 id, const QString &operation, const std::function<void(Manager &)> &task,
                  operation_error_source source);
     void preview_files(const QStringList &paths, const std::shared_ptr<discovery_control> &cancelled);
+    void review_inventory(const QVector<app_record> &records, const QVector<discovery_issue> &issues,
+                          const std::shared_ptr<discovery_control> &cancelled);
+    void remove_missing_applications(const QVector<app_record> &records,
+                                     const std::shared_ptr<discovery_control> &cancelled);
     void apply_catalog_preview(const QVector<app_record> &applications, QVector<discovery_issue> issues,
                                const std::shared_ptr<discovery_control> &cancelled, import_conflict_policy policy,
-                               const std::function<void(qsizetype, qsizetype)> &report_progress);
+                               const std::function<void(qsizetype, qsizetype)> &report_progress, bool quiet = false);
     void backup_profile(const QString &path, const QString &database_path, const QString &settings_path,
                         bool settings_ok);
     void restore_profile(const QString &path, const QString &database_path, const QString &settings_path,

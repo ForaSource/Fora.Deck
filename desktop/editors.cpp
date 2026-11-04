@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDialogButtonBox>
@@ -5,6 +6,7 @@
 #include <QFileInfo>
 #include <QGridLayout>
 #include <QHeaderView>
+#include <QKeySequenceEdit>
 #include <QLineEdit>
 #include <QListWidget>
 #include <QPlainTextEdit>
@@ -13,7 +15,9 @@
 #include <QSpinBox>
 #include <QTableWidget>
 #include <QTextDocument>
+#include <QTimer>
 
+#include "Application.h"
 #include "DesktopService.h"
 #include "editors.h"
 #include "localization.h"
@@ -48,6 +52,15 @@ QDialog *application_editor(const ui_context &context, QWidget *const parent) {
     auto *layout = new QVBoxLayout(form);
     layout->setContentsMargins(0, 16, 0, 8);
     layout->setSpacing(6);
+    auto *target_type = new QComboBox;
+    target_type->setObjectName("application_target_type");
+    target_type->addItem(QCoreApplication::translate("XLibrary", "Application file"), "executable");
+    target_type->addItem(QCoreApplication::translate("XLibrary", "Desktop shortcut"), "desktop");
+    target_type->addItem(QCoreApplication::translate("XLibrary", "Steam game (AppID)"), "steam");
+    target_type->addItem(QCoreApplication::translate("XLibrary", "Windows settings URI"), "system_uri");
+    target_type->addItem(QCoreApplication::translate("XLibrary", "Windows application (AUMID)"), "aumid");
+    target_type->setCurrentIndex(qMax(0, target_type->findData(Application::target_kind(record))));
+    field(layout, QCoreApplication::translate("XLibrary", "Launch target type"), target_type);
     auto *path = new QLineEdit;
     path->setMaxLength(static_cast<int>(catalog_limits::text_length));
     path->setText(record.path);
@@ -58,7 +71,7 @@ QDialog *application_editor(const ui_context &context, QWidget *const parent) {
     file_layout->setContentsMargins(0, 0, 0, 0);
     file_layout->addWidget(path, 1);
     file_layout->addWidget(browse);
-    field(layout, QCoreApplication::translate("XLibrary", "Application file or shortcut"), file_row);
+    field(layout, QCoreApplication::translate("XLibrary", "Launch target"), file_row);
     auto *name = new QLineEdit(record.name);
     name->setObjectName("application_name");
     name->setMaxLength(256);
@@ -78,7 +91,55 @@ QDialog *application_editor(const ui_context &context, QWidget *const parent) {
     directory->setText(record.working_directory);
     directory->setPlaceholderText(QCoreApplication::translate("XLibrary", "Default: application folder"));
     field(layout, QCoreApplication::translate("XLibrary", "Working directory"), directory);
+    auto *profiles = new QComboBox;
+    profiles->setObjectName("application_launch_profile");
+    const auto refresh_profiles = [=] {
+        const auto selected = profiles->count() ? profiles->currentData().toString() : record.default_launch_profile;
+        const QSignalBlocker blocker(profiles);
+        profiles->clear();
+        profiles->addItem(QCoreApplication::translate("XLibrary", "Configured launch arguments"), QString{});
+        auto candidate = record;
+        candidate.path = path->text();
+        candidate.target_kind = target_type->currentData().toString();
+        for (const auto &profile : service->launch_profiles(candidate))
+            profiles->addItem(profile.icon_path.isEmpty() ? appearance::icon(profile.kind == "private" ? "lock" : "app")
+                                                          : QIcon(profile.icon_path),
+                              profile.name, profile.id);
+        if (!selected.isEmpty() && profiles->findData(selected) < 0)
+            profiles->addItem(QCoreApplication::translate("XLibrary", "Unavailable profile: %1").arg(selected),
+                              selected);
+        profiles->setCurrentIndex(qMax(0, profiles->findData(selected)));
+        profiles->setEnabled(profiles->count() > 1);
+    };
+    field(layout, QCoreApplication::translate("XLibrary", "Default browser launch"), profiles);
+    refresh_profiles();
+    QObject::connect(service, &DesktopService::launch_profiles_changed, dialog, [=](const QString &changed_path) {
+        if (changed_path == path->text())
+            refresh_profiles();
+    });
+    const auto update_target_fields = [=] {
+        const auto kind = target_type->currentData().toString();
+        const bool file = kind == "executable" || kind == "desktop";
+        browse->setEnabled(file);
+        arguments->setEnabled(file);
+        directory->setEnabled(file);
+        path->setPlaceholderText(kind == "steam"        ? QString("730")
+                                 : kind == "system_uri" ? QString("ms-settings:")
+                                 : kind == "aumid"      ? QString("PackageFamilyName!ApplicationId")
+                                                        : QString{});
+        refresh_profiles();
+    };
+    QObject::connect(target_type, &QComboBox::currentIndexChanged, dialog, update_target_fields);
+    QObject::connect(path, &QLineEdit::editingFinished, dialog, refresh_profiles);
+    update_target_fields();
+    auto *shortcut = new QKeySequenceEdit(service->target_shortcut(false, record.id));
+    shortcut->setMaximumSequenceLength(1);
+    shortcut->setObjectName("application_hotkey");
+    field(layout, QCoreApplication::translate("XLibrary", "Global hotkey"), shortcut);
+    if (record.id > 0)
+        layout->addWidget(label(QString("XLibrary --launch-id %1").arg(record.id), "muted"));
     auto *tags = new QLineEdit(record.tags.join(", "));
+    tags->setObjectName("application_tags");
     tags->setPlaceholderText(QCoreApplication::translate("XLibrary", "development, work"));
     field(layout, QCoreApplication::translate("XLibrary", "Tags separated by commas"), tags);
     auto *tag_search = new QLineEdit;
@@ -155,6 +216,9 @@ QDialog *application_editor(const ui_context &context, QWidget *const parent) {
                          if (QDir::cleanPath(path->text()) != QDir::cleanPath(requested_path))
                              return;
                          path->setText(resolved.path);
+                         target_type->setCurrentIndex(
+                             qMax(0, target_type->findData(Application::target_kind(resolved))));
+                         refresh_profiles();
                          if (name->text().isEmpty() || name->text() == name->property("resolved_name").toString())
                              name->setText(resolved.name);
                          name->setProperty("resolved_name", resolved.name);
@@ -163,24 +227,46 @@ QDialog *application_editor(const ui_context &context, QWidget *const parent) {
                      });
     QObject::connect(buttons, &QDialogButtonBox::accepted, dialog, [=] {
         app_record updated = record;
+        updated.id = dialog->property("saved_application_id").isValid()
+                         ? dialog->property("saved_application_id").toLongLong()
+                         : record.id;
         updated.name = name->text().trimmed();
-        updated.path = QDir::fromNativeSeparators(path->text());
-        updated.arguments = arguments->text();
-        updated.working_directory = directory->text();
+        updated.target_kind = target_type->currentData().toString();
+        updated.path =
+            Application::file_target(updated) ? QDir::fromNativeSeparators(path->text()) : path->text().trimmed();
+        if (updated.target_kind != Application::target_kind(record) || updated.path != record.path) {
+            updated.installation_directory.clear();
+            updated.executable_path.clear();
+            updated.icon_path.clear();
+        }
+        updated.default_launch_profile = profiles->currentData().toString();
+        updated.arguments = arguments->isEnabled() ? arguments->text() : QString{};
+        updated.working_directory = directory->isEnabled() ? directory->text() : QString{};
         if (tags->text() != record.tags.join(", "))
             updated.tags = parse_tags(tags->text());
         if (aliases->document()->isModified()) {
             updated.aliases.clear();
             for (auto alias : aliases->toPlainText().split('\n', Qt::SkipEmptyParts)) {
                 alias = alias.trimmed();
-                if (!alias.isEmpty() && !updated.aliases.contains(alias, Qt::CaseInsensitive))
+                if (!alias.isEmpty() && !std::ranges::any_of(updated.aliases, [&](const QString &existing) {
+                        return tag_name_key(existing) == tag_name_key(alias);
+                    }))
                     updated.aliases.append(alias);
             }
         }
         updated.favorite = favorite->isChecked();
-        if (updated.name.isEmpty() || !QFileInfo(updated.path).isAbsolute()) {
-            error->setText(
-                QCoreApplication::translate("XLibrary", "Enter a name and an absolute path to the application file."));
+        try {
+            if (updated.name.isEmpty())
+                throw std::invalid_argument(
+                    QCoreApplication::translate("XLibrary", "Enter an application name.").toStdString());
+            Application::validate_launch_target(updated);
+        } catch (const std::exception &failure) {
+            error->setText(QString::fromUtf8(failure.what()));
+            return;
+        }
+        QString shortcut_error;
+        if (!service->validate_target_shortcut(false, updated.id, shortcut->keySequence(), shortcut_error)) {
+            error->setText(shortcut_error);
             return;
         }
         if (!updated.working_directory.isEmpty() && !QFileInfo(updated.working_directory).isAbsolute()) {
@@ -206,20 +292,49 @@ QDialog *application_editor(const ui_context &context, QWidget *const parent) {
         save->setEnabled(false);
         dialog->setProperty("save_request_id", QVariant::fromValue(service->save_application(std::move(updated))));
     });
+    QObject::connect(service, &DesktopService::application_saved, dialog, [=](quint64 request_id, qint64 id) {
+        if (request_id == dialog->property("save_request_id").toULongLong())
+            dialog->setProperty("saved_application_id", id);
+    });
     QObject::connect(service, &DesktopService::operation_changed, dialog, [=](const operation_result &result) {
+        if (result.operation == "target_shortcut" && dialog->property("waiting_shortcut").toBool()) {
+            if (result.state == operation_state::loading)
+                dialog->setProperty("shortcut_request_id", QVariant::fromValue(result.id));
+            else if (result.id == dialog->property("shortcut_request_id").toULongLong()) {
+                dialog->setProperty("waiting_shortcut", false);
+                if (result.state == operation_state::completed)
+                    dialog->accept();
+                else {
+                    save->setEnabled(true);
+                    error->setText(result.error.user_message);
+                }
+            }
+            return;
+        }
         if (result.state == operation_state::loading)
             return;
         if (result.id == dialog->property("resolve_request_id").toULongLong()) {
             dialog->setProperty("resolve_request_id", {});
-            browse->setEnabled(true);
+            update_target_fields();
             if (result.state == operation_state::error)
                 error->setText(result.error.user_message);
         }
         if (result.id == dialog->property("save_request_id").toULongLong()) {
             dialog->setProperty("save_request_id", {});
-            if (result.state == operation_state::completed)
-                dialog->accept();
-            else {
+            if (result.state == operation_state::completed) {
+                QString shortcut_error;
+                const auto id = dialog->property("saved_application_id").toLongLong();
+                const bool changed = service->target_shortcut(false, id) != shortcut->keySequence();
+                dialog->setProperty("waiting_shortcut", changed);
+                if (service->set_target_shortcut(false, id, shortcut->keySequence(), shortcut_error)) {
+                    if (!changed)
+                        dialog->accept();
+                } else {
+                    dialog->setProperty("waiting_shortcut", false);
+                    save->setEnabled(true);
+                    error->setText(shortcut_error);
+                }
+            } else {
                 save->setEnabled(true);
                 error->setText(result.error.user_message);
             }
@@ -302,10 +417,17 @@ QDialog *scenario_editor(const ui_context &context, QWidget *const parent) {
     form_layout->addSpacing(16);
     form_layout->addWidget(
         label(QCoreApplication::translate("XLibrary", "Applications · delay before launch"), "muted"));
-    auto *table = new QTableWidget(0, 3);
+    auto *shortcut = new QKeySequenceEdit(service->target_shortcut(true, record.id));
+    shortcut->setMaximumSequenceLength(1);
+    shortcut->setObjectName("scenario_hotkey");
+    field(form_layout, QCoreApplication::translate("XLibrary", "Global hotkey"), shortcut);
+    if (record.id > 0)
+        form_layout->addWidget(label(QString("XLibrary --scenario-id %1").arg(record.id), "muted"));
+    auto *table = new QTableWidget(0, 4);
     table->setHorizontalHeaderLabels({QCoreApplication::translate("XLibrary", "Enabled"),
                                       QCoreApplication::translate("XLibrary", "Application"),
-                                      QCoreApplication::translate("XLibrary", "Delay, s")});
+                                      QCoreApplication::translate("XLibrary", "Delay, s"),
+                                      QCoreApplication::translate("XLibrary", "Launch profile")});
     table->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
     table->horizontalHeader()->resizeSection(0, appearance::scaled(*context.settings, 95));
     table->horizontalHeader()->resizeSection(2, appearance::scaled(*context.settings, 140));
@@ -335,6 +457,34 @@ QDialog *scenario_editor(const ui_context &context, QWidget *const parent) {
         delay->setAccessibleName(QCoreApplication::translate("XLibrary", "Delay before step ") +
                                  QString::number(row + 1) + QCoreApplication::translate("XLibrary", ", seconds"));
         table->setCellWidget(row, 2, delay);
+        auto *profiles = new QComboBox;
+        profiles->setAccessibleName(QCoreApplication::translate("XLibrary", "Launch profile"));
+        const auto update_profiles = [=] {
+            const auto previous = profiles->count() ? profiles->currentData().toString() : step.launch_profile;
+            profiles->clear();
+            profiles->addItem(QCoreApplication::translate("XLibrary", "Application default"), QString{});
+            if (const auto *application = service->model.find(apps->currentData().toLongLong()))
+                for (const auto &profile : service->launch_profiles(*application))
+                    profiles->addItem(profile.icon_path.isEmpty()
+                                          ? appearance::icon(profile.kind == "private" ? "lock" : "app")
+                                          : QIcon(profile.icon_path),
+                                      profile.name, profile.id);
+            if (!previous.isEmpty() && profiles->findData(previous) < 0)
+                profiles->addItem(QCoreApplication::translate("XLibrary", "Unavailable profile: %1").arg(previous),
+                                  previous);
+            profiles->setCurrentIndex(qMax(0, profiles->findData(previous)));
+        };
+        QObject::connect(apps, &QComboBox::currentIndexChanged, dialog, [=] {
+            profiles->setCurrentIndex(0);
+            update_profiles();
+        });
+        QObject::connect(service, &DesktopService::launch_profiles_changed, profiles, [=](const QString &changed_path) {
+            const auto *application = service->model.find(apps->currentData().toLongLong());
+            if (application && application->path == changed_path)
+                update_profiles();
+        });
+        update_profiles();
+        table->setCellWidget(row, 3, profiles);
         table->setRowHeight(row, qMax(apps->sizeHint().height(), delay->sizeHint().height()) + 8);
     };
     for (const auto &step : record.steps)
@@ -356,8 +506,9 @@ QDialog *scenario_editor(const ui_context &context, QWidget *const parent) {
         for (int row = 0; row < table->rowCount(); ++row) {
             auto *apps = qobject_cast<QComboBox *>(table->cellWidget(row, 1));
             auto *delay = qobject_cast<QSpinBox *>(table->cellWidget(row, 2));
+            auto *profiles = qobject_cast<QComboBox *>(table->cellWidget(row, 3));
             steps.append({apps->currentData().toLongLong(), delay->value() * 1000,
-                          table->item(row, 0)->checkState() == Qt::Checked});
+                          table->item(row, 0)->checkState() == Qt::Checked, profiles->currentData().toString()});
         }
         return steps;
     };
@@ -396,7 +547,15 @@ QDialog *scenario_editor(const ui_context &context, QWidget *const parent) {
     root->addWidget(buttons);
     QObject::connect(buttons, &QDialogButtonBox::rejected, dialog, &QDialog::reject);
     auto save_scenario = [=](const bool run) {
-        scenario_record updated{record.id, name->text().trimmed(), read_steps()};
+        scenario_record updated{dialog->property("saved_scenario_id").isValid()
+                                    ? dialog->property("saved_scenario_id").toLongLong()
+                                    : record.id,
+                                name->text().trimmed(), read_steps()};
+        QString shortcut_error;
+        if (!service->validate_target_shortcut(true, updated.id, shortcut->keySequence(), shortcut_error)) {
+            error->setText(shortcut_error);
+            return;
+        }
         if (updated.name.isEmpty() || updated.steps.isEmpty()) {
             error->setText(QCoreApplication::translate("XLibrary", "Enter a name and add an application."));
             return;
@@ -410,17 +569,48 @@ QDialog *scenario_editor(const ui_context &context, QWidget *const parent) {
     QObject::connect(buttons, &QDialogButtonBox::accepted, dialog, [=] { save_scenario(false); });
     QObject::connect(save_and_run, &QPushButton::clicked, dialog, [=] { save_scenario(true); });
     QObject::connect(service, &DesktopService::scenario_saved, dialog, [=](const quint64 request_id, const qint64 id) {
-        if (request_id == dialog->property("save_request_id").toULongLong() &&
-            dialog->property("run_after_save").toBool())
-            service->run_scenario(id);
+        if (request_id == dialog->property("save_request_id").toULongLong())
+            dialog->setProperty("saved_scenario_id", id);
     });
     QObject::connect(service, &DesktopService::operation_changed, dialog, [=](const operation_result &result) {
+        if (result.operation == "target_shortcut" && dialog->property("waiting_shortcut").toBool()) {
+            if (result.state == operation_state::loading)
+                dialog->setProperty("shortcut_request_id", QVariant::fromValue(result.id));
+            else if (result.id == dialog->property("shortcut_request_id").toULongLong()) {
+                dialog->setProperty("waiting_shortcut", false);
+                if (result.state == operation_state::completed) {
+                    if (dialog->property("run_after_save").toBool())
+                        service->run_scenario(dialog->property("saved_scenario_id").toLongLong());
+                    dialog->accept();
+                } else {
+                    buttons->button(QDialogButtonBox::Save)->setEnabled(true);
+                    save_and_run->setEnabled(true);
+                    error->setText(result.error.user_message);
+                }
+            }
+            return;
+        }
         if (result.id == dialog->property("save_request_id").toULongLong() &&
             result.state != operation_state::loading) {
             dialog->setProperty("save_request_id", {});
-            if (result.state == operation_state::completed)
-                dialog->accept();
-            else {
+            if (result.state == operation_state::completed) {
+                QString shortcut_error;
+                const auto id = dialog->property("saved_scenario_id").toLongLong();
+                const bool changed = service->target_shortcut(true, id) != shortcut->keySequence();
+                dialog->setProperty("waiting_shortcut", changed);
+                if (service->set_target_shortcut(true, id, shortcut->keySequence(), shortcut_error)) {
+                    if (!changed) {
+                        if (dialog->property("run_after_save").toBool())
+                            service->run_scenario(id);
+                        dialog->accept();
+                    }
+                } else {
+                    dialog->setProperty("waiting_shortcut", false);
+                    buttons->button(QDialogButtonBox::Save)->setEnabled(true);
+                    save_and_run->setEnabled(true);
+                    error->setText(shortcut_error);
+                }
+            } else {
                 buttons->button(QDialogButtonBox::Save)->setEnabled(true);
                 save_and_run->setEnabled(true);
                 error->setText(result.error.user_message);
@@ -435,4 +625,20 @@ void register_editors(UiRegistry &registry) {
     registry.add_default("application_editor", application_editor);
     registry.add_default("tag_editor", tag_editor);
     registry.add_default("scenario_editor", scenario_editor);
+}
+
+void edit_application(DesktopService &service, const qint64 id, QWidget *const parent, const QString &focus_field) {
+    const auto *record = service.model.find(id);
+    if (!record)
+        return;
+    ui_context context;
+    context.service = &service;
+    context.settings = &service.settings;
+    context.parameters.insert("record", QVariant::fromValue(*record));
+    auto *dialog = application_editor(context, parent);
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    if (!focus_field.isEmpty())
+        if (auto *field = dialog->findChild<QWidget *>(focus_field))
+            QTimer::singleShot(0, field, [field] { field->setFocus(Qt::OtherFocusReason); });
+    dialog->open();
 }

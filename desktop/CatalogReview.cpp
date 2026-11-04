@@ -4,7 +4,8 @@
 #include <QHeaderView>
 #include <QLineEdit>
 #include <QListWidget>
-#include <QPlainTextEdit>
+#include <QScreen>
+#include <QScrollBar>
 #include <QTableWidget>
 
 #include "CatalogReview.h"
@@ -30,10 +31,21 @@ void show_catalog_review(const ui_context &context) {
     auto *service = static_cast<DesktopService *>(context.service);
     if (!service->is_reviewing())
         return;
+    const bool removal = service->is_removal_preview();
+    const bool scan = service->is_scan_preview();
     const auto records = service->catalog_preview();
-    auto *dialog = make_dialog(context, QCoreApplication::translate("XLibrary", "Review applications before import"));
+    auto *dialog =
+        make_dialog(context, removal ? QCoreApplication::translate("XLibrary", "Uninstalled applications")
+                             : scan  ? QCoreApplication::translate("XLibrary", "New applications")
+                                     : QCoreApplication::translate("XLibrary", "Review applications before import"));
     dialog->setObjectName("catalog_review");
+    prepare_dialog(dialog, context, {800, 300}, {480, 180});
     auto *layout = new QVBoxLayout(dialog);
+    if (removal)
+        layout->addWidget(label(QCoreApplication::translate(
+            "XLibrary",
+            "These applications appear to have been uninstalled. Remove the checked entries from the library? "
+            "Their paths will be checked again before removal.")));
     auto *search = new QLineEdit;
     search->setPlaceholderText(QCoreApplication::translate("XLibrary", "Search name, source or target"));
     search->setAccessibleName(search->placeholderText());
@@ -57,9 +69,15 @@ void show_catalog_review(const ui_context &context) {
     table->verticalHeader()->hide();
     table->horizontalHeader()->setSectionResizeMode(QHeaderView::Interactive);
     table->horizontalHeader()->setStretchLastSection(true);
-    table->setColumnWidth(0, 220);
-    table->setColumnWidth(1, 160);
-    table->setColumnWidth(2, 250);
+    table->setColumnWidth(0, appearance::scaled(*context.settings, 220));
+    table->setColumnWidth(1, appearance::scaled(*context.settings, 160));
+    table->setColumnWidth(2, appearance::scaled(*context.settings, 250));
+    if (scan) {
+        table->setColumnHidden(1, true);
+        table->setColumnHidden(3, true);
+        table->setColumnHidden(4, true);
+        table->horizontalHeader()->setSectionResizeMode(2, QHeaderView::Stretch);
+    }
     QSet<QString> known;
     for (const auto &record : service->catalog().applications)
         known.insert(launch_configuration_key(record.path, record.arguments, record.working_directory));
@@ -77,7 +95,7 @@ void show_catalog_review(const ui_context &context) {
         const QStringList values{record.discovery_source.isEmpty()
                                      ? QCoreApplication::translate("XLibrary", "JSON catalog")
                                      : record.discovery_source,
-                                 QDir::toNativeSeparators(record.path), record.arguments,
+                                 QDir::toNativeSeparators(Application::application_path(record)), record.arguments,
                                  QDir::toNativeSeparators(record.working_directory)};
         for (int column = 1; column < 5; ++column) {
             auto *item = new QTableWidgetItem(values[column - 1]);
@@ -129,15 +147,17 @@ void show_catalog_review(const ui_context &context) {
     layout->addWidget(policy);
     auto *remember =
         new QCheckBox(QCoreApplication::translate("XLibrary", "Do not offer unchecked applications in future scans"));
-    remember->setVisible(service->is_scan_preview());
+    remember->setChecked(true);
+    remember->setVisible(scan && !removal);
     layout->addWidget(remember);
-    auto *issues = new QPlainTextEdit(service->preview_details());
-    issues->setReadOnly(true);
-    issues->setMaximumHeight(100);
-    layout->addWidget(issues);
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
-    buttons->button(QDialogButtonBox::Ok)->setText(QCoreApplication::translate("XLibrary", "Import selected"));
-    buttons->button(QDialogButtonBox::Cancel)->setText(QCoreApplication::translate("XLibrary", "Cancel"));
+    buttons->button(QDialogButtonBox::Ok)
+        ->setText(removal ? QCoreApplication::translate("XLibrary", "Remove selected")
+                  : scan  ? QCoreApplication::translate("XLibrary", "Add selected")
+                          : QCoreApplication::translate("XLibrary", "Import selected"));
+    buttons->button(QDialogButtonBox::Cancel)
+        ->setText(removal ? QCoreApplication::translate("XLibrary", "Keep all")
+                          : QCoreApplication::translate("XLibrary", "Cancel"));
     layout->addWidget(buttons);
     QObject::connect(buttons, &QDialogButtonBox::accepted, dialog, [=] {
         QVector<int> rows;
@@ -150,12 +170,33 @@ void show_catalog_review(const ui_context &context) {
         dialog->accept();
     });
     QObject::connect(buttons, &QDialogButtonBox::rejected, dialog, &QDialog::reject);
-    QObject::connect(dialog, &QDialog::rejected, service, &DesktopService::cancel_discovery);
+    QObject::connect(dialog, &QDialog::rejected, service, [=] {
+        if (removal)
+            service->keep_missing_applications();
+        else
+            service->cancel_discovery();
+    });
     QObject::connect(service, &DesktopService::discovery_changed, dialog, [=] {
         if (!service->is_discovering())
             dialog->reject();
     });
     update_count();
+    dialog->ensurePolished();
+    const auto row_height = qMax(table->verticalHeader()->defaultSectionSize(),
+                                 table->fontMetrics().height() + appearance::scaled(*context.settings, 12));
+    table->verticalHeader()->setDefaultSectionSize(row_height);
+    const auto table_frame = table->horizontalHeader()->sizeHint().height() + 2 * table->frameWidth();
+    const auto visible_rows = qBound(1, table->rowCount(), 10);
+    const auto scrollbar_height = scan ? 0 : table->horizontalScrollBar()->sizeHint().height();
+    // Measure the surrounding controls with a content-sized table before allowing manual resizing.
+    table->setFixedHeight(table_frame + visible_rows * row_height + scrollbar_height);
+    layout->activate();
+    const auto available = dialog->screen()->availableGeometry().size() - QSize(32, 64);
+    const auto width = qMin(appearance::scaled(*context.settings, scan ? 800 : 900), available.width());
+    const auto height = layout->hasHeightForWidth() ? layout->totalHeightForWidth(width) : layout->sizeHint().height();
+    table->setMaximumHeight(QWIDGETSIZE_MAX);
+    table->setMinimumHeight(table_frame + row_height + scrollbar_height);
+    dialog->resize(width, qMin(height, available.height()));
     dialog->show();
 }
 

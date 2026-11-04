@@ -39,15 +39,43 @@ DesktopService::DesktopService(QObject *const parent, const QString &profile_pat
     qRegisterMetaType<operation_result>();
     qRegisterMetaType<profile_manifest>();
     qRegisterMetaType<QVector<path_relocation>>();
+    connect(this, &DesktopService::catalog_changed, this, &DesktopService::sync_target_hotkeys);
+    connect(this, &DesktopService::appearance_changed, this, &DesktopService::sync_target_hotkeys);
+    connect(this, &DesktopService::operation_changed, this, [this](const operation_result &result) {
+        if (!pending_shortcut_request || result.id != pending_shortcut_request ||
+            result.state == operation_state::loading)
+            return;
+        if (result.state != operation_state::completed) {
+            // Keep the old OS registration until persistence succeeds, so rollback cannot lose it.
+            target_hotkeys[pending_shortcut_key] = std::move(previous_target_hotkey);
+            if (previous_target_shortcut.isEmpty())
+                registered_target_shortcuts.remove(pending_shortcut_key);
+            else
+                registered_target_shortcuts.insert(pending_shortcut_key, previous_target_shortcut);
+        }
+        previous_target_hotkey.reset();
+        pending_shortcut_request = 0;
+        pending_shortcut_key.clear();
+        sync_target_hotkeys();
+        emit target_shortcuts_changed();
+    });
     library_request_id = begin_operation("library");
     worker->known_volume_roots = settings.value("availability/volume_roots").toStringList();
+    worker->verified_locations = settings.value("availability/verified_locations").toMap();
     filter.setSourceModel(&model);
+    launch_profile_pool.setMaxThreadCount(1);
+    launch_profile_pool.setExpiryTimeout(5000);
+    connect(this, &DesktopService::catalog_changed, this, &DesktopService::warm_launch_profiles);
     discovery_pool.setMaxThreadCount(1);
     discovery_pool.setExpiryTimeout(5000);
     worker->moveToThread(&worker_thread);
     connect(worker, &Manager::volumes_observed, this, [this](const QStringList &roots) {
         if (!profile_busy() && !restart_pending)
             settings.setValue("availability/volume_roots", roots);
+    });
+    connect(worker, &Manager::locations_observed, this, [this](const QVariantMap &locations) {
+        if (!profile_busy() && !restart_pending)
+            settings.setValue("availability/verified_locations", locations);
     });
     connect(this, &DesktopService::library_open_requested, worker, &Manager::initialize, Qt::QueuedConnection);
     connect(this, &DesktopService::library_restore_requested, worker, &Manager::restore, Qt::QueuedConnection);
@@ -82,6 +110,15 @@ DesktopService::DesktopService(QObject *const parent, const QString &profile_pat
     });
     connect(worker, &Manager::result, this, &DesktopService::publish_result);
     connect(worker, &Manager::notification, this, &DesktopService::message);
+    connect(worker, &Manager::discovery_dismissed, this, [this](const QStringList &dismissed) {
+        auto targets = settings.value("sources/dismissed_targets").toStringList();
+        targets.append(dismissed);
+        targets.removeDuplicates();
+        settings.setValue("sources/dismissed_targets", targets);
+        settings.sync();
+        if (settings.status() != QSettings::NoError)
+            notify(QCoreApplication::translate("XLibrary", "Could not save discovery exclusions."));
+    });
     connect(worker, &Manager::discovery_report_ready, this, [this](const QString &report) {
         scan_report = report;
         emit discovery_report_changed();
@@ -94,6 +131,18 @@ DesktopService::DesktopService(QObject *const parent, const QString &profile_pat
                     publish_result({id, preview_operation, operation_state::cancelled, {}});
                     return;
                 }
+                present_catalog_preview(records, issues);
+            });
+    connect(worker, &Manager::inventory_ready, this,
+            [this](const quint64 id, const QVector<app_record> &records, const QVector<app_record> &removed,
+                   const QVector<discovery_issue> &issues) {
+                if (id != discovery_request_id || !is_discovering())
+                    return;
+                if (discovery_cancelled->requested.load()) {
+                    publish_result({id, preview_operation, operation_state::cancelled, {}});
+                    return;
+                }
+                missing_records = removed;
                 present_catalog_preview(records, issues);
             });
     connect(worker, &Manager::undo_changed, this, [this](const bool available) {
@@ -158,7 +207,11 @@ DesktopService::DesktopService(QObject *const parent, const QString &profile_pat
     });
     connect(&scenario_timer, &QTimer::timeout, this, [this] {
         if (is_scenario_active() && step_index < pending_steps.size()) {
-            launch(pending_steps[step_index].application_id, false, true);
+            const auto &step = pending_steps[step_index];
+            if (step.launch_profile.isEmpty())
+                launch(step.application_id, false, true);
+            else
+                request_launch_mode(step.application_id, Application::launch_mode::launch, true, step.launch_profile);
         }
     });
     worker_thread.setObjectName("catalog_worker");
@@ -173,6 +226,8 @@ DesktopService::~DesktopService() {
     scenario_timer.stop();
     discovery_pool.clear();
     discovery_pool.waitForDone();
+    launch_profile_queue.clear();
+    launch_profile_pool.waitForDone();
     worker_thread.quit();
     worker_thread.wait();
 }
@@ -211,6 +266,8 @@ void DesktopService::publish_result(const operation_result &result) {
         pending_exclusions.clear();
         pending_exclusions_request_id = 0;
         if (result.state == operation_state::completed) {
+            exclusions.append(settings.value("sources/excluded_configurations").toStringList());
+            exclusions.removeDuplicates();
             settings.setValue("sources/excluded_configurations", exclusions);
             settings.sync();
             if (settings.status() != QSettings::NoError) {
@@ -240,6 +297,24 @@ void DesktopService::publish_result(const operation_result &result) {
         library_status = result.state;
         opening_error = result.error;
         emit catalog_changed();
+        if (is_ready() && startup_inventory_pending && !QCoreApplication::arguments().contains("--check-startup")) {
+            QTimer::singleShot(0, this, [this] {
+                if (!startup_inventory_pending)
+                    return;
+                startup_inventory_pending = false;
+                if (!is_discovering())
+                    discover(true);
+            });
+        }
+    }
+    if (result.id == missing_removal_request_id && result.state != operation_state::loading) {
+        missing_removal_request_id = 0;
+        missing_records.clear();
+        reviewing_missing = false;
+        if (result.state == operation_state::completed)
+            continue_inventory_review();
+        else
+            publish_result({discovery_request_id, preview_operation, result.state, {}});
     }
     if (result.id == discovery_request_id) {
         discovery_state = result.state;
@@ -255,6 +330,7 @@ void DesktopService::publish_result(const operation_result &result) {
     emit operation_changed(result);
     // Ошибку запуска уже показывает отдельный результат launch; сценарий сохраняет её для своих подписчиков.
     if (result.state == operation_state::error && result.operation != "run_scenario" &&
+        !(startup_scan && (result.id == discovery_request_id || result.operation == "remove_missing")) &&
         !result.error.user_message.isEmpty())
         emit message(result.error.user_message);
     if (result.state != operation_state::loading)
@@ -298,6 +374,8 @@ quint64 DesktopService::enqueue(const QString &operation, std::function<void(Man
 void DesktopService::select(const qint64 id) {
     if (selected_id != id) {
         selected_id = id;
+        if (const auto *record = model.find(id))
+            launch_profiles(*record);
         emit selection_changed();
     }
 }
@@ -330,6 +408,8 @@ void DesktopService::remove_application(const qint64 id) {
 }
 
 void DesktopService::remove_applications(const QVector<qint64> &ids) {
+    if (ids.isEmpty())
+        return;
     if (is_scenario_active()) {
         notify(QCoreApplication::translate("XLibrary", "Stop the scenario before removing applications."));
         return;
@@ -393,6 +473,19 @@ void DesktopService::launch(const qint64 id, const bool new_instance, const bool
 }
 
 quint64 DesktopService::request_launch(const qint64 id, const bool new_instance, const bool scenario) {
+    const auto mode = new_instance ? desktop_platform::launch_mode::new_instance
+                      : settings.value("behavior/relaunch", "activate").toString() == "activate"
+                          ? desktop_platform::launch_mode::activate
+                          : desktop_platform::launch_mode::launch;
+    return request_launch_mode(id, mode, scenario);
+}
+
+quint64 DesktopService::request_launch_profile(const qint64 id, const QString &profile) {
+    return request_launch_mode(id, Application::launch_mode::launch, false, profile);
+}
+
+quint64 DesktopService::request_launch_mode(const qint64 id, const Application::launch_mode mode, const bool scenario,
+                                            const QString &profile) {
     if (!is_ready() || !id || profile_busy() || restart_pending)
         return 0;
     if (launching.contains(id)) {
@@ -405,22 +498,21 @@ quint64 DesktopService::request_launch(const qint64 id, const bool new_instance,
     }
     launching.insert(id);
     const auto generation = scenario ? scenario_generation->load() : 0;
-    const auto mode = new_instance ? desktop_platform::launch_mode::new_instance
-                      : settings.value("behavior/relaunch", "activate").toString() == "activate"
-                          ? desktop_platform::launch_mode::activate
-                          : desktop_platform::launch_mode::launch;
     return enqueue(
         "launch",
-        [id, mode, generation, token = scenario_generation](Manager &worker) {
-            worker.launch_record(id, mode, generation, token, desktop_platform::launch_application);
+        [id, mode, generation, token = scenario_generation, profile](Manager &worker) {
+            worker.launch_record(id, mode, generation, token, desktop_platform::launch_application, profile);
         },
         operation_error_source::platform);
 }
 
 void DesktopService::open_folder(const qint64 id) {
-    if (const auto *record = model.find(id))
+    if (const auto *record = model.find(id);
+        record && (Application::file_target(*record) || !record->installation_directory.isEmpty()))
         enqueue(
-            "folder", [path = record->path](Manager &) { desktop_platform::open_folder(path); },
+            "folder",
+            [path = record->installation_directory.isEmpty() ? record->path : record->installation_directory + "/."](
+                Manager &) { desktop_platform::open_folder(path); },
             operation_error_source::platform);
 }
 
@@ -481,13 +573,16 @@ void DesktopService::finish_scenario(const operation_state state, const operatio
     publish_result({scenario_request_id, "run_scenario", state, error});
 }
 
-bool DesktopService::begin_catalog_preview(const QString &operation) {
+bool DesktopService::begin_catalog_preview(const QString &operation, const bool at_startup) {
     if (is_discovering() || !is_ready() || profile_busy() || restart_pending)
         return false;
     preview_operation = operation;
     reviewing = false;
     preview_records.clear();
     preview_issues.clear();
+    missing_records.clear();
+    reviewing_missing = false;
+    startup_scan = at_startup;
     discovery_state = operation_state::loading;
     discovery_request_id = begin_operation(operation);
     discovery_cancelled = std::make_shared<discovery_control>();
@@ -500,9 +595,15 @@ bool DesktopService::begin_catalog_preview(const QString &operation) {
 void DesktopService::present_catalog_preview(QVector<app_record> records, QVector<discovery_issue> issues) {
     if (is_scan_preview()) {
         const auto exclusions = settings.value("sources/excluded_configurations").toStringList();
+        const auto dismissed = settings.value("sources/dismissed_targets").toStringList();
+        QSet<QString> known;
+        for (const auto &record : snapshot.applications)
+            known.insert(Application::launch_key(record));
         records.removeIf([&](const app_record &record) {
+            if (known.contains(Application::launch_key(record)))
+                return true;
             const auto key = launch_configuration_key(record.path, record.arguments, record.working_directory);
-            auto excluded = exclusions.contains(key);
+            auto excluded = exclusions.contains(key) || dismissed.contains(Application::target_key(record));
 #ifdef Q_OS_WIN
             // Keep exclusions saved before empty and default directories became equivalent.
             if (!excluded && key == launch_configuration_key(record.path, record.arguments, {}))
@@ -518,10 +619,53 @@ void DesktopService::present_catalog_preview(QVector<app_record> records, QVecto
     preview_records = std::move(records);
     preview_issues = std::move(issues);
     reviewing = true;
+    if (!missing_records.isEmpty()) {
+        reviewing_missing = true;
+        if (!settings.value("sources/confirm_removal", true).toBool()) {
+            // Let an uninstaller/updater finish before the independent check at commit time.
+            QTimer::singleShot(1500, this, [this, cancelled = discovery_cancelled] {
+                if (cancelled != discovery_cancelled || cancelled->requested.load() || !reviewing_missing)
+                    return;
+                QVector<int> rows;
+                for (int row = 0; row < missing_records.size(); ++row)
+                    rows.append(row);
+                apply_catalog_preview(rows, false);
+            });
+            return;
+        }
+        emit catalog_preview_ready();
+        return;
+    }
+    continue_inventory_review();
+}
+
+void DesktopService::continue_inventory_review() {
+    if (is_scan_preview() && preview_records.isEmpty()) {
+        scan_report =
+            discovery_details(QCoreApplication::translate("XLibrary", "No new applications found."), preview_issues);
+        emit discovery_report_changed();
+        publish_result({discovery_request_id, preview_operation, operation_state::completed, {}});
+        if (!startup_scan)
+            notify(QCoreApplication::translate("XLibrary", "No new applications found."));
+        return;
+    }
+    reviewing = true;
     scan_progress = {90, 0, preview_records.size(),
                      QCoreApplication::translate("XLibrary", "Review applications before import")};
     emit discovery_progress_changed();
     emit catalog_preview_ready();
+}
+
+void DesktopService::keep_missing_applications() {
+    if (!reviewing_missing || missing_removal_request_id)
+        return;
+    reviewing_missing = false;
+    missing_records.clear();
+    // Open the next dialog after the current dialog has processed rejection.
+    QTimer::singleShot(0, this, [this] {
+        if (is_discovering() && !discovery_cancelled->requested.load())
+            continue_inventory_review();
+    });
 }
 
 QString DesktopService::preview_details() const {
@@ -533,6 +677,7 @@ void DesktopService::clear_discovery_exclusions() {
     if (profile_busy() || restart_pending || is_discovering())
         return;
     settings.remove("sources/excluded_configurations");
+    settings.remove("sources/dismissed_targets");
     settings.sync();
     notify(QCoreApplication::translate("XLibrary", "Discovery exclusions cleared."));
 }
@@ -542,11 +687,32 @@ void DesktopService::apply_catalog_preview(const QVector<int> &rows, const bool 
     if (!reviewing || !is_discovering())
         return;
     const QSet<int> selected_rows(rows.cbegin(), rows.cend());
+    if (reviewing_missing) {
+        if (is_scenario_active()) {
+            notify(QCoreApplication::translate("XLibrary", "Stop the scenario before removing applications."));
+            keep_missing_applications();
+            return;
+        }
+        QVector<app_record> removed;
+        for (int row = 0; row < missing_records.size(); ++row)
+            if (selected_rows.contains(row))
+                removed.append(missing_records[row]);
+        reviewing = false;
+        missing_removal_request_id =
+            enqueue("remove_missing", [removed, cancelled = discovery_cancelled](Manager &worker) {
+                worker.remove_missing_applications(removed, cancelled);
+            });
+        emit discovery_changed();
+        return;
+    }
     QVector<app_record> applications;
     auto issues = preview_issues;
     auto exclusions = settings.value("sources/excluded_configurations").toStringList();
+    const auto dismissed = settings.value("sources/dismissed_targets").toStringList();
     for (int row = 0; row < preview_records.size(); ++row) {
         const auto &record = preview_records[row];
+        if (is_scan_preview() && dismissed.contains(Application::target_key(record)))
+            continue;
         if (selected_rows.contains(row)) {
             applications.append(record);
         } else {
@@ -588,8 +754,8 @@ void DesktopService::apply_catalog_preview(const QVector<int> &rows, const bool 
     enqueue(
         preview_operation,
         [applications = std::move(applications), issues = std::move(issues), cancelled = discovery_cancelled, policy,
-         report_progress](Manager &worker) mutable {
-            worker.apply_catalog_preview(applications, std::move(issues), cancelled, policy, report_progress);
+         report_progress, quiet = startup_scan](Manager &worker) mutable {
+            worker.apply_catalog_preview(applications, std::move(issues), cancelled, policy, report_progress, quiet);
         },
         operation_error_source::sqlite, discovery_request_id);
 }
@@ -602,16 +768,16 @@ void DesktopService::preview_files(const QStringList &paths) {
         operation_error_source::platform, discovery_request_id);
 }
 
-void DesktopService::discover() {
+void DesktopService::discover(const bool at_startup) {
     if (is_discovering() || !is_ready() || profile_busy() || restart_pending)
         return;
     const bool registry = settings.value("sources/registry", true).toBool();
     const bool start_menu = settings.value("sources/start_menu", true).toBool();
-    if (!registry && !start_menu) {
+    if (!registry && !start_menu && !at_startup) {
         notify(QCoreApplication::translate("XLibrary", "Select discovery sources in the library settings."));
         return;
     }
-    if (!begin_catalog_preview("discover"))
+    if (!begin_catalog_preview("discover", at_startup))
         return;
     scan_progress = {-1, 0, 0, QCoreApplication::translate("XLibrary", "Preparing the application list…")};
     emit discovery_changed();
@@ -645,18 +811,24 @@ void DesktopService::discover() {
                 scan_report = discovery_details(message, result.second);
                 emit discovery_report_changed();
                 publish_result({discovery_request_id, "discover", operation_state::cancelled, {}});
-                notify(message);
+                if (!startup_scan)
+                    notify(message);
                 watcher->deleteLater();
                 return;
             }
-            present_catalog_preview(std::move(result.first), std::move(result.second));
+            enqueue(
+                "discover",
+                [records = std::move(result.first), issues = std::move(result.second), cancelled = discovery_cancelled](
+                    Manager &worker) { worker.review_inventory(records, issues, cancelled); },
+                operation_error_source::filesystem, discovery_request_id);
         } catch (const DiscoveryCancelled &) {
             const auto message = discovery_summary(
                 0, {}, QCoreApplication::translate("XLibrary", "Scan cancelled; changes were not saved."));
             scan_report = message;
             emit discovery_report_changed();
             publish_result({discovery_request_id, "discover", operation_state::cancelled, {}});
-            notify(message);
+            if (!startup_scan)
+                notify(message);
         } catch (const std::exception &error) {
             const QVector<discovery_issue> issues{{"Discovery", QString::fromUtf8(error.what())}};
             const auto message = discovery_summary(
@@ -679,7 +851,7 @@ void DesktopService::discover() {
 }
 
 void DesktopService::cancel_discovery() {
-    if (!is_discovering())
+    if (!can_cancel_discovery())
         return;
     auto expected = discovery_phase::running;
     if (!discovery_cancelled->phase.compare_exchange_strong(expected, discovery_phase::cancelling))
@@ -688,6 +860,8 @@ void DesktopService::cancel_discovery() {
     if (reviewing) {
         reviewing = false;
         preview_records.clear();
+        missing_records.clear();
+        reviewing_missing = false;
         scan_report = discovery_details(
             QCoreApplication::translate("XLibrary", "Import cancelled; changes were not saved."), preview_issues);
         emit discovery_report_changed();
@@ -696,7 +870,8 @@ void DesktopService::cancel_discovery() {
     }
     scan_progress.stage = QCoreApplication::translate("XLibrary", "Stopping the scan…");
     emit discovery_progress_changed();
-    notify(QCoreApplication::translate("XLibrary", "Stopping application discovery…"));
+    if (!startup_scan)
+        notify(QCoreApplication::translate("XLibrary", "Stopping application discovery…"));
 }
 
 void DesktopService::export_catalog(const QString &path) {
@@ -843,4 +1018,330 @@ void DesktopService::restart_application() {
         return;
     }
     QCoreApplication::quit();
+}
+
+namespace {
+QString shortcut_target_key(const bool scenario, const qint64 id) {
+    return (scenario ? QStringLiteral("scenario/") : QStringLiteral("application/")) + QString::number(id);
+}
+
+QMap<QString, QString> builtin_shortcut_defaults() {
+    return {{"shortcuts/global", desktop_platform::default_global_shortcut()},
+            {"shortcuts/overlay", desktop_platform::default_overlay_shortcut()},
+            {"shortcuts/search", "Ctrl+K"},
+            {"shortcuts/settings", "Ctrl+,"},
+            {"shortcuts/add", "Ctrl+N"},
+            {"shortcuts/launch", "Return"},
+            {"shortcuts/new_instance", "Ctrl+Return"},
+            {"shortcuts/open_folder", "Alt+Return"},
+            {"shortcuts/copy_path", "Ctrl+Shift+C"},
+            {"shortcuts/remove", "Delete"}};
+}
+
+QList<QKeySequence> shortcut_aliases(const QKeySequence &sequence) {
+    if (sequence.isEmpty())
+        return {};
+    QList<QKeySequence> result{sequence};
+    if (sequence.count() == 1) {
+        const auto key = sequence[0];
+        if (key.key() == Qt::Key_Return || key.key() == Qt::Key_Enter)
+            result.append(QKeySequence(QKeyCombination(key.keyboardModifiers(),
+                                                       key.key() == Qt::Key_Return ? Qt::Key_Enter : Qt::Key_Return)));
+    }
+    return result;
+}
+
+QSet<QString> reserved_shortcut_sequences() {
+    QSet<QString> result;
+    const auto add = [&](const QKeySequence &sequence) {
+        result.insert(sequence.toString(QKeySequence::PortableText));
+    };
+    add(QKeySequence(Qt::Key_Escape));
+    add(QKeySequence(Qt::Key_Tab));
+    add(QKeySequence(Qt::Key_Backtab));
+    for (const auto key : {Qt::Key_Up, Qt::Key_Down, Qt::Key_Left, Qt::Key_Right, Qt::Key_Home, Qt::Key_End,
+                           Qt::Key_PageUp, Qt::Key_PageDown})
+        for (const auto modifiers : {Qt::KeyboardModifiers{}, Qt::KeyboardModifiers(Qt::ShiftModifier),
+                                     Qt::KeyboardModifiers(Qt::ControlModifier),
+                                     Qt::KeyboardModifiers(Qt::ControlModifier | Qt::ShiftModifier)})
+            add(QKeySequence(QKeyCombination(modifiers, key)));
+    for (const auto key : {QKeySequence::Copy, QKeySequence::Cut, QKeySequence::Paste, QKeySequence::Undo,
+                           QKeySequence::Redo, QKeySequence::SelectAll})
+        for (const auto &sequence : QKeySequence::keyBindings(key))
+            add(sequence);
+    return result;
+}
+}
+
+QKeySequence DesktopService::target_shortcut(const bool scenario, const qint64 id) const {
+    const auto key = shortcut_target_key(scenario, id);
+    if (pending_shortcut_request && key == pending_shortcut_key)
+        return registered_target_shortcuts.value(key);
+    for (const auto &binding : snapshot.target_shortcuts)
+        if (binding.scenario == scenario && binding.target_id == id)
+            return QKeySequence::fromString(binding.sequence, QKeySequence::PortableText);
+    return {};
+}
+
+bool DesktopService::validate_shortcut_configuration(const QVariantMap &values, const QString &ignore_target,
+                                                     const QKeySequence &candidate, QString &error) const {
+    auto sequences = reserved_shortcut_sequences();
+    const auto add = [&](const QKeySequence &sequence) {
+        if (sequence.isEmpty())
+            return true;
+        if (sequence.count() != 1 || sequence[0].key() == Qt::Key_unknown) {
+            error = QCoreApplication::translate("XLibrary", "Use a single key combination.");
+            return false;
+        }
+        const auto aliases = shortcut_aliases(sequence);
+        for (const auto &alias : aliases)
+            if (sequences.contains(alias.toString(QKeySequence::PortableText))) {
+                error = QCoreApplication::translate("XLibrary", "The shortcut %1 is already assigned to another action "
+                                                                "or reserved for text editing and search.")
+                            .arg(sequence.toString(QKeySequence::NativeText));
+                return false;
+            }
+        for (const auto &alias : aliases)
+            sequences.insert(alias.toString(QKeySequence::PortableText));
+        return true;
+    };
+    const auto defaults = builtin_shortcut_defaults();
+    for (auto it = defaults.cbegin(); it != defaults.cend(); ++it) {
+        const auto value = values.contains(it.key()) ? values.value(it.key()) : settings.value(it.key(), it.value());
+        if (!add(QKeySequence::fromString(value.toString(), QKeySequence::PortableText)))
+            return false;
+    }
+    QSet<QString> visited;
+    for (const auto &binding : snapshot.target_shortcuts) {
+        const auto key = shortcut_target_key(binding.scenario, binding.target_id);
+        visited.insert(key);
+        const auto sequence = pending_shortcut_request && key == pending_shortcut_key
+                                  ? registered_target_shortcuts.value(key)
+                                  : QKeySequence::fromString(binding.sequence, QKeySequence::PortableText);
+        if (key != ignore_target && !add(sequence))
+            return false;
+    }
+    // A newly assigned shortcut may not have reached the catalog worker yet.
+    if (pending_shortcut_request && !visited.contains(pending_shortcut_key) && pending_shortcut_key != ignore_target &&
+        !add(registered_target_shortcuts.value(pending_shortcut_key)))
+        return false;
+    if (pending_shortcut_request && !previous_target_shortcut.isEmpty() &&
+        previous_target_shortcut != registered_target_shortcuts.value(pending_shortcut_key) &&
+        !add(previous_target_shortcut))
+        return false;
+    return add(candidate);
+}
+
+bool DesktopService::validate_shortcuts(const QVariantMap &values, QString &error) const {
+    return validate_shortcut_configuration(values, {}, {}, error);
+}
+
+bool DesktopService::validate_target_shortcut(const bool scenario, const qint64 id, const QKeySequence &sequence,
+                                              QString &error) const {
+    if (!sequence.isEmpty()) {
+        if (sequence.count() != 1) {
+            error = QCoreApplication::translate("XLibrary", "Use a single key combination.");
+            return false;
+        }
+        const auto combination = sequence[0];
+        const auto key = combination.key();
+        if (!((key >= Qt::Key_A && key <= Qt::Key_Z) || (key >= Qt::Key_0 && key <= Qt::Key_9) ||
+              (key >= Qt::Key_F1 && key <= Qt::Key_F24) || key == Qt::Key_Space)) {
+            error = QCoreApplication::translate("XLibrary", "Use a letter, digit, F1–F24, or Space.");
+            return false;
+        }
+        const auto modifiers = combination.keyboardModifiers();
+        if (!(modifiers & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier)) ||
+            (modifiers & ~(Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier | Qt::ShiftModifier))) {
+            error = QCoreApplication::translate("XLibrary", "Add Ctrl, Alt, or Super to the global shortcut.");
+            return false;
+        }
+    }
+    return validate_shortcut_configuration({}, shortcut_target_key(scenario, id), sequence, error);
+}
+
+bool DesktopService::set_target_shortcut(const bool scenario, const qint64 id, const QKeySequence &sequence,
+                                         QString &error) {
+    if (!is_ready() || profile_busy() || restart_pending || pending_shortcut_request) {
+        error = QCoreApplication::translate("XLibrary", "Wait for the current library operation to finish.");
+        return false;
+    }
+    const auto exists = scenario ? std::any_of(snapshot.scenarios.cbegin(), snapshot.scenarios.cend(),
+                                               [id](const auto &record) { return record.id == id; })
+                                 : model.find(id) != nullptr;
+    if (id <= 0 || !exists) {
+        error = QCoreApplication::translate("XLibrary", "The shortcut target no longer exists.");
+        return false;
+    }
+    if (!validate_target_shortcut(scenario, id, sequence, error))
+        return false;
+    const auto previous = target_shortcut(scenario, id);
+    const auto key = shortcut_target_key(scenario, id);
+    if (previous == sequence && (sequence.isEmpty() || registered_target_shortcuts.value(key) == sequence))
+        return true;
+    auto candidate = std::make_unique<GlobalHotkey>();
+    connect(candidate.get(), &GlobalHotkey::activated, this, [this, scenario, id] {
+        if (!is_ready() || profile_busy() || restart_pending)
+            return;
+        if (scenario)
+            run_scenario(id);
+        else
+            launch(id);
+    });
+    if (!candidate->set_sequence(sequence, error))
+        return false;
+    previous_target_hotkey = std::move(target_hotkeys[key]);
+    target_hotkeys[key] = std::move(candidate);
+    previous_target_shortcut = registered_target_shortcuts.value(key);
+    pending_shortcut_key = key;
+    registered_target_shortcuts.insert(key, sequence);
+    pending_shortcut_request = begin_operation("target_shortcut");
+    enqueue(
+        "target_shortcut",
+        [scenario, id, text = sequence.toString(QKeySequence::PortableText)](Manager &manager) {
+            manager.store->save_target_shortcut(scenario, id, text);
+            manager.refresh();
+        },
+        operation_error_source::sqlite, pending_shortcut_request);
+    emit target_shortcuts_changed();
+    return true;
+}
+
+void DesktopService::sync_target_hotkeys() {
+    if (pending_shortcut_request)
+        return;
+    QSet<QString> desired;
+    for (const auto &binding : snapshot.target_shortcuts)
+        desired.insert(shortcut_target_key(binding.scenario, binding.target_id));
+    for (auto it = target_hotkeys.begin(); it != target_hotkeys.end();) {
+        if (!desired.contains(it->first)) {
+            registered_target_shortcuts.remove(it->first);
+            target_shortcut_errors.remove(it->first);
+            it = target_hotkeys.erase(it);
+        } else {
+            ++it;
+        }
+    }
+    for (const auto &binding : snapshot.target_shortcuts) {
+        const auto key = shortcut_target_key(binding.scenario, binding.target_id);
+        const auto sequence = QKeySequence::fromString(binding.sequence, QKeySequence::PortableText);
+        if (target_hotkeys.contains(key) && target_hotkeys.at(key) &&
+            registered_target_shortcuts.value(key) == sequence)
+            continue;
+        QString error;
+        const auto report_error = [&](const QString &text) {
+            const auto signature = binding.sequence + QChar::Null + text;
+            if (target_shortcut_errors.value(key) != signature) {
+                target_shortcut_errors.insert(key, signature);
+                notify(text);
+            }
+        };
+        if (!validate_target_shortcut(binding.scenario, binding.target_id, sequence, error)) {
+            report_error(error);
+            continue;
+        }
+        auto &hotkey = target_hotkeys[key];
+        if (!hotkey) {
+            hotkey = std::make_unique<GlobalHotkey>();
+            connect(hotkey.get(), &GlobalHotkey::activated, this,
+                    [this, scenario = binding.scenario, id = binding.target_id] {
+                        if (!is_ready() || profile_busy() || restart_pending)
+                            return;
+                        if (scenario)
+                            run_scenario(id);
+                        else
+                            launch(id);
+                    });
+        }
+        if (hotkey->set_sequence(sequence, error)) {
+            registered_target_shortcuts.insert(key, sequence);
+            target_shortcut_errors.remove(key);
+        } else {
+            report_error(error);
+        }
+    }
+    emit target_shortcuts_changed();
+}
+
+namespace {
+QString launch_profile_key(const app_record &record) {
+    return Application::target_kind(record) + QChar::Null + record.path;
+}
+constexpr qsizetype launch_profile_cache_limit = 64;
+}
+
+QVector<launch_profile> DesktopService::launch_profiles(const app_record &record) {
+    const auto modes = Application::launch_modes(record);
+    if (modes.isEmpty())
+        return {};
+    const auto found = launch_profile_cache.constFind(launch_profile_key(record));
+    if (found != launch_profile_cache.cend())
+        return *found;
+    queue_launch_profiles(record, true);
+    return modes;
+}
+
+void DesktopService::queue_launch_profiles(const app_record &record, const bool priority) {
+    const auto key = launch_profile_key(record);
+    if (launch_profile_cache.contains(key) || active_launch_profile == key)
+        return;
+    if (pending_launch_profiles.contains(key)) {
+        if (priority) {
+            launch_profile_queue.removeAll(key);
+            launch_profile_queue.prepend(key);
+        }
+        return;
+    }
+    if (pending_launch_profiles.size() >= launch_profile_cache_limit) {
+        if (!priority)
+            return;
+        pending_launch_profiles.remove(launch_profile_queue.takeLast());
+    }
+    pending_launch_profiles.insert(key, record);
+    if (priority)
+        launch_profile_queue.prepend(key);
+    else
+        launch_profile_queue.append(key);
+    next_launch_profiles();
+}
+
+void DesktopService::next_launch_profiles() {
+    if (!active_launch_profile.isEmpty() || launch_profile_queue.isEmpty())
+        return;
+    const auto key = launch_profile_queue.takeFirst();
+    const auto record = pending_launch_profiles.take(key);
+    active_launch_profile = key;
+    auto *watcher = new QFutureWatcher<QVector<launch_profile>>(this);
+    connect(watcher, &QFutureWatcherBase::finished, this, [this, watcher, key, path = record.path] {
+        auto profiles = watcher->result();
+        watcher->deleteLater();
+        // The GUI uses themed icons; profile image files remain on the worker side.
+        for (auto &profile : profiles)
+            profile.icon_path.clear();
+        while (launch_profile_cache.size() >= launch_profile_cache_limit)
+            launch_profile_cache.remove(launch_profile_order.takeFirst());
+        launch_profile_cache.insert(key, std::move(profiles));
+        launch_profile_order.append(key);
+        active_launch_profile.clear();
+        emit launch_profiles_changed(path);
+        next_launch_profiles();
+    });
+    watcher->setFuture(QtConcurrent::run(&launch_profile_pool, [record] {
+        try {
+            return Application::launch_profiles(record);
+        } catch (const std::exception &) {
+            return Application::launch_modes(record);
+        }
+    }));
+}
+
+void DesktopService::warm_launch_profiles() {
+    qsizetype count = 0;
+    for (const auto &record : snapshot.applications) {
+        if (Application::launch_modes(record).isEmpty())
+            continue;
+        queue_launch_profiles(record, false);
+        if (++count >= launch_profile_cache_limit)
+            break;
+    }
 }

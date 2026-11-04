@@ -262,7 +262,7 @@ void MainWindow::create_actions() {
         [this] { service.open_folder(service.selection()); });
     add("copy_path", QCoreApplication::translate("XLibrary", "Copy path"), "copy", [this] {
         if (const auto *record = service.selected())
-            QApplication::clipboard()->setText(QDir::toNativeSeparators(record->path));
+            QApplication::clipboard()->setText(QDir::toNativeSeparators(Application::application_path(*record)));
     });
     add("copy_arguments", QCoreApplication::translate("XLibrary", "Copy arguments"), "copy", [this] {
         if (const auto *record = service.selected())

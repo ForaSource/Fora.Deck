@@ -3,12 +3,16 @@
 
 #include <atomic>
 #include <functional>
+#include <map>
 #include <QSettings>
 #include <QThread>
+#include <QThreadPool>
 #include <QTimer>
 
+#include "Application.h"
 #include "LibraryModel.h"
 #include "OperationTypes.h"
+#include "PlatformIntegration.h"
 #include "ProfileBackup.h"
 #include "UpdateChecker.h"
 
@@ -24,6 +28,15 @@ private:
     QThread worker_thread;
     Manager *worker;
     QThreadPool discovery_pool;
+    QThreadPool launch_profile_pool;
+    QHash<QString, QVector<launch_profile>> launch_profile_cache;
+    QHash<QString, app_record> pending_launch_profiles;
+    QStringList launch_profile_queue;
+    QStringList launch_profile_order;
+    QString active_launch_profile;
+    void queue_launch_profiles(const app_record &record, bool priority);
+    void next_launch_profiles();
+    void warm_launch_profiles();
     QTimer scenario_timer;
     QVector<scenario_step> pending_steps;
     QString scenario_name;
@@ -36,11 +49,27 @@ private:
     quint64 discovery_request_id = 0;
     QStringList pending_exclusions;
     quint64 pending_exclusions_request_id = 0;
+    QVector<app_record> missing_records;
+    bool reviewing_missing = false;
+    bool startup_inventory_pending = true;
+    bool startup_scan = false;
+    quint64 missing_removal_request_id = 0;
+    void continue_inventory_review();
     discovery_progress scan_progress;
     QString scan_report;
     QVector<app_record> preview_records;
     QVector<discovery_issue> preview_issues;
     QString preview_operation;
+    std::map<QString, std::unique_ptr<GlobalHotkey>> target_hotkeys;
+    QMap<QString, QKeySequence> registered_target_shortcuts;
+    QMap<QString, QString> target_shortcut_errors;
+    quint64 pending_shortcut_request = 0;
+    QString pending_shortcut_key;
+    QKeySequence previous_target_shortcut;
+    std::unique_ptr<GlobalHotkey> previous_target_hotkey;
+    void sync_target_hotkeys();
+    bool validate_shortcut_configuration(const QVariantMap &values, const QString &ignore_target,
+                                         const QKeySequence &candidate, QString &error) const;
     bool reviewing = false;
     bool undo_available = false;
     QVector<qint64> selected_ids;
@@ -66,7 +95,7 @@ private:
                     operation_error_source source = operation_error_source::sqlite, quint64 request_id = 0);
     void finish_scenario(operation_state state, const operation_error &error = {});
     void next_scenario_step();
-    bool begin_catalog_preview(const QString &operation);
+    bool begin_catalog_preview(const QString &operation, bool at_startup = false);
     void present_catalog_preview(QVector<app_record> records, QVector<discovery_issue> issues = {});
 
 public:
@@ -86,6 +115,7 @@ public:
     int schema_version() const { return current_schema_version; }
     bool profile_busy() const { return profile_status == operation_state::loading; }
     bool restart_required() const { return restart_pending; }
+    QVector<launch_profile> launch_profiles(const app_record &record);
     bool safe_mode() const;
     QString diagnostics_text() const;
     quint64 backup_profile(const QString &path);
@@ -99,11 +129,13 @@ public:
     void open_profile_folder();
     void restore_library(const QString &path);
     bool is_discovering() const { return discovery_state == operation_state::loading; }
+    bool is_startup_scan() const { return startup_scan; }
     bool is_cancelling_discovery() const {
         return is_discovering() && discovery_cancelled->phase.load() == discovery_phase::cancelling;
     }
     bool can_cancel_discovery() const {
-        return is_discovering() && discovery_cancelled->phase.load() == discovery_phase::running;
+        return is_discovering() && !missing_removal_request_id &&
+               discovery_cancelled->phase.load() == discovery_phase::running;
     }
     const discovery_progress &discovery_status() const { return scan_progress; }
     QString discovery_report() const { return scan_report; }
@@ -121,7 +153,9 @@ public:
     bool is_reviewing() const { return reviewing; }
     bool is_json_preview() const { return preview_operation == "import"; }
     bool is_scan_preview() const { return preview_operation == "discover"; }
-    const QVector<app_record> &catalog_preview() const { return preview_records; }
+    bool is_removal_preview() const { return reviewing_missing; }
+    const QVector<app_record> &catalog_preview() const { return reviewing_missing ? missing_records : preview_records; }
+    void keep_missing_applications();
     QString preview_details() const;
     void apply_catalog_preview(const QVector<int> &rows, bool remember_exclusions,
                                import_conflict_policy policy = import_conflict_policy::skip);
@@ -140,24 +174,33 @@ public:
     Q_INVOKABLE void remove_scenario(qint64 id);
     Q_INVOKABLE void run_scenario(qint64 id);
     Q_INVOKABLE void cancel_scenario();
-    Q_INVOKABLE void discover();
+    Q_INVOKABLE void discover(bool at_startup = false);
     Q_INVOKABLE void cancel_discovery();
     Q_INVOKABLE void export_catalog(const QString &path);
     Q_INVOKABLE void import_catalog(const QString &path);
     Q_INVOKABLE void launch(qint64 id, bool new_instance = false, bool scenario = false);
     quint64 request_launch(qint64 id, bool new_instance = false, bool scenario = false);
+    quint64 request_launch_mode(qint64 id, Application::launch_mode mode, bool scenario = false,
+                                const QString &profile = {});
+    quint64 request_launch_profile(qint64 id, const QString &profile);
     Q_INVOKABLE void open_folder(qint64 id);
     quint64 save_filter(saved_filter record);
     void remove_filter(qint64 id);
     void apply_filter(const saved_filter &record);
     void clear_filters();
     void clear_history();
+    QKeySequence target_shortcut(bool scenario, qint64 id) const;
+    bool validate_target_shortcut(bool scenario, qint64 id, const QKeySequence &sequence, QString &error) const;
+    bool set_target_shortcut(bool scenario, qint64 id, const QKeySequence &sequence, QString &error);
+    bool validate_shortcuts(const QVariantMap &values, QString &error) const;
     void notify(const QString &message);
 
 signals:
     void library_open_requested(quint64 request_id);
     void library_restore_requested(quint64 request_id, const QString &path);
     void catalog_changed();
+    void target_shortcuts_changed();
+    void launch_profiles_changed(const QString &path);
     void selection_changed();
     void selections_changed();
     void undo_removal_changed();

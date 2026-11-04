@@ -18,6 +18,10 @@ QIcon appearance::icon(const QString &name, const QColor &color) {
     if (name == "add") {
         painter.drawLine(QPointF(12, 5), QPointF(12, 19));
         painter.drawLine(QPointF(5, 12), QPointF(19, 12));
+    } else if (name == "lock" || name == "private") {
+        painter.drawRoundedRect(QRectF(5, 10, 14, 11), 2, 2);
+        painter.drawArc(QRectF(8, 3, 8, 13), 0, 180 * 16);
+        painter.drawLine(QPointF(12, 14), QPointF(12, 17));
     } else if (name == "search") {
         painter.drawEllipse(QRectF(4, 4, 12, 12));
         painter.drawLine(QPointF(15, 15), QPointF(21, 21));
@@ -210,6 +214,8 @@ void appearance::apply(const QSettings &settings, const QString &additional_styl
         QTabBar#shortcut_tabs::tab:last { margin-right: 0; }
         QTabBar#shortcut_tabs::tab:hover { background: %5; border-color: %6; }
         QTabBar#shortcut_tabs::tab:selected { color: %1; background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 %17, stop:1 %7); border-color: %16; }
+        QTabBar#shortcut_tabs::scroller { width: 2em; }
+        QTabBar#shortcut_tabs QToolButton { padding: 0; min-width: 0; min-height: 0; border-radius: 6px; }
         QAbstractItemView { background: %2; border: none; outline: none; selection-background-color: %7; }
         QAbstractItemView::item { padding: 6px; border: 1px solid transparent; border-radius: 10px; }
         QAbstractItemView::item:selected { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 %17, stop:1 %7); border-color: %16; color: %1; }

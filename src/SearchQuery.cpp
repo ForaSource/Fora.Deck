@@ -1,3 +1,5 @@
+#include <algorithm>
+#include <array>
 #include <cmath>
 #include <QCoreApplication>
 #include <QDir>
@@ -24,6 +26,134 @@ namespace {
 QString normalized_search(const QString &text) {
     return text.normalized(QString::NormalizationForm_C).toCaseFolded().simplified();
 }
+
+constexpr qsizetype maximum_fuzzy_length = 64;
+constexpr qsizetype maximum_fuzzy_words = 32;
+// Keep category, position and tie breakers in disjoint ranges for the shared integer rank.
+constexpr int rank_stride = 1 << 20;
+constexpr int abbreviation_rank = 3 * rank_stride;
+constexpr int fuzzy_rank = 4 * rank_stride;
+
+int position_rank(const qsizetype position) {
+    return static_cast<int>(qMin(position, qsizetype(rank_stride / 4 - 1))) * 4;
+}
+
+int substring_rank(const QString &query, const QString &alternate, const SearchQuery::SearchField &field) {
+    auto best = -1;
+    const auto consider = [&field, &best](const QString &text, const int layout_penalty) {
+        for (auto position = field.text.indexOf(text); position >= 0;
+             position = field.text.indexOf(text, position + 1)) {
+            const auto end = position + text.size();
+            const auto starts_word = position == 0 || !field.text[position - 1].isLetterOrNumber();
+            const auto ends_word = end == field.text.size() || !field.text[end].isLetterOrNumber();
+            const auto category = starts_word ? (ends_word ? 0 : 1) : 2;
+            const auto rank =
+                category * rank_stride + position_rank(position) + (field.text == text ? 0 : 2) + layout_penalty;
+            if (best < 0 || rank < best)
+                best = rank;
+            if (category == 0)
+                break;
+        }
+    };
+    consider(query, 0);
+    if (alternate != query)
+        consider(alternate, 1);
+    return best;
+}
+
+SearchQuery::SearchField prepare_field(const QString &text) {
+    SearchQuery::SearchField field;
+    field.text = normalized_search(text);
+    qsizetype start = 0;
+    while (start < field.text.size()) {
+        while (start < field.text.size() && !field.text[start].isLetterOrNumber())
+            ++start;
+        auto end = start;
+        while (end < field.text.size() && field.text[end].isLetterOrNumber())
+            ++end;
+        if (end > start) {
+            field.words.append(field.text.mid(start, end - start));
+            field.initials.append(field.text[start]);
+        }
+        start = end;
+    }
+    return field;
+}
+
+bool abbreviation_match(const QString &query, const SearchQuery::SearchField &field) {
+    if (field.words.size() < 2 || query.size() < 2 || query.size() > maximum_fuzzy_length)
+        return false;
+    if (field.initials.startsWith(query))
+        return true;
+    // Every participating word contributes a prefix, so "vscode" can mean "Visual Studio Code".
+    std::array<bool, maximum_fuzzy_length + 1> previous{};
+    previous[0] = true;
+    const auto word_count = qMin(field.words.size(), maximum_fuzzy_words);
+    for (qsizetype word_index = 0; word_index < word_count; ++word_index) {
+        const auto &word = field.words[word_index];
+        std::array<bool, maximum_fuzzy_length + 1> current{};
+        for (qsizetype position = 0; position < query.size(); ++position) {
+            if (!previous[position])
+                continue;
+            const auto length = qMin(word.size(), query.size() - position);
+            for (qsizetype offset = 0; offset < length && word[offset] == query[position + offset]; ++offset)
+                current[position + offset + 1] = true;
+        }
+        if (word_index > 0 && current[query.size()])
+            return true;
+        previous = current;
+    }
+    return false;
+}
+
+int typo_distance(const QString &query, const QString &candidate, const int limit) {
+    const auto length = query.size();
+    const auto candidate_length = candidate.size();
+    if (limit == 0 || candidate_length > maximum_fuzzy_length || qAbs(length - candidate_length) > limit)
+        return limit + 1;
+    // A narrow band and fixed-size rows bound work even for unusually long catalog names.
+    std::array<int, maximum_fuzzy_length + 1> previous_previous{};
+    std::array<int, maximum_fuzzy_length + 1> previous;
+    previous.fill(limit + 1);
+    for (qsizetype column = 0; column <= qMin(candidate_length, qsizetype(limit)); ++column)
+        previous[column] = static_cast<int>(column);
+    for (qsizetype row = 1; row <= length; ++row) {
+        std::array<int, maximum_fuzzy_length + 1> current;
+        current.fill(limit + 1);
+        if (row <= limit)
+            current[0] = static_cast<int>(row);
+        auto best = limit + 1;
+        const auto first = qMax(qsizetype(1), row - limit);
+        const auto last = qMin(candidate_length, row + limit);
+        for (auto column = first; column <= last; ++column) {
+            const auto substitution = previous[column - 1] + (query[row - 1] != candidate[column - 1]);
+            auto distance = qMin(substitution, qMin(previous[column] + 1, current[column - 1] + 1));
+            if (row > 1 && column > 1 && query[row - 1] == candidate[column - 2] &&
+                query[row - 2] == candidate[column - 1])
+                distance = qMin(distance, previous_previous[column - 2] + 1);
+            current[column] = distance;
+            best = qMin(best, distance);
+        }
+        if (best > limit)
+            return limit + 1;
+        previous_previous = previous;
+        previous = current;
+    }
+    return previous[candidate_length];
+}
+
+int fuzzy_field_rank(const QString &query, const SearchQuery::SearchField &field, const int limit) {
+    auto best = typo_distance(query, field.text, limit) * rank_stride;
+    const auto word_count = qMin(field.words.size(), maximum_fuzzy_words);
+    qsizetype position = 0;
+    for (qsizetype index = 0; index < word_count; ++index) {
+        position = field.text.indexOf(field.words[index], position);
+        const auto distance = typo_distance(query, field.words[index], limit);
+        best = qMin(best, distance * rank_stride + position_rank(position));
+        position += field.words[index].size();
+    }
+    return best;
+}
 }
 
 SearchQuery::SearchQuery(const QString &text) {
@@ -37,12 +167,31 @@ SearchQuery::SearchQuery(const QString &text) {
         else if (word.startsWith('#'))
             required_tags.append(word.mid(1));
         else {
-            terms.append({word, search_query::switch_layout(word)});
+            const auto maximum_distance = word.size() < 4 || word.size() > maximum_fuzzy_length ? 0
+                                          : word.size() < 6                                     ? 1
+                                                                                                : 2;
+            terms.append({word, search_query::switch_layout(word), maximum_distance});
             names.append(word);
         }
     }
     phrase = names.join(' ');
-    alternate_phrase = search_query::switch_layout(phrase);
+    abbreviations_enabled =
+        phrase.size() >= 2 && phrase.size() <= maximum_fuzzy_length &&
+        std::all_of(phrase.begin(), phrase.end(), [](const QChar character) { return character.isLetterOrNumber(); });
+}
+
+SearchQuery::SearchableData SearchQuery::prepare(const QString &name, const QString &file_name, const QStringList &tags,
+                                                 const QStringList &aliases) {
+    SearchableData data;
+    data.names.reserve(aliases.size() + 1);
+    data.names.append(prepare_field(name));
+    for (const auto &alias : aliases)
+        data.names.append(prepare_field(alias));
+    data.file_name = prepare_field(file_name);
+    data.tags.reserve(tags.size());
+    for (const auto &tag : tags)
+        data.tags.append(normalized_search(tag));
+    return data;
 }
 
 QString SearchQuery::tag_hint(const QStringList &known_tags) const {
@@ -80,46 +229,92 @@ QString search_query::rewrite_tag(const QString &text, const QString &old_name, 
 
 int SearchQuery::rank(const QString &name, const QString &file_name, const QStringList &tags,
                       const QStringList &aliases) const {
+    return rank(prepare(name, file_name, tags, aliases));
+}
+
+int SearchQuery::rank(const SearchableData &data) const {
     if (incomplete_tag)
         return -1;
-    QStringList normalized_tags;
-    for (const auto &tag : tags)
-        normalized_tags.append(normalized_search(tag));
     for (const auto &tag : required_tags)
-        if (!normalized_tags.contains(tag))
+        if (!data.tags.contains(tag))
             return -1;
     for (const auto &tag : excluded_tags)
-        if (normalized_tags.contains(tag))
+        if (data.tags.contains(tag))
             return -1;
     if (terms.isEmpty())
         return 0;
-    QStringList fields{normalized_search(name), normalized_search(file_name)};
-    for (const auto &alias : aliases)
-        fields.append(normalized_search(alias));
-    bool literal_match = true;
+    const auto any_field = [&data](const auto &matches) {
+        return matches(data.file_name) || std::any_of(data.names.begin(), data.names.end(), matches);
+    };
+    const auto alternate_phrase = search_query::switch_layout(phrase);
+    if (!data.names.isEmpty()) {
+        if (data.names.front().text == phrase)
+            return 0;
+        if (data.names.front().text == alternate_phrase)
+            return 1;
+    }
+    int direct_rank = 0;
+    bool all_direct = true;
     for (const auto &term : terms) {
-        bool literal = false;
-        bool alternate = false;
-        for (const auto &field : fields) {
-            literal |= field.contains(term.literal);
-            alternate |= field.contains(term.alternate);
+        auto best = data.names.isEmpty() ? -1 : substring_rank(term.literal, term.alternate, data.names.front());
+        // A filename or alias must not move an existing title match to an earlier position.
+        if (best < 0) {
+            const auto consider = [&term, &best](const auto &field) {
+                const auto rank = substring_rank(term.literal, term.alternate, field);
+                if (rank >= 0 && (best < 0 || rank < best))
+                    best = rank;
+            };
+            consider(data.file_name);
+            for (qsizetype index = 1; index < data.names.size(); ++index)
+                consider(data.names[index]);
         }
-        if (!literal && !alternate)
+        if (best < 0) {
+            all_direct = false;
+            break;
+        }
+        direct_rank = qMax(direct_rank, best);
+    }
+    if (all_direct)
+        return direct_rank;
+    if (abbreviations_enabled && any_field([this, &alternate_phrase](const auto &field) {
+            return abbreviation_match(phrase, field) || abbreviation_match(alternate_phrase, field);
+        }))
+        return abbreviation_rank;
+    int suggestion_rank = 0;
+    for (const auto &term : terms) {
+        if (any_field([&term](const auto &field) {
+                return field.text.contains(term.literal) || field.text.contains(term.alternate);
+            }))
+            continue;
+        if (term.maximum_distance == 0)
             return -1;
-        literal_match &= literal;
+        auto best = (term.maximum_distance + 1) * rank_stride;
+        const auto consider = [&term, &best](const auto &field) {
+            best = qMin(best, fuzzy_field_rank(term.literal, field, term.maximum_distance));
+            if (term.alternate != term.literal)
+                best = qMin(best, fuzzy_field_rank(term.alternate, field, term.maximum_distance) + 1);
+        };
+        if (!data.names.isEmpty())
+            consider(data.names.front());
+        const auto title_rank = best;
+        consider(data.file_name);
+        for (qsizetype index = 1; index < data.names.size(); ++index)
+            consider(data.names[index]);
+        // Prefer fewer edits in any field, then use the displayed title's position when equally close.
+        if (title_rank / rank_stride == best / rank_stride)
+            best = title_rank;
+        if (best / rank_stride > term.maximum_distance)
+            return -1;
+        suggestion_rank = qMax(suggestion_rank, best);
     }
-    int best = literal_match ? 4 : 5;
-    for (const auto &field : fields) {
-        if (field == phrase)
-            best = qMin(best, 0);
-        else if (field == alternate_phrase)
-            best = qMin(best, 1);
-        else if (field.startsWith(phrase))
-            best = qMin(best, 2);
-        else if (field.startsWith(alternate_phrase))
-            best = qMin(best, 3);
-    }
-    return best;
+    return fuzzy_rank + suggestion_rank;
+}
+
+bool SearchQuery::accepts_rank(const int rank, const int best_rank) {
+    if (rank < 0 || best_rank < 0)
+        return false;
+    // Typo suggestions are a fallback, limited to the closest available edit distance.
+    return best_rank < fuzzy_rank ? rank < fuzzy_rank : rank / rank_stride == best_rank / rank_stride;
 }
 
 bool search_query::is_path(const QString &text) {
