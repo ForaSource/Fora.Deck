@@ -69,6 +69,7 @@ public:
     void remove_tag(const QString &name);
     qint64 save_scenario(const scenario_record &record);
     void remove_scenario(qint64 id);
+    void save_target_shortcut(bool scenario, qint64 id, const QString &sequence);
     void record_launch(qint64 id);
     void clear_history();
     catalog_import_result import_records(const QVector<app_record> &records, discovery_control *control = nullptr,

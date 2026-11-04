@@ -92,7 +92,8 @@ public:
     void recover_paths(const QVector<path_relocation> &changes);
     void launch_record(qint64 id, Application::launch_mode mode, quint64 generation,
                        const std::shared_ptr<std::atomic<quint64>> &token,
-                       const std::function<void(const app_record &, Application::launch_mode)> &launch_action);
+                       const std::function<void(const app_record &, Application::launch_mode)> &launch_action,
+                       const QString &profile = {});
     void execute(quint64 id, const QString &operation, const std::function<void(Manager &)> &task,
                  operation_error_source source);
     void preview_files(const QStringList &paths, const std::shared_ptr<discovery_control> &cancelled);

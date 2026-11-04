@@ -156,6 +156,7 @@ std::uint32_t Application::launch(const std::wstring &arguments, const std::file
 #include <QRegularExpression>
 #include <QSet>
 #include <shlobj.h>
+#include <shobjidl.h>
 
 #include "PathHelpers.h"
 #include "Windows/RegistryScan.h"
@@ -226,12 +227,93 @@ bool should_import_application(const app_record &record) {
 
 }
 
-QString Application::new_instance_error(const app_record &) {
-    return {};
+QString Application::new_instance_error(const app_record &record) {
+    return file_target(record) ? QString{}
+                               : QCoreApplication::translate("XLibrary", "This target supports activation only.");
+}
+
+QString Application::configured_arguments(const app_record &record) {
+    return record.arguments;
 }
 
 void Application::launch_application(const app_record &record, const launch_mode mode) {
+    validate_launch_target(record);
     const xlibrary::ComScope com;
+    const auto kind = target_kind(record);
+    if (file_target(record)) {
+        const auto suffix = QFileInfo(record.path).suffix().toLower();
+        if (kind != "executable" || (suffix != "exe" && suffix != "bat" && suffix != "cmd"))
+            throw std::invalid_argument(
+                QCoreApplication::translate("XLibrary", "Unsupported Windows executable target").toStdString());
+    }
+    if (!file_target(record)) {
+        if (mode == launch_mode::new_instance || mode == launch_mode::elevated)
+            throw std::invalid_argument(
+                QCoreApplication::translate("XLibrary", "This target supports activation only").toStdString());
+        if (!target_available(record))
+            throw std::runtime_error(
+                QCoreApplication::translate("XLibrary", "Launch target is unavailable").toStdString());
+        if (kind == "aumid") {
+            IApplicationActivationManager *raw_manager = nullptr;
+            const auto created = CoCreateInstance(CLSID_ApplicationActivationManager, nullptr, CLSCTX_INPROC_SERVER,
+                                                  IID_PPV_ARGS(&raw_manager));
+            if (FAILED(created))
+                throw std::runtime_error(
+                    QCoreApplication::translate("XLibrary", "Cannot create application activation manager")
+                        .toStdString());
+            const auto release = [](IApplicationActivationManager *value) { value->Release(); };
+            const std::unique_ptr<IApplicationActivationManager, decltype(release)> manager(raw_manager, release);
+            DWORD process_id = 0;
+            const auto activated =
+                manager->ActivateApplication(record.path.toStdWString().c_str(), nullptr, AO_NONE, &process_id);
+            if (FAILED(activated))
+                throw std::runtime_error(
+                    QCoreApplication::translate("XLibrary", "Application activation failed (Windows error %1).")
+                        .arg(activated)
+                        .toStdString());
+            return;
+        }
+        const auto target = (kind == "steam" ? "steam://run/" + record.path : record.path).toStdWString();
+        SHELLEXECUTEINFOW info{};
+        info.cbSize = sizeof(info);
+        info.fMask = SEE_MASK_NOASYNC | SEE_MASK_FLAG_NO_UI;
+        info.lpVerb = L"open";
+        info.lpFile = target.c_str();
+        info.nShow = SW_SHOWNORMAL;
+        if (!ShellExecuteExW(&info))
+            throw std::runtime_error(
+                QCoreApplication::translate("XLibrary", "Target activation failed (Windows error %1).")
+                    .arg(GetLastError())
+                    .toStdString());
+        return;
+    }
+    if (mode == launch_mode::elevated) {
+        if (kind != "executable" || QFileInfo(record.path).suffix().compare("exe", Qt::CaseInsensitive) != 0 ||
+            !QFileInfo(record.path).isAbsolute() || !QFileInfo(record.path).isFile())
+            throw std::invalid_argument(
+                QCoreApplication::translate("XLibrary", "Elevation requires an available Windows executable")
+                    .toStdString());
+        const auto path = QDir::toNativeSeparators(record.path).toStdWString();
+        const auto arguments = record.arguments.toStdWString();
+        const auto directory =
+            QDir::toNativeSeparators(record.working_directory.isEmpty() ? QFileInfo(record.path).absolutePath()
+                                                                        : record.working_directory)
+                .toStdWString();
+        SHELLEXECUTEINFOW info{};
+        info.cbSize = sizeof(info);
+        info.fMask = SEE_MASK_NOASYNC | SEE_MASK_FLAG_NO_UI;
+        info.lpVerb = L"runas";
+        info.lpFile = path.c_str();
+        info.lpParameters = arguments.empty() ? nullptr : arguments.c_str();
+        info.lpDirectory = directory.c_str();
+        info.nShow = SW_SHOWNORMAL;
+        if (!ShellExecuteExW(&info))
+            throw std::runtime_error(
+                QCoreApplication::translate("XLibrary", "Elevated launch failed (Windows error %1).")
+                    .arg(GetLastError())
+                    .toStdString());
+        return;
+    }
     Application application(record.name.toStdString(), std::filesystem::path(record.path.toStdWString()));
     const auto directory =
         record.working_directory.isEmpty() ? QFileInfo(record.path).absolutePath() : record.working_directory;
@@ -426,8 +508,16 @@ QVector<app_record> Application::discover(const bool registry, const bool start_
             unique.append(std::move(record));
         }
     }
+    if (registry) unique += discover_system(issues, cancelled, progress);
+    QVector<app_record> combined;
+    QSet<QString> combined_keys;
+    for (auto &record : unique) {
+        if (cancelled.load()) return {};
+        const auto key = launch_key(record);
+        if (!combined_keys.contains(key)) { combined_keys.insert(key); combined.append(std::move(record)); }
+    }
     report(total, total, QCoreApplication::translate("XLibrary", "Application checks complete"));
-    return unique;
+    return combined;
 }
 
 xlibrary::ComScope::ComScope() : result(CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED)) {
@@ -435,4 +525,57 @@ xlibrary::ComScope::ComScope() : result(CoInitializeEx(nullptr, COINIT_APARTMENT
 xlibrary::ComScope::~ComScope() {
     if (SUCCEEDED(result))
         CoUninitialize();
+}
+
+bool Application::windows_aumid_available(const QString &aumid) {
+    const xlibrary::ComScope com;
+    IShellItem *item = nullptr;
+    const auto result =
+        SHCreateItemInKnownFolder(FOLDERID_AppsFolder, 0, aumid.toStdWString().c_str(), IID_PPV_ARGS(&item));
+    if (item)
+        item->Release();
+    return SUCCEEDED(result);
+}
+
+QVector<app_record> Application::discover_system(QVector<discovery_issue> &issues, const std::atomic_bool &cancelled,
+                                                 const std::function<void(const discovery_progress &)> &progress) {
+    QVector<app_record> result;
+    const auto add = [&](const QString &name, const QString &kind, const QString &value) {
+        if (cancelled.load())
+            return;
+        app_record record;
+        record.name = QCoreApplication::translate("XLibrary", name.toUtf8().constData());
+        record.target_kind = kind;
+        record.path = value;
+        record.discovery_source =
+            "windows-system:" + (kind == "executable" ? QFileInfo(value).fileName().toLower() : value);
+        if (target_available(record))
+            result.append(std::move(record));
+        else
+            issues.append({record.discovery_source,
+                           QCoreApplication::translate("XLibrary", "The target is not installed or is unavailable."),
+                           discovery_issue_kind::skipped});
+    };
+    if (progress)
+        progress({-1, 0, 0, QCoreApplication::translate("XLibrary", "Checking Windows system applications")});
+    const auto windows = qEnvironmentVariable("WINDIR");
+    if (!windows.isEmpty()) {
+        add(QT_TRANSLATE_NOOP("XLibrary", "File Explorer"), "executable", windows + "/explorer.exe");
+        add(QT_TRANSLATE_NOOP("XLibrary", "Task Manager"), "executable", windows + "/System32/Taskmgr.exe");
+        add(QT_TRANSLATE_NOOP("XLibrary", "Control Panel"), "executable", windows + "/System32/control.exe");
+    }
+    add(QT_TRANSLATE_NOOP("XLibrary", "Settings"), "system_uri", "ms-settings:");
+    add(QT_TRANSLATE_NOOP("XLibrary", "Bluetooth"), "system_uri", "ms-settings:bluetooth");
+    add(QT_TRANSLATE_NOOP("XLibrary", "Display"), "system_uri", "ms-settings:display");
+    add(QT_TRANSLATE_NOOP("XLibrary", "Sound"), "system_uri", "ms-settings:sound");
+    add(QT_TRANSLATE_NOOP("XLibrary", "Network"), "system_uri", "ms-settings:network");
+    add(QT_TRANSLATE_NOOP("XLibrary", "Installed apps"), "system_uri", "ms-settings:appsfeatures");
+    add(QT_TRANSLATE_NOOP("XLibrary", "Windows Update"), "system_uri", "ms-settings:windowsupdate");
+    add(QT_TRANSLATE_NOOP("XLibrary", "Calculator"), "aumid", "Microsoft.WindowsCalculator_8wekyb3d8bbwe!App");
+    add(QT_TRANSLATE_NOOP("XLibrary", "Microsoft Store"), "aumid", "Microsoft.WindowsStore_8wekyb3d8bbwe!App");
+    add(QT_TRANSLATE_NOOP("XLibrary", "Windows Terminal"), "aumid", "Microsoft.WindowsTerminal_8wekyb3d8bbwe!App");
+    if (progress)
+        progress({90, result.size(), result.size(),
+                  QCoreApplication::translate("XLibrary", "System application checks complete")});
+    return cancelled.load() ? QVector<app_record>{} : result;
 }

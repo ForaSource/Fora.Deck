@@ -27,7 +27,23 @@ private:
     }
 
 public:
-    enum class launch_mode { launch, activate, new_instance };
+    enum class launch_mode { launch, activate, new_instance, elevated };
+    static QString target_kind(const app_record &record);
+    static bool file_target(const app_record &record);
+    static void validate_launch_target(const app_record &record);
+    static QString launch_key(const app_record &record);
+    static bool target_available(const app_record &record);
+    static bool requires_fresh_launch(const app_record &record);
+    static QString configured_arguments(const app_record &record);
+    static bool valid_launch_profile_id(const QString &profile);
+    static QVector<launch_profile> launch_modes(const app_record &record);
+    static QVector<launch_profile> launch_profiles(const app_record &record);
+    static app_record with_launch_profile(const app_record &record, const QString &profile);
+#ifdef Q_OS_WIN
+    static bool windows_aumid_available(const QString &aumid);
+#endif
+    static QVector<app_record> discover_system(QVector<discovery_issue> &issues, const std::atomic_bool &cancelled,
+        const std::function<void(const discovery_progress &)> &progress = {});
     static void launch_application(const app_record &record, launch_mode mode);
     static QString new_instance_error(const app_record &record);
     static app_record resolve_application(const QString &path);

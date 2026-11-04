@@ -41,7 +41,11 @@ struct app_record {
     qint64 configuration_id = 0;
     QString name;
     QString path;
+    QString target_kind;
+    QString installation_directory;
+    QString icon_path;
     QString arguments;
+    QString default_launch_profile;
     QString working_directory;
     QStringList tags;
     QStringList aliases;
@@ -94,6 +98,14 @@ struct scenario_step {
     qint64 application_id = 0;
     int delay_ms = 0;
     bool enabled = true;
+    QString launch_profile;
+};
+
+struct launch_profile {
+    QString id;
+    QString name;
+    QString kind;
+    QString icon_path;
 };
 
 struct scenario_record {
@@ -112,11 +124,18 @@ struct saved_filter {
     Qt::SortOrder sort_order = Qt::AscendingOrder;
 };
 
+struct target_shortcut {
+    bool scenario = false;
+    qint64 target_id = 0;
+    QString sequence;
+};
+
 struct catalog_snapshot {
     QVector<app_record> applications;
     QStringList tags;
     QVector<scenario_record> scenarios;
     QVector<saved_filter> filters;
+    QVector<target_shortcut> target_shortcuts;
 };
 
 struct path_relocation {

@@ -114,7 +114,8 @@ std::vector<Application> Database::get_applications() const {
     sqlite3_stmt *raw_statement = nullptr;
     int result = sqlite3_prepare_v2(
         this->connection.get(),
-        "SELECT a.name,c.path FROM applications a JOIN launch_configuration c ON c.id=a.configuration_id;", -1,
+        "SELECT a.name,c.path FROM applications a JOIN launch_configuration c ON c.id=a.configuration_id "
+        "JOIN launch_target t ON t.id=c.target_id WHERE t.kind IN ('executable','desktop');", -1,
         &raw_statement, nullptr);
 
     const std::unique_ptr<sqlite3_stmt, decltype(&sqlite3_finalize)> statement(raw_statement, &sqlite3_finalize);
@@ -168,14 +169,17 @@ std::vector<Application> Database::get_applications() const {
 #include "SearchQuery.h"
 
 void Database::validate_application(const app_record &record) {
-    if (record.name.trimmed().isEmpty() || record.name.size() > 256 || !QFileInfo(record.path).isAbsolute() ||
-        record.name.contains(QChar::Null) || record.path.contains(QChar::Null) ||
-        record.arguments.contains(QChar::Null) || record.working_directory.contains(QChar::Null)) {
+    if (record.name.trimmed().isEmpty() || record.name.size() > 256 || record.name.contains(QChar::Null) ||
+        record.path.contains(QChar::Null) || record.arguments.contains(QChar::Null) ||
+        record.working_directory.contains(QChar::Null)) {
         throw std::invalid_argument(
             QCoreApplication::translate("XLibrary", "Invalid application name or path.").toStdString());
     }
+    Application::validate_launch_target(record);
+    if (!Application::valid_launch_profile_id(record.default_launch_profile))
+        throw std::invalid_argument("Invalid default launch profile");
 #ifdef Q_OS_WIN
-    if (QFileInfo(record.path).suffix().isEmpty())
+    if (Application::file_target(record) && QFileInfo(record.path).suffix().isEmpty())
         throw std::invalid_argument(
             QCoreApplication::translate("XLibrary", "A Windows target requires a filename extension.").toStdString());
 #endif
@@ -185,7 +189,9 @@ void Database::validate_application(const app_record &record) {
     }
     if (record.path.size() > catalog_limits::text_length || record.arguments.size() > catalog_limits::text_length ||
         record.working_directory.size() > catalog_limits::text_length ||
-        record.tags.size() > catalog_limits::tags_per_application) {
+        record.installation_directory.size() > catalog_limits::text_length ||
+        record.icon_path.size() > catalog_limits::text_length || record.installation_directory.contains(QChar::Null) ||
+        record.icon_path.contains(QChar::Null) || record.tags.size() > catalog_limits::tags_per_application) {
         throw std::invalid_argument(
             QCoreApplication::translate("XLibrary", "Paths and arguments: up to 32768 characters; tags: up to 256.")
                 .toStdString());
@@ -324,8 +330,9 @@ catalog_snapshot Database::read() const {
     auto *connection = get_connection();
     xlibrary::SqliteStatement applications(connection, R"(
         SELECT a.id, a.name, c.path, c.arguments, c.working_directory,
-               coalesce(d.favorite,0), coalesce(d.last_launch,0),c.id,c.target_id
+               coalesce(d.favorite,0), coalesce(d.last_launch,0),c.id,c.target_id,t.kind,c.installation_directory,c.icon_path,coalesce(d.default_launch_profile,'')
         FROM applications a JOIN launch_configuration c ON c.id=a.configuration_id
+        JOIN launch_target t ON t.id=c.target_id
         LEFT JOIN desktop_application d ON a.id = d.application_id ORDER BY a.id;
     )");
     QHash<qint64, qsizetype> rows;
@@ -340,7 +347,11 @@ catalog_snapshot Database::read() const {
         record.last_launch = applications.number(6);
         record.configuration_id = applications.number(7);
         record.target_id = applications.number(8);
-        record.available = QFileInfo(record.path).isFile();
+        record.target_kind = applications.qtext(9);
+        record.installation_directory = applications.qtext(10);
+        record.icon_path = applications.qtext(11);
+        record.default_launch_profile = applications.qtext(12);
+        record.available = Application::target_available(record);
         rows.insert(record.id, result.applications.size());
         result.applications.append(std::move(record));
     }
@@ -386,36 +397,76 @@ catalog_snapshot Database::read() const {
     xlibrary::SqliteStatement scenarios(connection, "SELECT id, name FROM desktop_scenario ORDER BY name;");
     while (scenarios.next()) {
         scenario_record record{scenarios.number(0), scenarios.qtext(1), {}};
-        xlibrary::SqliteStatement steps(connection,
-                                        "SELECT application_id, delay_ms, enabled FROM desktop_scenario_step WHERE "
-                                        "scenario_id = ? ORDER BY position;");
+        xlibrary::SqliteStatement steps(
+            connection, "SELECT application_id, delay_ms, enabled, launch_profile FROM desktop_scenario_step WHERE "
+                        "scenario_id = ? ORDER BY position;");
         steps.bind(1, record.id);
         while (steps.next()) {
-            record.steps.append({steps.number(0), static_cast<int>(steps.number(1)), steps.number(2) != 0});
+            record.steps.append(
+                {steps.number(0), static_cast<int>(steps.number(1)), steps.number(2) != 0, steps.qtext(3)});
         }
         result.scenarios.append(std::move(record));
     }
+    xlibrary::SqliteStatement shortcuts(
+        connection,
+        "SELECT scenario_id IS NOT NULL,coalesce(application_id,scenario_id),sequence FROM target_shortcut;");
+    while (shortcuts.next())
+        result.target_shortcuts.append({shortcuts.number(0) != 0, shortcuts.number(1), shortcuts.qtext(2)});
     return result;
+}
+
+void Database::save_target_shortcut(const bool scenario, const qint64 id, const QString &sequence) {
+    if (id <= 0 || sequence.size() > 128 || sequence.contains(QChar::Null))
+        throw std::invalid_argument("Invalid target shortcut");
+    auto *connection = get_connection();
+    xlibrary::SqliteStatement target(connection, scenario ? "SELECT id FROM desktop_scenario WHERE id=?;"
+                                                          : "SELECT id FROM applications WHERE id=?;");
+    target.bind(1, id);
+    if (!target.next())
+        throw std::invalid_argument("The shortcut target no longer exists");
+    const auto column = scenario ? "scenario_id" : "application_id";
+    if (sequence.isEmpty()) {
+        const auto sql = std::string("DELETE FROM target_shortcut WHERE ") + column + "=?;";
+        xlibrary::SqliteStatement remove(connection, sql.c_str());
+        remove.bind(1, id);
+        remove.next();
+    } else {
+        const auto sql = std::string("INSERT INTO target_shortcut(") + column +
+                         ",sequence) VALUES(?,?) "
+                         "ON CONFLICT(" +
+                         column + ") DO UPDATE SET sequence=excluded.sequence;";
+        xlibrary::SqliteStatement save(connection, sql.c_str());
+        save.bind(1, id);
+        save.bind(2, sequence);
+        save.next();
+    }
 }
 
 void Database::write_metadata(const qint64 id, const app_record &record) {
     auto *connection = get_connection();
     xlibrary::SqliteStatement metadata(connection, R"(
-        INSERT INTO desktop_application(application_id, favorite) VALUES(?,?)
-        ON CONFLICT(application_id) DO UPDATE SET favorite=excluded.favorite;
+        INSERT INTO desktop_application(application_id, favorite, default_launch_profile) VALUES(?,?,?)
+        ON CONFLICT(application_id) DO UPDATE SET favorite=excluded.favorite,default_launch_profile=excluded.default_launch_profile;
     )");
     metadata.bind(1, id);
     metadata.bind(2, record.favorite);
+    metadata.bind(3, record.default_launch_profile);
     metadata.next();
     xlibrary::SqliteStatement clear_aliases(connection, "DELETE FROM application_alias WHERE application_id=?;");
     clear_aliases.bind(1, id);
     clear_aliases.next();
-    for (qsizetype position = 0; position < record.aliases.size(); ++position) {
+    QSet<QString> alias_keys;
+    qint64 alias_position = 0;
+    for (const auto &name : record.aliases) {
+        const auto key = name.trimmed().normalized(QString::NormalizationForm_C).toCaseFolded();
+        if (alias_keys.contains(key))
+            continue;
+        alias_keys.insert(key);
         xlibrary::SqliteStatement alias(connection,
                                         "INSERT INTO application_alias(application_id,position,name) VALUES(?,?,?);");
         alias.bind(1, id);
-        alias.bind(2, static_cast<qint64>(position));
-        alias.bind(3, record.aliases[position]);
+        alias.bind(2, alias_position++);
+        alias.bind(3, name.trimmed());
         alias.next();
     }
     xlibrary::SqliteStatement clear(connection, "DELETE FROM application_tags WHERE application_id = ?;");
@@ -458,7 +509,8 @@ void Database::write_source(const qint64 configuration_id, const app_record &rec
             get_connection(),
             "INSERT OR IGNORE INTO discovery_source(configuration_id,kind,source_key) VALUES(?,?,?);");
         source.bind(1, configuration_id);
-        source.bind(2, QFileInfo(path).suffix().compare("desktop", Qt::CaseInsensitive) == 0 ? QString("desktop")
+        source.bind(2, !Application::file_target(record) ? Application::target_kind(record)
+                       : QFileInfo(path).suffix().compare("desktop", Qt::CaseInsensitive) == 0 ? QString("desktop")
                        : QFileInfo(path).suffix().compare("lnk", Qt::CaseInsensitive) == 0   ? QString("shortcut")
                                                                                              : QString("discovery"));
         source.bind(3, path);
@@ -472,18 +524,18 @@ qint64 Database::save_application(const app_record &record) {
     Transaction transaction(connection);
     qint64 configuration_id = 0;
     if (record.id != 0) {
-        xlibrary::SqliteStatement current(connection,
-                                          "SELECT c.id,c.path,c.arguments,c.working_directory FROM applications a "
-                                          "JOIN launch_configuration c ON c.id=a.configuration_id WHERE a.id=?;");
+        xlibrary::SqliteStatement current(
+            connection, "SELECT c.id,c.path,c.arguments,c.working_directory,t.kind FROM applications a "
+                        "JOIN launch_configuration c ON c.id=a.configuration_id "
+                        "JOIN launch_target t ON t.id=c.target_id WHERE a.id=?;");
         current.bind(1, record.id);
-        if (current.next() && launch_configuration_key(current.qtext(1), current.qtext(2), current.qtext(3)) ==
-                                  launch_configuration_key(record.path, record.arguments, record.working_directory))
+        if (current.next() && current.qtext(4) == Application::target_kind(record) &&
+            launch_configuration_key(current.qtext(1), current.qtext(2), current.qtext(3)) ==
+                launch_configuration_key(record.path, record.arguments, record.working_directory))
             configuration_id = current.number(0);
     }
     if (configuration_id == 0) {
-        configuration_id = xlibrary::ensure_launch_configuration(connection, filesystem_path(record.path),
-                                                                 record.arguments.toStdString(),
-                                                                 filesystem_path(record.working_directory));
+        configuration_id = xlibrary::ensure_launch_configuration(connection, record);
         xlibrary::SqliteStatement duplicate(connection,
                                             "SELECT id FROM applications WHERE configuration_id=? AND id<>? LIMIT 1;");
         duplicate.bind(1, configuration_id);
@@ -493,6 +545,12 @@ qint64 Database::save_application(const app_record &record) {
                 QCoreApplication::translate("XLibrary", "This launch configuration is already in the library.")
                     .toStdString());
     }
+    xlibrary::SqliteStatement location(connection,
+        "UPDATE launch_configuration SET installation_directory=?,icon_path=? WHERE id=?;");
+    location.bind(1, record.installation_directory);
+    location.bind(2, record.icon_path);
+    location.bind(3, configuration_id);
+    location.next();
     qint64 id = record.id;
     if (id == 0) {
         xlibrary::SqliteStatement insert(connection, "INSERT INTO applications(name,configuration_id) VALUES(?,?);");
@@ -583,7 +641,7 @@ void Database::undo_removal() {
                 fail();
             const auto &other = now->steps[index++];
             if (step.application_id != other.application_id || step.delay_ms != other.delay_ms ||
-                step.enabled != other.enabled)
+                step.enabled != other.enabled || step.launch_profile != other.launch_profile)
                 fail();
         }
         if (index != now->steps.size())
@@ -610,18 +668,24 @@ void Database::undo_removal() {
         history.bind(2, record.id);
         history.next();
     }
+    for (const auto &shortcut : last_removal.target_shortcuts)
+        if (!shortcut.scenario && deleted_ids.contains(shortcut.target_id))
+            save_target_shortcut(false, shortcut.target_id, shortcut.sequence);
     for (const auto &scenario : last_removal.scenarios) {
         xlibrary::SqliteStatement clear(connection, "DELETE FROM desktop_scenario_step WHERE scenario_id=?;");
         clear.bind(1, scenario.id);
         clear.next();
         for (qsizetype index = 0; index < scenario.steps.size(); ++index) {
             const auto &step = scenario.steps[index];
-            xlibrary::SqliteStatement insert(connection, "INSERT INTO desktop_scenario_step VALUES(?,?,?,?,?);");
+            xlibrary::SqliteStatement insert(connection, "INSERT INTO "
+                                                         "desktop_scenario_step(scenario_id,position,application_id,"
+                                                         "delay_ms,enabled,launch_profile) VALUES(?,?,?,?,?,?);");
             insert.bind(1, scenario.id);
             insert.bind(2, index);
             insert.bind(3, step.application_id);
             insert.bind(4, step.delay_ms);
             insert.bind(5, step.enabled);
+            insert.bind(6, step.launch_profile);
             insert.next();
         }
     }
@@ -771,12 +835,15 @@ qint64 Database::save_scenario(const scenario_record &record) {
     }
     for (qsizetype index = 0; index < record.steps.size(); ++index) {
         const auto &step = record.steps[index];
-        xlibrary::SqliteStatement insert(connection, "INSERT INTO desktop_scenario_step VALUES(?,?,?,?,?);");
+        xlibrary::SqliteStatement insert(connection, "INSERT INTO desktop_scenario_step(scenario_id,position,application_id,delay_ms,enabled,launch_profile) VALUES(?,?,?,?,?,?);");
         insert.bind(1, id);
         insert.bind(2, index);
         insert.bind(3, step.application_id);
         insert.bind(4, step.delay_ms);
+        if (!Application::valid_launch_profile_id(step.launch_profile))
+            throw std::invalid_argument("Invalid scenario launch profile");
         insert.bind(5, step.enabled);
+        insert.bind(6, step.launch_profile);
         insert.next();
     }
     transaction.commit();
@@ -820,7 +887,8 @@ void Database::consolidate_discovered_application(const qint64 configuration_id,
     const auto key = launch_configuration_key(record.path, record.arguments, record.working_directory);
     const auto name_key = record.name.normalized(QString::NormalizationForm_C).toCaseFolded();
     app_record merged;
-    for (const auto &existing : read().applications) {
+    const auto snapshot = read();
+    for (const auto &existing : snapshot.applications) {
         if (existing.name.normalized(QString::NormalizationForm_C).toCaseFolded() != name_key ||
             launch_configuration_key(existing.path, existing.arguments, existing.working_directory) != key)
             continue;
@@ -828,6 +896,11 @@ void Database::consolidate_discovered_application(const qint64 configuration_id,
             merged = existing;
             continue;
         }
+        const bool has_shortcut = std::ranges::any_of(snapshot.target_shortcuts, [&](const target_shortcut &shortcut) {
+            return !shortcut.scenario && shortcut.target_id == existing.id;
+        });
+        if (existing.default_launch_profile != merged.default_launch_profile || has_shortcut)
+            continue;
         auto combined = merged;
         for (const auto &tag : existing.tags)
             if (!combined.tags.contains(tag))
@@ -907,9 +980,7 @@ catalog_import_result Database::import_records(const QVector<app_record> &record
         if (progress)
             progress(index, candidates.size());
         const auto &record = *candidates[index];
-        const auto configuration_id = xlibrary::ensure_launch_configuration(
-            get_connection(), filesystem_path(record.path), record.arguments.toStdString(),
-            filesystem_path(record.working_directory));
+        const auto configuration_id = xlibrary::ensure_launch_configuration(get_connection(), record);
         consolidate_discovered_application(configuration_id, record);
         write_source(configuration_id, record);
         xlibrary::SqliteStatement duplicate(get_connection(),
@@ -976,7 +1047,7 @@ QVector<path_relocation> Database::preview_relocation(const QString &old_root, c
     QVector<path_relocation> result;
     const auto snapshot = read();
     for (const auto &record : snapshot.applications) {
-        if (record.available)
+        if (!Application::file_target(record) || record.available)
             continue;
         const auto replacement = replace_root(record.path);
         if (replacement == record.path)

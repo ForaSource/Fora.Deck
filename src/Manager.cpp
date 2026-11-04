@@ -60,6 +60,7 @@ std::vector<Application> Manager::get_apps() const {
     std::vector<Application> result;
     result.reserve(catalog.applications.size());
     for (const auto &record : catalog.applications) {
+        if (!Application::file_target(record)) continue;
         const auto found = std::ranges::find_if(std::as_const(applications), [&](const auto &app) {
             return app.get_file_title() == record.name.toStdString() &&
                    app.get_file_path() == filesystem_path(record.path);
@@ -164,8 +165,12 @@ void Manager::poll(const bool force) {
                 record.new_instance_error = error;
                 capabilities_changed = true;
             }
-            record.available = QFileInfo(record.path).isFile();
+            record.available = Application::target_available(record);
             record.volume_unavailable = false;
+            if (!Application::file_target(record)) {
+                if (!record.available) unavailable.insert(Application::launch_key(record));
+                continue;
+            }
             if (record.available) {
                 const QStorageInfo volume(record.path);
                 if (const auto root = QDir::fromNativeSeparators(volume.rootPath());
@@ -225,7 +230,8 @@ void Manager::poll(const bool force) {
 void Manager::save_application(const app_record &record) {
     const auto current = std::ranges::find_if(std::as_const(this->catalog.applications),
                                               [&](const app_record &item) { return item.id == record.id; });
-    if (record.id == 0 || (current != this->catalog.applications.cend() && current->path != record.path))
+    if (Application::file_target(record) &&
+        (record.id == 0 || (current != this->catalog.applications.cend() && current->path != record.path)))
         Application::resolve_application(record.path);
     const auto id = this->store->save_application(record);
     this->refresh();
@@ -324,7 +330,11 @@ void Manager::export_catalog(const QString &path) {
         }
         const auto contents = QJsonDocument(QJsonObject{{"name", record.name},
                                                         {"path", record.path},
+                                                        {"target_kind", Application::target_kind(record)},
+                                                        {"installation_directory", record.installation_directory},
+                                                        {"icon_path", record.icon_path},
                                                         {"arguments", record.arguments},
+                                                        {"default_launch_profile", record.default_launch_profile},
                                                         {"working_directory", record.working_directory},
                                                         {"favorite", record.favorite},
                                                         {"tags", QJsonArray::fromStringList(record.tags)},
@@ -405,7 +415,11 @@ void Manager::import_catalog(const QString &path) {
         app_record record;
         record.name = text("name", true).trimmed();
         record.path = QDir::fromNativeSeparators(text("path", true));
+        record.target_kind = text("target_kind");
+        record.installation_directory = text("installation_directory");
+        record.icon_path = text("icon_path");
         record.arguments = text("arguments");
+        record.default_launch_profile = text("default_launch_profile");
         record.working_directory = text("working_directory");
         if (object.contains("favorite") && !object.value("favorite").isBool())
             fail("favorite", QCoreApplication::translate("XLibrary", "expected a boolean"));
@@ -444,10 +458,8 @@ void Manager::import_catalog(const QString &path) {
         }
         if (record.name.isEmpty() || record.name.size() > 256)
             fail("name", QCoreApplication::translate("XLibrary", "the name must contain 1 to 256 characters"));
-        if (!QFileInfo(record.path).isAbsolute())
-            fail("path", QCoreApplication::translate("XLibrary", "expected an absolute path"));
 #ifdef Q_OS_WIN
-        if (QFileInfo(record.path).suffix().isEmpty())
+        if (Application::file_target(record) && QFileInfo(record.path).suffix().isEmpty())
             fail("path", QCoreApplication::translate("XLibrary", "a Windows target requires a filename extension"));
 #endif
         if (!record.working_directory.isEmpty() && !QFileInfo(record.working_directory).isAbsolute())
@@ -488,7 +500,8 @@ void Manager::recover_paths(const QVector<path_relocation> &changes) {
 
 void Manager::launch_record(const qint64 id, const Application::launch_mode mode, const quint64 generation,
                             const std::shared_ptr<std::atomic<quint64>> &token,
-                            const std::function<void(const app_record &, Application::launch_mode)> &launch_action) {
+                            const std::function<void(const app_record &, Application::launch_mode)> &launch_action,
+                            const QString &) {
     try {
         if (generation && token->load() != generation) {
             throw DiscoveryCancelled();

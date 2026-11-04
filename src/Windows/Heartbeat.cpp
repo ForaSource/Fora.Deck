@@ -8,6 +8,7 @@
 #include <utility>
 
 #include "Heartbeat.h"
+#include "Application.h"
 
 namespace {
 using unique_handle = std::unique_ptr<void, decltype(&CloseHandle)>;
@@ -142,6 +143,8 @@ QSet<QString> Heartbeat::running_paths(const QVector<app_record> &applications) 
     QSet<QString> names;
     QSet<QString> paths;
     for (const auto &application : applications) {
+        if (!Application::file_target(application))
+            continue;
         names.insert(QFileInfo(application.path).fileName().toCaseFolded());
     }
     if (names.isEmpty()) {

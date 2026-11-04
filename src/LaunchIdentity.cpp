@@ -1,3 +1,4 @@
+#include <QCoreApplication>
 #ifdef _WIN32
 #include <windows.h>
 #endif
@@ -119,4 +120,57 @@ sqlite3_int64 xlibrary::ensure_launch_configuration(sqlite3 *const connection, c
     if (!find_configuration.next())
         throw std::runtime_error("Launch configuration was not saved");
     return find_configuration.number(0);
+}
+
+#include "Application.h"
+#include "PathHelpers.h"
+
+sqlite3_int64 xlibrary::ensure_launch_configuration(sqlite3 *const connection, const app_record &record) {
+    Application::validate_launch_target(record);
+    sqlite3_int64 configuration_id = 0;
+    const auto kind = Application::target_kind(record).toStdString();
+    if (Application::file_target(record)) {
+        configuration_id =
+            ensure_launch_configuration(connection, filesystem_path(record.path), record.arguments.toStdString(),
+                                        filesystem_path(record.working_directory));
+    } else {
+        const auto key = (kind == "aumid" ? record.path.toCaseFolded() : record.path).toStdString();
+        SqliteStatement create_target(
+            connection,
+            "INSERT INTO launch_target(kind,identity_key) VALUES(?,?) ON CONFLICT(kind,identity_key) DO NOTHING;");
+        create_target.bind(1, kind);
+        create_target.bind(2, key);
+        create_target.next();
+        SqliteStatement target(connection, "SELECT id FROM launch_target WHERE kind=? AND identity_key=?;");
+        target.bind(1, kind);
+        target.bind(2, key);
+        if (!target.next())
+            throw std::runtime_error(
+                QCoreApplication::translate("XLibrary", "Launch target was not saved").toStdString());
+        const auto target_id = target.number(0);
+        SqliteStatement create_configuration(
+            connection,
+            "INSERT INTO "
+            "launch_configuration(target_id,path,arguments,working_directory,working_directory_key,invocation_key) "
+            "VALUES(?,?,'','','',?) ON CONFLICT(target_id,invocation_key,arguments,working_directory_key) DO NOTHING;");
+        create_configuration.bind(1, target_id);
+        create_configuration.bind(2, record.path);
+        create_configuration.bind(3, key);
+        create_configuration.next();
+        SqliteStatement find(connection, "SELECT id FROM launch_configuration WHERE target_id=? AND invocation_key=?;");
+        find.bind(1, target_id);
+        find.bind(2, key);
+        if (!find.next())
+            throw std::runtime_error(
+                QCoreApplication::translate("XLibrary", "Launch configuration was not saved").toStdString());
+        configuration_id = find.number(0);
+    }
+    // Location is discovery metadata: moving a Steam library must preserve the card and target IDs.
+    SqliteStatement metadata(connection,
+                             "UPDATE launch_configuration SET installation_directory=?,icon_path=? WHERE id=?;");
+    metadata.bind(1, record.installation_directory);
+    metadata.bind(2, record.icon_path);
+    metadata.bind(3, configuration_id);
+    metadata.next();
+    return configuration_id;
 }
