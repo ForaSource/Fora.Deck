@@ -836,6 +836,7 @@ QVector<app_record> Application::discover(const bool system_applications, const 
     if (progress)
         progress({90, entries.size(), entries.size(),
                   QCoreApplication::translate("XLibrary", "Application checks complete")});
+    if (system_applications || user_applications) result += discover_steam(issues, cancelled, progress);
     return cancelled.load() ? QVector<app_record>{} : result;
 }
 

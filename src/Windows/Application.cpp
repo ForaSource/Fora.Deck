@@ -157,6 +157,7 @@ std::uint32_t Application::launch(const std::wstring &arguments, const std::file
 #include <QSet>
 #include <shlobj.h>
 #include <shobjidl.h>
+#include <QSettings>
 
 #include "PathHelpers.h"
 #include "Windows/RegistryScan.h"
@@ -509,6 +510,7 @@ QVector<app_record> Application::discover(const bool registry, const bool start_
         }
     }
     if (registry) unique += discover_system(issues, cancelled, progress);
+    if (registry || start_menu) unique += discover_steam(issues, cancelled, progress);
     QVector<app_record> combined;
     QSet<QString> combined_keys;
     for (auto &record : unique) {
@@ -535,6 +537,27 @@ bool Application::windows_aumid_available(const QString &aumid) {
     if (item)
         item->Release();
     return SUCCEEDED(result);
+}
+
+QStringList Application::windows_steam_roots() {
+    QStringList roots;
+    for (const auto &key :
+         {QString("HKEY_CURRENT_USER\\Software\\Valve\\Steam"), QString("HKEY_LOCAL_MACHINE\\SOFTWARE\\Valve\\Steam"),
+          QString("HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Valve\\Steam")}) {
+        const QSettings registry(key, QSettings::NativeFormat);
+        for (const auto &value : {"SteamPath", "InstallPath"}) {
+            const auto path = registry.value(value).toString();
+            if (!path.isEmpty())
+                roots.append(QDir::fromNativeSeparators(path));
+        }
+    }
+    for (const auto &variable : {"ProgramFiles(x86)", "ProgramFiles"}) {
+        const auto directory = qEnvironmentVariable(variable);
+        if (!directory.isEmpty())
+            roots.append(directory + "/Steam");
+    }
+    roots.removeDuplicates();
+    return roots;
 }
 
 QVector<app_record> Application::discover_system(QVector<discovery_issue> &issues, const std::atomic_bool &cancelled,

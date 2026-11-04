@@ -145,6 +145,264 @@ bool Application::target_available(const app_record &record) {
 #endif
 }
 
+namespace {
+// Valve KeyValues files contain escaped quoted strings, nested objects and // comments.
+struct steam_node {
+    QString key;
+    QString value;
+    QVector<steam_node> children;
+};
+class SteamVdfReader {
+    QString text;
+    qsizetype position = 0;
+    const std::atomic_bool &cancelled;
+    void whitespace() {
+        for (;;) {
+            if (cancelled.load())
+                throw DiscoveryCancelled();
+            while (position < text.size() && text[position].isSpace())
+                ++position;
+            if (text.mid(position, 2) != "//")
+                return;
+            while (position < text.size() && text[position] != '\n')
+                ++position;
+        }
+    }
+    QString token() {
+        whitespace();
+        if (position >= text.size())
+            throw std::invalid_argument(QCoreApplication::translate("XLibrary", "Unexpected end of VDF").toStdString());
+        QString result;
+        if (text[position] != '"') {
+            while (position < text.size() && !text[position].isSpace() && text[position] != '{' &&
+                   text[position] != '}')
+                result += text[position++];
+            if (result.isEmpty())
+                throw std::invalid_argument(QCoreApplication::translate("XLibrary", "Invalid VDF token").toStdString());
+            return result;
+        }
+        ++position;
+        while (position < text.size()) {
+            auto character = text[position++];
+            if (character == '"')
+                return result;
+            if (character == '\\' && position < text.size()) {
+                const auto escaped = text[position++];
+                if (escaped == '\\' || escaped == '"')
+                    character = escaped;
+                else {
+                    result += character;
+                    character = escaped;
+                }
+            }
+            result += character;
+        }
+        throw std::invalid_argument(QCoreApplication::translate("XLibrary", "Unterminated VDF string").toStdString());
+    }
+    QVector<steam_node> object(const int depth, const bool nested) {
+        if (depth > 32)
+            throw std::invalid_argument(
+                QCoreApplication::translate("XLibrary", "VDF nesting limit exceeded").toStdString());
+        QVector<steam_node> nodes;
+        for (;;) {
+            whitespace();
+            if (position == text.size()) {
+                if (nested)
+                    throw std::invalid_argument(
+                        QCoreApplication::translate("XLibrary", "Unterminated VDF object").toStdString());
+                return nodes;
+            }
+            if (text[position] == '}') {
+                if (!nested)
+                    throw std::invalid_argument(
+                        QCoreApplication::translate("XLibrary", "Unexpected VDF closing brace").toStdString());
+                ++position;
+                return nodes;
+            }
+            steam_node node;
+            node.key = token();
+            whitespace();
+            if (position < text.size() && text[position] == '{') {
+                ++position;
+                node.children = object(depth + 1, true);
+            } else
+                node.value = token();
+            nodes.append(std::move(node));
+        }
+    }
+
+  public:
+    SteamVdfReader(QString contents, const std::atomic_bool &cancelled)
+        : text(std::move(contents)), cancelled(cancelled) {
+        if (text.startsWith(QChar(0xfeff)))
+            text.remove(0, 1);
+    }
+    QVector<steam_node> read() { return object(0, false); }
+};
+QVector<steam_node> steam_read(const QString &path, const std::atomic_bool &cancelled) {
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly))
+        throw std::runtime_error(file.errorString().toStdString());
+    const auto contents = file.read(8 * 1024 * 1024 + 1);
+    if (contents.size() > 8 * 1024 * 1024)
+        throw std::invalid_argument(
+            QCoreApplication::translate("XLibrary", "Steam metadata file exceeds 8 MiB").toStdString());
+    if (file.error() != QFileDevice::NoError)
+        throw std::runtime_error(file.errorString().toStdString());
+    return SteamVdfReader(QString::fromUtf8(contents), cancelled).read();
+}
+QString steam_value(const QVector<steam_node> &nodes, const QString &key) {
+    for (const auto &node : nodes)
+        if (node.key.compare(key, Qt::CaseInsensitive) == 0)
+            return node.value;
+    return {};
+}
+} // namespace
+
+QVector<app_record> Application::discover_steam(QVector<discovery_issue> &issues, const std::atomic_bool &cancelled,
+                                                const std::function<void(const discovery_progress &)> &progress) {
+    QStringList roots;
+#ifdef Q_OS_WIN
+    roots = windows_steam_roots();
+#else
+    for (const auto &suffix : {"/.steam/steam", "/.local/share/Steam", "/.steam/root",
+                               "/.var/app/com.valvesoftware.Steam/.local/share/Steam"})
+        roots.append(QDir::homePath() + suffix);
+#endif
+    return discover_steam(roots, issues, cancelled, progress);
+}
+
+QVector<app_record> Application::discover_steam(const QStringList &roots, QVector<discovery_issue> &issues,
+                                                const std::atomic_bool &cancelled,
+                                                const std::function<void(const discovery_progress &)> &progress) {
+    QStringList libraries;
+    QSet<QString> library_keys;
+    const auto add_library = [&](const QString &path) {
+        const QFileInfo info(QDir::fromNativeSeparators(path));
+        if (!info.isAbsolute() || !info.isDir())
+            return;
+        const auto key = normalized_path(info.canonicalFilePath());
+        if (!library_keys.contains(key)) {
+            library_keys.insert(key);
+            libraries.append(info.absoluteFilePath());
+        }
+    };
+    for (const auto &root : roots) {
+        if (cancelled.load())
+            return {};
+        add_library(root);
+        const auto folders = QDir(root).filePath("steamapps/libraryfolders.vdf");
+        if (!QFileInfo::exists(folders))
+            continue;
+        try {
+            const auto tree = steam_read(folders, cancelled);
+            for (const auto &node : tree) {
+                if (node.key.compare("libraryfolders", Qt::CaseInsensitive) != 0)
+                    continue;
+                for (const auto &entry : node.children) {
+                    bool numeric = false;
+                    entry.key.toUInt(&numeric);
+                    if (!numeric)
+                        continue;
+                    add_library(entry.children.isEmpty() ? entry.value : steam_value(entry.children, "path"));
+                }
+            }
+        } catch (const DiscoveryCancelled &) {
+            return {};
+        } catch (const std::exception &error) {
+            issues.append({folders, QString::fromUtf8(error.what())});
+        }
+    }
+    QStringList manifests;
+    for (const auto &library : libraries) {
+        const QDir directory(QDir(library).filePath("steamapps"));
+        if (directory.exists() && !QFileInfo(directory.absolutePath()).isReadable())
+            issues.append({directory.absolutePath(), "Steam library is not readable"});
+        for (const auto &name : directory.entryList({"appmanifest_*.acf"}, QDir::Files, QDir::Name)) {
+            if (cancelled.load())
+                return {};
+            manifests.append(directory.filePath(name));
+        }
+    }
+    QVector<app_record> records;
+    QSet<QString> app_ids;
+    for (qsizetype index = 0; index < manifests.size(); ++index) {
+        if (cancelled.load())
+            return {};
+        const auto &manifest = manifests[index];
+        if (progress)
+            progress({static_cast<int>(90.0 * index / manifests.size()), index, manifests.size(),
+                      QCoreApplication::translate("XLibrary", "Checking Steam libraries")});
+        try {
+            const auto tree = steam_read(manifest, cancelled);
+            const steam_node *state = nullptr;
+            for (const auto &node : tree)
+                if (node.key.compare("AppState", Qt::CaseInsensitive) == 0) {
+                    state = &node;
+                    break;
+                }
+            if (!state)
+                throw std::invalid_argument(
+                    QCoreApplication::translate("XLibrary", "Steam manifest has no AppState").toStdString());
+            app_record record;
+            record.target_kind = "steam";
+            record.path = steam_value(state->children, "appid");
+            record.name = steam_value(state->children, "name").trimmed();
+            validate_launch_target(record);
+            const auto expected_file = "appmanifest_" + record.path + ".acf";
+            if (QFileInfo(manifest).fileName() != expected_file)
+                throw std::invalid_argument(
+                    QCoreApplication::translate("XLibrary", "Steam AppID does not match manifest filename")
+                        .toStdString());
+            const auto directory = steam_value(state->children, "installdir");
+            if (record.name.isEmpty() || record.name.size() > 256 || record.name.contains(QChar::Null) ||
+                directory.isEmpty() || directory == "." || directory == ".." || directory.contains('/') ||
+                directory.contains('\\') || directory.contains(QChar::Null))
+                throw std::invalid_argument(
+                    QCoreApplication::translate("XLibrary", "Steam manifest has invalid name or installation directory")
+                        .toStdString());
+            bool state_numeric = false;
+            const auto flags = steam_value(state->children, "StateFlags").toUInt(&state_numeric);
+            if (!state_numeric || (flags & 4U) == 0) {
+                issues.append({manifest, QCoreApplication::translate("XLibrary", "Steam game is not fully installed"),
+                               discovery_issue_kind::skipped});
+                continue;
+            }
+            record.installation_directory = QDir(QFileInfo(manifest).absolutePath()).filePath("common/" + directory);
+            if (!QFileInfo(record.installation_directory).isDir()) {
+                issues.append({manifest,
+                               QCoreApplication::translate("XLibrary", "Steam installation directory is unavailable"),
+                               discovery_issue_kind::skipped});
+                continue;
+            }
+            if (app_ids.contains(record.path)) {
+                issues.append({manifest, QCoreApplication::translate("XLibrary", "Duplicate Steam AppID"),
+                               discovery_issue_kind::duplicate});
+                continue;
+            }
+            app_ids.insert(record.path);
+            record.discovery_source = manifest;
+            // Cached cover art is optional and is never fetched or changed by discovery.
+            for (const auto &root : roots) {
+                const auto icon = QDir(root).filePath("appcache/librarycache/" + record.path + "_icon.jpg");
+                if (QFileInfo(icon).isFile()) {
+                    record.icon_path = icon;
+                    break;
+                }
+            }
+            records.append(std::move(record));
+        } catch (const DiscoveryCancelled &) {
+            return {};
+        } catch (const std::exception &error) {
+            issues.append({manifest, QString::fromUtf8(error.what())});
+        }
+    }
+    if (progress)
+        progress(
+            {90, manifests.size(), manifests.size(), QCoreApplication::translate("XLibrary", "Steam checks complete")});
+    return cancelled.load() ? QVector<app_record>{} : records;
+}
+
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QSettings>
