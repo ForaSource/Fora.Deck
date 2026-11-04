@@ -22,6 +22,7 @@ class LinuxHotkeyState;
 namespace desktop_platform {
 QString default_global_shortcut();
 QString default_overlay_shortcut();
+void activate_overlay(QWidget *window);
 using launch_mode = Application::launch_mode;
 void launch_application(const app_record &record, launch_mode mode);
 

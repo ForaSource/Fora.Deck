@@ -8,9 +8,11 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QScreen>
+#include <QTimer>
 #include <QToolButton>
 #include <QVariantAnimation>
 #include <QVBoxLayout>
+#include <QWindow>
 
 #include "appearance.h"
 #include "DesktopService.h"
@@ -20,11 +22,17 @@
 #include "SearchResults.h"
 
 SearchOverlay::SearchOverlay(DesktopService &service, QWidget *const parent)
-    : QWidget(parent, Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint), service(service),
-      contents(new QWidget(this)), input(new QLineEdit), open_button(new QToolButton),
+    : QWidget(parent,
+#ifdef Q_OS_WIN
+              Qt::Tool |
+#else
+              Qt::Window |
+#endif
+                  Qt::FramelessWindowHint),
+      service(service), contents(new QWidget(this)), input(new QLineEdit), open_button(new QToolButton),
       results(new SearchResults(service, *input, true)), notice(new NotificationBanner(service.settings, 0, 7000)),
       opacity(new QGraphicsOpacityEffect(contents)), reveal(new QVariantAnimation(this)),
-      height_animation(new QVariantAnimation(this)) {
+      height_animation(new QVariantAnimation(this)), activation_check(new QTimer(this)) {
     setObjectName("search_overlay");
     setWindowTitle(QCoreApplication::translate("XLibrary", "Quick search"));
     setWindowIcon(appearance::logo());
@@ -79,6 +87,19 @@ SearchOverlay::SearchOverlay(DesktopService &service, QWidget *const parent)
     connect(reveal, &QVariantAnimation::valueChanged, this, [this](const QVariant &value) {
         progress = value.toReal();
         update_surface();
+    });
+    connect(reveal, &QVariantAnimation::finished, this, [this] {
+        progress = 1;
+        update_surface();
+    });
+    activation_check->setSingleShot(true);
+    activation_check->setInterval(700);
+    connect(activation_check, &QTimer::timeout, this, [this] {
+        if (isVisible() && !isActiveWindow() && QGuiApplication::platformName().startsWith("wayland"))
+            notice->show_message(QCoreApplication::translate(
+                "XLibrary",
+                "Wayland did not activate quick search. Click the search field or assign XLibrary --overlay "
+                "in the system keyboard settings."));
     });
     height_animation->setDuration(140);
     height_animation->setEasingCurve(QEasingCurve::OutCubic);
@@ -146,7 +167,10 @@ void SearchOverlay::update_surface() {
     QPainterPath clip;
     clip.addRoundedRect(surface.translated(-inset, -inset), qMin(22.0, animated_height / 2),
                         qMin(22.0, animated_height / 2));
-    contents->setMask(QRegion(clip.toFillPolygon().toPolygon()));
+    if (progress < 1)
+        contents->setMask(QRegion(clip.toFillPolygon().toPolygon()));
+    else
+        contents->clearMask();
     const auto time = reveal->state() == QAbstractAnimation::Running ? reveal->currentTime() / 200.0 : 1.0;
     opacity->setOpacity(qBound(0.0, (time - 0.12) / 0.7, 1.0));
     update();
@@ -183,37 +207,58 @@ void SearchOverlay::toggle() {
         show_search();
 }
 
+void SearchOverlay::position_on_screen() {
+    auto *target_screen = QGuiApplication::screenAt(QCursor::pos());
+    if (!target_screen)
+        target_screen = QGuiApplication::primaryScreen();
+    const auto available = target_screen->availableGeometry();
+    setScreen(target_screen);
+    resize(qMax(1, qMin(appearance::scaled(service.settings, 680), available.width() - 24)), height());
+    update_height();
+    move(available.center().x() - width() / 2,
+         qBound(available.top(), available.top() + available.height() / 4, available.bottom() - height() + 1));
+    // Create the native surface with the final bounds before mapping it.
+    winId();
+    windowHandle()->setGeometry(geometry());
+}
+
+void SearchOverlay::focus_search() {
+    input->setFocus(Qt::ShortcutFocusReason);
+    desktop_platform::activate_overlay(this);
+    activation_check->start();
+}
+
 void SearchOverlay::show_search() {
     if (auto *modal = QApplication::activeModalWidget()) {
         modal->raise();
         modal->activateWindow();
         return;
     }
-    auto *target_screen = QGuiApplication::screenAt(QCursor::pos());
-    if (!target_screen)
-        target_screen = QGuiApplication::primaryScreen();
-    const auto available = target_screen->availableGeometry();
-    setScreen(target_screen);
-    resize(qMin(appearance::scaled(service.settings, 680), available.width() - 24), height());
-    input->clear();
-    update_height();
-    move(available.center().x() - width() / 2,
-         qBound(available.top(), available.top() + available.height() / 4, available.bottom() - height() + 1));
     reveal->stop();
     height_animation->stop();
+    activation_check->stop();
+    dismiss_on_deactivate = isVisible() && isActiveWindow();
+    progress = 0;
+    input->clear();
+    position_on_screen();
     progress = desktop_platform::animations_enabled() ? 0 : 1;
     update_surface();
     show();
-    raise();
-    activateWindow();
-    input->setFocus();
     if (progress == 0)
         reveal->start();
+    focus_search();
 }
 
 bool SearchOverlay::event(QEvent *const event) {
-    if (event->type() == QEvent::WindowDeactivate && isVisible())
-        hide();
+    if (event->type() == QEvent::WindowActivate) {
+        dismiss_on_deactivate = true;
+        activation_check->stop();
+    } else if (event->type() == QEvent::WindowDeactivate && isVisible() && dismiss_on_deactivate) {
+        const auto *popup = QApplication::activePopupWidget();
+        const auto *modal = QApplication::activeModalWidget();
+        if ((!popup || !isAncestorOf(popup)) && (!modal || !isAncestorOf(modal)))
+            hide();
+    }
     return QWidget::event(event);
 }
 
@@ -227,6 +272,10 @@ void SearchOverlay::hideEvent(QHideEvent *const event) {
     results->reset_launch();
     reveal->stop();
     height_animation->stop();
+    activation_check->stop();
+    dismiss_on_deactivate = false;
+    progress = 1;
+    update_surface();
     notice->dismiss();
     QWidget::hideEvent(event);
 }
