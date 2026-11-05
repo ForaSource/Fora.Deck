@@ -56,6 +56,7 @@ option(XLIBRARY_ENABLE_CLANG_TIDY "Analyze the project's C++ sources with clang-
 # Dependencies
 # ------------------------------------------------------------
 
+include(CTest)
 include(FetchContent)
 find_package(Threads REQUIRED)
 if(WIN32)
@@ -399,4 +400,8 @@ if(XLIBRARY_NATIVE_CPU)
             "$<$<CONFIG:Release>:-march=native>"
     )
     target_compile_options(xlibrary_core PRIVATE "$<$<CONFIG:Release>:-march=native>")
+endif()
+
+if(BUILD_TESTING)
+    add_subdirectory(tests)
 endif()

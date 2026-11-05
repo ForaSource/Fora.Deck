@@ -31,6 +31,9 @@ DesktopService::DesktopService(QObject *const parent, const QString &profile_pat
                                        : profile_path) +
                    "/settings.ini",
                QSettings::IniFormat) {
+    updates.set_channel(settings.value("updates/channel", "stable").toString());
+    connect(&updates, &UpdateChecker::channel_changed, this,
+            [this] { settings.setValue("updates/channel", updates.channel()); });
     qRegisterMetaType<QVector<app_record>>();
     qRegisterMetaType<QVector<discovery_issue>>();
     qRegisterMetaType<operation_state>();

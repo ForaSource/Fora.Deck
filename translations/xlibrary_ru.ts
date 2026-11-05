@@ -2755,5 +2755,33 @@ Technical reason: %3</source>
         <source>Added applications: %1.</source>
         <translation>Добавлено приложений: %1.</translation>
     </message>
+    <message>
+        <source>Stable</source>
+        <translation>Стабильный</translation>
+    </message>
+    <message>
+        <source>Preview</source>
+        <translation>Предварительный</translation>
+    </message>
+    <message>
+        <source>Update channel</source>
+        <translation>Канал обновлений</translation>
+    </message>
+    <message>
+        <source>Stable includes published stable releases. Preview also includes pre-releases. Changing the channel takes effect immediately and cancels any current update request.</source>
+        <translation>Стабильный канал включает опубликованные стабильные релизы. Предварительный также включает предварительные версии. Смена канала применяется сразу и отменяет текущий запрос обновления.</translation>
+    </message>
+    <message>
+        <source>Checks GitHub Releases at startup and on request for the selected channel. Results are cached for 60 seconds without a token or 5 seconds with a token.</source>
+        <translation>Проверяет релизы GitHub при запуске и по запросу для выбранного канала. Результаты кэшируются на 60 секунд без токена или на 5 секунд с токеном.</translation>
+    </message>
+    <message>
+        <source>Channel changed. Check for updates.</source>
+        <translation>Канал изменён. Проверьте обновления.</translation>
+    </message>
+    <message>
+        <source>New version available: %1 (%2 channel)</source>
+        <translation>Доступна новая версия: %1 (канал: %2)</translation>
+    </message>
 </context>
 </TS>

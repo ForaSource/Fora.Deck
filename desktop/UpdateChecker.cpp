@@ -7,6 +7,7 @@
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QRegularExpression>
+#include <QScopedValueRollback>
 #include <QSysInfo>
 
 #include "PlatformIntegration.h"
@@ -105,6 +106,90 @@ QNetworkRequest request(const QUrl &url) {
 }
 }
 
+std::optional<int> UpdateChecker::compare_release_versions(const QString &left, const QString &right) {
+    const auto a = parse_version(left);
+    const auto b = parse_version(right);
+    if (!a || !b)
+        return std::nullopt;
+    return compare_versions(*a, *b);
+}
+
+UpdateChecker::release_selection UpdateChecker::select_release_page(const QByteArray &json,
+                                                                    const QString &current_version,
+                                                                    const QString &channel,
+                                                                    const QJsonObject &previous) {
+    release_selection result;
+    if (!parse_version(current_version)) {
+        result.error = "invalid_current_version";
+        return result;
+    }
+    QJsonParseError error;
+    const auto document = QJsonDocument::fromJson(json, &error);
+    if (error.error != QJsonParseError::NoError || !document.isArray()) {
+        result.error = "invalid_release_json";
+        return result;
+    }
+    auto releases = document.array();
+    if (!previous.isEmpty())
+        releases.prepend(previous);
+    for (const auto &value : releases) {
+        if (!value.isObject()) {
+            result.error = "invalid_release_record";
+            break;
+        }
+        const auto release = value.toObject();
+        if (!release.value("draft").isBool() || !release.value("prerelease").isBool() ||
+            !release.value("tag_name").isString() || !release.value("published_at").isString()) {
+            result.error = "invalid_release_fields";
+            break;
+        }
+        if (release.value("draft").toBool() || release.value("published_at").toString().isEmpty() ||
+            (channel != "preview" && release.value("prerelease").toBool()))
+            continue;
+        const auto tag = release.value("tag_name").toString();
+        const auto version = parse_version(tag);
+        if (!version)
+            continue;
+        if (!release_link(QUrl(release.value("html_url").toString()), tag)) {
+            result.error = "invalid_release_link";
+            break;
+        }
+        if (result.release.isEmpty() || *compare_release_versions(tag, result.release.value("tag_name").toString()) > 0)
+            result.release = release;
+    }
+    if (!result.error.isEmpty()) {
+        result.release = {};
+        return result;
+    }
+    if (!result.release.isEmpty())
+        result.update_available =
+            *compare_release_versions(result.release.value("tag_name").toString(), current_version) > 0;
+    return result;
+}
+
+void UpdateChecker::clear_available_release() {
+    latest_release = {};
+    release_tag.clear();
+    release_url.clear();
+    installer_url.clear();
+    installer_digest.clear();
+    installer_size = 0;
+}
+
+void UpdateChecker::set_channel(const QString &channel) {
+    const QString normalized = channel == "preview" ? "preview" : "stable";
+    if (channel_changing || normalized == update_channel)
+        return;
+    {
+        // Cancellation emits synchronous callbacks; none may start a request under the previous channel.
+        QScopedValueRollback<bool> switching(channel_changing, true);
+        clear_available_release();
+        cancel();
+        update_channel = normalized;
+    }
+    emit channel_changed();
+}
+
 UpdateChecker::UpdateChecker(QObject *const parent) : QObject(parent) {
     qRegisterMetaType<operation_result>();
     deadline.setSingleShot(true);
@@ -180,6 +265,7 @@ void UpdateChecker::cancel() {
 void UpdateChecker::cache_result(const operation_state state, const operation_error &error) {
     cached_check result;
     result.age.start();
+    result.authenticated = check_authenticated;
     result.release = state == operation_state::completed ? latest_release : QJsonObject{};
     result.state = state;
     result.error = error;
@@ -187,8 +273,9 @@ void UpdateChecker::cache_result(const operation_state state, const operation_er
 }
 
 quint64 UpdateChecker::check(const QString &token) {
-    if (is_busy())
+    if (channel_changing || is_busy())
         return 0;
+    clear_available_release();
     const auto id = begin_request(request_kind::check);
     if (request_id != id || !is_busy())
         return id;
@@ -208,18 +295,14 @@ quint64 UpdateChecker::check(const QString &token) {
              "invalid_current_version", operation_error_source::validation);
         return id;
     }
-    latest_release = {};
-    release_tag.clear();
-    release_url.clear();
-    installer_url.clear();
-    installer_digest.clear();
-    installer_size = 0;
     release_page = 0;
-    check_key = trimmed_token.isEmpty() ? QByteArray{}
-                                        : QCryptographicHash::hash(trimmed_token.toUtf8(), QCryptographicHash::Sha256);
+    check_authenticated = !trimmed_token.isEmpty();
+    check_key = update_channel.toLatin1() + ':' +
+                (check_authenticated ? QCryptographicHash::hash(trimmed_token.toUtf8(), QCryptographicHash::Sha256)
+                                     : QByteArray{});
     // Reading the cache does not extend its lifetime; remove expired entries along with token fingerprints.
     for (auto it = check_cache.begin(); it != check_cache.end();) {
-        const auto interval = it.key().isEmpty() ? anonymous_check_interval : authenticated_check_interval;
+        const auto interval = it->authenticated ? authenticated_check_interval : anonymous_check_interval;
         if (it->age.elapsed() >= interval)
             it = check_cache.erase(it);
         else
@@ -348,42 +431,17 @@ void UpdateChecker::finish_reply() {
         emit installer_ready();
         return;
     }
-    QJsonParseError error;
-    const auto document = QJsonDocument::fromJson(response, &error);
-    if (error.error != QJsonParseError::NoError || !document.isArray()) {
-        fail(QCoreApplication::translate("XLibrary", "GitHub returned an invalid release list."),
-             QString("json_error=%1; offset=%2; expected_array").arg(static_cast<int>(error.error)).arg(error.offset));
+    const auto selection =
+        select_release_page(response, QCoreApplication::applicationVersion(), update_channel, latest_release);
+    if (!selection.error.isEmpty()) {
+        fail(selection.error == "invalid_release_link"
+                 ? QCoreApplication::translate("XLibrary", "GitHub returned an invalid release link.")
+                 : QCoreApplication::translate("XLibrary", "GitHub returned an invalid release list."),
+             selection.error);
         return;
     }
-    const auto releases = document.array();
-    for (const auto &value : releases) {
-        if (!value.isObject()) {
-            fail(QCoreApplication::translate("XLibrary", "GitHub returned an invalid release list."),
-                 "invalid_release_record");
-            return;
-        }
-        const auto release = value.toObject();
-        if (!release.value("draft").isBool() || !release.value("prerelease").isBool() ||
-            !release.value("tag_name").isString() || !release.value("published_at").isString()) {
-            fail(QCoreApplication::translate("XLibrary", "GitHub returned an invalid release list."),
-                 "invalid_release_fields");
-            return;
-        }
-        if (release.value("draft").toBool() || release.value("published_at").toString().isEmpty())
-            continue;
-        const auto tag = release.value("tag_name").toString();
-        const auto version = parse_version(tag);
-        if (!version)
-            continue;
-        if (!release_link(QUrl(release.value("html_url").toString()), tag)) {
-            fail(QCoreApplication::translate("XLibrary", "GitHub returned an invalid release link."),
-                 "invalid_release_link");
-            return;
-        }
-        if (latest_release.isEmpty() ||
-            compare_versions(*version, *parse_version(latest_release.value("tag_name").toString())) > 0)
-            latest_release = release;
-    }
+    latest_release = selection.release;
+    const auto releases = QJsonDocument::fromJson(response).array();
     if (releases.size() == 100) {
         if (release_page >= 20) {
             fail(QCoreApplication::translate("XLibrary",
@@ -461,7 +519,7 @@ bool UpdateChecker::can_install() const {
 }
 
 quint64 UpdateChecker::download() {
-    if (is_busy())
+    if (channel_changing || is_busy())
         return 0;
     const auto id = begin_request(request_kind::download);
     if (request_id != id || !is_busy())

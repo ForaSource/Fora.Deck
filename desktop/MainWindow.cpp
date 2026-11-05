@@ -86,6 +86,7 @@ QWidget *shell(const ui_context &context, QWidget *const parent) {
     QObject::connect(&service->updates, &UpdateChecker::check_cancelled, update_notice, [=] {
         update_notice->show_message(QCoreApplication::translate("XLibrary", "Update cancelled."));
     });
+    QObject::connect(&service->updates, &UpdateChecker::channel_changed, update_notice, &QWidget::hide);
     update_notice->activated = [=] { context.actions.value("update_settings")->trigger(); };
     auto *splitter =
         new LibrarySplitter(*context.settings, navigation, center, context.registry->create("details", context, widget),
