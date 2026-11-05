@@ -10,6 +10,7 @@
 
 #include "Database.h"
 #include "LaunchIdentity.h"
+#include "Manager.h"
 #include "ProfileBackup.h"
 #include "ProfileSchema.h"
 #include "SearchQuery.h"
@@ -65,6 +66,39 @@ private slots:
         QVERIFY(fuzzy >= 0);
         QVERIFY(exact < fuzzy);
         QCOMPARE(search_query::switch_layout("ghbdtn"), QString("привет"));
+    }
+    void availability_refresh_and_events() {
+        QTemporaryDir temporary;
+        const auto path = temporary.filePath("fixture.exe");
+        const auto create_target = [&] {
+            QFile target(path);
+            if (!target.open(QIODevice::WriteOnly))
+                return false;
+            target.write("fixture");
+            target.close();
+            return target.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner);
+        };
+        QVERIFY(create_target());
+        Manager manager(QString{}, std::make_shared<std::atomic<quint64>>(0));
+        auto app = record();
+        app.path = path;
+        manager.catalog.applications = {app};
+        manager.poll(true);
+        QVERIFY(manager.catalog.applications.front().available);
+        QVERIFY(QFile::remove(path));
+        // Before directory events are delivered, the process-only pass retains availability.
+        manager.poll();
+        QVERIFY(manager.catalog.applications.front().available);
+        manager.poll(true);
+        QVERIFY(!manager.catalog.applications.front().available);
+        QCOMPARE(manager.catalog.applications.size(), 1);
+        QVERIFY(create_target());
+        QTRY_VERIFY_WITH_TIMEOUT(([&] {
+                                     manager.poll();
+                                     return manager.catalog.applications.front().available;
+                                 })(),
+                                 3000);
+        QCOMPARE(manager.catalog.applications.size(), 1);
     }
     void launch_identity() {
         QTemporaryDir temporary;

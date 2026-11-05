@@ -36,3 +36,9 @@ target_link_libraries(library_model_test PRIVATE Qt6::Widgets Qt6::Concurrent)
 
 xlibrary_add_test(ui_registry_test ui_registry_test.cpp)
 target_link_libraries(ui_registry_test PRIVATE Qt6::Widgets)
+
+option(XLIBRARY_BUILD_BENCHMARKS "Build optional local poll timing tool (not installed)" OFF)
+if(XLIBRARY_BUILD_BENCHMARKS)
+    add_executable(poll_benchmark poll_benchmark.cpp)
+    target_link_libraries(poll_benchmark PRIVATE xlibrary_core)
+endif()
