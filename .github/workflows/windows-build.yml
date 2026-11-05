@@ -113,6 +113,14 @@ jobs:
           cmake --build build --config $env:BUILD_CONFIGURATION --parallel 4
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Run offline tests
+        env:
+          BUILD_CONFIGURATION: ${{ matrix.configuration }}
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          ctest --test-dir build -C $env:BUILD_CONFIGURATION --output-on-failure
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: MSVC Release install smoke test
         if: matrix.compiler == 'msvc' && matrix.configuration == 'Release'
         timeout-minutes: 2
@@ -128,6 +136,7 @@ jobs:
         with:
           name: diagnostics-${{ matrix.compiler }}-${{ matrix.configuration }}-${{ github.run_attempt }}
           path: |
+            build/Testing/Temporary/LastTest.log
             build/CMakeCache.txt
             build/CMakeFiles/CMakeConfigureLog.yaml
             build/install-check/

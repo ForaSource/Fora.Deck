@@ -551,3 +551,30 @@ Inno `AppId`, каталог установки, пути БД и настрое
 
 Для добавления сообщений используйте QCoreApplication::translate с контекстом XLibrary и обновляйте
 русский TS-каталог. lrelease не запускается в пользовательском приложении.
+
+## Автоматические тесты (v0.7.0)
+
+CTest включён по умолчанию (`BUILD_TESTING=ON`). Дополнительно нужен компонент
+Qt Test той же версии Qt, что и приложение. Тесты используют временные профили
+и локальные фикстуры; реальный GitHub, Steam, домашний каталог и реестр не нужны.
+
+```sh
+cmake --preset linux-debug -DBUILD_TESTING=ON
+cmake --build --preset linux-debug --parallel 4
+ctest --test-dir cmake-build-linux-debug --output-on-failure
+# Аналогично: linux-release, linux-clang-debug, linux-clang-release.
+```
+
+Windows, включая multi-config MSVC:
+
+```powershell
+cmake -S . -B build -DBUILD_TESTING=ON
+cmake --build build --config Release --parallel 4
+ctest --test-dir build -C Release --output-on-failure
+```
+
+Для сборки только пользовательского приложения/пакета можно передать
+`-DBUILD_TESTING=OFF`. Тестовые цели и Qt Test не устанавливаются через
+`cmake --install`; штатное развёртывание Qt анализирует только `XLibrary`.
+Офлайн-тесты не заменяют ручную проверку установки, Wayland/X11, системных
+hotkeys, DPI и нескольких мониторов.

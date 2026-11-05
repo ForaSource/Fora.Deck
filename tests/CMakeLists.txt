@@ -12,3 +12,5 @@ endfunction()
 xlibrary_add_test(update_checker_test update_checker_test.cpp
     ../desktop/UpdateChecker.cpp ../desktop/UpdateChecker.h)
 target_link_libraries(update_checker_test PRIVATE Qt6::Network Qt6::Widgets)
+
+xlibrary_add_test(core_test core_test.cpp)

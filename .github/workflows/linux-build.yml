@@ -70,6 +70,12 @@ jobs:
           BUILD_PRESET: ${{ matrix.preset }}
         run: cmake --build --preset "$BUILD_PRESET" --parallel "$(nproc)"
 
+      - name: Run offline tests
+        env:
+          BUILD_PRESET: ${{ matrix.preset }}
+          QT_QPA_PLATFORM: offscreen
+        run: ctest --test-dir "cmake-build-$BUILD_PRESET" --output-on-failure
+
       - name: Check startup on X11
         env:
           BUILD_PRESET: ${{ matrix.preset }}
@@ -94,6 +100,7 @@ jobs:
         with:
           name: diagnostics-${{ matrix.preset }}-${{ github.run_attempt }}
           path: |
+            cmake-build-${{ matrix.preset }}/Testing/Temporary/LastTest.log
             cmake-build-${{ matrix.preset }}/CMakeCache.txt
             cmake-build-${{ matrix.preset }}/CMakeFiles/CMakeConfigureLog.yaml
           if-no-files-found: ignore
