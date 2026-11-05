@@ -4,10 +4,15 @@
 #include <functional>
 #include <QAbstractItemModel>
 #include <QAction>
+#include <QCoreApplication>
 #include <QHash>
+#include <QJsonObject>
+#include <QScopeGuard>
 #include <QSettings>
 #include <QWidget>
 #include <stdexcept>
+
+#define XLIBRARY_UI_PLUGIN_IID "org.xlibrary.desktop.UiPlugin/1.0"
 
 class UiRegistry;
 
@@ -32,6 +37,43 @@ private:
     QString additional_style;
 
 public:
+    // Qt supplies IID and version without executing the module. IID 1.0 modules
+    // need no custom metadata; their compiler/runtime ABI remains a trust decision.
+    static QString plugin_compatibility_error(const QJsonObject &metadata) {
+        if (metadata.value("IID").toString() != XLIBRARY_UI_PLUGIN_IID)
+            return QCoreApplication::translate("XLibrary", "Unsupported UI plugin interface (requires IID 1.0).");
+        const auto version = metadata.value("version").toInt(-1);
+        if (version < 0 || version > 0xffffff)
+            return QCoreApplication::translate("XLibrary", "Missing or invalid Qt version metadata.");
+        if ((version >> 16) != QT_VERSION_MAJOR)
+            return QCoreApplication::translate("XLibrary", "Incompatible Qt major version.");
+        if (((version >> 8) & 0xff) > QT_VERSION_MINOR)
+            return QCoreApplication::translate("XLibrary", "Plugin requires a newer Qt minor version.");
+        return {};
+    }
+
+    template <typename Configure> QString configure_transaction(Configure &&configure) {
+        try {
+            auto original = *this;
+            auto rollback = qScopeGuard([this, &original] {
+                // Restore without allocation before an exception reaches the caller.
+                defaults.swap(original.defaults);
+                overrides.swap(original.overrides);
+                additional_style.swap(original.additional_style);
+            });
+            // Existing IID 1.0 factories may retain a reference to this registry.
+            configure(*this);
+            rollback.dismiss();
+            return {};
+        } catch (const std::exception &error) {
+            return QCoreApplication::translate("XLibrary", "Plugin configuration failed: %1")
+                .arg(QString::fromUtf8(error.what()));
+        } catch (...) {
+            return QCoreApplication::translate("XLibrary",
+                                               "Plugin configuration failed with an unknown C++ exception.");
+        }
+    }
+
     void add_default(const QString &id, widget_factory factory) { defaults.insert(id, std::move(factory)); }
     void replace(const QString &id, widget_factory factory) { overrides.insert(id, std::move(factory)); }
     void append_style(const QString &style) { additional_style += '\n' + style; }
@@ -65,10 +107,10 @@ public:
 class UiPlugin {
 public:
     virtual ~UiPlugin() = default;
+    // The registry retains its address; failed configuration restores its contents.
     virtual void configure(UiRegistry &registry) = 0;
 };
 
-#define XLIBRARY_UI_PLUGIN_IID "org.xlibrary.desktop.UiPlugin/1.0"
 Q_DECLARE_INTERFACE(UiPlugin, XLIBRARY_UI_PLUGIN_IID)
 
 #endif

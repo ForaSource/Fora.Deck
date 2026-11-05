@@ -362,11 +362,20 @@ QWidget *plugins(const ui_context &context, QWidget *) {
             if (!available.contains(id))
                 available.append(id);
     }
+    const auto errors = context.parameters.value("plugin_errors").toMap();
     for (const auto &id : available) {
         auto *control = new QCheckBox(id);
         control->setProperty("plugin_id", id);
         control->setChecked(enabled.contains(id));
         widget->layout()->addWidget(control);
+        const auto error = errors.value(id).toString();
+        if (!error.isEmpty()) {
+            control->setToolTip(error);
+            // Keep an enabled failed module selectable so it can be disabled.
+            if (!control->isChecked())
+                control->setEnabled(false);
+            widget->layout()->addWidget(label(error, "muted"));
+        }
     }
     if (available.isEmpty() && !service->safe_mode())
         widget->layout()->addWidget(

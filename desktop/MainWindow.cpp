@@ -383,33 +383,50 @@ void MainWindow::load_plugins() {
     }
     const QDir directory(QApplication::applicationDirPath() + "/plugins");
     QStringList available;
+    QVariantMap errors;
     const auto enabled = service.settings.value("plugins/enabled").toStringList();
+    const auto report_error = [this, &errors](const QString &id, const QString &error) {
+        errors.insert(id, error);
+        if (service.settings.value("plugins/enabled").toStringList().contains(id))
+            QTimer::singleShot(0, &service, [this, id, error] {
+                service.notify(QCoreApplication::translate("XLibrary", "Could not load ") + id + ": " + error);
+            });
+    };
     for (const auto &file : directory.entryInfoList(QDir::Files | QDir::NoSymLinks, QDir::Name)) {
         if (!QLibrary::isLibrary(file.fileName()))
             continue;
-        auto loader = std::make_unique<QPluginLoader>(file.absoluteFilePath());
-        if (loader->metaData().value("IID").toString() != XLIBRARY_UI_PLUGIN_IID)
-            continue;
         const auto id = file.fileName();
         available.append(id);
-        if (!enabled.contains(id))
-            continue;
-        loader->setLoadHints(QLibrary::PreventUnloadHint);
-        auto *plugin = qobject_cast<UiPlugin *>(loader->instance());
-        if (!plugin) {
-            QTimer::singleShot(0, &service, [this, id, error = loader->errorString()] {
-                service.notify(QCoreApplication::translate("XLibrary", "Could not load ") + id + ": " + error);
-            });
-            continue;
-        }
         try {
-            plugin->configure(registry);
+            auto loader = std::make_unique<QPluginLoader>(file.absoluteFilePath());
+            const auto compatibility_error = UiRegistry::plugin_compatibility_error(loader->metaData());
+            if (!compatibility_error.isEmpty()) {
+                report_error(id, compatibility_error);
+                continue;
+            }
+            if (!enabled.contains(id))
+                continue;
+            // Registry callbacks may outlive a failed transaction or the loader itself.
+            loader->setLoadHints(QLibrary::PreventUnloadHint);
+            auto *plugin = qobject_cast<UiPlugin *>(loader->instance());
+            if (!plugin) {
+                report_error(id, loader->errorString());
+                continue;
+            }
+            // Allocate loader ownership before publishing registry callbacks.
             plugins.push_back(std::move(loader));
+            const auto error =
+                registry.configure_transaction([plugin](UiRegistry &candidate) { plugin->configure(candidate); });
+            if (!error.isEmpty())
+                report_error(id, error);
         } catch (const std::exception &error) {
-            throw std::runtime_error("UI plugin " + id.toStdString() + ": " + error.what());
+            report_error(id, QString::fromUtf8(error.what()));
+        } catch (...) {
+            report_error(id, QCoreApplication::translate("XLibrary", "Unknown C++ exception while loading plugin."));
         }
     }
     context.parameters.insert("available_plugins", available);
+    context.parameters.insert("plugin_errors", errors);
 }
 
 void MainWindow::update_layout() {

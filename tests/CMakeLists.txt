@@ -33,3 +33,6 @@ target_link_libraries(path_search_test PRIVATE Qt6::Widgets)
 xlibrary_add_test(library_model_test library_model_test.cpp
     ../desktop/LibraryModel.cpp ../desktop/LibraryModel.h ../desktop/appearance.cpp)
 target_link_libraries(library_model_test PRIVATE Qt6::Widgets Qt6::Concurrent)
+
+xlibrary_add_test(ui_registry_test ui_registry_test.cpp)
+target_link_libraries(ui_registry_test PRIVATE Qt6::Widgets)

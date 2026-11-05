@@ -179,6 +179,26 @@ the faulty module in **Settings → Plugins**, save, and restart. The profile pa
 and settings locations, schema/product versions, portable/installed mode, and the last error.
 Its diagnostic export excludes catalog contents, arguments, settings values, tokens, and raw errors.
 
+Native UI modules in `plugins/` beside the executable require explicit opt-in in **Settings → Plugins**.
+Before instantiation, XLibrary checks Qt's embedded metadata: the interface IID must be
+`org.xlibrary.desktop.UiPlugin/1.0`, the Qt major version must match, and the module must not
+require a newer Qt minor version. Existing IID 1.0 modules without custom metadata remain
+supported under this explicit compatibility policy; Qt's standard IID/version metadata is required.
+Build modules against the matching XLibrary headers, architecture, compiler and runtime ABI;
+metadata checks cannot prove binary compatibility. Qt also applies its own platform/build checks.
+Incompatible modules and load/configuration failures are shown with a reason in settings.
+A C++ exception during configuration discards that module's registry changes and allows startup
+to continue. `configure()` receives the live registry at its stable address, preserving existing
+IID 1.0 callbacks that retain a reference to it. Failed configuration restores the registry's
+previous factories and styles. Rollback cannot undo a module's other side effects. Safe mode also lists saved enabled
+modules so a faulty module can be disabled without loading it.
+
+These are trusted native modules running inside XLibrary, with the application's access to the
+profile and system. There is no sandbox: a segfault, undefined behavior, a crash in a module's
+callback, or other native code failure can still terminate or corrupt the process. Enable only
+modules from trusted sources and keep profile backups. Loaded libraries stay mapped while their
+callbacks can exist; changes to enabled modules take effect after restarting XLibrary.
+
 For a missing application, use **Locate application…** in its details. **Settings → Profile →
 Recover moved folder…** previews replacements for a moved directory before applying selected
 valid entries together. Card IDs, tags, favorites, history, arguments, and scenario references
