@@ -82,14 +82,12 @@ public:
                                                                     : file_icon;
         if (entry.type == search_entry::kind::application) {
             // Reuse the model's asynchronous icon cache; painting never touches the disk.
-            for (int row = 0; row < service.model.rowCount(); ++row)
-                if (service.model.at(row).id == entry.application_id) {
-                    const auto cached =
-                        service.model.data(service.model.index(row, 0), Qt::DecorationRole).value<QIcon>();
-                    if (!cached.isNull())
-                        icon = cached;
-                    break;
-                }
+            const auto row = service.model.row_for_id(entry.application_id);
+            if (row >= 0) {
+                const auto cached = service.model.data(service.model.index(row, 0), Qt::DecorationRole).value<QIcon>();
+                if (!cached.isNull())
+                    icon = cached;
+            }
         }
         if (entry.type != search_entry::kind::message)
             icon.paint(painter, icon_rect);
