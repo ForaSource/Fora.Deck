@@ -288,16 +288,35 @@ For the selected application:
 Change or clear these bindings in Settings → Keyboard shortcuts. Switch between the **Global shortcuts**, **Navigation**, and **Application actions** tabs at the top. Both main and numeric keypad Enter are supported. Text editing keys keep their usual behavior in text fields. Use ↑/↓ in search to select an application; Escape clears the search and cannot be reassigned. Duplicate shortcuts are rejected when saving settings, and the tab containing the conflicting field opens automatically.
 
 Application and scenario editors also accept a global hotkey. The **Applications** and **Scenarios**
-keyboard settings tabs list these assignments. Conflicts and OS registration failures preserve the
-previous binding. Deleting a target removes its binding; full profile backups retain assignments.
-On Wayland, use compositor shortcuts for `XLibrary --launch-id ID` or `XLibrary --scenario-id ID`;
-the editor shows the persistent ID command. XLibrary does not intercept unsupported Wayland keys.
+keyboard settings tabs list these assignments. Conflicts and synchronous OS registration failures
+preserve the previous binding. Portal registration completes asynchronously; a refused binding
+stays saved for retry but is inactive. Deleting a target removes its binding; full profile backups retain assignments.
+On Wayland, configured bindings request permission through the GlobalShortcuts portal (interface
+version 1 or later). The portal may offer a different binding; user approval and a successful
+BindShortcuts response are required. Each binding has its own session, closed when cleared,
+replaced, deleted or on exit. A failure banner reports unsupported services, denial and lost sessions.
+For system shortcuts use `XLibrary --launch-id ID` or `XLibrary --scenario-id ID`;
+the editor shows the persistent ID command. No Wayland key interception is used.
 
-Quick search uses normal window-manager activation on Linux. For Plasma/Wayland, assign
-`XLibrary --overlay` directly in System Settings → Keyboard → Shortcuts so the compositor can
-authorize activation. Existing-instance commands forward an available XDG activation token.
+Quick search uses normal window-manager activation on Linux. Wayland defaults remain unassigned;
+configure a binding in XLibrary to request portal permission, or create a system shortcut whose
+command is `XLibrary --overlay` (use the full executable path if it is not on PATH):
+
+- **KDE Plasma:** System Settings → Keyboard → Shortcuts → Add New → Command or Script.
+- **GNOME:** Settings → Keyboard → View and Customize Shortcuts → Custom Shortcuts → Add.
+- **Xfce/X11:** Settings → Keyboard → Application Shortcuts → Add.
+
+Choose an unused key combination. `XLibrary` opens the library; both commands address the running
+instance. System shortcut labels vary between desktop versions. Portal availability depends on
+the installed desktop backend, not just the presence of xdg-desktop-portal.
+Existing-instance commands and portal activations forward an available XDG activation token to
+Qt's Wayland activation request; Qt 6.5–6.8 consumes it through the supported environment handoff
+and `QWindow::requestActivate()`. A token is single-use and is cleared after the request.
 Focus and fullscreen stacking remain subject to compositor policy. A banner explains refused
-Wayland activation; XLibrary does not repeatedly force focus or permanently pin the overlay above windows.
+Wayland activation and disappears if focus arrives later. XLibrary does not repeatedly force focus
+or permanently pin the overlay above windows. X11 continues to use its existing native hotkeys.
+KDE Wayland, GNOME Wayland, Xfce/X11, foreground browser/editor/Steam and multi-monitor behavior
+require manual verification on those desktops; they are **not tested** in the headless build environment.
 
 ## Development
 

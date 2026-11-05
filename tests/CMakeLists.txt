@@ -14,3 +14,15 @@ xlibrary_add_test(update_checker_test update_checker_test.cpp
 target_link_libraries(update_checker_test PRIVATE Qt6::Network Qt6::Widgets)
 
 xlibrary_add_test(core_test core_test.cpp)
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    find_program(XLIBRARY_DBUS_RUN_SESSION dbus-run-session REQUIRED)
+    add_executable(linux_portal_test linux_portal_test.cpp
+        ../desktop/LinuxIntegration.cpp ../desktop/PlatformIntegration.h)
+    set_target_properties(linux_portal_test PROPERTIES AUTOMOC ON)
+    target_include_directories(linux_portal_test PRIVATE "${PROJECT_SOURCE_DIR}/desktop")
+    target_link_libraries(linux_portal_test PRIVATE xlibrary_core Qt6::Widgets Qt6::DBus Qt6::Test)
+    add_test(NAME linux_portal_test COMMAND "${XLIBRARY_DBUS_RUN_SESSION}" -- $<TARGET_FILE:linux_portal_test>)
+    set_tests_properties(linux_portal_test PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen;XDG_SESSION_TYPE=wayland" TIMEOUT 60)
+endif()

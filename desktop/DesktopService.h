@@ -62,11 +62,15 @@ private:
     QString preview_operation;
     std::map<QString, std::unique_ptr<GlobalHotkey>> target_hotkeys;
     QMap<QString, QKeySequence> registered_target_shortcuts;
+    QMap<QString, QKeySequence> refused_target_shortcuts;
     QMap<QString, QString> target_shortcut_errors;
     quint64 pending_shortcut_request = 0;
     QString pending_shortcut_key;
     QKeySequence previous_target_shortcut;
+    QKeySequence previous_refused_target_shortcut;
+    QString previous_target_shortcut_error;
     std::unique_ptr<GlobalHotkey> previous_target_hotkey;
+    void shortcut_registration_failed(GlobalHotkey *source, const QString &key, const QString &message);
     void sync_target_hotkeys();
     bool validate_shortcut_configuration(const QVariantMap &values, const QString &ignore_target,
                                          const QKeySequence &candidate, QString &error) const;

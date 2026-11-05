@@ -24,6 +24,11 @@
 #include "src/ProfileBackup.h"
 
 int main(int argc, char *argv[]) {
+#ifdef Q_OS_LINUX
+    // Capture before Qt can consume the startup token while creating native windows.
+    const auto activation_token = qgetenv("XDG_ACTIVATION_TOKEN");
+    qunsetenv("XDG_ACTIVATION_TOKEN");
+#endif
     QApplication application(argc, argv);
     Localization localization;
     localization.apply();
@@ -49,7 +54,6 @@ int main(int argc, char *argv[]) {
         invocation.insert("id", QString::number(id));
     }
 #ifdef Q_OS_LINUX
-    const auto activation_token = qgetenv("XDG_ACTIVATION_TOKEN");
     if (activation_token.size() <= 4096 && !activation_token.contains('\0'))
         invocation.insert("activation_token", QString::fromUtf8(activation_token));
 #endif
@@ -129,13 +133,19 @@ int main(int argc, char *argv[]) {
             if (command == "show" || command == "overlay") {
 #ifdef Q_OS_LINUX
                 const auto token = request.value("activation_token").toString().toUtf8();
-                if (!token.isEmpty() && token.size() <= 4096 && !token.contains('\0'))
+                qunsetenv("XDG_ACTIVATION_TOKEN");
+                if (QGuiApplication::platformName().startsWith("wayland") && !token.isEmpty() &&
+                    token.size() <= 4096 && !token.contains('\0'))
                     qputenv("XDG_ACTIVATION_TOKEN", token);
 #endif
                 if (command == "overlay")
                     window.show_overlay();
                 else
                     window.show_library();
+#ifdef Q_OS_LINUX
+                // Tokens authorize one activation and must not leak to a later request or child process.
+                qunsetenv("XDG_ACTIVATION_TOKEN");
+#endif
             } else if (command == "launch" || command == "scenario") {
                 bool valid = false;
                 const auto id = request.value("id").toString().toLongLong(&valid);
@@ -207,7 +217,15 @@ int main(int argc, char *argv[]) {
                 read_request();
             }
         });
+#ifdef Q_OS_LINUX
+        if (QGuiApplication::platformName().startsWith("wayland") && !activation_token.isEmpty() &&
+            activation_token.size() <= 4096 && !activation_token.contains('\0'))
+            qputenv("XDG_ACTIVATION_TOKEN", activation_token);
+#endif
         window.start();
+#ifdef Q_OS_LINUX
+        qunsetenv("XDG_ACTIVATION_TOKEN");
+#endif
         if (invocation.value("command") == "launch" || invocation.value("command") == "scenario")
             handle_invocation(invocation);
         return application.exec();

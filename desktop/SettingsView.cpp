@@ -163,8 +163,10 @@ QWidget *hotkeys(const ui_context &context, QWidget *) {
         if (pages->count() == 0)
             layout->addWidget(label(
                 QCoreApplication::translate("XLibrary",
-                                            "On Wayland, assign a desktop shortcut to the XLibrary command. It opens "
-                                            "the running library. The built-in global shortcut is available on X11."),
+                                            "Wayland shortcuts request permission through the GlobalShortcuts portal when "
+                                            "supported. If refused or unavailable, bind XLibrary --overlay in system "
+                                            "keyboard settings: KDE: Keyboard → Shortcuts; GNOME: Keyboard → Custom "
+                                            "Shortcuts; Xfce: Keyboard → Application Shortcuts. Use XLibrary for the library."),
                 "muted"));
 #endif
         layout->addStretch();

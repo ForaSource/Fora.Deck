@@ -51,12 +51,21 @@ DesktopService::DesktopService(QObject *const parent, const QString &profile_pat
         if (result.state != operation_state::completed) {
             // Keep the old OS registration until persistence succeeds, so rollback cannot lose it.
             target_hotkeys[pending_shortcut_key] = std::move(previous_target_hotkey);
-            if (previous_target_shortcut.isEmpty())
+            if (!previous_target_shortcut_error.isEmpty()) {
+                registered_target_shortcuts.remove(pending_shortcut_key);
+                refused_target_shortcuts.insert(pending_shortcut_key, previous_refused_target_shortcut.isEmpty()
+                                                                          ? previous_target_shortcut
+                                                                          : previous_refused_target_shortcut);
+                target_shortcut_errors.insert(pending_shortcut_key, previous_target_shortcut_error);
+                notify(previous_target_shortcut_error);
+            } else if (previous_target_shortcut.isEmpty())
                 registered_target_shortcuts.remove(pending_shortcut_key);
             else
                 registered_target_shortcuts.insert(pending_shortcut_key, previous_target_shortcut);
         }
         previous_target_hotkey.reset();
+        previous_target_shortcut_error.clear();
+        previous_refused_target_shortcut = {};
         pending_shortcut_request = 0;
         pending_shortcut_key.clear();
         sync_target_hotkeys();
@@ -1183,6 +1192,10 @@ bool DesktopService::set_target_shortcut(const bool scenario, const qint64 id, c
     if (previous == sequence && (sequence.isEmpty() || registered_target_shortcuts.value(key) == sequence))
         return true;
     auto candidate = std::make_unique<GlobalHotkey>();
+    connect(candidate.get(), &GlobalHotkey::registration_failed, this,
+            [this, key, source = candidate.get()](const QString &message) {
+                shortcut_registration_failed(source, key, message);
+            });
     connect(candidate.get(), &GlobalHotkey::activated, this, [this, scenario, id] {
         if (!is_ready() || profile_busy() || restart_pending)
             return;
@@ -1193,6 +1206,11 @@ bool DesktopService::set_target_shortcut(const bool scenario, const qint64 id, c
     });
     if (!candidate->set_sequence(sequence, error))
         return false;
+    previous_refused_target_shortcut = refused_target_shortcuts.value(key);
+    previous_target_shortcut_error =
+        previous_refused_target_shortcut.isEmpty() ? QString{} : target_shortcut_errors.value(key);
+    refused_target_shortcuts.remove(key);
+    target_shortcut_errors.remove(key);
     previous_target_hotkey = std::move(target_hotkeys[key]);
     target_hotkeys[key] = std::move(candidate);
     previous_target_shortcut = registered_target_shortcuts.value(key);
@@ -1210,6 +1228,24 @@ bool DesktopService::set_target_shortcut(const bool scenario, const qint64 id, c
     return true;
 }
 
+void DesktopService::shortcut_registration_failed(GlobalHotkey *const source, const QString &key,
+                                                  const QString &message) {
+    // An old registration can fail while retained for a pending database rollback.
+    // Keep that failure with the old instance instead of poisoning its replacement.
+    if (pending_shortcut_key == key && source == previous_target_hotkey.get()) {
+        previous_target_shortcut_error = message;
+        return;
+    }
+    const auto current = target_hotkeys.find(key);
+    if (current == target_hotkeys.end() || current->second.get() != source)
+        return;
+    refused_target_shortcuts.insert(key, registered_target_shortcuts.value(key));
+    registered_target_shortcuts.remove(key);
+    target_shortcut_errors.insert(key, message);
+    notify(message);
+    emit target_shortcuts_changed();
+}
+
 void DesktopService::sync_target_hotkeys() {
     if (pending_shortcut_request)
         return;
@@ -1220,6 +1256,7 @@ void DesktopService::sync_target_hotkeys() {
         if (!desired.contains(it->first)) {
             registered_target_shortcuts.remove(it->first);
             target_shortcut_errors.remove(it->first);
+            refused_target_shortcuts.remove(it->first);
             it = target_hotkeys.erase(it);
         } else {
             ++it;
@@ -1228,6 +1265,10 @@ void DesktopService::sync_target_hotkeys() {
     for (const auto &binding : snapshot.target_shortcuts) {
         const auto key = shortcut_target_key(binding.scenario, binding.target_id);
         const auto sequence = QKeySequence::fromString(binding.sequence, QKeySequence::PortableText);
+        // A refusal stays inactive until an explicit save, changed binding, or application restart.
+        // Catalog/theme refreshes must not reopen compositor permission dialogs.
+        if (refused_target_shortcuts.contains(key) && refused_target_shortcuts.value(key) == sequence)
+            continue;
         if (target_hotkeys.contains(key) && target_hotkeys.at(key) &&
             registered_target_shortcuts.value(key) == sequence)
             continue;
@@ -1246,6 +1287,10 @@ void DesktopService::sync_target_hotkeys() {
         auto &hotkey = target_hotkeys[key];
         if (!hotkey) {
             hotkey = std::make_unique<GlobalHotkey>();
+            connect(hotkey.get(), &GlobalHotkey::registration_failed, this,
+                    [this, key, source = hotkey.get()](const QString &message) {
+                        shortcut_registration_failed(source, key, message);
+                    });
             connect(hotkey.get(), &GlobalHotkey::activated, this,
                     [this, scenario = binding.scenario, id = binding.target_id] {
                         if (!is_ready() || profile_busy() || restart_pending)

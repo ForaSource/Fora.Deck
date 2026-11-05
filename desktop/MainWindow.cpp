@@ -152,6 +152,8 @@ MainWindow::MainWindow(DesktopService &service)
         if (reason == QSystemTrayIcon::Trigger || reason == QSystemTrayIcon::DoubleClick)
             show_library();
     });
+    connect(&hotkey, &GlobalHotkey::registration_failed, &service, &DesktopService::notify);
+    connect(&overlay_hotkey, &GlobalHotkey::registration_failed, &service, &DesktopService::notify);
     connect(&hotkey, &GlobalHotkey::activated, this, &MainWindow::show_library);
     connect(&overlay_hotkey, &GlobalHotkey::activated, overlay.get(), &SearchOverlay::toggle);
     connect(overlay.get(), &SearchOverlay::open_library, this, [this](const QString &query) {
