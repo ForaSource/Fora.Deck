@@ -95,9 +95,9 @@ private slots:
         metadata["IID"] = "org.xlibrary.desktop.UiPlugin/2.0";
         QTest::newRow("different interface") << metadata << false;
         metadata = current;
-        metadata["version"] = QT_VERSION_CHECK(QT_VERSION_MAJOR + 1, 0, 0);
+        metadata["version"] = QT_VERSION_CHECK((QT_VERSION_MAJOR + 1), 0, 0);
         QTest::newRow("different Qt major") << metadata << false;
-        metadata["version"] = QT_VERSION_CHECK(QT_VERSION_MAJOR, QT_VERSION_MINOR + 1, 0);
+        metadata["version"] = QT_VERSION_CHECK(QT_VERSION_MAJOR, (QT_VERSION_MINOR + 1), 0);
         QTest::newRow("newer Qt minor") << metadata << false;
         metadata = current;
         metadata["version"] = QT_VERSION_CHECK(QT_VERSION_MAJOR, 0, 0);

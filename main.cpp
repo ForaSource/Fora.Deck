@@ -134,8 +134,8 @@ int main(int argc, char *argv[]) {
 #ifdef Q_OS_LINUX
                 const auto token = request.value("activation_token").toString().toUtf8();
                 qunsetenv("XDG_ACTIVATION_TOKEN");
-                if (QGuiApplication::platformName().startsWith("wayland") && !token.isEmpty() &&
-                    token.size() <= 4096 && !token.contains('\0'))
+                if (QGuiApplication::platformName().startsWith("wayland") && !token.isEmpty() && token.size() <= 4096 &&
+                    !token.contains('\0'))
                     qputenv("XDG_ACTIVATION_TOKEN", token);
 #endif
                 if (command == "overlay")

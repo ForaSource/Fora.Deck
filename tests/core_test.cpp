@@ -125,7 +125,7 @@ private slots:
         auto app = record();
         const auto id = db.save_application(app);
         QCOMPARE(db.read().applications.size(), 1);
-        QVERIFY_EXCEPTION_THROWN(db.save_application(app), std::exception);
+        QVERIFY_THROWS_EXCEPTION(std::exception, db.save_application(app));
         QCOMPARE(db.read().applications.size(), 1);
         const auto loaded = db.read().applications.front();
         QCOMPARE(loaded.id, id);
@@ -139,7 +139,7 @@ private slots:
         xlibrary::validate_profile(db.get_connection());
         auto invalid = app;
         invalid.name.clear();
-        QVERIFY_EXCEPTION_THROWN(db.import_records({app, invalid}), std::exception);
+        QVERIFY_THROWS_EXCEPTION(std::exception, db.import_records({app, invalid}));
         QCOMPARE(db.read().applications.size(), 1);
         xlibrary::validate_profile(db.get_connection());
     }
@@ -180,7 +180,7 @@ private slots:
             Database db(path);
             xlibrary::sqlite_execute(db.get_connection(), "PRAGMA user_version=999;");
         }
-        QVERIFY_EXCEPTION_THROWN(Database{path}, std::exception);
+        QVERIFY_THROWS_EXCEPTION(std::exception, Database{path});
         sqlite3 *raw = nullptr;
         QCOMPARE(sqlite3_open(path.toUtf8().constData(), &raw), SQLITE_OK);
         QCOMPARE(xlibrary::read_schema_version(raw), 999);
@@ -189,7 +189,7 @@ private slots:
         QVERIFY(damaged.open(QIODevice::WriteOnly));
         damaged.write("not a database");
         damaged.close();
-        QVERIFY_EXCEPTION_THROWN(Database{damaged.fileName()}, std::exception);
+        QVERIFY_THROWS_EXCEPTION(std::exception, Database{damaged.fileName()});
     }
     void import_cancel_rescan_and_steam() {
         QTemporaryDir temporary;
@@ -208,10 +208,10 @@ private slots:
             discovery_control control;
             auto extra = record();
             extra.arguments = "--new-configuration";
-            QVERIFY_EXCEPTION_THROWN(
-                db.import_records({extra, record()}, &control,
-                                  [&](qsizetype, qsizetype) { control.phase.store(discovery_phase::cancelling); }),
-                DiscoveryCancelled);
+            QVERIFY_THROWS_EXCEPTION(DiscoveryCancelled,
+                                     db.import_records({extra, record()}, &control, [&](qsizetype, qsizetype) {
+                                         control.phase.store(discovery_phase::cancelling);
+                                     }));
             QCOMPARE(db.read().applications.size(), 2);
             xlibrary::validate_profile(db.get_connection());
         }
@@ -294,8 +294,8 @@ private slots:
         QVERIFY(!manifest.fingerprint.isEmpty());
         auto wrong_fingerprint = manifest.fingerprint;
         wrong_fingerprint[0] = static_cast<char>(wrong_fingerprint[0] ^ 1);
-        QVERIFY_EXCEPTION_THROWN(ProfileBackup::restore(backup_path, database_path, settings_path, wrong_fingerprint),
-                                 std::exception);
+        QVERIFY_THROWS_EXCEPTION(std::exception,
+                                 ProfileBackup::restore(backup_path, database_path, settings_path, wrong_fingerprint));
         {
             Database db(database_path);
             db.remove_application(id);
@@ -327,10 +327,9 @@ private slots:
         QVERIFY(damaged.open(QIODevice::WriteOnly));
         damaged.write("broken archive");
         damaged.close();
-        QVERIFY_EXCEPTION_THROWN(ProfileBackup::inspect(damaged.fileName()), std::exception);
-        QVERIFY_EXCEPTION_THROWN(
-            ProfileBackup::restore(damaged.fileName(), database_path, settings_path, manifest.fingerprint),
-            std::exception);
+        QVERIFY_THROWS_EXCEPTION(std::exception, ProfileBackup::inspect(damaged.fileName()));
+        QVERIFY_THROWS_EXCEPTION(std::exception, ProfileBackup::restore(damaged.fileName(), database_path,
+                                                                        settings_path, manifest.fingerprint));
         QCOMPARE(Database(database_path).read().applications.size(), 1);
     }
 };

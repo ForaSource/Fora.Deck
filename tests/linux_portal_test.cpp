@@ -63,8 +63,8 @@ public:
         const auto options = qdbus_cast<QVariantMap>(message.arguments().last());
         auto sender = message.service().mid(1);
         sender.replace('.', '_');
-        const auto request_path = "/org/freedesktop/portal/desktop/request/" + sender + '/' +
-                                  options.value("handle_token").toString();
+        const auto request_path =
+            "/org/freedesktop/portal/desktop/request/" + sender + '/' + options.value("handle_token").toString();
         requests.append(request_path);
         QVariantMap results;
         uint code = create_response;
@@ -92,9 +92,9 @@ public:
     }
     void activate(const QString &session, const QString &id) {
         auto signal = QDBusMessage::createSignal("/org/freedesktop/portal/desktop",
-                                               "org.freedesktop.portal.GlobalShortcuts", "Activated");
-        signal.setArguments({QVariant::fromValue(QDBusObjectPath(session)), id,
-                             QVariant::fromValue<qulonglong>(123), QVariantMap{}});
+                                                 "org.freedesktop.portal.GlobalShortcuts", "Activated");
+        signal.setArguments(
+            {QVariant::fromValue(QDBusObjectPath(session)), id, QVariant::fromValue<qulonglong>(123), QVariantMap{}});
         QDBusConnection::sessionBus().send(signal);
     }
 };

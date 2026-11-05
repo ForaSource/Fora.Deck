@@ -2784,6 +2784,58 @@ Technical reason: %3</source>
         <translation>Доступна новая версия: %1 (канал: %2)</translation>
     </message>
     <message>
+        <source>The GlobalShortcuts portal did not register the shortcut. Use system keyboard settings: KDE: Keyboard → Shortcuts; GNOME: Keyboard → Custom Shortcuts; Xfce: Keyboard → Application Shortcuts. Command: XLibrary --overlay (quick search) or XLibrary (library). For applications/scenarios use the command in their editor.</source>
+        <translation>Портал GlobalShortcuts не зарегистрировал сочетание. Используйте системные настройки клавиатуры: KDE: Клавиатура → Комбинации клавиш; GNOME: Клавиатура → Пользовательские комбинации; Xfce: Клавиатура → Комбинации клавиш приложений. Команда: XLibrary --overlay (быстрый поиск) или XLibrary (библиотека). Для приложений и сценариев используйте команду из их редактора.</translation>
+    </message>
+    <message>
+        <source>XLibrary shortcut</source>
+        <translation>Горячая клавиша XLibrary</translation>
+    </message>
+    <message>
+        <source>Use Ctrl, Alt, or Super with a letter, digit, F1–F24, or Space.</source>
+        <translation>Используйте Ctrl, Alt или Super с буквой, цифрой, F1–F24 или пробелом.</translation>
+    </message>
+    <message>
+        <source>Unknown C++ exception while loading plugin.</source>
+        <translation>Неизвестное исключение C++ при загрузке плагина.</translation>
+    </message>
+    <message>
+        <source>Could not open the folder.</source>
+        <translation>Не удалось открыть папку.</translation>
+    </message>
+    <message>
+        <source>Results limited. Open folder</source>
+        <translation>Выдача ограничена. Открыть папку</translation>
+    </message>
+    <message>
+        <source>Wayland shortcuts request permission through the GlobalShortcuts portal when supported. If refused or unavailable, bind XLibrary --overlay in system keyboard settings: KDE: Keyboard → Shortcuts; GNOME: Keyboard → Custom Shortcuts; Xfce: Keyboard → Application Shortcuts. Use XLibrary for the library.</source>
+        <translation>При поддержке Wayland горячие клавиши запрашивают разрешение через портал GlobalShortcuts. При отказе или недоступности задайте XLibrary --overlay в системных настройках: KDE: Клавиатура → Комбинации клавиш; GNOME: Клавиатура → Пользовательские комбинации; Xfce: Клавиатура → Комбинации клавиш приложений. Для библиотеки используйте XLibrary.</translation>
+    </message>
+    <message>
+        <source>Unsupported UI plugin interface (requires IID 1.0).</source>
+        <translation>Неподдерживаемый интерфейс UI-плагина (требуется IID 1.0).</translation>
+    </message>
+    <message>
+        <source>Missing or invalid Qt version metadata.</source>
+        <translation>Метаданные версии Qt отсутствуют или некорректны.</translation>
+    </message>
+    <message>
+        <source>Incompatible Qt major version.</source>
+        <translation>Несовместимая основная версия Qt.</translation>
+    </message>
+    <message>
+        <source>Plugin requires a newer Qt minor version.</source>
+        <translation>Плагину требуется более новая дополнительная версия Qt.</translation>
+    </message>
+    <message>
+        <source>Plugin configuration failed: %1</source>
+        <translation>Ошибка настройки плагина: %1</translation>
+    </message>
+    <message>
+        <source>Plugin configuration failed with an unknown C++ exception.</source>
+        <translation>При настройке плагина возникло неизвестное исключение C++.</translation>
+    </message>
+    <message>
         <source>Refresh availability</source>
         <translation>Обновить доступность</translation>
     </message>

@@ -235,11 +235,16 @@ Check results are cached locally for **60 seconds without a token** or **5 secon
 a token**, measured from completion. Repeated clicks return the cached result without
 new GitHub requests. Errors and cancellations use the same interval. The cache stays in
 memory for the application session, including when Settings is closed and reopened.
-Unauthenticated checks and each personal token have separate cache entries; tokens
+Each update channel, unauthenticated checks and each personal token have separate cache entries; tokens
 themselves are not stored in the cache. Reading a cached result does not extend its lifetime.
 
-Checks run at startup and on request and include published pre-releases. Versions are compared using
-Semantic Versioning; drafts and tags without a supported version are ignored.
+**Settings → Update → Update channel** defaults to **Stable**, which considers only
+published releases whose GitHub `prerelease` flag is false. **Preview** also considers
+pre-releases. Versions use Semantic Versioning, so `1.0.0` is newer than `1.0.0-rc.1`;
+downgrades are never offered. Drafts and unsupported version tags are ignored.
+Changing channels cancels the current check/download and clears its available installer;
+a new check uses that channel's separate cache. Existing profiles default to Stable
+without a database migration. Updates still require confirmation.
 
 On Windows x64, an installer-managed copy can download the matching MinGW or MSVC installer
 after confirmation. XLibrary verifies its size and GitHub-provided SHA-256 before starting
@@ -359,3 +364,20 @@ If you would like to follow the project, star the repository or watch it for upd
 ## License
 
 XLibrary is released under the [MIT License](LICENSE).
+
+
+## v0.7.0 reliability notes
+
+Path searches retain at most 50 matches and inspect at most 20,000 directory entries
+per request. A final **Results limited. Open folder** action means the listing is
+incomplete, including when no prefix match was found in the scanned portion.
+Directories sort before files; complete path identities and cancellation are retained.
+
+Process state is polled every 2.5 seconds. Measured filesystem and volume work is
+refreshed every 10 seconds, immediately via **Refresh availability** above the library, and on observed parent
+directory changes. Watching is capped at 128 directories; unobserved paths and volume
+events are covered by the periodic refresh. A missing external drive never deletes cards.
+Opt-in local timing uses `QT_LOGGING_RULES=xlibrary.poll.debug=true`; nothing is sent online.
+
+See [release notes](docs/releases/v0.7.0.md) and the
+[validation record](docs/releases/v0.7.0-validation.md) for platform checks and limitations.

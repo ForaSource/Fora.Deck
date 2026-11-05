@@ -37,14 +37,14 @@ constexpr int x11_success = Success;
 #include <mutex>
 #include <QApplication>
 #include <QDBusArgument>
+#include <QDBusConnection>
+#include <QDBusConnectionInterface>
+#include <QDBusMessage>
 #include <QDBusMetaType>
 #include <QDBusPendingCallWatcher>
 #include <QDBusPendingReply>
 #include <QDBusServiceWatcher>
 #include <QDBusVariant>
-#include <QDBusConnection>
-#include <QDBusConnectionInterface>
-#include <QDBusMessage>
 #include <QDirIterator>
 #include <QFileIconProvider>
 #include <QFileInfo>
@@ -59,9 +59,9 @@ constexpr int x11_success = Success;
 #include <QStandardPaths>
 #include <QStyle>
 #include <QtGui/qguiapplication_platform.h>
+#include <QTimer>
 #include <QUrl>
 #include <QUuid>
-#include <QTimer>
 #include <QWidget>
 #include <QWindow>
 #include <stdexcept>
@@ -190,9 +190,7 @@ class LinuxHotkeyState : public QObject {
     static constexpr auto request_interface = "org.freedesktop.portal.Request";
     static constexpr auto session_interface = "org.freedesktop.portal.Session";
 
-    static QString token() {
-        return QStringLiteral("xlibrary_") + QUuid::createUuid().toString(QUuid::Id128);
-    }
+    static QString token() { return QStringLiteral("xlibrary_") + QUuid::createUuid().toString(QUuid::Id128); }
     QString sender_path() const {
         auto sender = bus.baseService();
         sender.remove(0, 1);
@@ -207,7 +205,7 @@ class LinuxHotkeyState : public QObject {
         timeout.stop();
         if (!request_path.isEmpty())
             bus.disconnect(service, request_path, request_interface, "Response", this,
-                           SLOT(response(uint,QVariantMap)));
+                           SLOT(response(uint, QVariantMap)));
         close_path(request_path, request_interface);
         close_path(session_path, session_interface);
         request_path.clear();
@@ -220,17 +218,18 @@ class LinuxHotkeyState : public QObject {
         failed = true;
         close_portal();
         emit owner->registration_failed(QCoreApplication::translate(
-            "XLibrary", "The GlobalShortcuts portal did not register the shortcut. Use system keyboard settings: "
-                        "KDE: Keyboard → Shortcuts; GNOME: Keyboard → Custom Shortcuts; "
-                        "Xfce: Keyboard → Application Shortcuts. Command: XLibrary --overlay "
-                        "(quick search) or XLibrary (library). For applications/scenarios use the command in their editor."));
+            "XLibrary",
+            "The GlobalShortcuts portal did not register the shortcut. Use system keyboard settings: "
+            "KDE: Keyboard → Shortcuts; GNOME: Keyboard → Custom Shortcuts; "
+            "Xfce: Keyboard → Application Shortcuts. Command: XLibrary --overlay "
+            "(quick search) or XLibrary (library). For applications/scenarios use the command in their editor."));
     }
     void request(const QString &method, const QVariantList &arguments, QVariantMap options) {
         const auto handle_token = token();
         options.insert("handle_token", handle_token);
         request_path = "/org/freedesktop/portal/desktop/request/" + sender_path() + '/' + handle_token;
         if (!bus.connect(service, request_path, request_interface, "Response", this,
-                         SLOT(response(uint,QVariantMap)))) {
+                         SLOT(response(uint, QVariantMap)))) {
             fail();
             return;
         }
@@ -257,8 +256,7 @@ class LinuxHotkeyState : public QObject {
 
 private slots:
     void response(uint code, const QVariantMap &results) {
-        bus.disconnect(service, request_path, request_interface, "Response", this,
-                       SLOT(response(uint,QVariantMap)));
+        bus.disconnect(service, request_path, request_interface, "Response", this, SLOT(response(uint, QVariantMap)));
         request_path.clear();
         timeout.stop();
         if (code != 0) {
@@ -273,11 +271,15 @@ private slots:
                 return;
             }
             binding = true;
-            request("BindShortcuts", {QVariant::fromValue(QDBusObjectPath(session_path)),
-                                     QVariant::fromValue(PortalShortcuts{{action_id,
-                                         {{"description", QCoreApplication::translate("XLibrary", "XLibrary shortcut") +
-                                                               " (" + trigger + ')'},
-                                          {"preferred_trigger", trigger}}}}), QString{}}, {});
+            request("BindShortcuts",
+                    {QVariant::fromValue(QDBusObjectPath(session_path)),
+                     QVariant::fromValue(PortalShortcuts{
+                         {action_id,
+                          {{"description",
+                            QCoreApplication::translate("XLibrary", "XLibrary shortcut") + " (" + trigger + ')'},
+                           {"preferred_trigger", trigger}}}}),
+                     QString{}},
+                    {});
         } else {
             const auto shortcuts = qdbus_cast<PortalShortcuts>(results.value("shortcuts"));
             bound = std::ranges::any_of(shortcuts, [this](const auto &shortcut) { return shortcut.id == action_id; });
@@ -285,8 +287,7 @@ private slots:
                 fail();
         }
     }
-    void portal_activated(const QDBusObjectPath &session, const QString &id, qulonglong,
-                          const QVariantMap &options) {
+    void portal_activated(const QDBusObjectPath &session, const QString &id, qulonglong, const QVariantMap &options) {
         if (!bound || session.path() != session_path || id != action_id)
             return;
         const auto activation_token = options.value("activation_token").toString().toUtf8();
@@ -326,11 +327,11 @@ public:
         if (modifiers & Qt::MetaModifier)
             trigger += "LOGO+";
         const auto key = combination.key();
-        trigger += key == Qt::Key_Space ? QStringLiteral("space")
+        trigger += key == Qt::Key_Space                   ? QStringLiteral("space")
                    : key >= Qt::Key_A && key <= Qt::Key_Z ? QString(QChar('a' + key - Qt::Key_A))
-                   : QKeySequence(key).toString(QKeySequence::PortableText);
-        auto *service_watcher = new QDBusServiceWatcher(service, bus,
-                                                       QDBusServiceWatcher::WatchForUnregistration, this);
+                                                          : QKeySequence(key).toString(QKeySequence::PortableText);
+        auto *service_watcher =
+            new QDBusServiceWatcher(service, bus, QDBusServiceWatcher::WatchForUnregistration, this);
         connect(service_watcher, &QDBusServiceWatcher::serviceUnregistered, this, [this] { fail(); });
         auto message = QDBusMessage::createMethodCall(service, portal_path, "org.freedesktop.DBus.Properties", "Get");
         message.setArguments({shortcut_interface, "version"});
@@ -347,7 +348,7 @@ public:
             const auto session_token = token();
             session_path = "/org/freedesktop/portal/desktop/session/" + sender_path() + '/' + session_token;
             if (!bus.connect(service, portal_path, shortcut_interface, "Activated", this,
-                             SLOT(portal_activated(QDBusObjectPath,QString,qulonglong,QVariantMap))) ||
+                             SLOT(portal_activated(QDBusObjectPath, QString, qulonglong, QVariantMap))) ||
                 !bus.connect(service, session_path, session_interface, "Closed", this,
                              SLOT(session_closed(QVariantMap)))) {
                 fail();
@@ -490,7 +491,8 @@ bool GlobalHotkey::set_sequence(const QKeySequence &value, QString &error) {
               (key >= Qt::Key_F1 && key <= Qt::Key_F24) || key == Qt::Key_Space) ||
             !(modifiers & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier)) ||
             (modifiers & ~(Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier | Qt::ShiftModifier))) {
-            error = QCoreApplication::translate("XLibrary", "Use Ctrl, Alt, or Super with a letter, digit, F1–F24, or Space.");
+            error = QCoreApplication::translate("XLibrary",
+                                                "Use Ctrl, Alt, or Super with a letter, digit, F1–F24, or Space.");
             return false;
         }
         linux_state = std::make_unique<LinuxHotkeyState>(this);

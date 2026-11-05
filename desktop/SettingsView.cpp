@@ -162,11 +162,11 @@ QWidget *hotkeys(const ui_context &context, QWidget *) {
 #ifdef Q_OS_LINUX
         if (pages->count() == 0)
             layout->addWidget(label(
-                QCoreApplication::translate("XLibrary",
-                                            "Wayland shortcuts request permission through the GlobalShortcuts portal when "
-                                            "supported. If refused or unavailable, bind XLibrary --overlay in system "
-                                            "keyboard settings: KDE: Keyboard → Shortcuts; GNOME: Keyboard → Custom "
-                                            "Shortcuts; Xfce: Keyboard → Application Shortcuts. Use XLibrary for the library."),
+                QCoreApplication::translate(
+                    "XLibrary", "Wayland shortcuts request permission through the GlobalShortcuts portal when "
+                                "supported. If refused or unavailable, bind XLibrary --overlay in system "
+                                "keyboard settings: KDE: Keyboard → Shortcuts; GNOME: Keyboard → Custom "
+                                "Shortcuts; Xfce: Keyboard → Application Shortcuts. Use XLibrary for the library."),
                 "muted"));
 #endif
         layout->addStretch();
