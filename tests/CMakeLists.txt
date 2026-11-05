@@ -26,3 +26,6 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set_tests_properties(linux_portal_test PROPERTIES
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen;XDG_SESSION_TYPE=wayland" TIMEOUT 60)
 endif()
+
+xlibrary_add_test(path_search_test path_search_test.cpp)
+target_link_libraries(path_search_test PRIVATE Qt6::Widgets)
