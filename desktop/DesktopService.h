@@ -130,6 +130,7 @@ public:
     quint64 recover_paths(const QVector<path_relocation> &changes);
     void restart_application();
     void retry_library();
+    void refresh_availability();
     void open_profile_folder();
     void restore_library(const QString &path);
     bool is_discovering() const { return discovery_state == operation_state::loading; }

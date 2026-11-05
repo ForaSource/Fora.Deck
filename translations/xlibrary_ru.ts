@@ -2783,5 +2783,9 @@ Technical reason: %3</source>
         <source>New version available: %1 (%2 channel)</source>
         <translation>Доступна новая версия: %1 (канал: %2)</translation>
     </message>
+    <message>
+        <source>Refresh availability</source>
+        <translation>Обновить доступность</translation>
+    </message>
 </context>
 </TS>

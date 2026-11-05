@@ -279,6 +279,8 @@ void MainWindow::create_actions() {
     connect(&service, &DesktopService::selections_changed, this, &MainWindow::refresh_actions);
     for (const auto &id : {"launch", "new_instance", "open_folder", "copy_path", "remove_application"})
         context.actions.value(id)->setAutoRepeat(false);
+    add("refresh_availability", QCoreApplication::translate("XLibrary", "Refresh availability"), "refresh",
+        [this] { service.refresh_availability(); });
     add("discover", QCoreApplication::translate("XLibrary", "Find installed applications"), "refresh", [this] {
         if (service.is_discovering())
             service.cancel_discovery();
@@ -322,6 +324,7 @@ void MainWindow::refresh_actions() {
             : QCoreApplication::translate(
                   "XLibrary", "Runs the launch command directly. The application may reuse an existing window."));
     context.actions.value("add_application")->setEnabled(profile_available && service.is_ready());
+    context.actions.value("refresh_availability")->setEnabled(profile_available && service.is_ready());
     context.actions.value("bulk_edit")
         ->setEnabled(profile_available && service.is_ready() && !service.selections().isEmpty());
     context.actions.value("undo_removal")

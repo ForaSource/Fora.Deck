@@ -244,6 +244,12 @@ DesktopService::~DesktopService() {
     worker_thread.wait();
 }
 
+void DesktopService::refresh_availability() {
+    if (!is_ready() || profile_busy() || restart_required())
+        return;
+    enqueue("availability_refresh", [](Manager &manager) { manager.poll(true); }, operation_error_source::platform);
+}
+
 void DesktopService::retry_library() {
     if (is_ready() || is_opening())
         return;
