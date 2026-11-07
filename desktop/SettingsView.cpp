@@ -1,6 +1,7 @@
 #include <memory>
 #include <QButtonGroup>
 #include <QCheckBox>
+#include <QClipboard>
 #include <QComboBox>
 #include <QCoreApplication>
 #include <QDialogButtonBox>
@@ -12,6 +13,7 @@
 #include <QProgressBar>
 #include <QRegularExpressionValidator>
 #include <QStackedWidget>
+#include <QSysInfo>
 #include <QTabBar>
 #include <QTreeWidget>
 #include <QUrl>
@@ -497,12 +499,31 @@ QWidget *about(const ui_context &context, QWidget *) {
         "muted"));
     auto *github = button(QCoreApplication::translate("XLibrary", "Open GitHub ↗"));
     auto *issues = button(QCoreApplication::translate("XLibrary", "Report an issue ↗"));
+    auto *documentation = button(QCoreApplication::translate("XLibrary", "Open documentation ↗"));
+    auto *copy = button(QCoreApplication::translate("XLibrary", "Copy version and environment"));
     card_layout->addWidget(github);
     card_layout->addWidget(issues);
+    card_layout->addWidget(documentation);
+    card_layout->addWidget(copy);
     QObject::connect(github, &QPushButton::clicked, widget,
                      [] { desktop_platform::open_url(QUrl("https://github.com/lappland-open/XLibrary")); });
     QObject::connect(issues, &QPushButton::clicked, widget,
                      [] { desktop_platform::open_url(QUrl("https://github.com/lappland-open/XLibrary/issues")); });
+    QObject::connect(documentation, &QPushButton::clicked, widget, [] {
+        desktop_platform::open_url(QUrl("https://github.com/lappland-open/XLibrary/blob/main/README.md"));
+    });
+    QObject::connect(copy, &QPushButton::clicked, widget, [=] {
+        const auto text =
+            QCoreApplication::translate("XLibrary",
+                                        "XLibrary %1\nOS: %2\nArchitecture: %3\nQt: %4\nSession: %5\nMode: %6")
+                .arg(QCoreApplication::applicationVersion(), QSysInfo::prettyProductName(),
+                     QSysInfo::currentCpuArchitecture(), QString::fromLatin1(qVersion()),
+                     QGuiApplication::platformName(),
+                     application_paths::portable_mode() ? QStringLiteral("portable") : QStringLiteral("installed"));
+        QGuiApplication::clipboard()->setText(text);
+        static_cast<DesktopService *>(context.service)
+            ->notify(QCoreApplication::translate("XLibrary", "Version and environment copied."));
+    });
     widget->layout()->addWidget(card);
     widget->layout()->addWidget(
         label(QCoreApplication::translate("XLibrary", "Technologies and licenses"), "subheading"));

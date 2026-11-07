@@ -2991,5 +2991,31 @@ Technical reason: %3</source>
         <source>Type an application name, alias or filename. Use #work to require a tag and -#games to exclude one; combine them with text. Clear filters to search the whole library. Quick search also accepts file paths and calculations such as (2 + 3) * 4; Enter copies the result.</source>
         <translation>Введите название, псевдоним или имя файла приложения. #работа требует тег, а -#игры исключает его; их можно сочетать с текстом. Сбросьте фильтры для поиска по всей библиотеке. Быстрый поиск также принимает пути и выражения вроде (2 + 3) * 4; Enter копирует результат.</translation>
     </message>
+    <message>
+        <source>Copy version and environment</source>
+        <translation>Копировать версию и окружение</translation>
+    </message>
+    <message>
+        <source>Open documentation ↗</source>
+        <translation>Открыть документацию ↗</translation>
+    </message>
+    <message>
+        <source>Version and environment copied.</source>
+        <translation>Версия и сведения об окружении скопированы.</translation>
+    </message>
+    <message>
+        <source>XLibrary %1
+OS: %2
+Architecture: %3
+Qt: %4
+Session: %5
+Mode: %6</source>
+        <translation>XLibrary %1
+ОС: %2
+Архитектура: %3
+Qt: %4
+Сессия: %5
+Режим: %6</translation>
+    </message>
 </context>
 </TS>
