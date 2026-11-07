@@ -2935,5 +2935,41 @@ Technical reason: %3</source>
         <source>Waiting</source>
         <translation>Ожидание</translation>
     </message>
+    <message>
+        <source>Fix the scenario before running it:</source>
+        <translation>Исправьте сценарий перед запуском:</translation>
+    </message>
+    <message>
+        <source>Invalid step delay</source>
+        <translation>Некорректная задержка шага</translation>
+    </message>
+    <message>
+        <source>Step %1 · %2: %3</source>
+        <translation>Шаг %1 · %2: %3</translation>
+    </message>
+    <message>
+        <source>The scenario was not found.</source>
+        <translation>Сценарий не найден.</translation>
+    </message>
+    <message>
+        <source>The working directory is unavailable.</source>
+        <translation>Рабочая папка недоступна.</translation>
+    </message>
+    <message>
+        <source>Check again</source>
+        <translation>Проверить снова</translation>
+    </message>
+    <message>
+        <source>Checking scenario…</source>
+        <translation>Проверка сценария…</translation>
+    </message>
+    <message>
+        <source>Could not check the scenario.</source>
+        <translation>Не удалось проверить сценарий.</translation>
+    </message>
+    <message>
+        <source>Scenario issues</source>
+        <translation>Проблемы сценария</translation>
+    </message>
 </context>
 </TS>

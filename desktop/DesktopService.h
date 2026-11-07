@@ -44,6 +44,12 @@ private:
     qint64 running_scenario_id = 0;
     quint64 scenario_run_generation = 0;
     void clear_stale_scenario_run();
+    qint64 pending_scenario_id = 0;
+    quint64 scenario_check_sequence = 0;
+    QHash<qint64, quint64> scenario_check_requests;
+    QHash<qint64, QStringList> scenario_check_results;
+    void invalidate_scenario_checks();
+    void start_scenario(qint64 id);
     QString scenario_name;
     qsizetype step_index = 0;
     operation_state scenario_status = operation_state::ready;
@@ -149,10 +155,13 @@ public:
     }
     const discovery_progress &discovery_status() const { return scan_progress; }
     QString discovery_report() const { return scan_report; }
-    bool is_scenario_active() const { return scenario_status == operation_state::loading; }
+    bool is_scenario_active() const { return scenario_status == operation_state::loading || pending_scenario_id != 0; }
     qint64 scenario_run_id() const { return running_scenario_id; }
     const QVector<scenario_step> &scenario_run_steps() const { return pending_steps; }
     QString scenario_step_status(qsizetype index) const;
+    QStringList scenario_issues(qint64 id) const;
+    bool scenario_checked(qint64 id) const { return scenario_check_results.contains(id); }
+    void check_scenario(qint64 id, bool force = false);
     qint64 selection() const { return selected_id; }
     const app_record *selected() const { return model.find(selected_id); }
     const catalog_snapshot &catalog() const { return snapshot; }
@@ -232,6 +241,7 @@ signals:
     void application_launch_finished(qint64 id, const operation_result &result);
     void scenario_changed(const QString &status);
     void scenario_steps_changed();
+    void scenario_check_changed(qint64 id);
     void appearance_changed();
     void profile_state_changed();
     void profile_preview_ready(quint64 request_id, const QString &path, const profile_manifest &manifest);

@@ -182,6 +182,7 @@ DesktopService::DesktopService(QObject *const parent, const QString &profile_pat
         if (!current_tag.isEmpty() && !snapshot.tags.contains(current_tag))
             navigate(current_section);
         model.replace(value.applications);
+        invalidate_scenario_checks();
         if (!model.find(selected_id))
             selected_id = 0;
         selected_ids.removeIf([this](const qint64 id) { return !model.find(id); });
@@ -190,8 +191,15 @@ DesktopService::DesktopService(QObject *const parent, const QString &profile_pat
         emit selections_changed();
     });
     connect(worker, &Manager::state_changed, this, [this](const QVector<app_record> &applications) {
+        const bool availability_changed =
+            std::any_of(applications.cbegin(), applications.cend(), [this](const auto &app) {
+                const auto *previous = model.find(app.id);
+                return !previous || previous->available != app.available;
+            });
         snapshot.applications = applications;
         model.update_state(applications);
+        if (availability_changed)
+            invalidate_scenario_checks();
         emit selection_changed();
     });
     connect(worker, &Manager::launched, this,
@@ -557,12 +565,20 @@ void DesktopService::open_folder(const qint64 id) {
 }
 
 void DesktopService::run_scenario(const qint64 id) {
-    if (profile_busy() || restart_pending)
+    if (!is_ready() || !id || profile_busy() || restart_pending)
         return;
     if (is_scenario_active()) {
         notify(QCoreApplication::translate("XLibrary", "A scenario is already running. Stop it first."));
         return;
     }
+    pending_scenario_id = id;
+    emit scenario_changed(QCoreApplication::translate("XLibrary", "Checking scenario…"));
+    check_scenario(id, true);
+}
+
+void DesktopService::start_scenario(const qint64 id) {
+    if (!is_ready() || profile_busy() || restart_pending)
+        return;
     for (const auto &record : snapshot.scenarios) {
         if (record.id == id) {
             if (std::none_of(record.steps.cbegin(), record.steps.cend(),
@@ -589,6 +605,60 @@ void DesktopService::run_scenario(const qint64 id) {
     }
 }
 
+QStringList DesktopService::scenario_issues(const qint64 id) const {
+    return scenario_check_results.value(id);
+}
+
+void DesktopService::invalidate_scenario_checks() {
+    scenario_check_results.clear();
+    scenario_check_requests.clear();
+    if (pending_scenario_id)
+        check_scenario(pending_scenario_id, true);
+    emit scenario_check_changed(0);
+}
+
+void DesktopService::check_scenario(const qint64 id, const bool force) {
+    if (!id || !is_ready() || profile_busy() || restart_pending ||
+        (!force && (scenario_check_results.contains(id) || scenario_check_requests.contains(id))))
+        return;
+    const auto found = std::find_if(snapshot.scenarios.cbegin(), snapshot.scenarios.cend(),
+                                    [id](const auto &record) { return record.id == id; });
+    const auto record = found == snapshot.scenarios.cend() ? scenario_record{} : *found;
+    const auto request = ++scenario_check_sequence;
+    scenario_check_results.remove(id);
+    scenario_check_requests.insert(id, request);
+    auto *watcher = new QFutureWatcher<QStringList>(this);
+    connect(watcher, &QFutureWatcher<QStringList>::finished, this, [this, watcher, id, request] {
+        watcher->deleteLater();
+        if (scenario_check_requests.value(id) != request)
+            return;
+        scenario_check_requests.remove(id);
+        QStringList issues;
+        try {
+            issues = watcher->result();
+        } catch (const std::exception &) {
+            issues = {QCoreApplication::translate("XLibrary", "Could not check the scenario.")};
+        }
+        scenario_check_results.insert(id, issues);
+        emit scenario_check_changed(id);
+        if (pending_scenario_id != id)
+            return;
+        pending_scenario_id = 0;
+        if (!issues.isEmpty()) {
+            emit scenario_changed(QCoreApplication::translate("XLibrary", "Fix the scenario before running it:"));
+            notify(QCoreApplication::translate("XLibrary", "Fix the scenario before running it:") + "\n" +
+                   issues.first());
+            return;
+        }
+        start_scenario(id);
+    });
+    watcher->setFuture(QtConcurrent::run(&launch_profile_pool, [record, applications = snapshot.applications] {
+        if (!record.id)
+            return QStringList{QCoreApplication::translate("XLibrary", "The scenario was not found.")};
+        return Manager::scenario_issues(record, applications);
+    }));
+}
+
 void DesktopService::next_scenario_step() {
     while (step_index < pending_steps.size() && !pending_steps[step_index].enabled)
         ++step_index;
@@ -610,7 +680,10 @@ void DesktopService::next_scenario_step() {
 void DesktopService::cancel_scenario() {
     if (!is_scenario_active())
         return;
-    finish_scenario(operation_state::cancelled);
+    if (pending_scenario_id)
+        pending_scenario_id = 0;
+    else
+        finish_scenario(operation_state::cancelled);
     emit scenario_changed(QCoreApplication::translate(
         "XLibrary", "The scenario stopped. Applications already opened will keep running."));
 }

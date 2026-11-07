@@ -1103,9 +1103,44 @@ QWidget *scenarios(const ui_context &context, QWidget *const parent) {
     auto *edit = button(QCoreApplication::translate("XLibrary", "Edit"));
     auto *remove = button(QCoreApplication::translate("XLibrary", "Remove"));
     auto *stop = button(QCoreApplication::translate("XLibrary", "Stop"));
+    auto *issues = new QPlainTextEdit;
+    issues->setReadOnly(true);
+    issues->setAccessibleName(QCoreApplication::translate("XLibrary", "Scenario issues"));
+    issues->setMinimumHeight(appearance::scaled(*context.settings, 60));
+    issues->setMaximumHeight(appearance::scaled(*context.settings, 150));
+    auto *recheck = button(QCoreApplication::translate("XLibrary", "Check again"));
+    root->addWidget(issues);
+    const auto check_selected = [=] {
+        const auto id = list->currentItem() ? list->currentItem()->data(Qt::UserRole).toLongLong() : 0;
+        const bool can_check = id && !service->is_scenario_active() && service->section() == "scenarios";
+        if (can_check)
+            service->check_scenario(id);
+        const bool checked = service->scenario_checked(id);
+        const auto problems = service->scenario_issues(id);
+        issues->setPlainText(!checked ? QCoreApplication::translate("XLibrary", "Checking scenario…")
+                             : problems.isEmpty()
+                                 ? QString{}
+                                 : QCoreApplication::translate("XLibrary", "Fix the scenario before running it:") +
+                                       "\n" + problems.join('\n'));
+        issues->setVisible(can_check && (!checked || !problems.isEmpty()));
+        run->setEnabled(can_check && checked && problems.isEmpty());
+        recheck->setEnabled(can_check && checked);
+    };
+    QObject::connect(list, &QListWidget::currentRowChanged, widget, [=] { check_selected(); });
+    QObject::connect(service, &DesktopService::navigation_changed, widget, check_selected);
+    QObject::connect(service, &DesktopService::scenario_check_changed, widget, [=](const qint64 id) {
+        if (!id || (list->currentItem() && list->currentItem()->data(Qt::UserRole).toLongLong() == id))
+            check_selected();
+    });
+    QObject::connect(recheck, &QPushButton::clicked, widget, [=] {
+        if (list->currentItem())
+            service->check_scenario(list->currentItem()->data(Qt::UserRole).toLongLong(), true);
+        check_selected();
+    });
     tools->addWidget(run);
     tools->addWidget(edit);
     tools->addWidget(remove);
+    tools->addWidget(recheck);
     tools->addStretch();
     tools->addWidget(stop);
     root->addLayout(tools);
@@ -1130,6 +1165,7 @@ QWidget *scenarios(const ui_context &context, QWidget *const parent) {
         remove->setEnabled(has);
         empty->setVisible(!has);
         stop->setEnabled(service->is_scenario_active());
+        check_selected();
     };
     auto run_selected = [=] {
         if (list->currentItem())
@@ -1160,6 +1196,7 @@ QWidget *scenarios(const ui_context &context, QWidget *const parent) {
         status->setText(text);
         run->setEnabled(list->count() > 0 && !service->is_scenario_active());
         stop->setEnabled(service->is_scenario_active());
+        check_selected();
     });
     rebuild();
     return widget;
