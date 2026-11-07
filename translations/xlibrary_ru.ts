@@ -2839,5 +2839,49 @@ Technical reason: %3</source>
         <source>Refresh availability</source>
         <translation>Обновить доступность</translation>
     </message>
+    <message>
+        <source>Add an application manually</source>
+        <translation>Добавить приложение вручную</translation>
+    </message>
+    <message>
+        <source>Choose a file and customize its name, tags and launch options.</source>
+        <translation>Выберите файл, задайте название, теги и параметры запуска.</translation>
+    </message>
+    <message>
+        <source>Choose how to start. You can return to this screen in Settings.</source>
+        <translation>Выберите, с чего начать. Этот экран можно снова открыть в настройках.</translation>
+    </message>
+    <message>
+        <source>Find my applications</source>
+        <translation>Найти мои приложения</translation>
+    </message>
+    <message>
+        <source>Open welcome screen</source>
+        <translation>Открыть экран приветствия</translation>
+    </message>
+    <message>
+        <source>Preview and restore a complete .xlprofile backup.</source>
+        <translation>Проверьте и восстановите полную резервную копию .xlprofile.</translation>
+    </message>
+    <message>
+        <source>Restore my library</source>
+        <translation>Восстановить мою библиотеку</translation>
+    </message>
+    <message>
+        <source>Review installed applications and choose what to keep.</source>
+        <translation>Просмотрите установленные приложения и выберите нужные.</translation>
+    </message>
+    <message>
+        <source>Start with an empty library</source>
+        <translation>Начать с пустой библиотеки</translation>
+    </message>
+    <message>
+        <source>Welcome to XLibrary</source>
+        <translation>Добро пожаловать в XLibrary</translation>
+    </message>
+    <message>
+        <source>Your applications. One home.</source>
+        <translation>Все приложения — в одном месте.</translation>
+    </message>
 </context>
 </TS>

@@ -22,6 +22,7 @@
 #include "localization.h"
 #include "MainWindow.h"
 #include "NotificationBanner.h"
+#include "ProfileView.h"
 #include "SettingsView.h"
 #include "UiHelpers.h"
 
@@ -232,6 +233,7 @@ void MainWindow::create_actions() {
     });
     add("add_application", QCoreApplication::translate("XLibrary", "Add application"), "add",
         [this] { open_dialog("application_editor", context); });
+    add("welcome", QCoreApplication::translate("XLibrary", "Open welcome screen"), "app", [this] { show_welcome(); });
     add("edit_application", QCoreApplication::translate("XLibrary", "Edit"), "settings", [this] {
         if (const auto *record = service.selected()) {
             auto edit_context = context;
@@ -456,6 +458,16 @@ void MainWindow::show_overlay() {
 }
 
 void MainWindow::start() {
+    const auto offer_welcome = [this] {
+        if (welcome_offered || !service.is_ready() || service.profile_busy() || service.restart_required() ||
+            QCoreApplication::arguments().contains("--check-startup"))
+            return;
+        welcome_offered = true;
+        if (!service.settings.value("onboarding/completed", false).toBool())
+            show_welcome();
+    };
+    connect(&service, &DesktopService::catalog_changed, this, offer_welcome);
+    QTimer::singleShot(0, this, offer_welcome);
     if (service.safe_mode() && !QCoreApplication::arguments().contains("--check-startup"))
         QTimer::singleShot(0, &service, [this] {
             service.notify(
@@ -480,6 +492,73 @@ void MainWindow::start() {
             tokens->read();
         });
     }
+}
+
+void MainWindow::show_welcome() {
+    if (!service.is_ready() || service.profile_busy() || service.restart_required())
+        return;
+    if (auto *existing = findChild<QDialog *>("welcome", Qt::FindDirectChildrenOnly)) {
+        existing->raise();
+        existing->activateWindow();
+        return;
+    }
+    show_library();
+    auto *dialog = new QDialog(this);
+    dialog->setObjectName("welcome");
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->setWindowTitle(QCoreApplication::translate("XLibrary", "Welcome to XLibrary"));
+    prepare_dialog(dialog, context, {700, 640}, {480, 400});
+    auto *root = new QVBoxLayout(dialog);
+    root->setContentsMargins(28, 28, 28, 28);
+    root->setSpacing(16);
+    auto *logo = new QLabel;
+    const auto logo_size = appearance::scaled(service.settings, 64);
+    logo->setPixmap(appearance::logo().pixmap(logo_size, logo_size));
+    root->addWidget(logo, 0, Qt::AlignHCenter);
+    root->addWidget(label(QCoreApplication::translate("XLibrary", "Your applications. One home."), "heading"));
+    root->addWidget(label(
+        QCoreApplication::translate("XLibrary", "Choose how to start. You can return to this screen in Settings."),
+        "muted"));
+    auto *contents = new QWidget;
+    auto *cards = new QVBoxLayout(contents);
+    cards->setContentsMargins(0, 0, 0, 0);
+    const auto choice = [=, this](const QString &title, const QString &description, const QString &icon,
+                                  const std::function<void()> &callback) {
+        auto *card = new QFrame;
+        card->setProperty("card", true);
+        auto *layout = new QVBoxLayout(card);
+        layout->setContentsMargins(16, 12, 16, 12);
+        auto *control = button(title);
+        control->setIcon(appearance::icon(icon));
+        layout->addWidget(control);
+        layout->addWidget(label(description, "muted"));
+        cards->addWidget(card);
+        connect(control, &QPushButton::clicked, dialog, [=, this] {
+            dialog->accept();
+            QTimer::singleShot(0, this, callback);
+        });
+    };
+    choice(QCoreApplication::translate("XLibrary", "Find my applications"),
+           QCoreApplication::translate("XLibrary", "Review installed applications and choose what to keep."), "search",
+           [this] { service.discover(); });
+    choice(QCoreApplication::translate("XLibrary", "Add an application manually"),
+           QCoreApplication::translate("XLibrary", "Choose a file and customize its name, tags and launch options."),
+           "add", [this] { context.actions.value("add_application")->trigger(); });
+    choice(QCoreApplication::translate("XLibrary", "Restore my library"),
+           QCoreApplication::translate("XLibrary", "Preview and restore a complete .xlprofile backup."), "folder",
+           [this] { select_profile_restore(context, this); });
+    root->addWidget(ui_helpers::scroll(contents), 1);
+    auto *later = button(QCoreApplication::translate("XLibrary", "Start with an empty library"), "quiet");
+    root->addWidget(later);
+    connect(later, &QPushButton::clicked, dialog, &QDialog::reject);
+    connect(dialog, &QDialog::finished, this, [this] {
+        if (!service.profile_busy() && !service.restart_required()) {
+            service.settings.setValue("onboarding/completed", true);
+            service.settings.sync();
+        }
+    });
+    dialog->setWindowModality(Qt::WindowModal);
+    dialog->open();
 }
 
 void MainWindow::closeEvent(QCloseEvent *const event) {

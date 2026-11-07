@@ -31,6 +31,11 @@ DesktopService::DesktopService(QObject *const parent, const QString &profile_pat
                                        : profile_path) +
                    "/settings.ini",
                QSettings::IniFormat) {
+    // Detect existing profiles before the worker opens a new database or the UI writes defaults.
+    if (!settings.contains("onboarding/completed") &&
+        (QFileInfo(settings.fileName()).isFile() || (!database_path.isEmpty() && QFileInfo(database_path).isFile())))
+        settings.setValue("onboarding/completed", true);
+    startup_inventory_pending = settings.value("onboarding/completed", false).toBool();
     updates.set_channel(settings.value("updates/channel", "stable").toString());
     connect(&updates, &UpdateChecker::channel_changed, this,
             [this] { settings.setValue("updates/channel", updates.channel()); });

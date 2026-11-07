@@ -60,6 +60,7 @@ void choices(QWidget *const page, QSettings &settings, const QString &key, const
 QWidget *general(const ui_context &context, QWidget *) {
     auto *widget = page(QCoreApplication::translate("XLibrary", "Application behavior"));
     auto &settings = *context.settings;
+    widget->layout()->addWidget(action_button(context.actions.value("welcome")));
     choices(
         widget, settings, "interface/language", QCoreApplication::translate("XLibrary", "Interface language"),
         {{QCoreApplication::translate("XLibrary", "System language"), "system"}, {"English", "en"}, {"Русский", "ru"}},
