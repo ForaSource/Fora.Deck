@@ -533,6 +533,10 @@ QWidget *library(const ui_context &context, QWidget *const parent) {
     remove->setAccessibleName(
         QCoreApplication::translate("XLibrary", "Remove the selected application from the library"));
     header->addWidget(remove);
+    auto *refresh = action_button(context.actions.value("refresh_availability"), false, "");
+    refresh->setAccessibleName(QCoreApplication::translate("XLibrary", "Refresh availability"));
+    refresh->setFixedWidth(44);
+    header->addWidget(refresh);
     auto *scan = action_button(context.actions.value("discover"), false, "");
     scan->setAccessibleName(QCoreApplication::translate("XLibrary", "Find installed applications"));
     scan->setFixedWidth(44);

@@ -1,12 +1,17 @@
 #include <algorithm>
 #include <cctype>
+#include <QElapsedTimer>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QLoggingCategory>
 #include <QSaveFile>
+#include <QScopeGuard>
 #include <stdexcept>
 
 #include "Manager.h"
+
+Q_LOGGING_CATEGORY(poll_log, "xlibrary.poll", QtWarningMsg)
 
 std::string Manager::to_lower(std::string data) {
     std::ranges::transform(data, data.begin(), [](const unsigned char c) { return std::tolower(c); });
@@ -155,8 +160,19 @@ void Manager::refresh() {
 }
 
 void Manager::poll(const bool force) {
-    QSet<QString> unavailable;
-    QSet<QString> missing_volumes;
+    const bool measured = poll_log().isDebugEnabled();
+    QElapsedTimer elapsed;
+    if (measured)
+        elapsed.start();
+    const auto report = qScopeGuard([&] {
+        if (measured)
+            qCDebug(poll_log).nospace() << "poll records=" << catalog.applications.size()
+                                        << " elapsed_us=" << elapsed.nsecsElapsed() / 1000 << " force=" << force;
+    });
+    const bool check_availability = force || availability_invalidated || !availability_age.isValid() ||
+                                    availability_age.elapsed() >= availability_interval_ms;
+    QSet<QString> unavailable = check_availability ? QSet<QString>{} : last_unavailable;
+    QSet<QString> missing_volumes = check_availability ? QSet<QString>{} : last_missing_volumes;
     const auto previous_roots = known_volume_roots;
     bool locations_changed = false;
     const auto observe_location = [&](const QString &path) {
@@ -176,69 +192,104 @@ void Manager::poll(const bool force) {
     bool capabilities_changed = false;
     auto paths = last_running;
     try {
-        for (auto &record : catalog.applications) {
-            if (const auto error = Application::new_instance_error(record); error != record.new_instance_error) {
-                record.new_instance_error = error;
-                capabilities_changed = true;
-            }
-            record.available = Application::target_available(record);
-            if (Application::file_target(record)) {
-                observe_location(record.path);
-                if (Application::target_kind(record) == "desktop")
-                    observe_location(record.executable_path);
-            } else if (Application::target_kind(record) == "steam") {
-                observe_location(record.installation_directory);
-                for (const auto &source : record.discovery_sources)
-                    observe_location(source);
-                observe_location(record.discovery_source);
-            }
-            record.volume_unavailable = false;
-            if (!Application::file_target(record)) {
-                if (Application::target_kind(record) == "steam" && record.available) {
-                    const QStorageInfo volume(record.installation_directory);
-                    const auto root = QDir::fromNativeSeparators(volume.rootPath());
-                    if (volume.isValid() && !root.isEmpty() && root != "/" && !known_volume_roots.contains(root))
+        if (check_availability) {
+            for (auto &record : catalog.applications) {
+                if (const auto error = Application::new_instance_error(record); error != record.new_instance_error) {
+                    record.new_instance_error = error;
+                    capabilities_changed = true;
+                }
+                record.available = Application::target_available(record);
+                if (Application::file_target(record)) {
+                    observe_location(record.path);
+                    if (Application::target_kind(record) == "desktop")
+                        observe_location(record.executable_path);
+                } else if (Application::target_kind(record) == "steam") {
+                    observe_location(record.installation_directory);
+                    for (const auto &source : record.discovery_sources)
+                        observe_location(source);
+                    observe_location(record.discovery_source);
+                }
+                record.volume_unavailable = false;
+                if (!Application::file_target(record)) {
+                    if (Application::target_kind(record) == "steam" && record.available) {
+                        const QStorageInfo volume(record.installation_directory);
+                        const auto root = QDir::fromNativeSeparators(volume.rootPath());
+                        if (volume.isValid() && !root.isEmpty() && root != "/" && !known_volume_roots.contains(root))
+                            known_volume_roots.append(root);
+                    }
+                    if (!record.available)
+                        unavailable.insert(Application::launch_key(record));
+                    continue;
+                }
+                if (record.available) {
+                    const QStorageInfo volume(record.path);
+                    if (const auto root = QDir::fromNativeSeparators(volume.rootPath());
+                        volume.isValid() && !root.isEmpty() && root != "/" && !known_volume_roots.contains(root))
                         known_volume_roots.append(root);
-                }
-                if (!record.available)
-                    unavailable.insert(Application::launch_key(record));
-                continue;
-            }
-            if (record.available) {
-                const QStorageInfo volume(record.path);
-                if (const auto root = QDir::fromNativeSeparators(volume.rootPath());
-                    volume.isValid() && !root.isEmpty() && root != "/" && !known_volume_roots.contains(root))
-                    known_volume_roots.append(root);
-            } else {
-                auto roots = known_volume_roots;
+                } else {
+                    auto roots = known_volume_roots;
 #ifdef Q_OS_WIN
-                if (const auto path = QDir::fromNativeSeparators(record.path); path.size() >= 3 && path[1] == ':')
-                    roots.append(path.left(3));
-                else if (path.startsWith("//")) {
-                    if (const auto end = path.indexOf('/', path.indexOf('/', 2) + 1); end > 2)
-                        roots.append(path.left(end));
-                }
+                    if (const auto path = QDir::fromNativeSeparators(record.path); path.size() >= 3 && path[1] == ':')
+                        roots.append(path.left(3));
+                    else if (path.startsWith("//")) {
+                        if (const auto end = path.indexOf('/', path.indexOf('/', 2) + 1); end > 2)
+                            roots.append(path.left(end));
+                    }
 #endif
-                for (const auto &root : roots) {
-                    if (const auto prefix = root.endsWith('/') ? root : root + '/';
-                        !record.path.startsWith(prefix, path_case_sensitivity))
-                        continue;
-                    if (const QStorageInfo volume(root); !volume.isValid() || !volume.isReady() ||
-                                                         normalized_path(volume.rootPath()) != normalized_path(root)) {
-                        record.volume_unavailable = true;
-                        missing_volumes.insert(normalized_path(record.path));
-                        break;
+                    for (const auto &root : roots) {
+                        if (const auto prefix = root.endsWith('/') ? root : root + '/';
+                            !record.path.startsWith(prefix, path_case_sensitivity))
+                            continue;
+                        if (const QStorageInfo volume(root);
+                            !volume.isValid() || !volume.isReady() ||
+                            normalized_path(volume.rootPath()) != normalized_path(root)) {
+                            record.volume_unavailable = true;
+                            missing_volumes.insert(normalized_path(record.path));
+                            break;
+                        }
                     }
                 }
+                if (!record.available)
+                    unavailable.insert(normalized_path(record.path));
             }
-            if (!record.available)
-                unavailable.insert(normalized_path(record.path));
+            if (!availability_watcher) {
+                availability_watcher = std::make_unique<QFileSystemWatcher>(this);
+                connect(availability_watcher.get(), &QFileSystemWatcher::directoryChanged, this,
+                        [this] { availability_invalidated = true; });
+            }
+            QSet<QString> watched;
+            const auto watch_parent = [&](const QString &path) {
+                if (watched.size() < availability_watch_limit && QFileInfo(path).isAbsolute()) {
+                    const auto parent = QFileInfo(path).absolutePath();
+                    if (QDir(parent).exists())
+                        watched.insert(parent);
+                }
+            };
+            // Parent directories observe deletion/recreation; mount parents observe many removable-volume events.
+            for (const auto &root : known_volume_roots)
+                watch_parent(root);
+            for (const auto &record : catalog.applications) {
+                watch_parent(Application::file_target(record) ? record.path : record.installation_directory);
+                if (watched.size() >= availability_watch_limit)
+                    break;
+            }
+            const auto previous = availability_watcher->directories();
+            const QSet<QString> old(previous.cbegin(), previous.cend());
+            const auto removed = (old - watched).values();
+            const auto added = (watched - old).values();
+            if (!removed.isEmpty())
+                availability_watcher->removePaths(removed);
+            if (!added.isEmpty())
+                availability_watcher->addPaths(added);
+            availability_invalidated = false;
+            availability_age.restart();
         }
         paths = Heartbeat::running_paths(catalog.applications);
         if (monitor_state == operation_state::error)
             emit result({monitor_request_id, "monitor", operation_state::ready, {}});
         monitor_state = operation_state::ready;
     } catch (const std::exception &error) {
+        availability_invalidated = true;
         if (monitor_state != operation_state::error) {
             monitor_request_id = ++*request_sequence;
             emit result({monitor_request_id, "monitor", operation_state::error,

@@ -38,27 +38,25 @@ int LibraryModel::columnCount(const QModelIndex &parent) const {
     return parent.isValid() ? 0 : 3;
 }
 
-QIcon LibraryModel::fallback_icon(const app_record &record) const {
-    const auto kind = Application::target_kind(record);
-    const auto key = "kind:" + kind;
-    if (const auto *icon = icons.object(key))
-        return *icon;
+QIcon LibraryModel::fallback_icon(const QString &kind) const {
+    const auto cached = fallback_icons.constFind(kind);
+    if (cached != fallback_icons.cend())
+        return *cached;
     const auto icon = kind == "steam"        ? QIcon::fromTheme("steam", appearance::icon("library"))
                       : kind == "system_uri" ? QIcon::fromTheme("preferences-system", appearance::icon("settings"))
-                      : kind == "aumid" || Application::file_target(record) ? appearance::icon("app")
-                                                                            : appearance::icon("external");
-    icons.insert(key, new QIcon(icon));
+                      : kind == "aumid" || kind == "executable" || kind == "desktop" ? appearance::icon("app")
+                                                                                     : appearance::icon("external");
+    fallback_icons.insert(kind, icon);
     return icon;
 }
 
-void LibraryModel::request_icon(const app_record &record) const {
-    const auto key = icon_cache_key(record);
+void LibraryModel::request_icon(const app_record &record, const QString &key, const QString &kind) const {
     if (key.startsWith("kind:") || pending_icons.contains(key) || pending_icons.size() >= 32) {
         return;
     }
     const auto image_file = key.startsWith("image:");
-    const auto path = image_file ? record.icon_path : Application::process_path(record);
-    const auto fallback = fallback_icon(record);
+    const auto path = image_file ? record.icon_path : key.mid(5);
+    const auto fallback = fallback_icon(kind);
     pending_icons.insert(key);
     auto *self = const_cast<LibraryModel *>(this);
 #ifdef Q_OS_LINUX
@@ -69,7 +67,7 @@ void LibraryModel::request_icon(const app_record &record) const {
             self->pending_icons.remove(key);
             self->icons.insert(key, new QIcon(image.isNull() ? fallback : QIcon(QPixmap::fromImage(image))));
             for (int row = 0; row < self->records.size(); ++row) {
-                if (icon_cache_key(self->records[row]) == key)
+                if (self->icon_keys[row] == key)
                     emit self->dataChanged(self->index(row, 0), self->index(row, 0), {Qt::DecorationRole});
             }
         });
@@ -83,7 +81,7 @@ void LibraryModel::request_icon(const app_record &record) const {
         self->icons.insert(key, new QIcon(image.isNull() ? fallback : QIcon(QPixmap::fromImage(image))));
         watcher->deleteLater();
         for (int row = 0; row < self->records.size(); ++row) {
-            if (icon_cache_key(self->records[row]) == key) {
+            if (self->icon_keys[row] == key) {
                 emit self->dataChanged(self->index(row, 0), self->index(row, 0), {Qt::DecorationRole});
             }
         }
@@ -112,10 +110,10 @@ QVariant LibraryModel::data(const QModelIndex &index, const int requested_role) 
         return record.name + '\n' + QDir::toNativeSeparators(Application::application_path(record));
     case Qt::DecorationRole:
         if (index.column() == 0) {
-            if (const auto *icon = icons.object(icon_cache_key(record)))
+            if (const auto *icon = icons.object(icon_keys[index.row()]))
                 return *icon;
-            request_icon(record);
-            return fallback_icon(record);
+            request_icon(record, icon_keys[index.row()], icon_kinds[index.row()]);
+            return fallback_icon(icon_kinds[index.row()]);
         }
         return {};
     case id_role:
@@ -152,16 +150,27 @@ QVariant LibraryModel::headerData(const int section, const Qt::Orientation orien
 void LibraryModel::replace(QVector<app_record> applications) {
     beginResetModel();
     records = std::move(applications);
+    rows_by_id.clear();
+    rows_by_id.reserve(records.size());
+    for (int row = 0; row < records.size(); ++row)
+        rows_by_id.insert(records[row].id, row);
     searchable_records.clear();
+    icon_keys.clear();
+    icon_kinds.clear();
     search_tags.clear();
     name_sort_keys.clear();
     tag_sort_keys.clear();
     searchable_records.reserve(records.size());
+    icon_keys.reserve(records.size());
+    icon_kinds.reserve(records.size());
     search_tags.reserve(records.size());
     name_sort_keys.reserve(records.size());
     tag_sort_keys.reserve(records.size());
     const QCollator collator;
     for (const auto &record : records) {
+        icon_keys.append(icon_cache_key(record));
+        icon_kinds.append(Application::target_kind(record));
+        (void)fallback_icon(icon_kinds.back());
         const auto local_path = Application::process_path(record);
         const auto file_name = local_path.isEmpty() ? record.path : QFileInfo(local_path).fileName();
         searchable_records.append(SearchQuery::prepare(record.name, file_name, record.tags, record.aliases));
@@ -219,11 +228,8 @@ void LibraryModel::update_state(const QVector<app_record> &applications) {
 }
 
 const app_record *LibraryModel::find(const qint64 id) const {
-    for (const auto &record : records) {
-        if (record.id == id)
-            return &record;
-    }
-    return nullptr;
+    const auto row = row_for_id(id);
+    return row < 0 ? nullptr : &records[row];
 }
 
 LibraryFilter::LibraryFilter(QObject *const parent) : QSortFilterProxyModel(parent) {

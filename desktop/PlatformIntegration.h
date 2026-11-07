@@ -55,6 +55,7 @@ public:
 
 signals:
     void activated();
+    void registration_failed(const QString &message);
 };
 
 #endif

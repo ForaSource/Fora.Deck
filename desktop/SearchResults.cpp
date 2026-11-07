@@ -75,20 +75,19 @@ public:
             appearance::paint_selection(*painter, area, option.palette, 12);
         const auto icon_size = appearance::scaled(service.settings, 24);
         const QRect icon_rect(area.left() + 14, area.center().y() - icon_size / 2, icon_size, icon_size);
-        auto icon = entry.type == search_entry::kind::application   ? app_icon
-                    : entry.type == search_entry::kind::directory   ? folder_icon
+        auto icon = entry.type == search_entry::kind::application ? app_icon
+                    : (entry.type == search_entry::kind::directory || entry.type == search_entry::kind::open_folder)
+                        ? folder_icon
                     : entry.type == search_entry::kind::calculation ? copy_icon
                                                                     : file_icon;
         if (entry.type == search_entry::kind::application) {
             // Reuse the model's asynchronous icon cache; painting never touches the disk.
-            for (int row = 0; row < service.model.rowCount(); ++row)
-                if (service.model.at(row).id == entry.application_id) {
-                    const auto cached =
-                        service.model.data(service.model.index(row, 0), Qt::DecorationRole).value<QIcon>();
-                    if (!cached.isNull())
-                        icon = cached;
-                    break;
-                }
+            const auto row = service.model.row_for_id(entry.application_id);
+            if (row >= 0) {
+                const auto cached = service.model.data(service.model.index(row, 0), Qt::DecorationRole).value<QIcon>();
+                if (!cached.isNull())
+                    icon = cached;
+            }
         }
         if (entry.type != search_entry::kind::message)
             icon.paint(painter, icon_rect);
@@ -102,41 +101,6 @@ public:
     }
 };
 
-QVector<search_entry> directory_entries(const QString &request, const std::shared_ptr<std::atomic<quint64>> &generation,
-                                        const quint64 expected) {
-    if (generation->load() != expected)
-        return {};
-    auto path = request;
-#ifdef Q_OS_WIN
-    if (path.size() == 2 && path[1] == ':')
-        path += '/';
-#endif
-    QFileInfo target(path);
-    QString prefix;
-    if (!target.isDir()) {
-        if (path.endsWith('/'))
-            return {
-                {search_entry::kind::message, QCoreApplication::translate("XLibrary", "Folder unavailable"), {}, 0}};
-        prefix = target.fileName();
-        path = target.absolutePath();
-    }
-    const QDir directory(path);
-    if (!directory.exists() || !QFileInfo(path).isReadable())
-        return {{search_entry::kind::message, QCoreApplication::translate("XLibrary", "Folder unavailable"), {}, 0}};
-    const auto files = directory.entryInfoList(QDir::AllEntries | QDir::Hidden | QDir::System | QDir::NoDotAndDotDot,
-                                               QDir::DirsFirst | QDir::Name | QDir::IgnoreCase);
-    QVector<search_entry> entries;
-    entries.reserve(files.size());
-    for (const auto &file : files) {
-        if (generation->load() != expected)
-            return {};
-        if (!file.fileName().startsWith(prefix, Qt::CaseInsensitive))
-            continue;
-        entries.append({file.isDir() ? search_entry::kind::directory : search_entry::kind::file, file.fileName(),
-                        file.absoluteFilePath(), 0});
-    }
-    return entries;
-}
 }
 
 SearchResults::SearchResults(DesktopService &service, QLineEdit &input, const bool compact, QWidget *const parent)
@@ -304,7 +268,8 @@ void SearchResults::read_path() {
     pending_path.clear();
     active_generation = generation->load();
     // Only one disk request is active per field; newer input replaces the pending request.
-    path_watcher.setFuture(QtConcurrent::run(directory_entries, active_path, generation, active_generation));
+    path_watcher.setFuture(
+        QtConcurrent::run(search_results::directory_entries, active_path, generation, active_generation));
 }
 
 void SearchResults::activate_current() {
@@ -314,7 +279,12 @@ void SearchResults::activate_current() {
     if (row < 0 || row >= results->entries.size())
         return;
     const auto entry = results->entries[row];
-    if (entry.type == search_entry::kind::directory) {
+    if (entry.type == search_entry::kind::open_folder) {
+        if (desktop_platform::open_url(QUrl::fromLocalFile(entry.path)))
+            emit application_activated();
+        else
+            service.notify(QCoreApplication::translate("XLibrary", "Could not open the folder."));
+    } else if (entry.type == search_entry::kind::directory) {
         input.setText(QDir::toNativeSeparators(entry.path + '/'));
         input.setFocus();
     } else if (entry.type == search_entry::kind::application) {

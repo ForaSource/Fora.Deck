@@ -16,15 +16,19 @@ class LibraryModel : public QAbstractTableModel {
     Q_OBJECT
 private:
     QVector<app_record> records;
+    QHash<qint64, int> rows_by_id;
     QVector<SearchQuery::SearchableData> searchable_records;
+    QVector<QString> icon_keys;
+    QVector<QString> icon_kinds;
+    mutable QHash<QString, QIcon> fallback_icons;
     QStringList search_tags;
     QVector<QCollatorSortKey> name_sort_keys;
     QVector<QCollatorSortKey> tag_sort_keys;
     mutable QCache<QString, QIcon> icons{256};
     mutable QSet<QString> pending_icons;
     QThreadPool icon_pool;
-    QIcon fallback_icon(const app_record &record) const;
-    void request_icon(const app_record &record) const;
+    QIcon fallback_icon(const QString &kind) const;
+    void request_icon(const app_record &record, const QString &key, const QString &kind) const;
 
 public:
     enum role { id_role = Qt::UserRole + 1, record_role, tags_role, running_role, favorite_role, available_role };
@@ -37,6 +41,7 @@ public:
     QHash<int, QByteArray> roleNames() const override;
     void replace(QVector<app_record> applications);
     void update_state(const QVector<app_record> &applications);
+    int row_for_id(qint64 id) const { return rows_by_id.value(id, -1); }
     const app_record *find(qint64 id) const;
     const app_record &at(const int row) const { return records[row]; }
     const SearchQuery::SearchableData &search_data(const int row) const { return searchable_records[row]; }

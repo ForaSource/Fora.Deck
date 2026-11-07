@@ -86,6 +86,7 @@ QWidget *shell(const ui_context &context, QWidget *const parent) {
     QObject::connect(&service->updates, &UpdateChecker::check_cancelled, update_notice, [=] {
         update_notice->show_message(QCoreApplication::translate("XLibrary", "Update cancelled."));
     });
+    QObject::connect(&service->updates, &UpdateChecker::channel_changed, update_notice, &QWidget::hide);
     update_notice->activated = [=] { context.actions.value("update_settings")->trigger(); };
     auto *splitter =
         new LibrarySplitter(*context.settings, navigation, center, context.registry->create("details", context, widget),
@@ -151,6 +152,8 @@ MainWindow::MainWindow(DesktopService &service)
         if (reason == QSystemTrayIcon::Trigger || reason == QSystemTrayIcon::DoubleClick)
             show_library();
     });
+    connect(&hotkey, &GlobalHotkey::registration_failed, &service, &DesktopService::notify);
+    connect(&overlay_hotkey, &GlobalHotkey::registration_failed, &service, &DesktopService::notify);
     connect(&hotkey, &GlobalHotkey::activated, this, &MainWindow::show_library);
     connect(&overlay_hotkey, &GlobalHotkey::activated, overlay.get(), &SearchOverlay::toggle);
     connect(overlay.get(), &SearchOverlay::open_library, this, [this](const QString &query) {
@@ -276,6 +279,8 @@ void MainWindow::create_actions() {
     connect(&service, &DesktopService::selections_changed, this, &MainWindow::refresh_actions);
     for (const auto &id : {"launch", "new_instance", "open_folder", "copy_path", "remove_application"})
         context.actions.value(id)->setAutoRepeat(false);
+    add("refresh_availability", QCoreApplication::translate("XLibrary", "Refresh availability"), "refresh",
+        [this] { service.refresh_availability(); });
     add("discover", QCoreApplication::translate("XLibrary", "Find installed applications"), "refresh", [this] {
         if (service.is_discovering())
             service.cancel_discovery();
@@ -319,6 +324,7 @@ void MainWindow::refresh_actions() {
             : QCoreApplication::translate(
                   "XLibrary", "Runs the launch command directly. The application may reuse an existing window."));
     context.actions.value("add_application")->setEnabled(profile_available && service.is_ready());
+    context.actions.value("refresh_availability")->setEnabled(profile_available && service.is_ready());
     context.actions.value("bulk_edit")
         ->setEnabled(profile_available && service.is_ready() && !service.selections().isEmpty());
     context.actions.value("undo_removal")
@@ -380,33 +386,50 @@ void MainWindow::load_plugins() {
     }
     const QDir directory(QApplication::applicationDirPath() + "/plugins");
     QStringList available;
+    QVariantMap errors;
     const auto enabled = service.settings.value("plugins/enabled").toStringList();
+    const auto report_error = [this, &errors](const QString &id, const QString &error) {
+        errors.insert(id, error);
+        if (service.settings.value("plugins/enabled").toStringList().contains(id))
+            QTimer::singleShot(0, &service, [this, id, error] {
+                service.notify(QCoreApplication::translate("XLibrary", "Could not load ") + id + ": " + error);
+            });
+    };
     for (const auto &file : directory.entryInfoList(QDir::Files | QDir::NoSymLinks, QDir::Name)) {
         if (!QLibrary::isLibrary(file.fileName()))
             continue;
-        auto loader = std::make_unique<QPluginLoader>(file.absoluteFilePath());
-        if (loader->metaData().value("IID").toString() != XLIBRARY_UI_PLUGIN_IID)
-            continue;
         const auto id = file.fileName();
         available.append(id);
-        if (!enabled.contains(id))
-            continue;
-        loader->setLoadHints(QLibrary::PreventUnloadHint);
-        auto *plugin = qobject_cast<UiPlugin *>(loader->instance());
-        if (!plugin) {
-            QTimer::singleShot(0, &service, [this, id, error = loader->errorString()] {
-                service.notify(QCoreApplication::translate("XLibrary", "Could not load ") + id + ": " + error);
-            });
-            continue;
-        }
         try {
-            plugin->configure(registry);
+            auto loader = std::make_unique<QPluginLoader>(file.absoluteFilePath());
+            const auto compatibility_error = UiRegistry::plugin_compatibility_error(loader->metaData());
+            if (!compatibility_error.isEmpty()) {
+                report_error(id, compatibility_error);
+                continue;
+            }
+            if (!enabled.contains(id))
+                continue;
+            // Registry callbacks may outlive a failed transaction or the loader itself.
+            loader->setLoadHints(QLibrary::PreventUnloadHint);
+            auto *plugin = qobject_cast<UiPlugin *>(loader->instance());
+            if (!plugin) {
+                report_error(id, loader->errorString());
+                continue;
+            }
+            // Allocate loader ownership before publishing registry callbacks.
             plugins.push_back(std::move(loader));
+            const auto error =
+                registry.configure_transaction([plugin](UiRegistry &candidate) { plugin->configure(candidate); });
+            if (!error.isEmpty())
+                report_error(id, error);
         } catch (const std::exception &error) {
-            throw std::runtime_error("UI plugin " + id.toStdString() + ": " + error.what());
+            report_error(id, QString::fromUtf8(error.what()));
+        } catch (...) {
+            report_error(id, QCoreApplication::translate("XLibrary", "Unknown C++ exception while loading plugin."));
         }
     }
     context.parameters.insert("available_plugins", available);
+    context.parameters.insert("plugin_errors", errors);
 }
 
 void MainWindow::update_layout() {

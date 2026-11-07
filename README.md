@@ -179,6 +179,26 @@ the faulty module in **Settings → Plugins**, save, and restart. The profile pa
 and settings locations, schema/product versions, portable/installed mode, and the last error.
 Its diagnostic export excludes catalog contents, arguments, settings values, tokens, and raw errors.
 
+Native UI modules in `plugins/` beside the executable require explicit opt-in in **Settings → Plugins**.
+Before instantiation, XLibrary checks Qt's embedded metadata: the interface IID must be
+`org.xlibrary.desktop.UiPlugin/1.0`, the Qt major version must match, and the module must not
+require a newer Qt minor version. Existing IID 1.0 modules without custom metadata remain
+supported under this explicit compatibility policy; Qt's standard IID/version metadata is required.
+Build modules against the matching XLibrary headers, architecture, compiler and runtime ABI;
+metadata checks cannot prove binary compatibility. Qt also applies its own platform/build checks.
+Incompatible modules and load/configuration failures are shown with a reason in settings.
+A C++ exception during configuration discards that module's registry changes and allows startup
+to continue. `configure()` receives the live registry at its stable address, preserving existing
+IID 1.0 callbacks that retain a reference to it. Failed configuration restores the registry's
+previous factories and styles. Rollback cannot undo a module's other side effects. Safe mode also lists saved enabled
+modules so a faulty module can be disabled without loading it.
+
+These are trusted native modules running inside XLibrary, with the application's access to the
+profile and system. There is no sandbox: a segfault, undefined behavior, a crash in a module's
+callback, or other native code failure can still terminate or corrupt the process. Enable only
+modules from trusted sources and keep profile backups. Loaded libraries stay mapped while their
+callbacks can exist; changes to enabled modules take effect after restarting XLibrary.
+
 For a missing application, use **Locate application…** in its details. **Settings → Profile →
 Recover moved folder…** previews replacements for a moved directory before applying selected
 valid entries together. Card IDs, tags, favorites, history, arguments, and scenario references
@@ -215,11 +235,16 @@ Check results are cached locally for **60 seconds without a token** or **5 secon
 a token**, measured from completion. Repeated clicks return the cached result without
 new GitHub requests. Errors and cancellations use the same interval. The cache stays in
 memory for the application session, including when Settings is closed and reopened.
-Unauthenticated checks and each personal token have separate cache entries; tokens
+Each update channel, unauthenticated checks and each personal token have separate cache entries; tokens
 themselves are not stored in the cache. Reading a cached result does not extend its lifetime.
 
-Checks run at startup and on request and include published pre-releases. Versions are compared using
-Semantic Versioning; drafts and tags without a supported version are ignored.
+**Settings → Update → Update channel** defaults to **Stable**, which considers only
+published releases whose GitHub `prerelease` flag is false. **Preview** also considers
+pre-releases. Versions use Semantic Versioning, so `1.0.0` is newer than `1.0.0-rc.1`;
+downgrades are never offered. Drafts and unsupported version tags are ignored.
+Changing channels cancels the current check/download and clears its available installer;
+a new check uses that channel's separate cache. Existing profiles default to Stable
+without a database migration. Updates still require confirmation.
 
 On Windows x64, an installer-managed copy can download the matching MinGW or MSVC installer
 after confirmation. XLibrary verifies its size and GitHub-provided SHA-256 before starting
@@ -288,16 +313,35 @@ For the selected application:
 Change or clear these bindings in Settings → Keyboard shortcuts. Switch between the **Global shortcuts**, **Navigation**, and **Application actions** tabs at the top. Both main and numeric keypad Enter are supported. Text editing keys keep their usual behavior in text fields. Use ↑/↓ in search to select an application; Escape clears the search and cannot be reassigned. Duplicate shortcuts are rejected when saving settings, and the tab containing the conflicting field opens automatically.
 
 Application and scenario editors also accept a global hotkey. The **Applications** and **Scenarios**
-keyboard settings tabs list these assignments. Conflicts and OS registration failures preserve the
-previous binding. Deleting a target removes its binding; full profile backups retain assignments.
-On Wayland, use compositor shortcuts for `XLibrary --launch-id ID` or `XLibrary --scenario-id ID`;
-the editor shows the persistent ID command. XLibrary does not intercept unsupported Wayland keys.
+keyboard settings tabs list these assignments. Conflicts and synchronous OS registration failures
+preserve the previous binding. Portal registration completes asynchronously; a refused binding
+stays saved for retry but is inactive. Deleting a target removes its binding; full profile backups retain assignments.
+On Wayland, configured bindings request permission through the GlobalShortcuts portal (interface
+version 1 or later). The portal may offer a different binding; user approval and a successful
+BindShortcuts response are required. Each binding has its own session, closed when cleared,
+replaced, deleted or on exit. A failure banner reports unsupported services, denial and lost sessions.
+For system shortcuts use `XLibrary --launch-id ID` or `XLibrary --scenario-id ID`;
+the editor shows the persistent ID command. No Wayland key interception is used.
 
-Quick search uses normal window-manager activation on Linux. For Plasma/Wayland, assign
-`XLibrary --overlay` directly in System Settings → Keyboard → Shortcuts so the compositor can
-authorize activation. Existing-instance commands forward an available XDG activation token.
+Quick search uses normal window-manager activation on Linux. Wayland defaults remain unassigned;
+configure a binding in XLibrary to request portal permission, or create a system shortcut whose
+command is `XLibrary --overlay` (use the full executable path if it is not on PATH):
+
+- **KDE Plasma:** System Settings → Keyboard → Shortcuts → Add New → Command or Script.
+- **GNOME:** Settings → Keyboard → View and Customize Shortcuts → Custom Shortcuts → Add.
+- **Xfce/X11:** Settings → Keyboard → Application Shortcuts → Add.
+
+Choose an unused key combination. `XLibrary` opens the library; both commands address the running
+instance. System shortcut labels vary between desktop versions. Portal availability depends on
+the installed desktop backend, not just the presence of xdg-desktop-portal.
+Existing-instance commands and portal activations forward an available XDG activation token to
+Qt's Wayland activation request; Qt 6.5–6.8 consumes it through the supported environment handoff
+and `QWindow::requestActivate()`. A token is single-use and is cleared after the request.
 Focus and fullscreen stacking remain subject to compositor policy. A banner explains refused
-Wayland activation; XLibrary does not repeatedly force focus or permanently pin the overlay above windows.
+Wayland activation and disappears if focus arrives later. XLibrary does not repeatedly force focus
+or permanently pin the overlay above windows. X11 continues to use its existing native hotkeys.
+KDE Wayland, GNOME Wayland, Xfce/X11, foreground browser/editor/Steam and multi-monitor behavior
+require manual verification on those desktops; they are **not tested** in the headless build environment.
 
 ## Development
 
@@ -320,3 +364,20 @@ If you would like to follow the project, star the repository or watch it for upd
 ## License
 
 XLibrary is released under the [MIT License](LICENSE).
+
+
+## v0.7.0 reliability notes
+
+Path searches retain at most 50 matches and inspect at most 20,000 directory entries
+per request. A final **Results limited. Open folder** action means the listing is
+incomplete, including when no prefix match was found in the scanned portion.
+Directories sort before files; complete path identities and cancellation are retained.
+
+Process state is polled every 2.5 seconds. Measured filesystem and volume work is
+refreshed every 10 seconds, immediately via **Refresh availability** above the library, and on observed parent
+directory changes. Watching is capped at 128 directories; unobserved paths and volume
+events are covered by the periodic refresh. A missing external drive never deletes cards.
+Opt-in local timing uses `QT_LOGGING_RULES=xlibrary.poll.debug=true`; nothing is sent online.
+
+See [release notes](docs/releases/v0.7.0.md) and the
+[validation record](docs/releases/v0.7.0-validation.md) for platform checks and limitations.

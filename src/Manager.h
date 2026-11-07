@@ -2,7 +2,9 @@
 #define XLIBRARY_MANAGER_H
 
 #include <QDir>
+#include <QElapsedTimer>
 #include <QFileInfo>
+#include <QFileSystemWatcher>
 #include <QObject>
 #include <QStorageInfo>
 #include <QTimer>
@@ -20,6 +22,12 @@
 class Manager : public QObject {
     Q_OBJECT
     QString database_path;
+    QElapsedTimer availability_age;
+    std::unique_ptr<QFileSystemWatcher> availability_watcher;
+    bool availability_invalidated = true;
+    // Measured filesystem/volume work dominates large catalogs; process polling stays at 2500 ms.
+    static constexpr qint64 availability_interval_ms = 10000;
+    static constexpr qsizetype availability_watch_limit = 128;
     std::shared_ptr<std::atomic<quint64>> request_sequence = std::make_shared<std::atomic<quint64>>(0);
 
 public:

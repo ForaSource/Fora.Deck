@@ -162,9 +162,11 @@ QWidget *hotkeys(const ui_context &context, QWidget *) {
 #ifdef Q_OS_LINUX
         if (pages->count() == 0)
             layout->addWidget(label(
-                QCoreApplication::translate("XLibrary",
-                                            "On Wayland, assign a desktop shortcut to the XLibrary command. It opens "
-                                            "the running library. The built-in global shortcut is available on X11."),
+                QCoreApplication::translate(
+                    "XLibrary", "Wayland shortcuts request permission through the GlobalShortcuts portal when "
+                                "supported. If refused or unavailable, bind XLibrary --overlay in system "
+                                "keyboard settings: KDE: Keyboard → Shortcuts; GNOME: Keyboard → Custom "
+                                "Shortcuts; Xfce: Keyboard → Application Shortcuts. Use XLibrary for the library."),
                 "muted"));
 #endif
         layout->addStretch();
@@ -360,11 +362,20 @@ QWidget *plugins(const ui_context &context, QWidget *) {
             if (!available.contains(id))
                 available.append(id);
     }
+    const auto errors = context.parameters.value("plugin_errors").toMap();
     for (const auto &id : available) {
         auto *control = new QCheckBox(id);
         control->setProperty("plugin_id", id);
         control->setChecked(enabled.contains(id));
         widget->layout()->addWidget(control);
+        const auto error = errors.value(id).toString();
+        if (!error.isEmpty()) {
+            control->setToolTip(error);
+            // Keep an enabled failed module selectable so it can be disabled.
+            if (!control->isChecked())
+                control->setEnabled(false);
+            widget->layout()->addWidget(label(error, "muted"));
+        }
     }
     if (available.isEmpty() && !service->safe_mode())
         widget->layout()->addWidget(
@@ -438,6 +449,16 @@ QWidget *update_page(const ui_context &context, QWidget *) {
         if (*request_started)
             updates->cancel();
     });
+    auto *channel = new QComboBox;
+    channel->addItem(QCoreApplication::translate("XLibrary", "Stable"), "stable");
+    channel->addItem(QCoreApplication::translate("XLibrary", "Preview"), "preview");
+    channel->setCurrentIndex(channel->findData(updates->channel()));
+    field(card_layout, QCoreApplication::translate("XLibrary", "Update channel"), channel);
+    card_layout->addWidget(
+        label(QCoreApplication::translate(
+                  "XLibrary", "Stable includes published stable releases. Preview also includes pre-releases. "
+                              "Changing the channel takes effect immediately and cancels any current update request."),
+              "muted"));
     auto *tokens = new GithubTokenStore(*context.settings, context.service);
     // libsecret completes requests asynchronously; closing the window must not destroy an active job.
     QObject::connect(widget, &QObject::destroyed, tokens, [tokens] {
@@ -482,7 +503,7 @@ QWidget *update_page(const ui_context &context, QWidget *) {
     auto *check_update = button(QCoreApplication::translate("XLibrary", "Check for updates"));
     auto *update_status =
         label(QCoreApplication::translate(
-                  "XLibrary", "Checks GitHub Releases at startup and on request, including pre-releases. "
+                  "XLibrary", "Checks GitHub Releases at startup and on request for the selected channel. "
                               "Results are cached for 60 seconds without a token or 5 seconds with a token."),
               "muted");
     auto *update_progress = new QProgressBar;
@@ -501,6 +522,15 @@ QWidget *update_page(const ui_context &context, QWidget *) {
     card_layout->addWidget(cancel_update);
     card_layout->addWidget(install_update);
     card_layout->addWidget(release_button);
+    QObject::connect(channel, &QComboBox::currentIndexChanged, widget,
+                     [=] { updates->set_channel(channel->currentData().toString()); });
+    QObject::connect(updates, &UpdateChecker::channel_changed, widget, [=] {
+        channel->setCurrentIndex(channel->findData(updates->channel()));
+        release_button->hide();
+        install_update->hide();
+        update_progress->hide();
+        update_status->setText(QCoreApplication::translate("XLibrary", "Channel changed. Check for updates."));
+    });
     auto open_release = [=] {
         if (!desktop_platform::open_url(updates->available_release_url()))
             update_status->setText(QCoreApplication::translate("XLibrary", "Could not open the release in a browser."));
@@ -509,6 +539,7 @@ QWidget *update_page(const ui_context &context, QWidget *) {
     auto refresh_token_controls = [=] {
         const bool idle =
             !updates->is_busy() && !tokens->is_busy() && !service->profile_busy() && !service->restart_required();
+        channel->setEnabled(!service->profile_busy() && !service->restart_required() && !tokens->is_busy());
         token->setEnabled(idle);
         save_token->setEnabled(idle && !token->text().isEmpty() && token->hasAcceptableInput());
         remove_token->setEnabled(idle && tokens->has_token());
@@ -596,8 +627,8 @@ QWidget *update_page(const ui_context &context, QWidget *) {
         install_update->setText(
             QCoreApplication::translate("XLibrary", updates->can_install() ? "Update now" : "Open release"));
         install_update->show();
-        update_status->setText(
-            QCoreApplication::translate("XLibrary", "New version available: %1").arg(updates->available_version()));
+        update_status->setText(QCoreApplication::translate("XLibrary", "New version available: %1 (%2 channel)")
+                                   .arg(updates->available_version(), channel->currentText()));
     };
     QObject::connect(updates, &UpdateChecker::update_available, widget, show_available_update);
     if (!updates->available_version().isEmpty())

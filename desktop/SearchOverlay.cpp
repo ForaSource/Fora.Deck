@@ -67,8 +67,10 @@ SearchOverlay::SearchOverlay(DesktopService &service, QWidget *const parent)
     layout->addWidget(notice);
     contents->installEventFilter(this);
     connect(&service, &DesktopService::message, notice, [this](const QString &message) {
-        if (isVisible())
+        if (isVisible()) {
+            activation_notice = false;
             notice->show_message(message);
+        }
     });
     connect(open_button, &QToolButton::clicked, this, [this] {
         const auto query = input->text();
@@ -95,11 +97,13 @@ SearchOverlay::SearchOverlay(DesktopService &service, QWidget *const parent)
     activation_check->setSingleShot(true);
     activation_check->setInterval(700);
     connect(activation_check, &QTimer::timeout, this, [this] {
-        if (isVisible() && !isActiveWindow() && QGuiApplication::platformName().startsWith("wayland"))
+        if (isVisible() && !isActiveWindow() && QGuiApplication::platformName().startsWith("wayland")) {
+            activation_notice = true;
             notice->show_message(QCoreApplication::translate(
                 "XLibrary",
                 "Wayland did not activate quick search. Click the search field or assign XLibrary --overlay "
                 "in the system keyboard settings."));
+        }
     });
     height_animation->setDuration(140);
     height_animation->setEasingCurve(QEasingCurve::OutCubic);
@@ -253,6 +257,10 @@ bool SearchOverlay::event(QEvent *const event) {
     if (event->type() == QEvent::WindowActivate) {
         dismiss_on_deactivate = true;
         activation_check->stop();
+        if (activation_notice) {
+            activation_notice = false;
+            notice->dismiss();
+        }
     } else if (event->type() == QEvent::WindowDeactivate && isVisible() && dismiss_on_deactivate) {
         const auto *popup = QApplication::activePopupWidget();
         const auto *modal = QApplication::activeModalWidget();
@@ -277,5 +285,6 @@ void SearchOverlay::hideEvent(QHideEvent *const event) {
     progress = 1;
     update_surface();
     notice->dismiss();
+    activation_notice = false;
     QWidget::hideEvent(event);
 }

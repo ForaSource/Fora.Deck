@@ -36,9 +36,15 @@ constexpr int x11_success = Success;
 #include <memory>
 #include <mutex>
 #include <QApplication>
+#include <QDBusArgument>
 #include <QDBusConnection>
 #include <QDBusConnectionInterface>
 #include <QDBusMessage>
+#include <QDBusMetaType>
+#include <QDBusPendingCallWatcher>
+#include <QDBusPendingReply>
+#include <QDBusServiceWatcher>
+#include <QDBusVariant>
 #include <QDirIterator>
 #include <QFileIconProvider>
 #include <QFileInfo>
@@ -53,7 +59,9 @@ constexpr int x11_success = Success;
 #include <QStandardPaths>
 #include <QStyle>
 #include <QtGui/qguiapplication_platform.h>
+#include <QTimer>
 #include <QUrl>
+#include <QUuid>
 #include <QWidget>
 #include <QWindow>
 #include <stdexcept>
@@ -143,8 +151,212 @@ KeySym hotkey_symbol(const Qt::Key key) {
 #endif
 }
 
-class LinuxHotkeyState {
+struct PortalShortcut {
+    QString id;
+    QVariantMap properties;
+};
+using PortalShortcuts = QList<PortalShortcut>;
+Q_DECLARE_METATYPE(PortalShortcut)
+Q_DECLARE_METATYPE(PortalShortcuts)
+
+QDBusArgument &operator<<(QDBusArgument &argument, const PortalShortcut &shortcut) {
+    argument.beginStructure();
+    argument << shortcut.id << shortcut.properties;
+    argument.endStructure();
+    return argument;
+}
+const QDBusArgument &operator>>(const QDBusArgument &argument, PortalShortcut &shortcut) {
+    argument.beginStructure();
+    argument >> shortcut.id >> shortcut.properties;
+    argument.endStructure();
+    return argument;
+}
+
+class LinuxHotkeyState : public QObject {
+    Q_OBJECT
+    GlobalHotkey *owner;
+    QDBusConnection bus = QDBusConnection::sessionBus();
+    QString session_path;
+    QString request_path;
+    QString action_id;
+    QString trigger;
+    bool binding = false;
+    bool bound = false;
+    bool failed = false;
+    QTimer timeout;
+    static constexpr auto service = "org.freedesktop.portal.Desktop";
+    static constexpr auto portal_path = "/org/freedesktop/portal/desktop";
+    static constexpr auto shortcut_interface = "org.freedesktop.portal.GlobalShortcuts";
+    static constexpr auto request_interface = "org.freedesktop.portal.Request";
+    static constexpr auto session_interface = "org.freedesktop.portal.Session";
+
+    static QString token() { return QStringLiteral("xlibrary_") + QUuid::createUuid().toString(QUuid::Id128); }
+    QString sender_path() const {
+        auto sender = bus.baseService();
+        sender.remove(0, 1);
+        sender.replace('.', '_');
+        return sender;
+    }
+    void close_path(const QString &path, const char *interface) {
+        if (!path.isEmpty())
+            bus.asyncCall(QDBusMessage::createMethodCall(service, path, interface, "Close"));
+    }
+    void close_portal() {
+        timeout.stop();
+        if (!request_path.isEmpty())
+            bus.disconnect(service, request_path, request_interface, "Response", this,
+                           SLOT(response(uint, QVariantMap)));
+        close_path(request_path, request_interface);
+        close_path(session_path, session_interface);
+        request_path.clear();
+        session_path.clear();
+        bound = false;
+    }
+    void fail() {
+        if (failed)
+            return;
+        failed = true;
+        close_portal();
+        emit owner->registration_failed(QCoreApplication::translate(
+            "XLibrary",
+            "The GlobalShortcuts portal did not register the shortcut. Use system keyboard settings: "
+            "KDE: Keyboard → Shortcuts; GNOME: Keyboard → Custom Shortcuts; "
+            "Xfce: Keyboard → Application Shortcuts. Command: XLibrary --overlay "
+            "(quick search) or XLibrary (library). For applications/scenarios use the command in their editor."));
+    }
+    void request(const QString &method, const QVariantList &arguments, QVariantMap options) {
+        const auto handle_token = token();
+        options.insert("handle_token", handle_token);
+        request_path = "/org/freedesktop/portal/desktop/request/" + sender_path() + '/' + handle_token;
+        if (!bus.connect(service, request_path, request_interface, "Response", this,
+                         SLOT(response(uint, QVariantMap)))) {
+            fail();
+            return;
+        }
+        auto message = QDBusMessage::createMethodCall(service, portal_path, shortcut_interface, method);
+        auto parameters = arguments;
+        parameters.append(options);
+        message.setArguments(parameters);
+        const auto expected_path = request_path;
+        auto *watcher = new QDBusPendingCallWatcher(bus.asyncCall(message), this);
+        connect(watcher, &QDBusPendingCallWatcher::finished, this, [this, expected_path, watcher] {
+            const QDBusPendingReply<QDBusObjectPath> reply = *watcher;
+            watcher->deleteLater();
+            // A fast Response can arrive before the method reply and start the next request.
+            if (request_path != expected_path)
+                return;
+            if (reply.isError() || reply.value().path() != expected_path) {
+                if (!reply.isError())
+                    close_path(reply.value().path(), request_interface);
+                fail();
+            }
+        });
+        timeout.start();
+    }
+
+private slots:
+    void response(uint code, const QVariantMap &results) {
+        bus.disconnect(service, request_path, request_interface, "Response", this, SLOT(response(uint, QVariantMap)));
+        request_path.clear();
+        timeout.stop();
+        if (code != 0) {
+            fail();
+            return;
+        }
+        if (!binding) {
+            // The portal historically returns this object path as a string.
+            const auto handle = results.value("session_handle").toString();
+            if (handle != session_path) {
+                fail();
+                return;
+            }
+            binding = true;
+            request("BindShortcuts",
+                    {QVariant::fromValue(QDBusObjectPath(session_path)),
+                     QVariant::fromValue(PortalShortcuts{
+                         {action_id,
+                          {{"description",
+                            QCoreApplication::translate("XLibrary", "XLibrary shortcut") + " (" + trigger + ')'},
+                           {"preferred_trigger", trigger}}}}),
+                     QString{}},
+                    {});
+        } else {
+            const auto shortcuts = qdbus_cast<PortalShortcuts>(results.value("shortcuts"));
+            bound = std::ranges::any_of(shortcuts, [this](const auto &shortcut) { return shortcut.id == action_id; });
+            if (!bound)
+                fail();
+        }
+    }
+    void portal_activated(const QDBusObjectPath &session, const QString &id, qulonglong, const QVariantMap &options) {
+        if (!bound || session.path() != session_path || id != action_id)
+            return;
+        const auto activation_token = options.value("activation_token").toString().toUtf8();
+        if (QGuiApplication::platformName().startsWith("wayland")) {
+            // Qt's xdg-shell requestActivate consumes this token (Qt 6.5+).
+            qunsetenv("XDG_ACTIVATION_TOKEN");
+            if (!activation_token.isEmpty() && activation_token.size() <= 4096 && !activation_token.contains('\0'))
+                qputenv("XDG_ACTIVATION_TOKEN", activation_token);
+        }
+        emit owner->activated();
+        if (QGuiApplication::platformName().startsWith("wayland"))
+            qunsetenv("XDG_ACTIVATION_TOKEN");
+    }
+    void session_closed(const QVariantMap &) {
+        if (!session_path.isEmpty())
+            fail();
+    }
+
 public:
+    explicit LinuxHotkeyState(GlobalHotkey *value) : owner(value) {
+        timeout.setSingleShot(true);
+        timeout.setInterval(120000); // A portal may wait for the user's permission dialog.
+        connect(&timeout, &QTimer::timeout, this, &LinuxHotkeyState::fail);
+    }
+    void start_portal(const QKeySequence &value, const int id) {
+        qDBusRegisterMetaType<PortalShortcut>();
+        qDBusRegisterMetaType<PortalShortcuts>();
+        action_id = "xlibrary_action_" + QString::number(id);
+        const auto combination = value[0];
+        const auto modifiers = combination.keyboardModifiers();
+        if (modifiers & Qt::ControlModifier)
+            trigger += "CTRL+";
+        if (modifiers & Qt::AltModifier)
+            trigger += "ALT+";
+        if (modifiers & Qt::ShiftModifier)
+            trigger += "SHIFT+";
+        if (modifiers & Qt::MetaModifier)
+            trigger += "LOGO+";
+        const auto key = combination.key();
+        trigger += key == Qt::Key_Space                   ? QStringLiteral("space")
+                   : key >= Qt::Key_A && key <= Qt::Key_Z ? QString(QChar('a' + key - Qt::Key_A))
+                                                          : QKeySequence(key).toString(QKeySequence::PortableText);
+        auto *service_watcher =
+            new QDBusServiceWatcher(service, bus, QDBusServiceWatcher::WatchForUnregistration, this);
+        connect(service_watcher, &QDBusServiceWatcher::serviceUnregistered, this, [this] { fail(); });
+        auto message = QDBusMessage::createMethodCall(service, portal_path, "org.freedesktop.DBus.Properties", "Get");
+        message.setArguments({shortcut_interface, "version"});
+        auto *watcher = new QDBusPendingCallWatcher(bus.asyncCall(message), this);
+        connect(watcher, &QDBusPendingCallWatcher::finished, this, [this, watcher] {
+            const QDBusPendingReply<QDBusVariant> reply = *watcher;
+            watcher->deleteLater();
+            if (failed)
+                return;
+            if (reply.isError() || reply.value().variant().toUInt() < 1) {
+                fail();
+                return;
+            }
+            const auto session_token = token();
+            session_path = "/org/freedesktop/portal/desktop/session/" + sender_path() + '/' + session_token;
+            if (!bus.connect(service, portal_path, shortcut_interface, "Activated", this,
+                             SLOT(portal_activated(QDBusObjectPath, QString, qulonglong, QVariantMap))) ||
+                !bus.connect(service, session_path, session_interface, "Closed", this,
+                             SLOT(session_closed(QVariantMap)))) {
+                fail();
+                return;
+            }
+            request("CreateSession", {}, {{"session_handle_token", session_token}});
+        });
+    }
 #ifdef XLIBRARY_HAVE_X11
     x11_display display{nullptr, &XCloseDisplay};
     std::unique_ptr<QSocketNotifier> notifier;
@@ -153,8 +365,11 @@ public:
     unsigned int ignored_modifiers = LockMask;
     QVector<unsigned int> lock_combinations;
     bool pressed = false;
+#endif
 
-    ~LinuxHotkeyState() {
+    ~LinuxHotkeyState() override {
+        close_portal();
+#ifdef XLIBRARY_HAVE_X11
         notifier.reset();
         if (display) {
             const std::lock_guard lock(x11_mutex);
@@ -167,8 +382,8 @@ public:
             }
             display.reset();
         }
-    }
 #endif
+    }
 };
 
 bool WindowManager::activate_window(const app_record &record) {
@@ -219,6 +434,7 @@ bool WindowManager::activate_window(const app_record &record) {
 }
 
 GlobalHotkey::GlobalHotkey(QObject *const parent) : QObject(parent) {
+    connect(this, &GlobalHotkey::registration_failed, this, [this] { sequence = {}; });
 }
 
 GlobalHotkey::~GlobalHotkey() = default;
@@ -226,7 +442,7 @@ GlobalHotkey::~GlobalHotkey() = default;
 void desktop_platform::activate_overlay(QWidget *const window) {
     window->raise();
 #if defined(XLIBRARY_HAVE_X11) && QT_CONFIG(xcb)
-    if (hotkey_activation_time != CurrentTime) {
+    if (!wayland_session() && hotkey_activation_time != CurrentTime) {
         if (const auto *native = qGuiApp->nativeInterface<QNativeInterface::QX11Application>()) {
             const std::lock_guard lock(x11_mutex);
             auto *display = native->display();
@@ -268,9 +484,23 @@ bool GlobalHotkey::set_sequence(const QKeySequence &value, QString &error) {
         return false;
     }
     if (wayland_session()) {
-        error = QCoreApplication::translate(
-            "XLibrary", "Wayland manages global shortcuts. Assign XLibrary in the system keyboard settings.");
-        return false;
+        const auto combination = value[0];
+        const auto key = combination.key();
+        const auto modifiers = combination.keyboardModifiers();
+        if (!((key >= Qt::Key_A && key <= Qt::Key_Z) || (key >= Qt::Key_0 && key <= Qt::Key_9) ||
+              (key >= Qt::Key_F1 && key <= Qt::Key_F24) || key == Qt::Key_Space) ||
+            !(modifiers & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier)) ||
+            (modifiers & ~(Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier | Qt::ShiftModifier))) {
+            error = QCoreApplication::translate("XLibrary",
+                                                "Use Ctrl, Alt, or Super with a letter, digit, F1–F24, or Space.");
+            return false;
+        }
+        linux_state = std::make_unique<LinuxHotkeyState>(this);
+        if (!current_id)
+            current_id = next_id++;
+        sequence = value;
+        linux_state->start_portal(value, current_id);
+        return true; // Submission only; registration_failed reports asynchronous refusal.
     }
 #ifdef XLIBRARY_HAVE_X11
     const auto combination = value[0];
@@ -289,7 +519,7 @@ bool GlobalHotkey::set_sequence(const QKeySequence &value, QString &error) {
         return false;
     }
     if (!linux_state) {
-        auto state = std::make_unique<LinuxHotkeyState>();
+        auto state = std::make_unique<LinuxHotkeyState>(this);
         {
             const std::lock_guard lock(x11_mutex);
             state->display.reset(XOpenDisplay(nullptr));
@@ -496,3 +726,5 @@ void desktop_platform::launch_application(const app_record &record, const launch
 bool desktop_platform::set_autostart(const bool enabled, QString &error) {
     return Application::set_autostart(enabled, error);
 }
+
+#include "LinuxIntegration.moc"

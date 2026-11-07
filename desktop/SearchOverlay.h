@@ -25,6 +25,7 @@ class SearchOverlay : public QWidget {
     QVariantAnimation *height_animation;
     QTimer *activation_check;
     bool dismiss_on_deactivate = false;
+    bool activation_notice = false;
     qreal progress = 1;
     qreal surface_height = 0;
     int header_height = 0;
