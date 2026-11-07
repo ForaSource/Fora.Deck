@@ -432,6 +432,42 @@ QWidget *plugins(const ui_context &context, QWidget *) {
     return widget;
 }
 
+QWidget *help_page(const ui_context &, QWidget *) {
+    auto *widget = page(QCoreApplication::translate("XLibrary", "Quick help"));
+    const QList<QPair<QString, QString>> topics{
+        {QCoreApplication::translate("XLibrary", "Search"),
+         QCoreApplication::translate("XLibrary",
+                                     "Type an application name, alias or filename. Use #work to require a tag and "
+                                     "-#games to exclude one; combine them with text. "
+                                     "Clear filters to search the whole library. Quick search also accepts file paths "
+                                     "and calculations such as (2 + 3) * 4; Enter copies the result.")},
+        {QCoreApplication::translate("XLibrary", "Tags"),
+         QCoreApplication::translate("XLibrary", "Create tags in the sidebar or application editor. A tag has up to 64 "
+                                                 "characters without spaces, commas or #. "
+                                                 "Select several applications with Ctrl or Shift to edit their tags "
+                                                 "together. Removing a tag keeps the applications.")},
+        {QCoreApplication::translate("XLibrary", "Scenarios"),
+         QCoreApplication::translate("XLibrary", "Create a scenario from the Scenarios section. Add applications in "
+                                                 "launch order, set each delay and choose a launch profile. "
+                                                 "Disabled steps are skipped. Fix the listed problems before running. "
+                                                 "Success means the launch request was accepted, "
+                                                 "not that the application finished loading. Stop skips remaining "
+                                                 "steps and keeps already opened applications running.")},
+        {QCoreApplication::translate("XLibrary", "Keyboard shortcuts"),
+         QCoreApplication::translate(
+             "XLibrary",
+             "Open Settings → Keyboard shortcuts to see or change the current bindings. Clear a binding to disable it. "
+             "Assign application and scenario shortcuts in their editors. A shortcut already used by XLibrary or "
+             "another application "
+             "may be refused. On Wayland, system permission or a desktop shortcut may be required.")}};
+    for (const auto &topic : topics) {
+        widget->layout()->addWidget(label(topic.first, "subheading"));
+        widget->layout()->addWidget(label(topic.second, "muted"));
+    }
+    static_cast<QVBoxLayout *>(widget->layout())->addStretch();
+    return widget;
+}
+
 QWidget *about(const ui_context &context, QWidget *) {
     auto *widget = page(QCoreApplication::translate("XLibrary", "About"));
     auto *card = new QFrame;
@@ -757,6 +793,7 @@ QDialog *settings_dialog(const ui_context &context, QWidget *const parent) {
         {QCoreApplication::translate("XLibrary", "Local data"), "settings_storage"},
         {QCoreApplication::translate("XLibrary", "Plugins"), "settings_plugins"},
         {QCoreApplication::translate("XLibrary", "Update"), "settings_update"},
+        {QCoreApplication::translate("XLibrary", "Quick help"), "settings_help"},
         {QCoreApplication::translate("XLibrary", "About"), "settings_about"}};
     for (const auto &section : sections) {
         const auto index = pages->count();
@@ -936,4 +973,5 @@ void register_settings_views(UiRegistry &registry) {
     registry.add_default("settings_plugins", plugins);
     registry.add_default("settings_update", update_page);
     registry.add_default("settings_about", about);
+    registry.add_default("settings_help", help_page);
 }

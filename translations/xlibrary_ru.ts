@@ -2971,5 +2971,25 @@ Technical reason: %3</source>
         <source>Scenario issues</source>
         <translation>Проблемы сценария</translation>
     </message>
+    <message>
+        <source>Create a scenario from the Scenarios section. Add applications in launch order, set each delay and choose a launch profile. Disabled steps are skipped. Fix the listed problems before running. Success means the launch request was accepted, not that the application finished loading. Stop skips remaining steps and keeps already opened applications running.</source>
+        <translation>Создайте сценарий в разделе «Сценарии». Добавьте приложения по порядку, задайте задержки и профили запуска. Выключенные шаги пропускаются. Перед запуском исправьте перечисленные проблемы. Успех означает принятие команды запуска, а не завершение загрузки приложения. Остановка пропускает оставшиеся шаги; уже открытые приложения продолжают работать.</translation>
+    </message>
+    <message>
+        <source>Create tags in the sidebar or application editor. A tag has up to 64 characters without spaces, commas or #. Select several applications with Ctrl or Shift to edit their tags together. Removing a tag keeps the applications.</source>
+        <translation>Создавайте теги в боковом меню или редакторе приложения. Тег содержит до 64 символов без пробелов, запятых и #. Выделите несколько приложений с Ctrl или Shift для изменения тегов сразу у всех. Удаление тега сохраняет приложения.</translation>
+    </message>
+    <message>
+        <source>Open Settings → Keyboard shortcuts to see or change the current bindings. Clear a binding to disable it. Assign application and scenario shortcuts in their editors. A shortcut already used by XLibrary or another application may be refused. On Wayland, system permission or a desktop shortcut may be required.</source>
+        <translation>Откройте «Настройки → Горячие клавиши» для просмотра и изменения сочетаний. Очистите поле, чтобы отключить сочетание. Клавиши для приложений и сценариев назначаются в их редакторах. Занятое сочетание может быть отклонено. На Wayland может потребоваться системное разрешение или настройка сочетания в среде рабочего стола.</translation>
+    </message>
+    <message>
+        <source>Quick help</source>
+        <translation>Краткая справка</translation>
+    </message>
+    <message>
+        <source>Type an application name, alias or filename. Use #work to require a tag and -#games to exclude one; combine them with text. Clear filters to search the whole library. Quick search also accepts file paths and calculations such as (2 + 3) * 4; Enter copies the result.</source>
+        <translation>Введите название, псевдоним или имя файла приложения. #работа требует тег, а -#игры исключает его; их можно сочетать с текстом. Сбросьте фильтры для поиска по всей библиотеке. Быстрый поиск также принимает пути и выражения вроде (2 + 3) * 4; Enter копирует результат.</translation>
+    </message>
 </context>
 </TS>
