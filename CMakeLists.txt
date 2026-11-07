@@ -331,6 +331,8 @@ if(XLIBRARY_ENABLE_IPO)
     )
 
     if(XLIBRARY_IPO_SUPPORTED)
+        # Targets created later must also link the LTO-enabled static libraries.
+        set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
         set_property(TARGET XLibrary xlibrary_core sqlite3 PROPERTY
                 INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE
         )
