@@ -184,6 +184,9 @@ Before instantiation, XLibrary checks Qt's embedded metadata: the interface IID 
 `org.xlibrary.desktop.UiPlugin/1.0`, the Qt major version must match, and the module must not
 require a newer Qt minor version. Existing IID 1.0 modules without custom metadata remain
 supported under this explicit compatibility policy; Qt's standard IID/version metadata is required.
+Optional custom `MetaData` fields `name`, `version`, and `author` (strings; `Name`, `Version`,
+and `Author` are also accepted) are displayed in Settings → Plugins. Missing fields fall back
+to the module filename. Reading this metadata does not execute a disabled module.
 Build modules against the matching XLibrary headers, architecture, compiler and runtime ABI;
 metadata checks cannot prove binary compatibility. Qt also applies its own platform/build checks.
 Incompatible modules and load/configuration failures are shown with a reason in settings.

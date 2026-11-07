@@ -3045,5 +3045,13 @@ Qt: %4
         <source>Settings were reset. Restart XLibrary now?</source>
         <translation>Настройки сброшены. Перезапустить XLibrary сейчас?</translation>
     </message>
+    <message>
+        <source>Author: %1</source>
+        <translation>Автор: %1</translation>
+    </message>
+    <message>
+        <source>Version %1</source>
+        <translation>Версия %1</translation>
+    </message>
 </context>
 </TS>

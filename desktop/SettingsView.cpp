@@ -431,11 +431,31 @@ QWidget *plugins(const ui_context &context, QWidget *) {
                 available.append(id);
     }
     const auto errors = context.parameters.value("plugin_errors").toMap();
+    const auto metadata = context.parameters.value("plugin_metadata").toMap();
     for (const auto &id : available) {
-        auto *control = new QCheckBox(id);
+        const auto details = metadata.value(id).toMap();
+        const auto value = [&](const QString &key, const QString &alternate) {
+            auto text = details.value(key);
+            if (!text.isValid())
+                text = details.value(alternate);
+            return text.metaType().id() == QMetaType::QString ? text.toString().trimmed().left(256) : QString{};
+        };
+        const auto name = value("name", "Name");
+        const auto version = value("version", "Version");
+        const auto author = value("author", "Author");
+        auto *control = new QCheckBox(name.isEmpty() ? id : name);
         control->setProperty("plugin_id", id);
         control->setChecked(enabled.contains(id));
         widget->layout()->addWidget(control);
+        QStringList information;
+        if (!name.isEmpty())
+            information.append(id);
+        if (!version.isEmpty())
+            information.append(QCoreApplication::translate("XLibrary", "Version %1").arg(version));
+        if (!author.isEmpty())
+            information.append(QCoreApplication::translate("XLibrary", "Author: %1").arg(author));
+        if (!information.isEmpty())
+            widget->layout()->addWidget(label(information.join(" · "), "muted"));
         const auto error = errors.value(id).toString();
         if (!error.isEmpty()) {
             control->setToolTip(error);

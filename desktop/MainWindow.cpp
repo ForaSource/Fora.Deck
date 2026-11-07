@@ -388,6 +388,7 @@ void MainWindow::load_plugins() {
     }
     const QDir directory(QApplication::applicationDirPath() + "/plugins");
     QStringList available;
+    QVariantMap metadata;
     QVariantMap errors;
     const auto enabled = service.settings.value("plugins/enabled").toStringList();
     const auto report_error = [this, &errors](const QString &id, const QString &error) {
@@ -404,7 +405,9 @@ void MainWindow::load_plugins() {
         available.append(id);
         try {
             auto loader = std::make_unique<QPluginLoader>(file.absoluteFilePath());
-            const auto compatibility_error = UiRegistry::plugin_compatibility_error(loader->metaData());
+            const auto embedded = loader->metaData();
+            metadata.insert(id, embedded.value("MetaData").toObject().toVariantMap());
+            const auto compatibility_error = UiRegistry::plugin_compatibility_error(embedded);
             if (!compatibility_error.isEmpty()) {
                 report_error(id, compatibility_error);
                 continue;
@@ -431,6 +434,7 @@ void MainWindow::load_plugins() {
         }
     }
     context.parameters.insert("available_plugins", available);
+    context.parameters.insert("plugin_metadata", metadata);
     context.parameters.insert("plugin_errors", errors);
 }
 
