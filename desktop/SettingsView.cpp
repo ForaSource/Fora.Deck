@@ -476,8 +476,9 @@ QWidget *plugins(const ui_context &context, QWidget *) {
     return widget;
 }
 
-QWidget *help_page(const ui_context &, QWidget *) {
+QWidget *help_page(const ui_context &context, QWidget *) {
     auto *widget = page(QCoreApplication::translate("XLibrary", "Quick help"));
+    widget->layout()->addWidget(action_button(context.actions.value("tutorial")));
     const QList<QPair<QString, QString>> topics{
         {QCoreApplication::translate("XLibrary", "Search"),
          QCoreApplication::translate("XLibrary",

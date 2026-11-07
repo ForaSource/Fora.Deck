@@ -37,6 +37,16 @@ An app can belong to more than one part of your day. Give your browser both `#wo
 
 ## Features
 
+On first launch, choose discovery, manual entry, or complete profile restoration from the
+welcome screen, or take the four-step tour. Reopen the welcome screen in **Settings → General**
+and the tour in **Settings → Quick help**. Settings also includes local data paths, a
+portable-mode explanation, optional interface animations, and a confirmed preference reset
+that keeps the catalog. Restart after resetting preferences.
+
+Before running a scenario, review its missing targets or invalid launch options. Each step
+shows waiting, delay, launching, success, error, or skipped; stopping keeps opened apps running.
+Launch success means the command was accepted, rather than that the application's UI is ready.
+
 | | What you can do |
 | --- | --- |
 | **One application library** | Discover Windows system apps, registry and Start menu entries, Linux desktop entries, and installed Steam games across local libraries. |

@@ -2956,22 +2956,6 @@ Technical reason: %3</source>
         <translation>Рабочая папка недоступна.</translation>
     </message>
     <message>
-        <source>Check again</source>
-        <translation>Проверить снова</translation>
-    </message>
-    <message>
-        <source>Checking scenario…</source>
-        <translation>Проверка сценария…</translation>
-    </message>
-    <message>
-        <source>Could not check the scenario.</source>
-        <translation>Не удалось проверить сценарий.</translation>
-    </message>
-    <message>
-        <source>Scenario issues</source>
-        <translation>Проблемы сценария</translation>
-    </message>
-    <message>
         <source>Create a scenario from the Scenarios section. Add applications in launch order, set each delay and choose a launch profile. Disabled steps are skipped. Fix the listed problems before running. Success means the launch request was accepted, not that the application finished loading. Stop skips remaining steps and keeps already opened applications running.</source>
         <translation>Создайте сценарий в разделе «Сценарии». Добавьте приложения по порядку, задайте задержки и профили запуска. Выключенные шаги пропускаются. Перед запуском исправьте перечисленные проблемы. Успех означает принятие команды запуска, а не завершение загрузки приложения. Остановка пропускает оставшиеся шаги; уже открытые приложения продолжают работать.</translation>
     </message>
@@ -3056,6 +3040,94 @@ Qt: %4
     <message>
         <source>Enable interface animations</source>
         <translation>Включить анимации интерфейса</translation>
+    </message>
+    <message>
+        <source>A quick tour of XLibrary</source>
+        <translation>Короткое обучение XLibrary</translation>
+    </message>
+    <message>
+        <source>Add → Edit → Tags → Favorites</source>
+        <translation>Добавить → Изменить → Теги → Избранное</translation>
+    </message>
+    <message>
+        <source>Add an application from a file or find installed applications. Edit its name, arguments and tags. Use Ctrl or Shift to select several entries and edit them together. Removing an entry keeps its files.</source>
+        <translation>Добавьте приложение из файла или найдите установленные программы. Измените название, аргументы и теги. Ctrl и Shift помогают выделять несколько записей для общего редактирования. Удаление записи сохраняет её файлы.</translation>
+    </message>
+    <message>
+        <source>Back</source>
+        <translation>Назад</translation>
+    </message>
+    <message>
+        <source>Create a scenario, choose applications and set a delay before each launch. Review problems before starting and follow each step&apos;s status. Stop leaves already opened applications running.</source>
+        <translation>Создайте сценарий, выберите приложения и задержку перед каждым запуском. Исправьте проблемы перед стартом и следите за состоянием шагов. При остановке уже открытые приложения продолжают работать.</translation>
+    </message>
+    <message>
+        <source>Find it in a few keystrokes</source>
+        <translation>Находите за пару нажатий</translation>
+    </message>
+    <message>
+        <source>Finish</source>
+        <translation>Готово</translation>
+    </message>
+    <message>
+        <source>Keep XLibrary close</source>
+        <translation>Держите XLibrary под рукой</translation>
+    </message>
+    <message>
+        <source>Make the library yours</source>
+        <translation>Настройте библиотеку под себя</translation>
+    </message>
+    <message>
+        <source>Next</source>
+        <translation>Далее</translation>
+    </message>
+    <message>
+        <source>Open your workspace in order</source>
+        <translation>Открывайте рабочие приложения по порядку</translation>
+    </message>
+    <message>
+        <source>Search by name, alias or filename. Add #work to narrow results or -#games to exclude a tag. Quick search can also browse a path or calculate an expression.</source>
+        <translation>Ищите по названию, псевдониму или имени файла. Добавьте #работа для сужения результатов или -#игры для исключения тега. Быстрый поиск также открывает пути и вычисляет выражения.</translation>
+    </message>
+    <message>
+        <source>Settings → Keyboard shortcuts / Quick help</source>
+        <translation>Настройки → Горячие клавиши / Краткая справка</translation>
+    </message>
+    <message>
+        <source>Settings → Keyboard shortcuts shows your current bindings for the library, quick search and individual applications or scenarios. Settings also contains local data information, profile backups and quick help.</source>
+        <translation>В разделе «Настройки → Горячие клавиши» показаны сочетания для библиотеки, быстрого поиска, приложений и сценариев. В настройках также есть сведения о локальных данных, резервные копии профиля и краткая справка.</translation>
+    </message>
+    <message>
+        <source>Step %1 of %2</source>
+        <translation>Шаг %1 из %2</translation>
+    </message>
+    <message>
+        <source>Take a quick tour</source>
+        <translation>Пройти короткое обучение</translation>
+    </message>
+    <message>
+        <source>Waiting → Delay → Launching → Success</source>
+        <translation>Ожидание → Задержка → Запуск → Успех</translation>
+    </message>
+    <message>
+        <source>Restart</source>
+        <translation>Перезапустить</translation>
+    </message>
+    <message>
+        <source>Check again</source>
+        <translation>Проверить снова</translation>
+    </message>
+    <message>
+        <source>Checking scenario…</source>
+        <translation>Проверка сценария…</translation>
+    </message>
+    <message>
+        <source>Could not check the scenario.</source>
+        <translation>Не удалось проверить сценарий.</translation>
+    </message>
+    <message>
+        <source>Scenario issues</source>
+        <translation>Проблемы сценария</translation>
     </message>
 </context>
 </TS>

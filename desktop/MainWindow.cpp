@@ -234,6 +234,7 @@ void MainWindow::create_actions() {
     add("add_application", QCoreApplication::translate("XLibrary", "Add application"), "add",
         [this] { open_dialog("application_editor", context); });
     add("welcome", QCoreApplication::translate("XLibrary", "Open welcome screen"), "app", [this] { show_welcome(); });
+    add("tutorial", QCoreApplication::translate("XLibrary", "Take a quick tour"), "help", [this] { show_tutorial(); });
     add("edit_application", QCoreApplication::translate("XLibrary", "Edit"), "settings", [this] {
         if (const auto *record = service.selected()) {
             auto edit_context = context;
@@ -553,6 +554,13 @@ void MainWindow::show_welcome() {
            [this] { select_profile_restore(context, this); });
     root->addWidget(ui_helpers::scroll(contents), 1);
     auto *later = button(QCoreApplication::translate("XLibrary", "Start with an empty library"), "quiet");
+    auto *tour = button(QCoreApplication::translate("XLibrary", "Take a quick tour"));
+    tour->setIcon(appearance::icon("help"));
+    root->addWidget(tour);
+    connect(tour, &QPushButton::clicked, dialog, [this, dialog] {
+        dialog->accept();
+        QTimer::singleShot(0, this, &MainWindow::show_tutorial);
+    });
     root->addWidget(later);
     connect(later, &QPushButton::clicked, dialog, &QDialog::reject);
     connect(dialog, &QDialog::finished, this, [this] {
@@ -561,6 +569,101 @@ void MainWindow::show_welcome() {
             service.settings.sync();
         }
     });
+    dialog->setWindowModality(Qt::WindowModal);
+    dialog->open();
+}
+
+void MainWindow::show_tutorial() {
+    if (auto *existing = findChild<QDialog *>("tutorial")) {
+        existing->raise();
+        existing->activateWindow();
+        return;
+    }
+    auto *parent = QApplication::activeModalWidget();
+    auto *dialog = new QDialog(parent ? parent : this);
+    dialog->setObjectName("tutorial");
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->setWindowTitle(QCoreApplication::translate("XLibrary", "A quick tour of XLibrary"));
+    prepare_dialog(dialog, context, {640, 500}, {420, 340});
+    auto *root = new QVBoxLayout(dialog);
+    root->setContentsMargins(28, 24, 28, 24);
+    root->setSpacing(16);
+    auto *progress = label("", "muted");
+    root->addWidget(progress);
+    auto *pages = new QStackedWidget;
+    const QList<QStringList> topics{
+        {"search", QCoreApplication::translate("XLibrary", "Find it in a few keystrokes"),
+         QCoreApplication::translate("XLibrary",
+                                     "Search by name, alias or filename. Add #work to narrow results or -#games to "
+                                     "exclude a tag. Quick search can also browse a path or calculate an expression."),
+         QStringLiteral("#work browser     ·     (2 + 3) * 4")},
+        {"library", QCoreApplication::translate("XLibrary", "Make the library yours"),
+         QCoreApplication::translate(
+             "XLibrary",
+             "Add an application from a file or find installed applications. Edit its name, arguments and tags. Use "
+             "Ctrl or Shift to select several entries and edit them together. Removing an entry keeps its files."),
+         QCoreApplication::translate("XLibrary", "Add → Edit → Tags → Favorites")},
+        {"scenarios", QCoreApplication::translate("XLibrary", "Open your workspace in order"),
+         QCoreApplication::translate(
+             "XLibrary",
+             "Create a scenario, choose applications and set a delay before each launch. Review problems before "
+             "starting and follow each step's status. Stop leaves already opened applications running."),
+         QCoreApplication::translate("XLibrary", "Waiting → Delay → Launching → Success")},
+        {"keyboard", QCoreApplication::translate("XLibrary", "Keep XLibrary close"),
+         QCoreApplication::translate("XLibrary",
+                                     "Settings → Keyboard shortcuts shows your current bindings for the library, quick "
+                                     "search and individual applications or scenarios. Settings also contains local "
+                                     "data information, profile backups and quick help."),
+         QCoreApplication::translate("XLibrary", "Settings → Keyboard shortcuts / Quick help")}};
+    for (const auto &topic : topics) {
+        auto *contents = new QWidget;
+        auto *layout = new QVBoxLayout(contents);
+        layout->setContentsMargins(0, 0, 0, 0);
+        layout->setSpacing(20);
+        auto *icon = new QLabel;
+        const auto size = appearance::scaled(service.settings, 48);
+        icon->setPixmap(appearance::icon(topic[0], palette().color(QPalette::WindowText)).pixmap(size, size));
+        layout->addWidget(icon);
+        layout->addWidget(label(topic[1], "heading"));
+        layout->addWidget(label(topic[2], "muted"));
+        auto *example = new QFrame;
+        example->setProperty("card", true);
+        auto *example_layout = new QVBoxLayout(example);
+        example_layout->setContentsMargins(16, 16, 16, 16);
+        example_layout->addWidget(label(topic[3], "subheading"));
+        layout->addWidget(example);
+        layout->addStretch();
+        pages->addWidget(ui_helpers::scroll(contents));
+    }
+    auto *transition = new PageTransition(pages);
+    root->addWidget(transition, 1);
+    auto *controls = new QHBoxLayout;
+    auto *back = button(QCoreApplication::translate("XLibrary", "Back"));
+    auto *next = button("", "primary");
+    controls->addWidget(back);
+    controls->addStretch();
+    controls->addWidget(next);
+    root->addLayout(controls);
+    const auto update = [=] {
+        progress->setText(QCoreApplication::translate("XLibrary", "Step %1 of %2")
+                              .arg(pages->currentIndex() + 1)
+                              .arg(pages->count()));
+        back->setEnabled(pages->currentIndex() > 0);
+        next->setText(pages->currentIndex() + 1 == pages->count() ? QCoreApplication::translate("XLibrary", "Finish")
+                                                                  : QCoreApplication::translate("XLibrary", "Next"));
+    };
+    connect(back, &QPushButton::clicked, dialog, [=] { pages->setCurrentIndex(pages->currentIndex() - 1); });
+    connect(next, &QPushButton::clicked, dialog, [=] {
+        if (pages->currentIndex() + 1 == pages->count())
+            dialog->accept();
+        else
+            pages->setCurrentIndex(pages->currentIndex() + 1);
+    });
+    connect(pages, &QStackedWidget::currentChanged, dialog, [=] {
+        update();
+        transition->start();
+    });
+    update();
     dialog->setWindowModality(Qt::WindowModal);
     dialog->open();
 }
