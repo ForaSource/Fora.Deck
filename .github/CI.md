@@ -70,7 +70,7 @@ Linux-упаковщика — 60 секундами. Windows install step ог�
 через Settings → Rules → Rulesets или GitHub API. Включены требование PR,
 разрешение review threads и все 11 обязательных checks. Перед слиянием нужен
 как минимум один approval от code owner; новые коммиты сбрасывают прежние
-одобрения. [CODEOWNERS](CODEOWNERS) назначает `@Lappland-Julia` maintainer для всех
+одобрения. [CODEOWNERS](CODEOWNERS) назначает `@lappland-open` maintainer для всех
 путей, включая сам CODEOWNERS, CI и ruleset. Чтобы делегировать ревью другому
 maintainer, добавьте его в CODEOWNERS и предоставьте ему доступ на запись.
 GitHub использует CODEOWNERS из целевой ветки: сначала нужно слить этот файл

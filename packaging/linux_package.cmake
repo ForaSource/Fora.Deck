@@ -40,8 +40,8 @@ install(FILES "${CMAKE_CURRENT_LIST_DIR}/debian/copyright"
         DESTINATION "${CMAKE_INSTALL_DATADIR}/doc/xlibrary")
 
 set(CPACK_PACKAGE_NAME "xlibrary")
-set(CPACK_PACKAGE_VENDOR "Lappland-Julia")
-set(CPACK_PACKAGE_CONTACT "Lappland-Julia (https://github.com/lappland-open)" CACHE STRING
+set(CPACK_PACKAGE_VENDOR "lappland-open")
+set(CPACK_PACKAGE_CONTACT "lappland-open (https://github.com/lappland-open)" CACHE STRING
         "Package maintainer contact (name and email for distribution releases)")
 set(CPACK_PACKAGE_VERSION "${XLIBRARY_RELEASE_VERSION}")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Application launcher and organizer")
