@@ -69,6 +69,45 @@ QIcon appearance::icon(const QString &name, const QColor &color) {
     } else if (name == "copy") {
         painter.drawRoundedRect(QRectF(8, 8, 12, 13), 2, 2);
         painter.drawPolyline(QPolygonF{QPointF(5, 16), QPointF(3, 16), QPointF(3, 3), QPointF(15, 3), QPointF(15, 5)});
+    } else if (name == "keyboard") {
+        painter.drawRoundedRect(QRectF(2, 5, 20, 14), 3, 3);
+        for (int y : {9, 12})
+            for (int x : {6, 10, 14, 18})
+                painter.drawPoint(QPointF(x, y));
+        painter.drawLine(QPointF(7, 16), QPointF(17, 16));
+    } else if (name == "palette") {
+        QPainterPath path;
+        path.moveTo(21, 11);
+        path.cubicTo(21, 1, 3, 0, 3, 12);
+        path.cubicTo(3, 19, 9, 22, 13, 21);
+        path.cubicTo(18, 20, 12, 16, 16, 14);
+        path.cubicTo(18, 13, 21, 15, 21, 11);
+        painter.drawPath(path);
+        for (const auto &point : {QPointF(7, 10), QPointF(10, 6), QPointF(15, 6), QPointF(18, 10)})
+            painter.drawEllipse(point, 0.8, 0.8);
+    } else if (name == "profile") {
+        painter.drawEllipse(QRectF(8, 3, 8, 8));
+        painter.drawArc(QRectF(4, 13, 16, 14), 0, 180 * 16);
+        painter.drawLine(QPointF(4, 20), QPointF(20, 20));
+    } else if (name == "database") {
+        painter.drawEllipse(QRectF(4, 3, 16, 6));
+        painter.drawLine(QPointF(4, 6), QPointF(4, 18));
+        painter.drawLine(QPointF(20, 6), QPointF(20, 18));
+        painter.drawArc(QRectF(4, 9, 16, 6), 180 * 16, 180 * 16);
+        painter.drawArc(QRectF(4, 15, 16, 6), 180 * 16, 180 * 16);
+    } else if (name == "plugin") {
+        painter.drawRoundedRect(QRectF(5, 7, 14, 10), 3, 3);
+        painter.drawLine(QPointF(9, 3), QPointF(9, 7));
+        painter.drawLine(QPointF(15, 3), QPointF(15, 7));
+        painter.drawPolyline(QPolygonF{QPointF(12, 17), QPointF(12, 21), QPointF(17, 21)});
+    } else if (name == "help") {
+        painter.drawEllipse(QRectF(3, 3, 18, 18));
+        QPainterPath path;
+        path.moveTo(9, 8);
+        path.cubicTo(9, 4, 18, 6, 14, 11);
+        path.lineTo(12, 13);
+        painter.drawPath(path);
+        painter.drawPoint(QPointF(12, 17));
     } else if (name == "settings") {
         painter.drawEllipse(QRectF(5, 5, 14, 14));
         painter.drawEllipse(QRectF(9, 9, 6, 6));

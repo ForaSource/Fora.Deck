@@ -861,6 +861,14 @@ QDialog *settings_dialog(const ui_context &context, QWidget *const parent) {
     for (const auto &section : sections) {
         const auto index = pages->count();
         auto *item = new SelectionButton(section.first);
+        const QHash<QString, QString> icons{{"settings_general", "settings"}, {"settings_appearance", "palette"},
+                                            {"settings_hotkeys", "keyboard"}, {"settings_library", "library"},
+                                            {"settings_profile", "profile"},  {"settings_storage", "database"},
+                                            {"settings_plugins", "plugin"},   {"settings_update", "refresh"},
+                                            {"settings_help", "help"},        {"settings_about", "info"}};
+        item->setIcon(appearance::icon(icons.value(section.second), item->palette().color(QPalette::ButtonText)));
+        const auto icon_size = appearance::scaled(*context.settings, 20);
+        item->setIconSize({icon_size, icon_size});
         item->setObjectName(section.second + "_category");
         categories->addButton(item, index);
         navigation_layout->addWidget(item);
