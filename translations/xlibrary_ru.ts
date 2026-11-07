@@ -3053,5 +3053,9 @@ Qt: %4
         <source>Version %1</source>
         <translation>Версия %1</translation>
     </message>
+    <message>
+        <source>Enable interface animations</source>
+        <translation>Включить анимации интерфейса</translation>
+    </message>
 </context>
 </TS>

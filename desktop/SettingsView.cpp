@@ -129,6 +129,8 @@ QWidget *appearance_page(const ui_context &context, QWidget *) {
 #endif
     choices(widget, settings, "appearance/text_scale", QCoreApplication::translate("XLibrary", "Text size"),
             {{"100%", 100}, {"125%", 125}, {"150%", 150}, {"200%", 200}}, 100);
+    checkbox(widget, settings, "appearance/animations",
+             QCoreApplication::translate("XLibrary", "Enable interface animations"), true);
     widget->layout()->addWidget(
         label(QCoreApplication::translate("XLibrary",
                                           "Short, smooth transitions follow available system animation settings."),

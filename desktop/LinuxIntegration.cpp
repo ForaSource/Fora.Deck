@@ -698,6 +698,8 @@ QImage desktop_platform::application_icon(const QString &path) {
 }
 
 bool desktop_platform::animations_enabled() {
+    if (qApp->property("xlibrary_disable_animations").toBool())
+        return false;
     return qApp->style()->styleHint(QStyle::SH_Widget_Animate) != 0;
 }
 

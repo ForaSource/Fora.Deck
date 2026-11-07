@@ -144,6 +144,7 @@ void appearance::paint_selection(QPainter &painter, const QRectF &rect, const QP
 }
 
 void appearance::apply(const QSettings &settings, const QString &additional_style) {
+    qApp->setProperty("xlibrary_disable_animations", !settings.value("appearance/animations", true).toBool());
     const bool dark = is_dark(settings);
     const QColor base(dark ? "#242528" : "#F3F3F4");
     const QColor panel(dark ? "#2A2B2E" : "#EBECEE");

@@ -157,6 +157,8 @@ bool desktop_platform::set_autostart(const bool enabled, QString &error) {
 }
 
 bool desktop_platform::animations_enabled() {
+    if (qApp->property("xlibrary_disable_animations").toBool())
+        return false;
     BOOL enabled = TRUE;
     SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION, 0, &enabled, 0);
     return enabled;
