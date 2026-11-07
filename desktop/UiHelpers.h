@@ -269,6 +269,8 @@ inline void open_dialog(const QString &id, const ui_context &context) {
         dialog->resize(dialog->size().boundedTo(available));
         dialog->setSizeGripEnabled(true);
         QObject::connect(dialog, &QDialog::finished, dialog, [dialog, settings = context.settings, size_key] {
+            if (settings->property("profile_locked").toBool())
+                return;
             const auto scale = appearance::scaled(*settings, 100) / 100.0;
             settings->setValue(size_key, QSize(qRound(dialog->width() / scale), qRound(dialog->height() / scale)));
         });

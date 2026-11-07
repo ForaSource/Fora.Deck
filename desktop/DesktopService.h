@@ -140,6 +140,7 @@ public:
     quint64 preview_paths(const QString &old_root, const QString &new_root);
     quint64 recover_paths(const QVector<path_relocation> &changes);
     void restart_application();
+    bool reset_settings();
     void retry_library();
     void refresh_availability();
     void open_profile_folder();

@@ -24,6 +24,7 @@
 #include "PlatformIntegration.h"
 #include "ProfileBackup.h"
 #include "ProfileSchema.h"
+#include "ProfileSettings.h"
 
 DesktopService::DesktopService(QObject *const parent, const QString &profile_path, const QString &database_path)
     : QObject(parent), worker(new Manager(database_path, request_sequence)), model(this), filter(this),
@@ -128,6 +129,8 @@ DesktopService::DesktopService(QObject *const parent, const QString &profile_pat
     connect(worker, &Manager::result, this, &DesktopService::publish_result);
     connect(worker, &Manager::notification, this, &DesktopService::message);
     connect(worker, &Manager::discovery_dismissed, this, [this](const QStringList &dismissed) {
+        if (profile_busy() || restart_pending)
+            return;
         auto targets = settings.value("sources/dismissed_targets").toStringList();
         targets.append(dismissed);
         targets.removeDuplicates();
@@ -1170,6 +1173,52 @@ quint64 DesktopService::recover_paths(const QVector<path_relocation> &changes) {
         return 0;
     }
     return enqueue("profile_paths_recovery", [changes](Manager &worker) { worker.recover_paths(changes); });
+}
+
+bool DesktopService::reset_settings() {
+    if (!is_ready() || profile_busy() || restart_pending || is_discovering() || is_scenario_active() ||
+        !launching.isEmpty() || pending_shortcut_request || GithubTokenStore::pending_changes(settings) ||
+        updates.is_busy()) {
+        notify(QCoreApplication::translate("XLibrary", "Finish current operations before resetting settings."));
+        return false;
+    }
+    settings.sync();
+    if (settings.status() != QSettings::NoError) {
+        notify(QCoreApplication::translate("XLibrary", "Could not save the settings file."));
+        return false;
+    }
+    QVariantMap previous;
+    for (const auto &key : settings.allKeys())
+        previous.insert(key, settings.value(key));
+    const bool autostart = settings.value("behavior/autostart", false).toBool();
+    QString error;
+    if (autostart && !desktop_platform::set_autostart(false, error)) {
+        notify(error);
+        return false;
+    }
+    settings.clear();
+    // Credentials belong to the system store and are managed separately from preferences.
+    const auto marker = QString::fromLatin1(profile_settings::token_marker);
+    if (previous.contains(marker))
+        settings.setValue(marker, previous.value(marker));
+    settings.setValue("onboarding/completed", true);
+    settings.sync();
+    if (settings.status() != QSettings::NoError) {
+        settings.clear();
+        for (auto it = previous.cbegin(); it != previous.cend(); ++it)
+            settings.setValue(it.key(), it.value());
+        settings.sync();
+        if (autostart && !desktop_platform::set_autostart(true, error))
+            notify(error);
+        notify(QCoreApplication::translate("XLibrary", "Could not save the settings file."));
+        return false;
+    }
+    restart_pending = true;
+    GithubTokenStore::lock_profile(settings, true);
+    emit profile_state_changed();
+    notify(QCoreApplication::translate(
+        "XLibrary", "Settings reset. Restart XLibrary to apply the defaults. Your catalog was kept."));
+    return true;
 }
 
 void DesktopService::restart_application() {

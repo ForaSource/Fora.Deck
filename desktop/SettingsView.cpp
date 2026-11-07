@@ -87,6 +87,26 @@ QWidget *general(const ui_context &context, QWidget *) {
             {{QCoreApplication::translate("XLibrary", "Show the library"), "show"},
              {QCoreApplication::translate("XLibrary", "Start in the tray"), "tray"}},
             "show");
+    auto *reset = button(QCoreApplication::translate("XLibrary", "Reset settings…"), "danger");
+    widget->layout()->addWidget(reset);
+    QObject::connect(reset, &QPushButton::clicked, widget, [=] {
+        auto *service = static_cast<DesktopService *>(context.service);
+        if (!confirm(widget, QCoreApplication::translate("XLibrary", "Reset settings"),
+                     QCoreApplication::translate("XLibrary",
+                                                 "Restore default interface, shortcuts, sources and behavior settings? "
+                                                 "Applications, tags, scenarios, history and saved credentials will be "
+                                                 "kept. XLibrary will need a restart."),
+                     QCoreApplication::translate("XLibrary", "Reset")))
+            return;
+        if (!service->reset_settings())
+            return;
+        if (confirm(widget, QCoreApplication::translate("XLibrary", "Restart XLibrary"),
+                    QCoreApplication::translate("XLibrary", "Settings were reset. Restart XLibrary now?"),
+                    QCoreApplication::translate("XLibrary", "Restart")))
+            service->restart_application();
+        if (auto *dialog = qobject_cast<QDialog *>(widget->window()))
+            dialog->reject();
+    });
     static_cast<QVBoxLayout *>(widget->layout())->addStretch();
     return widget;
 }

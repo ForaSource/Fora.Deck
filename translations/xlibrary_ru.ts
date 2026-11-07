@@ -3017,5 +3017,33 @@ Qt: %4
 Сессия: %5
 Режим: %6</translation>
     </message>
+    <message>
+        <source>Finish current operations before resetting settings.</source>
+        <translation>Завершите текущие операции перед сбросом настроек.</translation>
+    </message>
+    <message>
+        <source>Reset</source>
+        <translation>Сбросить</translation>
+    </message>
+    <message>
+        <source>Reset settings</source>
+        <translation>Сброс настроек</translation>
+    </message>
+    <message>
+        <source>Reset settings…</source>
+        <translation>Сбросить настройки…</translation>
+    </message>
+    <message>
+        <source>Restore default interface, shortcuts, sources and behavior settings? Applications, tags, scenarios, history and saved credentials will be kept. XLibrary will need a restart.</source>
+        <translation>Восстановить стандартные настройки интерфейса, сочетаний клавиш, источников и поведения? Приложения, теги, сценарии, история и сохранённые учётные данные останутся. Потребуется перезапуск XLibrary.</translation>
+    </message>
+    <message>
+        <source>Settings reset. Restart XLibrary to apply the defaults. Your catalog was kept.</source>
+        <translation>Настройки сброшены. Перезапустите XLibrary для применения значений по умолчанию. Каталог сохранён.</translation>
+    </message>
+    <message>
+        <source>Settings were reset. Restart XLibrary now?</source>
+        <translation>Настройки сброшены. Перезапустить XLibrary сейчас?</translation>
+    </message>
 </context>
 </TS>
