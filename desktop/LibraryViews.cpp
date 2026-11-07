@@ -22,6 +22,7 @@
 #include <QStackedLayout>
 #include <QStyledItemDelegate>
 #include <QTreeView>
+#include <QTreeWidget>
 
 #include "appearance.h"
 #include "Application.h"
@@ -1060,6 +1061,43 @@ QWidget *scenarios(const ui_context &context, QWidget *const parent) {
     root->addWidget(empty);
     auto *status = label("", "muted");
     root->addWidget(status);
+    auto *steps = new QTreeWidget;
+    steps->setRootIsDecorated(false);
+    steps->setHeaderLabels({QCoreApplication::translate("XLibrary", "Application"),
+                            QCoreApplication::translate("XLibrary", "Step status")});
+    steps->header()->setSectionResizeMode(0, QHeaderView::Stretch);
+    steps->header()->setSectionResizeMode(1, QHeaderView::Stretch);
+    steps->setMinimumHeight(appearance::scaled(*context.settings, 150));
+    root->addWidget(steps, 1);
+    const auto rebuild_steps = [=] {
+        steps->clear();
+        if (!list->currentItem())
+            return;
+        const auto id = list->currentItem()->data(Qt::UserRole).toLongLong();
+        QVector<scenario_step> records;
+        const bool has_run = id == service->scenario_run_id();
+        if (has_run)
+            records = service->scenario_run_steps();
+        else
+            for (const auto &record : service->catalog().scenarios)
+                if (record.id == id) {
+                    records = record.steps;
+                    break;
+                }
+        for (qsizetype index = 0; index < records.size(); ++index) {
+            const auto &step = records[index];
+            const auto *app = service->model.find(step.application_id);
+            const auto name = app ? app->name : QCoreApplication::translate("XLibrary", "Missing application");
+            const auto state = has_run        ? service->scenario_step_status(index)
+                               : step.enabled ? QCoreApplication::translate("XLibrary", "Waiting")
+                                              : QCoreApplication::translate("XLibrary", "Skipped");
+            auto *item = new QTreeWidgetItem(steps, {QString::number(index + 1) + ". " + name, state});
+            item->setToolTip(1, state);
+        }
+    };
+    QObject::connect(service, &DesktopService::scenario_steps_changed, widget, rebuild_steps);
+    QObject::connect(service, &DesktopService::catalog_changed, widget, rebuild_steps);
+    QObject::connect(list, &QListWidget::currentRowChanged, widget, [=] { rebuild_steps(); });
     auto *tools = new QHBoxLayout;
     auto *run = button(QCoreApplication::translate("XLibrary", "Run scenario"), "primary");
     auto *edit = button(QCoreApplication::translate("XLibrary", "Edit"));

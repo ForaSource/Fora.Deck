@@ -178,6 +178,7 @@ DesktopService::DesktopService(QObject *const parent, const QString &profile_pat
     });
     connect(worker, &Manager::loaded, this, [this](const catalog_snapshot &value) {
         snapshot = value;
+        clear_stale_scenario_run();
         if (!current_tag.isEmpty() && !snapshot.tags.contains(current_tag))
             navigate(current_section);
         model.replace(value.applications);
@@ -200,6 +201,14 @@ DesktopService::DesktopService(QObject *const parent, const QString &profile_pat
                     emit application_launch_finished(id, result);
                 if (result.state == operation_state::completed && !from_scenario)
                     emit launch_succeeded();
+                if (from_scenario && from_scenario == scenario_run_generation && step_index < step_states.size()) {
+                    step_states[step_index] = result.state == operation_state::completed   ? "success"
+                                              : result.state == operation_state::cancelled ? "skipped"
+                                                                                           : "error";
+                    step_errors[step_index] = result.error.user_message;
+                    clear_stale_scenario_run();
+                    emit scenario_steps_changed();
+                }
                 if (!from_scenario || !is_scenario_active() || from_scenario != scenario_generation->load())
                     return;
                 if (result.state != operation_state::completed) {
@@ -225,10 +234,18 @@ DesktopService::DesktopService(QObject *const parent, const QString &profile_pat
     connect(&scenario_timer, &QTimer::timeout, this, [this] {
         if (is_scenario_active() && step_index < pending_steps.size()) {
             const auto &step = pending_steps[step_index];
+            step_states[step_index] = "launching";
+            emit scenario_steps_changed();
+            quint64 request = 0;
             if (step.launch_profile.isEmpty())
-                launch(step.application_id, false, true);
+                request = request_launch(step.application_id, false, true);
             else
-                request_launch_mode(step.application_id, Application::launch_mode::launch, true, step.launch_profile);
+                request = request_launch_mode(step.application_id, Application::launch_mode::launch, true,
+                                              step.launch_profile);
+            if (!request && is_scenario_active()) {
+                step_states[step_index] = "error";
+                finish_scenario(operation_state::error);
+            }
         }
     });
     worker_thread.setObjectName("catalog_worker");
@@ -548,16 +565,21 @@ void DesktopService::run_scenario(const qint64 id) {
     }
     for (const auto &record : snapshot.scenarios) {
         if (record.id == id) {
-            pending_steps.clear();
-            for (const auto &step : record.steps)
-                if (step.enabled)
-                    pending_steps.append(step);
-            if (pending_steps.isEmpty()) {
+            if (std::none_of(record.steps.cbegin(), record.steps.cend(),
+                             [](const auto &step) { return step.enabled; })) {
                 notify(QCoreApplication::translate("XLibrary", "The scenario has no enabled applications."));
                 return;
             }
+            pending_steps = record.steps;
+            step_states.clear();
+            step_errors.clear();
+            for (const auto &step : pending_steps) {
+                step_states.append(step.enabled ? "waiting" : "skipped");
+                step_errors.append(QString{});
+            }
+            running_scenario_id = id;
             scenario_name = record.name;
-            ++*scenario_generation;
+            scenario_run_generation = ++*scenario_generation;
             step_index = 0;
             scenario_status = operation_state::loading;
             scenario_request_id = begin_operation("run_scenario");
@@ -568,6 +590,8 @@ void DesktopService::run_scenario(const qint64 id) {
 }
 
 void DesktopService::next_scenario_step() {
+    while (step_index < pending_steps.size() && !pending_steps[step_index].enabled)
+        ++step_index;
     if (step_index >= pending_steps.size()) {
         finish_scenario(operation_state::completed);
         emit scenario_changed(QCoreApplication::translate("XLibrary", "Scenario “") + scenario_name +
@@ -578,7 +602,9 @@ void DesktopService::next_scenario_step() {
                               .arg(scenario_name)
                               .arg(step_index + 1)
                               .arg(pending_steps.size()));
-    scenario_timer.start(pending_steps[step_index].delay_ms);
+    step_states[step_index] = pending_steps[step_index].delay_ms > 0 ? "delaying" : "waiting";
+    emit scenario_steps_changed();
+    scenario_timer.start(qMax(0, pending_steps[step_index].delay_ms));
 }
 
 void DesktopService::cancel_scenario() {
@@ -593,7 +619,52 @@ void DesktopService::finish_scenario(const operation_state state, const operatio
     ++*scenario_generation;
     scenario_status = state;
     scenario_timer.stop();
+    for (auto &step_state : step_states)
+        if (step_state == "waiting" || step_state == "delaying")
+            step_state = "skipped";
+    clear_stale_scenario_run();
+    emit scenario_steps_changed();
     publish_result({scenario_request_id, "run_scenario", state, error});
+}
+
+void DesktopService::clear_stale_scenario_run() {
+    if (is_scenario_active() || !running_scenario_id || step_states.contains("launching"))
+        return;
+    const auto found = std::find_if(snapshot.scenarios.cbegin(), snapshot.scenarios.cend(),
+                                    [this](const auto &record) { return record.id == running_scenario_id; });
+    const auto same_step = [](const scenario_step &left, const scenario_step &right) {
+        return left.application_id == right.application_id && left.delay_ms == right.delay_ms &&
+               left.enabled == right.enabled && left.launch_profile == right.launch_profile;
+    };
+    if (found == snapshot.scenarios.cend() || !std::equal(pending_steps.cbegin(), pending_steps.cend(),
+                                                          found->steps.cbegin(), found->steps.cend(), same_step)) {
+        running_scenario_id = 0;
+        pending_steps.clear();
+        step_states.clear();
+        step_errors.clear();
+    }
+}
+
+QString DesktopService::scenario_step_status(const qsizetype index) const {
+    if (index < 0 || index >= step_states.size())
+        return {};
+    const auto &state = step_states[index];
+    QString text;
+    if (state == "waiting")
+        text = QCoreApplication::translate("XLibrary", "Waiting");
+    else if (state == "delaying")
+        text = QCoreApplication::translate("XLibrary", "Delay");
+    else if (state == "launching")
+        text = QCoreApplication::translate("XLibrary", "Launching");
+    else if (state == "success")
+        text = QCoreApplication::translate("XLibrary", "Success");
+    else if (state == "error")
+        text = QCoreApplication::translate("XLibrary", "Error");
+    else
+        text = QCoreApplication::translate("XLibrary", "Skipped");
+    if (!step_errors[index].isEmpty())
+        text += ": " + step_errors[index];
+    return text;
 }
 
 bool DesktopService::begin_catalog_preview(const QString &operation, const bool at_startup) {

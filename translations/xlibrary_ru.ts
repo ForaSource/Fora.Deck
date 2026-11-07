@@ -2911,5 +2911,29 @@ Technical reason: %3</source>
         <source>Your library, tags, scenarios and settings are stored on this computer. XLibrary does not upload your catalog. Update checks contact GitHub; your saved access token is kept in the system credential store.</source>
         <translation>Библиотека, теги, сценарии и настройки хранятся на этом компьютере. XLibrary не загружает каталог в сеть. Проверка обновлений обращается к GitHub; сохранённый токен доступа хранится в системном хранилище учётных данных.</translation>
     </message>
+    <message>
+        <source>Delay</source>
+        <translation>Задержка</translation>
+    </message>
+    <message>
+        <source>Launching</source>
+        <translation>Запуск</translation>
+    </message>
+    <message>
+        <source>Missing application</source>
+        <translation>Приложение отсутствует</translation>
+    </message>
+    <message>
+        <source>Step status</source>
+        <translation>Состояние шага</translation>
+    </message>
+    <message>
+        <source>Success</source>
+        <translation>Успех</translation>
+    </message>
+    <message>
+        <source>Waiting</source>
+        <translation>Ожидание</translation>
+    </message>
 </context>
 </TS>

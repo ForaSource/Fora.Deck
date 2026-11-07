@@ -39,6 +39,11 @@ private:
     void warm_launch_profiles();
     QTimer scenario_timer;
     QVector<scenario_step> pending_steps;
+    QStringList step_states;
+    QStringList step_errors;
+    qint64 running_scenario_id = 0;
+    quint64 scenario_run_generation = 0;
+    void clear_stale_scenario_run();
     QString scenario_name;
     qsizetype step_index = 0;
     operation_state scenario_status = operation_state::ready;
@@ -145,6 +150,9 @@ public:
     const discovery_progress &discovery_status() const { return scan_progress; }
     QString discovery_report() const { return scan_report; }
     bool is_scenario_active() const { return scenario_status == operation_state::loading; }
+    qint64 scenario_run_id() const { return running_scenario_id; }
+    const QVector<scenario_step> &scenario_run_steps() const { return pending_steps; }
+    QString scenario_step_status(qsizetype index) const;
     qint64 selection() const { return selected_id; }
     const app_record *selected() const { return model.find(selected_id); }
     const catalog_snapshot &catalog() const { return snapshot; }
@@ -223,6 +231,7 @@ signals:
     void launch_succeeded();
     void application_launch_finished(qint64 id, const operation_result &result);
     void scenario_changed(const QString &status);
+    void scenario_steps_changed();
     void appearance_changed();
     void profile_state_changed();
     void profile_preview_ready(quint64 request_id, const QString &path, const profile_manifest &manifest);
