@@ -5,6 +5,7 @@
 #include <QCoreApplication>
 #include <QDialogButtonBox>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QHeaderView>
 #include <QKeySequenceEdit>
 #include <QLineEdit>
@@ -15,6 +16,7 @@
 #include <QTreeWidget>
 #include <QUrl>
 
+#include "ApplicationPaths.h"
 #include "DesktopService.h"
 #include "GithubTokenStore.h"
 #include "localization.h"
@@ -338,6 +340,49 @@ QWidget *library_settings(const ui_context &context, QWidget *) {
                     QCoreApplication::translate("XLibrary", "Clear")))
             service->clear_history();
     });
+    static_cast<QVBoxLayout *>(widget->layout())->addStretch();
+    return widget;
+}
+
+QWidget *storage_page(const ui_context &context, QWidget *) {
+    auto *service = static_cast<DesktopService *>(context.service);
+    auto *widget = page(QCoreApplication::translate("XLibrary", "Local data"));
+    widget->layout()->addWidget(
+        label(QCoreApplication::translate(
+                  "XLibrary",
+                  "Your library, tags, scenarios and settings are stored on this computer. XLibrary does not upload "
+                  "your catalog. Update checks contact GitHub; your saved access token is kept in the system "
+                  "credential store."),
+              "muted"));
+    const auto add_path = [=](const QString &title, const QString &path) {
+        widget->layout()->addWidget(label(title, "subheading"));
+        auto *value = label(QDir::toNativeSeparators(path), "muted");
+        value->setTextInteractionFlags(Qt::TextSelectableByMouse | Qt::TextSelectableByKeyboard);
+        widget->layout()->addWidget(value);
+    };
+    add_path(QCoreApplication::translate("XLibrary", "Settings file"), context.settings->fileName());
+    auto *database = label("", "muted");
+    database->setTextInteractionFlags(Qt::TextSelectableByMouse | Qt::TextSelectableByKeyboard);
+    widget->layout()->addWidget(label(QCoreApplication::translate("XLibrary", "Catalog database"), "subheading"));
+    widget->layout()->addWidget(database);
+    const auto update_path = [=] { database->setText(QDir::toNativeSeparators(service->library_path())); };
+    QObject::connect(service, &DesktopService::catalog_changed, widget, update_path);
+    update_path();
+    widget->layout()->addWidget(label(application_paths::portable_mode()
+                                          ? QCoreApplication::translate("XLibrary", "Current mode: portable")
+                                          : QCoreApplication::translate("XLibrary", "Current mode: installed"),
+                                      "subheading"));
+    widget->layout()->addWidget(label(
+        QCoreApplication::translate(
+            "XLibrary",
+            "Installed mode uses your operating system's user data folders. A portable.flag next to the executable "
+            "selects the data folder beside it. An AppImage uses <AppImage>.data beside the image. Moving the "
+            "executable "
+            "alone does not transfer installed-mode data; use a complete profile backup to move your library."),
+        "muted"));
+    auto *folder = button(QCoreApplication::translate("XLibrary", "Open profile folder"));
+    widget->layout()->addWidget(folder);
+    QObject::connect(folder, &QPushButton::clicked, service, &DesktopService::open_profile_folder);
     static_cast<QVBoxLayout *>(widget->layout())->addStretch();
     return widget;
 }
@@ -709,6 +754,7 @@ QDialog *settings_dialog(const ui_context &context, QWidget *const parent) {
         {QCoreApplication::translate("XLibrary", "Keyboard shortcuts"), "settings_hotkeys"},
         {QCoreApplication::translate("XLibrary", "Library"), "settings_library"},
         {QCoreApplication::translate("XLibrary", "Profile"), "settings_profile"},
+        {QCoreApplication::translate("XLibrary", "Local data"), "settings_storage"},
         {QCoreApplication::translate("XLibrary", "Plugins"), "settings_plugins"},
         {QCoreApplication::translate("XLibrary", "Update"), "settings_update"},
         {QCoreApplication::translate("XLibrary", "About"), "settings_about"}};
@@ -886,6 +932,7 @@ void register_settings_views(UiRegistry &registry) {
     registry.add_default("settings_hotkeys", hotkeys);
     registry.add_default("settings_library", library_settings);
     registry.add_default("settings_profile", profile_view);
+    registry.add_default("settings_storage", storage_page);
     registry.add_default("settings_plugins", plugins);
     registry.add_default("settings_update", update_page);
     registry.add_default("settings_about", about);

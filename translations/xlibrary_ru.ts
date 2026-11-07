@@ -2883,5 +2883,33 @@ Technical reason: %3</source>
         <source>Your applications. One home.</source>
         <translation>Все приложения — в одном месте.</translation>
     </message>
+    <message>
+        <source>Catalog database</source>
+        <translation>База данных каталога</translation>
+    </message>
+    <message>
+        <source>Current mode: installed</source>
+        <translation>Текущий режим: установленное приложение</translation>
+    </message>
+    <message>
+        <source>Current mode: portable</source>
+        <translation>Текущий режим: portable</translation>
+    </message>
+    <message>
+        <source>Installed mode uses your operating system&apos;s user data folders. A portable.flag next to the executable selects the data folder beside it. An AppImage uses &lt;AppImage&gt;.data beside the image. Moving the executable alone does not transfer installed-mode data; use a complete profile backup to move your library.</source>
+        <translation>Установленное приложение использует пользовательские каталоги данных ОС. Файл portable.flag рядом с исполняемым файлом выбирает папку data рядом с ним. AppImage использует папку &lt;AppImage&gt;.data рядом с образом. Перемещение одного исполняемого файла не переносит данные установленной программы; для переноса библиотеки используйте полную резервную копию профиля.</translation>
+    </message>
+    <message>
+        <source>Local data</source>
+        <translation>Локальные данные</translation>
+    </message>
+    <message>
+        <source>Settings file</source>
+        <translation>Файл настроек</translation>
+    </message>
+    <message>
+        <source>Your library, tags, scenarios and settings are stored on this computer. XLibrary does not upload your catalog. Update checks contact GitHub; your saved access token is kept in the system credential store.</source>
+        <translation>Библиотека, теги, сценарии и настройки хранятся на этом компьютере. XLibrary не загружает каталог в сеть. Проверка обновлений обращается к GitHub; сохранённый токен доступа хранится в системном хранилище учётных данных.</translation>
+    </message>
 </context>
 </TS>
