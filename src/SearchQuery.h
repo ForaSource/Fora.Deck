@@ -2,6 +2,7 @@
 #define XLIBRARY_SEARCH_QUERY_H
 
 #include <optional>
+#include <QRegularExpression>
 #include <QStringList>
 #include <QVector>
 
@@ -46,6 +47,7 @@ public:
 namespace search_query {
 QString rewrite_tag(const QString &text, const QString &old_name, const QString &new_name);
 QString switch_layout(const QString &text);
+std::optional<QRegularExpression> file_pattern(const QString &text);
 bool is_path(const QString &text);
 QString expanded_path(const QString &text);
 struct calculation {

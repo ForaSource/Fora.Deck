@@ -268,7 +268,9 @@ void SearchResults::update_query() {
         return;
     }
     const auto calculation = search_query::calculate(text);
-    special = calculation.recognized;
+    // A numeric filename mask such as "2026*" is also an incomplete calculation.
+    special = calculation.recognized &&
+              !(files_enabled && !calculation.value && search_query::file_pattern(text).has_value());
     if (special) {
         if (calculation.value) {
             const auto number = QString::number(*calculation.value, 'g', 15);

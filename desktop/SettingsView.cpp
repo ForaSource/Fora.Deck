@@ -11,6 +11,7 @@
 #include <QKeySequenceEdit>
 #include <QLineEdit>
 #include <QListWidget>
+#include <QMenu>
 #include <QProgressBar>
 #include <QRegularExpressionValidator>
 #include <QStackedWidget>
@@ -430,9 +431,11 @@ QWidget *file_settings(const ui_context &context, QWidget *) {
     widget->layout()->addWidget(roots);
     auto *tools = new QHBoxLayout;
     auto *add = button(QCoreApplication::translate("XLibrary", "Add folder"));
+    auto *drive = button(QCoreApplication::translate("XLibrary", "Add drive"));
     auto *remove = button(QCoreApplication::translate("XLibrary", "Remove folder"));
     auto *all = button(QCoreApplication::translate("XLibrary", "Search all drives"));
     tools->addWidget(add);
+    tools->addWidget(drive);
     tools->addWidget(remove);
     tools->addWidget(all);
     static_cast<QVBoxLayout *>(widget->layout())->addLayout(tools);
@@ -441,6 +444,24 @@ QWidget *file_settings(const ui_context &context, QWidget *) {
             QFileDialog::getExistingDirectory(widget, QCoreApplication::translate("XLibrary", "Add folder"));
         if (!path.isEmpty() && roots->findItems(path, Qt::MatchExactly).isEmpty())
             roots->addItem(path);
+    });
+    auto *drives = new QMenu(drive);
+    drive->setMenu(drives);
+    QObject::connect(drives, &QMenu::aboutToShow, widget, [=] {
+        drives->clear();
+        for (const auto &path : FileManager::volume_roots()) {
+            auto *action = drives->addAction(QDir::toNativeSeparators(path));
+            const auto canonical = QFileInfo(path).canonicalFilePath();
+            bool selected = false;
+            for (int i = 0; i < roots->count(); ++i)
+                if (QFileInfo(roots->item(i)->text()).canonicalFilePath() == canonical) {
+                    selected = true;
+                    break;
+                }
+            action->setEnabled(!selected);
+            QObject::connect(action, &QAction::triggered, roots,
+                             [=] { roots->addItem(QDir::toNativeSeparators(path)); });
+        }
     });
     QObject::connect(remove, &QPushButton::clicked, widget, [=] { delete roots->takeItem(roots->currentRow()); });
     QObject::connect(all, &QPushButton::clicked, roots, &QListWidget::clear);
@@ -452,6 +473,11 @@ QWidget *file_settings(const ui_context &context, QWidget *) {
     auto *scan = button(QCoreApplication::translate("XLibrary", "Refresh file index"));
     widget->layout()->addWidget(scan);
     QObject::connect(scan, &QPushButton::clicked, service->files, &FileManager::rescan);
+    widget->layout()->addWidget(label(
+        QCoreApplication::translate("XLibrary",
+                                    "Filename masks: * matches any number of characters; ? matches one character. "
+                                    "Examples: *.pdf, report-??.txt. Other characters are literal."),
+        "muted"));
     widget->layout()->addWidget(
         label(QCoreApplication::translate("XLibrary",
                                           "Folder changes take effect after Save. An empty list means all drives. "

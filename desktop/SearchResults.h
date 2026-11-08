@@ -12,6 +12,7 @@
 #include <QListView>
 
 #include "LibraryModel.h"
+#include "SearchQuery.h"
 
 class DesktopService;
 class SearchResultModel;
@@ -59,6 +60,7 @@ inline QVector<search_entry> directory_entries(const QString &request,
         const auto comparison = QString::compare(left.title, right.title, Qt::CaseInsensitive);
         return comparison == 0 ? left.title < right.title : comparison < 0;
     };
+    const auto pattern = search_query::file_pattern(prefix);
     QDirIterator iterator(path, QDir::AllEntries | QDir::Hidden | QDir::System | QDir::NoDotAndDotDot);
     QVector<search_entry> entries;
     entries.reserve(result_limit + 1);
@@ -74,7 +76,8 @@ inline QVector<search_entry> directory_entries(const QString &request,
         iterator.next();
         ++scanned;
         const auto name = iterator.fileName();
-        if (!name.startsWith(prefix, Qt::CaseInsensitive))
+        if (pattern ? !pattern->match(name.normalized(QString::NormalizationForm_C)).hasMatch()
+                    : !name.startsWith(prefix, Qt::CaseInsensitive))
             continue;
         const auto file = iterator.fileInfo();
         search_entry entry{file.isDir() ? search_entry::kind::directory : search_entry::kind::file, name,

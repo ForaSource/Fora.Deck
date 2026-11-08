@@ -73,6 +73,9 @@ const QSet<QString> &extensions() {
     return allowed;
 }
 bool excluded_directory(const QFileInfo &info) {
+    // Windows marks volume roots hidden/system; those attributes must not exclude an entire drive.
+    if (info.isRoot())
+        return false;
     static const QSet<QString> names = {"windows",
                                         "program files",
                                         "program files (x86)",
@@ -384,11 +387,14 @@ void FileManager::search(const QString &text, const quint64 request, QObject *re
             return matches;
         try {
             auto db = open_index(path);
-            QString query_text = text.simplified();
+            const auto pattern = search_query::file_pattern(text.trimmed());
+            QString query_text = pattern ? text.trimmed() : text.simplified();
             QString extension;
             const auto token = query_text.section(' ', -1).toLower();
             const auto alternate = search_query::switch_layout(token).toLower();
             for (auto candidate : {token, alternate}) {
+                if (pattern)
+                    break;
                 if (candidate.startsWith("*."))
                     candidate.remove(0, 2);
                 else if (candidate.startsWith('.'))
@@ -426,7 +432,12 @@ void FileManager::search(const QString &text, const quint64 request, QObject *re
                 const auto name = rows.qtext(1).isEmpty() ? QFileInfo(file_path).fileName() : rows.qtext(1);
                 if (!extension.isEmpty() && QFileInfo(name).suffix().compare(extension, Qt::CaseInsensitive) != 0)
                     continue;
-                const auto rank = query_text.trimmed().isEmpty() ? 0 : query.rank(name, name, {});
+                int rank = 0;
+                if (pattern) {
+                    if (!pattern->match(name.normalized(QString::NormalizationForm_C)).hasMatch())
+                        continue;
+                } else if (!query_text.trimmed().isEmpty())
+                    rank = query.rank(name, name, {});
                 if (rank < 0)
                     continue;
                 file_match match{file_path, name, rank, rows.number(2) != 0, true};

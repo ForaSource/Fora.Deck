@@ -404,9 +404,15 @@ typo tolerance and alternate keyboard layout; `pdf`, `.pdf`, `*.pdf` and `report
 restrict results by extension. File results show their parent folder to distinguish
 identical names. Use the arrow keys and Enter, or right-click / Shift+F10 for actions.
 
+Filename masks match the entire name, ignoring case: `*` matches any number of
+characters and `?` matches exactly one. For example, `*.pdf`, `report-??.txt` and
+`C:\Documents\report*.pdf` work; other characters (including brackets and dots)
+are literal. Plain queries retain ranking, typo tolerance and alternate layouts.
+
 A separate `FileManager` indexes all accessible local drives and mounted local volumes
 in the background, independently of the switch. **Settings → File search** can restrict
-indexing to selected folders; an empty list restores all drives. Save settings to apply
+indexing to selected folders or disks using **Add folder** / **Add drive**;
+an empty list restores all drives. Save settings to apply
 folder changes. The index refreshes every 15 minutes, and can be refreshed manually.
 Search shows up to 30 file matches; quick search keeps up to five application matches.
 The initial scan can take time: results become available as indexing progresses, and

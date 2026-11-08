@@ -22,6 +22,18 @@ QString search_query::switch_layout(const QString &text) {
     return result;
 }
 
+std::optional<QRegularExpression> search_query::file_pattern(const QString &text) {
+    if (!text.contains('*') && !text.contains('?'))
+        return std::nullopt;
+    // Escape every other regex metacharacter so filenames such as "report[1].txt" stay literal.
+    auto expression = QRegularExpression::escape(text.normalized(QString::NormalizationForm_C));
+    expression.replace(QStringLiteral("\\*"), QStringLiteral(".*"));
+    expression.replace(QStringLiteral("\\?"), QStringLiteral("."));
+    return QRegularExpression(QRegularExpression::anchoredPattern(expression),
+                              QRegularExpression::CaseInsensitiveOption |
+                                  QRegularExpression::DotMatchesEverythingOption);
+}
+
 namespace {
 QString normalized_search(const QString &text) {
     return text.normalized(QString::NormalizationForm_C).toCaseFolded().simplified();

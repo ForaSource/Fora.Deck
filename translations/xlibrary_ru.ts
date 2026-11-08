@@ -3162,6 +3162,14 @@ Qt: %4
         <translation>Добавить папку</translation>
     </message>
     <message>
+        <source>Add drive</source>
+        <translation>Добавить диск</translation>
+    </message>
+    <message>
+        <source>Filename masks: * matches any number of characters; ? matches one character. Examples: *.pdf, report-??.txt. Other characters are literal.</source>
+        <translation>Маски имени файла: * — любое число символов; ? — один символ. Примеры: *.pdf, report-??.txt. Остальные символы ищутся буквально.</translation>
+    </message>
+    <message>
         <source>Remove folder</source>
         <translation>Убрать папку</translation>
     </message>
