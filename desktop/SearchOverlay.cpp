@@ -173,6 +173,15 @@ void SearchOverlay::update_surface() {
     const qreal animated_height = 8 + (surface_height - 8) * progress;
     const QRectF surface((width() - surface_width) / 2, center_y * (1 - progress) + 8 * progress - 4 * (1 - progress),
                          surface_width, animated_height);
+    // Without an X11 compositor, alpha pixels outside the panel are displayed as black.
+    // A native window shape removes those pixels; composited desktops keep the soft shadow.
+    if (!translucent_surface) {
+        QPainterPath window_clip;
+        window_clip.addRoundedRect(surface, qMin(22.0, animated_height / 2), qMin(22.0, animated_height / 2));
+        setMask(QRegion(window_clip.toFillPolygon().toPolygon()));
+    } else if (!mask().isEmpty()) {
+        clearMask();
+    }
     QPainterPath clip;
     clip.addRoundedRect(surface.translated(-inset, -inset), qMin(22.0, animated_height / 2),
                         qMin(22.0, animated_height / 2));
@@ -246,6 +255,7 @@ void SearchOverlay::show_search() {
     reveal->stop();
     height_animation->stop();
     activation_check->stop();
+    translucent_surface = desktop_platform::translucent_windows_supported();
     dismiss_on_deactivate = isVisible() && isActiveWindow();
     progress = 0;
     input->clear();

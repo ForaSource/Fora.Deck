@@ -156,6 +156,11 @@ bool desktop_platform::set_autostart(const bool enabled, QString &error) {
     return true;
 }
 
+bool desktop_platform::translucent_windows_supported() {
+    // DWM compositing is always enabled on the supported Windows 10+ versions.
+    return true;
+}
+
 bool desktop_platform::animations_enabled() {
     if (qApp->property("xlibrary_disable_animations").toBool())
         return false;
