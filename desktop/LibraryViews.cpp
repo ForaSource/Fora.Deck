@@ -23,6 +23,7 @@
 #include <QStyledItemDelegate>
 #include <QTreeView>
 #include <QTreeWidget>
+#include <QUrl>
 
 #include "appearance.h"
 #include "Application.h"
@@ -236,7 +237,8 @@ QWidget *navigation(const ui_context &context, QWidget *const parent) {
     const QList<QStringList> links{{"library", QCoreApplication::translate("XLibrary", "Library"), "library"},
                                    {"favorites", QCoreApplication::translate("XLibrary", "Favorites"), "favorite"},
                                    {"running", QCoreApplication::translate("XLibrary", "Running applications"), "play"},
-                                   {"scenarios", QCoreApplication::translate("XLibrary", "Scenarios"), "scenarios"}};
+                                   {"scenarios", QCoreApplication::translate("XLibrary", "Scenarios"), "scenarios"},
+                                   {"files", QCoreApplication::translate("XLibrary", "My files"), "file"}};
     for (const auto &link : links) {
         auto *item = new SelectionButton(link[1]);
         item->setIcon(appearance::icon(link[2]));
@@ -326,6 +328,80 @@ QWidget *navigation(const ui_context &context, QWidget *const parent) {
     return widget;
 }
 
+QWidget *my_files(const ui_context &context, QWidget *const parent) {
+    auto *service = static_cast<DesktopService *>(context.service);
+    auto *widget = new QWidget(parent);
+    auto *layout = new QVBoxLayout(widget);
+    layout->addWidget(label(QCoreApplication::translate("XLibrary", "My files"), "heading"));
+    layout->addWidget(
+        label(QCoreApplication::translate(
+                  "XLibrary",
+                  "Save files from search results using the context menu. Removing a saved file keeps it on disk."),
+              "muted"));
+    auto *list = new QTreeWidget;
+    list->setObjectName("my_files_list");
+    list->setAccessibleName(QCoreApplication::translate("XLibrary", "My files"));
+    list->setRootIsDecorated(false);
+    list->setHeaderLabels(
+        {QCoreApplication::translate("XLibrary", "Name"), QCoreApplication::translate("XLibrary", "Path")});
+    list->header()->setSectionResizeMode(QHeaderView::Stretch);
+    layout->addWidget(list, 1);
+    auto sequence = std::make_shared<quint64>(0);
+    const auto reload = [=] {
+        const auto request = ++*sequence;
+        service->files->saved_files(widget, [=](QVector<file_match> entries) {
+            if (request != *sequence)
+                return;
+            list->clear();
+            for (const auto &entry : entries) {
+                auto *item = new QTreeWidgetItem(list, {entry.name, QDir::toNativeSeparators(entry.path)});
+                item->setData(0, Qt::UserRole, entry.path);
+                item->setToolTip(0, entry.path);
+                if (!entry.available) {
+                    item->setText(0, entry.name + " · " + QCoreApplication::translate("XLibrary", "Unavailable"));
+                    item->setForeground(0, list->palette().color(QPalette::PlaceholderText));
+                }
+            }
+        });
+    };
+    QObject::connect(service->files, &FileManager::saved_paths_changed, widget, [=] {
+        if (service->section() == "files")
+            reload();
+    });
+    QObject::connect(service, &DesktopService::navigation_changed, widget, [=] {
+        if (service->section() == "files")
+            reload();
+    });
+    auto *tools = new QHBoxLayout;
+    const auto action = [=](const QString &title, const std::function<void(QString)> &callback) {
+        auto *control = button(title);
+        tools->addWidget(control);
+        QObject::connect(control, &QPushButton::clicked, widget, [=] {
+            if (!service->profile_busy() && !service->restart_required() && list->currentItem())
+                callback(list->currentItem()->data(0, Qt::UserRole).toString());
+        });
+    };
+    const auto open = [=](const QString &path) {
+        if (!FileManager::accepts_file(path) || !desktop_platform::open_url(QUrl::fromLocalFile(path)))
+            service->notify(QCoreApplication::translate("XLibrary", "Could not open the file."));
+    };
+    action(QCoreApplication::translate("XLibrary", "Open"), open);
+    action(QCoreApplication::translate("XLibrary", "Open folder"), [](const QString &path) {
+        desktop_platform::open_url(QUrl::fromLocalFile(QFileInfo(path).absolutePath()));
+    });
+    action(QCoreApplication::translate("XLibrary", "Copy path"),
+           [](const QString &path) { QApplication::clipboard()->setText(QDir::toNativeSeparators(path)); });
+    action(QCoreApplication::translate("XLibrary", "Remove from My files"),
+           [=](const QString &path) { service->files->set_saved(path, false); });
+    QObject::connect(list, &QTreeWidget::itemActivated, widget, [=](QTreeWidgetItem *item, int) {
+        if (!service->profile_busy() && !service->restart_required())
+            open(item->data(0, Qt::UserRole).toString());
+    });
+    layout->addLayout(tools);
+    reload();
+    return widget;
+}
+
 QWidget *search_bar(const ui_context &context, QWidget *const parent) {
     auto *service = static_cast<DesktopService *>(context.service);
     auto *widget = new QWidget(parent);
@@ -384,8 +460,13 @@ QWidget *search_bar(const ui_context &context, QWidget *const parent) {
     auto *settings = action_button(context.actions.value("settings"), false, "");
     settings->setAccessibleName(QCoreApplication::translate("XLibrary", "Settings"));
     settings->setFixedWidth(44);
+    auto *files = file_search_switch(true, widget);
+    layout->addWidget(files);
     layout->addWidget(settings);
-    root->addWidget(new SearchResults(*service, *search, false, widget));
+    auto *results = new SearchResults(*service, *search, false, widget);
+    results->set_files_enabled(true);
+    QObject::connect(files, &QAbstractButton::toggled, results, &SearchResults::set_files_enabled);
+    root->addWidget(results);
     root->addWidget(search_tools(*service, *search, widget));
     return widget;
 }
@@ -1207,6 +1288,7 @@ void register_library_views(UiRegistry &registry) {
     registry.add_default("discovery_progress", discovery_status);
     registry.add_default("navigation", navigation);
     registry.add_default("search_bar", search_bar);
+    registry.add_default("my_files", my_files);
     registry.add_default("library", library);
     registry.add_default("details", details);
     registry.add_default("details_dialog", [](const ui_context &context, QWidget *const parent) {

@@ -10,6 +10,7 @@
 #include <QHeaderView>
 #include <QKeySequenceEdit>
 #include <QLineEdit>
+#include <QListWidget>
 #include <QProgressBar>
 #include <QRegularExpressionValidator>
 #include <QStackedWidget>
@@ -408,6 +409,55 @@ QWidget *storage_page(const ui_context &context, QWidget *) {
     widget->layout()->addWidget(folder);
     QObject::connect(folder, &QPushButton::clicked, service, &DesktopService::open_profile_folder);
     static_cast<QVBoxLayout *>(widget->layout())->addStretch();
+    return widget;
+}
+
+QWidget *file_settings(const ui_context &context, QWidget *) {
+    auto *service = static_cast<DesktopService *>(context.service);
+    auto *widget = page(QCoreApplication::translate("XLibrary", "File search"));
+    widget->layout()->addWidget(label(
+        QCoreApplication::translate(
+            "XLibrary",
+            "By default, all accessible local drives are indexed. Add folders below to search only those locations. "
+            "System folders, caches, hidden files and unsupported file types are excluded. "
+            "Indexing runs in the background even when file search is off."),
+        "muted"));
+    auto *roots = new QListWidget;
+    roots->setObjectName("file_search_roots");
+    roots->setProperty("setting_key", "files/roots");
+    roots->setAccessibleName(QCoreApplication::translate("XLibrary", "File search folders"));
+    roots->addItems(context.settings->value("files/roots").toStringList());
+    widget->layout()->addWidget(roots);
+    auto *tools = new QHBoxLayout;
+    auto *add = button(QCoreApplication::translate("XLibrary", "Add folder"));
+    auto *remove = button(QCoreApplication::translate("XLibrary", "Remove folder"));
+    auto *all = button(QCoreApplication::translate("XLibrary", "Search all drives"));
+    tools->addWidget(add);
+    tools->addWidget(remove);
+    tools->addWidget(all);
+    static_cast<QVBoxLayout *>(widget->layout())->addLayout(tools);
+    QObject::connect(add, &QPushButton::clicked, widget, [=] {
+        const auto path =
+            QFileDialog::getExistingDirectory(widget, QCoreApplication::translate("XLibrary", "Add folder"));
+        if (!path.isEmpty() && roots->findItems(path, Qt::MatchExactly).isEmpty())
+            roots->addItem(path);
+    });
+    QObject::connect(remove, &QPushButton::clicked, widget, [=] { delete roots->takeItem(roots->currentRow()); });
+    QObject::connect(all, &QPushButton::clicked, roots, &QListWidget::clear);
+    auto *status = label(service->files->status(), "muted");
+    status->setObjectName("file_index_status");
+    widget->layout()->addWidget(status);
+    QObject::connect(service->files, &FileManager::status_changed, widget,
+                     [=] { status->setText(service->files->status()); });
+    auto *scan = button(QCoreApplication::translate("XLibrary", "Refresh file index"));
+    widget->layout()->addWidget(scan);
+    QObject::connect(scan, &QPushButton::clicked, service->files, &FileManager::rescan);
+    widget->layout()->addWidget(
+        label(QCoreApplication::translate("XLibrary",
+                                          "Folder changes take effect after Save. An empty list means all drives. "
+                                          "The index refreshes every 15 minutes; unavailable locations are skipped. "
+                                          "Right-click a search result to save it to My files."),
+              "muted"));
     return widget;
 }
 
@@ -855,6 +905,7 @@ QDialog *settings_dialog(const ui_context &context, QWidget *const parent) {
         {QCoreApplication::translate("XLibrary", "Library"), "settings_library"},
         {QCoreApplication::translate("XLibrary", "Profile"), "settings_profile"},
         {QCoreApplication::translate("XLibrary", "Local data"), "settings_storage"},
+        {QCoreApplication::translate("XLibrary", "File search"), "settings_files"},
         {QCoreApplication::translate("XLibrary", "Plugins"), "settings_plugins"},
         {QCoreApplication::translate("XLibrary", "Update"), "settings_update"},
         {QCoreApplication::translate("XLibrary", "Quick help"), "settings_help"},
@@ -862,11 +913,11 @@ QDialog *settings_dialog(const ui_context &context, QWidget *const parent) {
     for (const auto &section : sections) {
         const auto index = pages->count();
         auto *item = new SelectionButton(section.first);
-        const QHash<QString, QString> icons{{"settings_general", "settings"}, {"settings_appearance", "palette"},
-                                            {"settings_hotkeys", "keyboard"}, {"settings_library", "library"},
-                                            {"settings_profile", "profile"},  {"settings_storage", "database"},
-                                            {"settings_plugins", "plugin"},   {"settings_update", "refresh"},
-                                            {"settings_help", "help"},        {"settings_about", "info"}};
+        const QHash<QString, QString> icons{
+            {"settings_general", "settings"}, {"settings_appearance", "palette"}, {"settings_hotkeys", "keyboard"},
+            {"settings_library", "library"},  {"settings_profile", "profile"},    {"settings_storage", "database"},
+            {"settings_files", "file"},       {"settings_plugins", "plugin"},     {"settings_update", "refresh"},
+            {"settings_help", "help"},        {"settings_about", "info"}};
         item->setIcon(appearance::icon(icons.value(section.second), item->palette().color(QPalette::ButtonText)));
         const auto icon_size = appearance::scaled(*context.settings, 20);
         item->setIconSize({icon_size, icon_size});
@@ -938,6 +989,19 @@ QDialog *settings_dialog(const ui_context &context, QWidget *const parent) {
                 values.insert(key, box->isChecked());
             if (auto *combo = qobject_cast<QComboBox *>(control))
                 values.insert(key, combo->currentData());
+            if (auto *list = qobject_cast<QListWidget *>(control)) {
+                QStringList paths;
+                for (int i = 0; i < list->count(); ++i) {
+                    const QFileInfo folder(list->item(i)->text());
+                    if (!folder.isAbsolute() || !folder.isDir() || !folder.isReadable()) {
+                        show_error(QCoreApplication::translate("XLibrary", "A file search folder is unavailable."));
+                        return;
+                    }
+                    paths.append(folder.canonicalFilePath());
+                }
+                paths.removeDuplicates();
+                values.insert(key, paths);
+            }
             if (auto *edit = qobject_cast<QKeySequenceEdit *>(control)) {
                 const auto value = edit->keySequence().toString(QKeySequence::PortableText);
                 values.insert(key, value);
@@ -1027,6 +1091,8 @@ QDialog *settings_dialog(const ui_context &context, QWidget *const parent) {
             show_error(QCoreApplication::translate("XLibrary", "Could not save the settings file."));
             return;
         }
+        if (previous.value("files/roots") != values.value("files/roots"))
+            service->files->configure(values.value("files/roots").toStringList());
         emit service->appearance_changed();
         dialog->accept();
     });
@@ -1042,6 +1108,7 @@ void register_settings_views(UiRegistry &registry) {
     registry.add_default("settings_library", library_settings);
     registry.add_default("settings_profile", profile_view);
     registry.add_default("settings_storage", storage_page);
+    registry.add_default("settings_files", file_settings);
     registry.add_default("settings_plugins", plugins);
     registry.add_default("settings_update", update_page);
     registry.add_default("settings_about", about);

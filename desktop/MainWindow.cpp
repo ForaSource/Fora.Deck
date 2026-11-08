@@ -46,6 +46,7 @@ QWidget *shell(const ui_context &context, QWidget *const parent) {
     auto *pages = new QStackedWidget;
     pages->addWidget(context.registry->create("library", context, pages));
     pages->addWidget(context.registry->create("scenarios", context, pages));
+    pages->addWidget(context.registry->create("my_files", context, pages));
     auto *transition = new PageTransition(pages);
     body->addWidget(transition, 1);
     auto *notice = new NotificationBanner(*context.settings, 20);
@@ -99,7 +100,7 @@ QWidget *shell(const ui_context &context, QWidget *const parent) {
                              return;
                          section = service->section();
                          tag = service->tag();
-                         pages->setCurrentIndex(section == "scenarios" ? 1 : 0);
+                         pages->setCurrentIndex(section == "scenarios" ? 1 : section == "files" ? 2 : 0);
                          transition->start();
                      });
     return widget;
@@ -316,10 +317,10 @@ void MainWindow::refresh_actions() {
     for (const auto &id : {"launch", "new_instance", "edit_application", "remove_application", "favorite",
                            "open_folder", "copy_path", "copy_arguments", "details"})
         context.actions.value(id)->setEnabled(profile_available && record != nullptr &&
-                                              service.section() != "scenarios");
+                                              service.section() != "scenarios" && service.section() != "files");
     auto *new_instance = context.actions.value("new_instance");
     const bool can_start = profile_available && record && record->available && record->new_instance_error.isEmpty();
-    new_instance->setEnabled(can_start && service.section() != "scenarios");
+    new_instance->setEnabled(can_start && service.section() != "scenarios" && service.section() != "files");
     new_instance->setText(QCoreApplication::translate("XLibrary", "Request new instance"));
     new_instance->setToolTip(
         record && !record->new_instance_error.isEmpty()
@@ -444,7 +445,7 @@ void MainWindow::update_layout() {
     if (centralWidget())
         for (auto *splitter : centralWidget()->findChildren<QSplitter *>("library_splitter"))
             if (auto *library = dynamic_cast<LibrarySplitter *>(splitter))
-                library->update_layout(service.section() != "scenarios");
+                library->update_layout(service.section() != "scenarios" && service.section() != "files");
 }
 
 void MainWindow::show_library() {

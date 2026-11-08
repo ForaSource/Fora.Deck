@@ -17,11 +17,12 @@ class DesktopService;
 class SearchResultModel;
 class QMenu;
 struct search_entry {
-    enum class kind { application, file, directory, calculation, message, open_folder };
+    enum class kind { application, file, working_file, directory, calculation, message, open_folder };
     kind type = kind::file;
     QString title;
     QString path;
     qint64 application_id = 0;
+    bool saved = false;
 };
 
 namespace search_results {
@@ -108,6 +109,10 @@ class SearchResults : public QListView {
     QString active_path;
     quint64 active_generation = 0;
     bool special = false;
+    bool files_enabled = false;
+    int pending_file_queries = 0;
+    QVector<search_entry> application_entries;
+    void update_files();
     bool path_busy = false;
     quint64 pending_launch = 0;
     QMenu *action_menu = nullptr;
@@ -124,6 +129,7 @@ protected:
 public:
     SearchResults(DesktopService &service, QLineEdit &input, bool compact, QWidget *parent = nullptr);
     ~SearchResults() override;
+    void set_files_enabled(bool enabled);
     bool handles_query() const { return special; }
     void reset_launch() { pending_launch = 0; }
 

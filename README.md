@@ -394,3 +394,43 @@ Opt-in local timing uses `QT_LOGGING_RULES=xlibrary.poll.debug=true`; nothing is
 
 See [release notes](docs/releases/v0.7.0.md) and the
 [validation record](docs/releases/v0.7.0-validation.md) for platform checks and limitations.
+
+### Working-file search (0.8.0)
+
+The **Files** switch adds matching working files to search results: off by default in
+quick search, on by default in the main window. Files never become application
+entries and are not shown for an empty query. Search uses the application's ranking,
+typo tolerance and alternate keyboard layout; `pdf`, `.pdf`, `*.pdf` and `report.pdf`
+restrict results by extension. File results show their parent folder to distinguish
+identical names. Use the arrow keys and Enter, or right-click / Shift+F10 for actions.
+
+A separate `FileManager` indexes all accessible local drives and mounted local volumes
+in the background, independently of the switch. **Settings → File search** can restrict
+indexing to selected folders; an empty list restores all drives. Save settings to apply
+folder changes. The index refreshes every 15 minutes, and can be refreshed manually.
+Search shows up to 30 file matches; quick search keeps up to five application matches.
+The initial scan can take time: results become available as indexing progresses, and
+its status is shown in file settings. There is one background scanner and a separate
+query worker, leaving application discovery and the interface independent.
+
+Only explicitly supported working-file extensions are indexed: documents, office
+files, plain text, tables, images, design/CAD/3D assets, audio, video and subtitles.
+Executables, libraries, scripts, archives, databases and configuration files are not
+included. Hidden/system/temporary files, office lock files, caches, application data,
+OS directories, dependency and build folders are excluded. Binary text impostors and
+executable headers are rejected. Directory symlinks/junctions are not traversed;
+Linux directory identities prevent mount loops. Inaccessible locations are skipped.
+Network shares are not mounted or automatically enumerated; an explicitly selected
+accessible network folder can be searched. These filters classify documents, not
+certify that a document is safe to open.
+
+Choose **Save to My files** from a result's context menu to keep it in the separate
+**My files** section and favor it among equally relevant matches. Saved paths survive
+restarts, settings resets and complete profile backup/restore. They remain searchable
+even outside subsequently selected search folders. Removing a saved entry keeps the
+original file. Unavailable saved files remain visible in My files with a status.
+
+The recoverable `file-index.sqlite` cache is stored beside `settings.ini`. Saved paths
+are also stored in profile settings, so rebuilding the index does not lose them.
+Only names and paths are indexed locally; document contents are neither indexed nor
+uploaded. A small header sample is read to reject executables and binary text files.

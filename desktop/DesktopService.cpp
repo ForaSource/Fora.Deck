@@ -36,6 +36,17 @@ DesktopService::DesktopService(QObject *const parent, const QString &profile_pat
     if (!settings.contains("onboarding/completed") &&
         (QFileInfo(settings.fileName()).isFile() || (!database_path.isEmpty() && QFileInfo(database_path).isFile())))
         settings.setValue("onboarding/completed", true);
+    files = new FileManager(QFileInfo(settings.fileName()).absolutePath(), settings.value("files/saved").toStringList(),
+                            this);
+    connect(files, &FileManager::error, this, &DesktopService::notify);
+    connect(files, &FileManager::busy_changed, this, &DesktopService::profile_state_changed);
+    connect(files, &FileManager::saved_paths_changed, this, [this](const QStringList &paths) {
+        settings.setValue("files/saved", paths);
+        settings.sync();
+        if (settings.status() != QSettings::NoError)
+            notify(QCoreApplication::translate("XLibrary", "Could not save the settings file."));
+    });
+    QTimer::singleShot(0, this, [this] { files->configure(settings.value("files/roots").toStringList()); });
     startup_inventory_pending = settings.value("onboarding/completed", false).toBool();
     updates.set_channel(settings.value("updates/channel", "stable").toString());
     connect(&updates, &UpdateChecker::channel_changed, this,
@@ -264,6 +275,15 @@ DesktopService::DesktopService(QObject *const parent, const QString &profile_pat
 }
 
 DesktopService::~DesktopService() {
+    files->shutdown();
+    if (!restart_pending) {
+        try {
+            settings.setValue("files/saved", files->persisted_saved_paths());
+            settings.sync();
+        } catch (const std::exception &e) {
+            qWarning("Cannot flush saved file paths: %s", e.what());
+        }
+    }
     ++*scenario_generation;
     auto expected = discovery_phase::running;
     discovery_cancelled->phase.compare_exchange_strong(expected, discovery_phase::cancelling);
@@ -1202,6 +1222,8 @@ bool DesktopService::reset_settings() {
     if (previous.contains(marker))
         settings.setValue(marker, previous.value(marker));
     settings.setValue("onboarding/completed", true);
+    if (previous.contains("files/saved"))
+        settings.setValue("files/saved", previous.value("files/saved"));
     settings.sync();
     if (settings.status() != QSettings::NoError) {
         settings.clear();

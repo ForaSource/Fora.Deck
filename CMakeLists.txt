@@ -119,6 +119,7 @@ add_library(xlibrary_core STATIC
         src/Application.cpp
         src/Application.h
 
+        src/FileManager.h src/FileManager.cpp
         src/Manager.cpp
         src/Manager.h
 
@@ -161,7 +162,7 @@ endif()
 target_include_directories(xlibrary_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
 set_target_properties(xlibrary_core PROPERTIES AUTOMOC ON)
 target_link_libraries(xlibrary_core PUBLIC
-        Qt6::Core Qt6::Gui
+        Qt6::Core Qt6::Gui Qt6::Concurrent
         sqlite3
         Threads::Threads
 

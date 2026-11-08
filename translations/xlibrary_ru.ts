@@ -3129,5 +3129,85 @@ Qt: %4
         <source>Scenario issues</source>
         <translation>Проблемы сценария</translation>
     </message>
+    <message>
+        <source>Files</source>
+        <translation>Файлы</translation>
+    </message>
+    <message>
+        <source>Search working files</source>
+        <translation>Искать рабочие файлы</translation>
+    </message>
+    <message>
+        <source>File search</source>
+        <translation>Файловый поиск</translation>
+    </message>
+    <message>
+        <source>My files</source>
+        <translation>Свои файлы</translation>
+    </message>
+    <message>
+        <source>Save to My files</source>
+        <translation>Сохранить в свои файлы</translation>
+    </message>
+    <message>
+        <source>Remove from My files</source>
+        <translation>Убрать из своих файлов</translation>
+    </message>
+    <message>
+        <source>File search folders</source>
+        <translation>Папки файлового поиска</translation>
+    </message>
+    <message>
+        <source>Add folder</source>
+        <translation>Добавить папку</translation>
+    </message>
+    <message>
+        <source>Remove folder</source>
+        <translation>Убрать папку</translation>
+    </message>
+    <message>
+        <source>Search all drives</source>
+        <translation>Искать на всех дисках</translation>
+    </message>
+    <message>
+        <source>Refresh file index</source>
+        <translation>Обновить файловый индекс</translation>
+    </message>
+    <message>
+        <source>A file search folder is unavailable.</source>
+        <translation>Папка файлового поиска недоступна.</translation>
+    </message>
+    <message>
+        <source>Indexing files: %1</source>
+        <translation>Индексация файлов: %1</translation>
+    </message>
+    <message>
+        <source>File indexing cancelled</source>
+        <translation>Индексация файлов отменена</translation>
+    </message>
+    <message>
+        <source>Indexed %1 files; inaccessible folders: %2</source>
+        <translation>Проиндексировано файлов: %1; недоступных папок: %2</translation>
+    </message>
+    <message>
+        <source>File index error: %1</source>
+        <translation>Ошибка файлового индекса: %1</translation>
+    </message>
+    <message>
+        <source>The file is unavailable or its type is excluded.</source>
+        <translation>Файл недоступен или его тип исключён.</translation>
+    </message>
+    <message>
+        <source>By default, all accessible local drives are indexed. Add folders below to search only those locations. System folders, caches, hidden files and unsupported file types are excluded. Indexing runs in the background even when file search is off.</source>
+        <translation>По умолчанию индексируются все доступные локальные диски. Добавьте папки ниже, чтобы ограничить поиск ими. Системные папки, кэши, скрытые файлы и неподдерживаемые типы исключаются. Индексация работает в фоне, даже когда файловый поиск выключен.</translation>
+    </message>
+    <message>
+        <source>Folder changes take effect after Save. An empty list means all drives. The index refreshes every 15 minutes; unavailable locations are skipped. Right-click a search result to save it to My files.</source>
+        <translation>Изменения папок применяются после сохранения. Пустой список означает все диски. Индекс обновляется каждые 15 минут; недоступные папки пропускаются. Нажмите на результат правой кнопкой мыши, чтобы сохранить его в свои файлы.</translation>
+    </message>
+    <message>
+        <source>Save files from search results using the context menu. Removing a saved file keeps it on disk.</source>
+        <translation>Сохраняйте файлы из результатов поиска через контекстное меню. Удаление из списка не удаляет файл с диска.</translation>
+    </message>
 </context>
 </TS>

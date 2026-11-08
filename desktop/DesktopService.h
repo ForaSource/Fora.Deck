@@ -10,6 +10,7 @@
 #include <QTimer>
 
 #include "Application.h"
+#include "FileManager.h"
 #include "LibraryModel.h"
 #include "OperationTypes.h"
 #include "PlatformIntegration.h"
@@ -117,6 +118,7 @@ public:
     LibraryModel model;
     LibraryFilter filter;
     QSettings settings;
+    FileManager *files = nullptr;
     UpdateChecker updates;
     explicit DesktopService(QObject *parent = nullptr, const QString &profile_path = {},
                             const QString &database_path = {});
@@ -128,7 +130,7 @@ public:
     QString library_error() const { return opening_error.user_message; }
     QString library_path() const { return library_file; }
     int schema_version() const { return current_schema_version; }
-    bool profile_busy() const { return profile_status == operation_state::loading; }
+    bool profile_busy() const { return profile_status == operation_state::loading || (files && files->is_saving()); }
     bool restart_required() const { return restart_pending; }
     QVector<launch_profile> launch_profiles(const app_record &record);
     bool safe_mode() const;
