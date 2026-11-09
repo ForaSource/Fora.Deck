@@ -74,6 +74,29 @@ const QSet<QString> &extensions() {
     }();
     return allowed;
 }
+QString file_query_text(const QString &text, QString &extension) {
+    auto query_text = text.simplified();
+    const auto token = query_text.section(' ', -1).toLower();
+    const auto alternate = search_query::switch_layout(token).toLower();
+    for (auto candidate : {token, alternate}) {
+        if (candidate.startsWith("*."))
+            candidate.remove(0, 2);
+        else if (candidate.startsWith('.'))
+            candidate.remove(0, 1);
+        if (extensions().contains(candidate)) {
+            extension = candidate;
+            query_text.chop(token.size());
+            break;
+        }
+        const auto dot = candidate.lastIndexOf('.');
+        if (dot > 0 && extensions().contains(candidate.mid(dot + 1))) {
+            extension = candidate.mid(dot + 1);
+            query_text.chop(candidate.size() - dot);
+            break;
+        }
+    }
+    return query_text.trimmed();
+}
 bool excluded_directory(const QFileInfo &info) {
     // Windows marks volume roots hidden/system; those attributes must not exclude an entire drive.
     if (info.isRoot())
@@ -414,31 +437,10 @@ void FileManager::search(const QString &text, const quint64 request, QObject *re
         try {
             auto db = open_index(path);
             const auto pattern = search_query::file_pattern(text.trimmed());
-            QString query_text = pattern ? text.trimmed() : text.simplified();
             QString extension;
-            const auto token = query_text.section(' ', -1).toLower();
-            const auto alternate = search_query::switch_layout(token).toLower();
-            for (auto candidate : {token, alternate}) {
-                if (pattern)
-                    break;
-                if (candidate.startsWith("*."))
-                    candidate.remove(0, 2);
-                else if (candidate.startsWith('.'))
-                    candidate.remove(0, 1);
-                if (extensions().contains(candidate)) {
-                    extension = candidate;
-                    query_text.chop(token.size());
-                    break;
-                }
-                const auto dot = candidate.lastIndexOf('.');
-                if (dot > 0 && extensions().contains(candidate.mid(dot + 1))) {
-                    extension = candidate.mid(dot + 1);
-                    query_text.chop(candidate.size() - dot);
-                    break;
-                }
-            }
-            const SearchQuery query(query_text.trimmed());
-            const bool has_query = !query_text.trimmed().isEmpty();
+            const auto query_text = pattern ? text.trimmed() : file_query_text(text, extension);
+            const SearchQuery query(query_text);
+            const bool has_query = !query_text.isEmpty();
             QStringList preferred{QStandardPaths::writableLocation(QStandardPaths::DesktopLocation),
                                   QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation)};
             for (auto &root : preferred)
@@ -552,6 +554,31 @@ void FileManager::search(const QString &text, const quint64 request, QObject *re
         return cancelled() ? QVector<file_match>{} : matches;
     }));
 }
+QVector<file_match> FileManager::filter_matches(const QString &text, QVector<file_match> matches) {
+    if (text.trimmed().isEmpty())
+        return {};
+    const auto pattern = search_query::file_pattern(text.trimmed());
+    QString extension;
+    const auto query_text = pattern ? text.trimmed() : file_query_text(text, extension);
+    const SearchQuery query(query_text);
+    for (auto &match : matches) {
+        if (!extension.isEmpty() && QFileInfo(match.name).suffix().compare(extension, Qt::CaseInsensitive) != 0)
+            match.rank = -1;
+        else if (pattern)
+            match.rank = pattern->match(match.name.normalized(QString::NormalizationForm_C)).hasMatch() ? 0 : -1;
+        else
+            match.rank = query.rank(match.name, {}, {});
+    }
+    matches.removeIf([](const auto &match) { return match.rank < 0; });
+    if (!matches.isEmpty()) {
+        const auto best = std::min_element(matches.begin(), matches.end(), [](const auto &a, const auto &b) {
+                              return a.rank < b.rank;
+                          })->rank;
+        matches.removeIf([best](const auto &match) { return !SearchQuery::accepts_rank(match.rank, best); });
+    }
+    return matches;
+}
+
 void FileManager::saved_files(QObject *receiver, std::function<void(QVector<file_match>)> completed) {
     auto *watcher = new QFutureWatcher<QVector<file_match>>(receiver);
     connect(watcher, &QFutureWatcher<QVector<file_match>>::finished, receiver,

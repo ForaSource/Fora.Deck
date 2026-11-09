@@ -130,7 +130,10 @@ SearchResults::SearchResults(DesktopService &service, QLineEdit &input, const bo
         }
     });
     connect(&service.model, &QAbstractItemModel::dataChanged, viewport(), qOverload<>(&QWidget::update));
-    connect(&service, &DesktopService::catalog_changed, this, &SearchResults::update_query);
+    connect(&service, &DesktopService::catalog_changed, this, [this] {
+        file_matches.clear();
+        update_query();
+    });
     connect(&service, &DesktopService::navigation_changed, this, [this] {
         if (!this->compact)
             update_query();
@@ -152,14 +155,15 @@ SearchResults::SearchResults(DesktopService &service, QLineEdit &input, const bo
             auto entries = path_watcher.result();
             // Resolve library identities in memory on the GUI thread, preserving launch configurations.
             QHash<QString, qint64> known;
-            for (const auto &record : this->service.model.applications()) {
-                const auto path = normalized_path(record.path);
-                // A file path cannot identify which arguments or working directory the user wants.
-                if (known.contains(path))
-                    known[path] = 0;
-                else
-                    known.insert(path, record.id);
-            }
+            if (this->compact)
+                for (const auto &record : this->service.model.applications()) {
+                    const auto path = normalized_path(record.path);
+                    // A file path cannot identify which arguments or working directory the user wants.
+                    if (known.contains(path))
+                        known[path] = 0;
+                    else
+                        known.insert(path, record.id);
+                }
             for (auto &entry : entries)
                 if (entry.type == search_entry::kind::file) {
                     entry.application_id = known.value(normalized_path(entry.path));
@@ -172,6 +176,7 @@ SearchResults::SearchResults(DesktopService &service, QLineEdit &input, const bo
             read_path();
     });
     connect(service.files, &FileManager::changed, this, [this] {
+        file_matches.clear();
         if (!action_menu)
             update_query();
     });
@@ -269,7 +274,6 @@ void SearchResults::update_applications() {
                         candidate.second, record.launch_count, record.last_launch, 0, 0});
     }
     application_entries = entries;
-    replace_entries(compact ? std::move(entries) : QVector<search_entry>{});
 }
 
 void SearchResults::update_query() {
@@ -281,8 +285,9 @@ void SearchResults::update_query() {
     ++*generation;
     pending_path.clear();
     const auto text = input.text().trimmed();
-    special = search_query::is_path(text);
+    special = (compact || files_enabled) && search_query::is_path(text);
     if (special) {
+        file_matches.clear();
         pending_path = search_query::expanded_path(text);
         replace_entries({{search_entry::kind::message, QCoreApplication::translate("XLibrary", "…"), {}, 0}});
         if (!path_busy)
@@ -294,17 +299,19 @@ void SearchResults::update_query() {
     special = calculation.recognized &&
               !(files_enabled && !calculation.value && search_query::file_pattern(text).has_value());
     if (special) {
+        file_matches.clear();
         if (calculation.value) {
             const auto number = QString::number(*calculation.value, 'g', 15);
             replace_entries({{search_entry::kind::calculation, "= " + number, number, 0}});
         } else
             replace_entries({{search_entry::kind::message, QCoreApplication::translate("XLibrary", "—"), {}, 0}});
     } else {
+        if (!files_enabled || text.isEmpty())
+            file_matches.clear();
         application_entries.clear();
-        if (compact || (files_enabled && !text.isEmpty()))
+        if (compact)
             update_applications();
-        else
-            replace_entries({});
+        update_entries();
         if (files_enabled && !text.isEmpty())
             file_delay.start();
     }
@@ -323,38 +330,49 @@ void SearchResults::update_files() {
             --pending_file_queries;
             if (request != generation->load() || !files_enabled)
                 return;
-            auto entries = compact || !matches.isEmpty() ? application_entries : QVector<search_entry>{};
-            for (const auto &match : matches)
-                entries.append({search_entry::kind::working_file,
-                                (match.saved ? QStringLiteral("★ ") : QString{}) + match.name + QStringLiteral(" · ") +
-                                    QDir::toNativeSeparators(QFileInfo(match.path).absolutePath()),
-                                match.path, 0, match.saved, match.rank, match.use_count, match.last_used,
-                                match.location, match.depth});
-            std::sort(entries.begin(), entries.end(), [](const search_entry &a, const search_entry &b) {
-                if (a.rank != b.rank)
-                    return a.rank < b.rank;
-                if (a.saved != b.saved)
-                    return a.saved;
-                if (a.use_count != b.use_count)
-                    return a.use_count > b.use_count;
-                if (a.last_used != b.last_used)
-                    return a.last_used > b.last_used;
-                if (a.location != b.location)
-                    return a.location < b.location;
-                if (a.depth != b.depth)
-                    return a.depth < b.depth;
-                const auto comparison = QString::compare(a.title, b.title, Qt::CaseInsensitive);
-                if (comparison != 0)
-                    return comparison < 0;
-                return a.path == b.path ? a.application_id < b.application_id : a.path < b.path;
-            });
-            if (!entries.isEmpty()) {
-                const auto best = entries.front().rank;
-                entries.removeIf([best](const auto &entry) { return !SearchQuery::accepts_rank(entry.rank, best); });
-            }
-            replace_entries(std::move(entries));
+            file_matches = std::move(matches);
+            update_entries();
         },
         generation, service.catalog().file_usage);
+}
+
+void SearchResults::update_entries() {
+    // Refine the last completed file search while its replacement is still pending.
+    const auto matches = FileManager::filter_matches(input.text(), file_matches);
+    if (matches.isEmpty()) {
+        replace_entries(compact ? application_entries : QVector<search_entry>{});
+        return;
+    }
+    auto entries = application_entries;
+    for (const auto &match : matches)
+        entries.append({search_entry::kind::working_file,
+                        (match.saved ? QStringLiteral("★ ") : QString{}) + match.name + QStringLiteral(" · ") +
+                            QDir::toNativeSeparators(QFileInfo(match.path).absolutePath()),
+                        match.path, 0, match.saved, match.rank, match.use_count, match.last_used, match.location,
+                        match.depth});
+    std::sort(entries.begin(), entries.end(), [](const search_entry &a, const search_entry &b) {
+        if (a.rank != b.rank)
+            return a.rank < b.rank;
+        if (a.saved != b.saved)
+            return a.saved;
+        if (a.use_count != b.use_count)
+            return a.use_count > b.use_count;
+        if (a.last_used != b.last_used)
+            return a.last_used > b.last_used;
+        if (a.location != b.location)
+            return a.location < b.location;
+        if (a.depth != b.depth)
+            return a.depth < b.depth;
+        const auto comparison = QString::compare(a.title, b.title, Qt::CaseInsensitive);
+        if (comparison != 0)
+            return comparison < 0;
+        return a.path == b.path ? a.application_id < b.application_id : a.path < b.path;
+    });
+    if (!entries.isEmpty()) {
+        const auto best = entries.front().rank;
+        entries.removeIf([best](const auto &entry) { return !SearchQuery::accepts_rank(entry.rank, best); });
+    }
+    replace_entries(std::move(entries));
 }
 
 void SearchResults::read_path() {
@@ -365,13 +383,14 @@ void SearchResults::read_path() {
     // Only one disk request is active per field; newer input replaces the pending request.
     auto usage = service.catalog().file_usage;
     QSet<QString> favorites;
-    for (const auto &record : service.model.applications()) {
-        usage.insert(normalized_path(record.path), {record.launch_count, record.last_launch});
-        if (record.favorite)
-            favorites.insert(normalized_path(record.path));
-    }
+    if (compact)
+        for (const auto &record : service.model.applications()) {
+            usage.insert(normalized_path(record.path), {record.launch_count, record.last_launch});
+            if (record.favorite)
+                favorites.insert(normalized_path(record.path));
+        }
     path_watcher.setFuture(QtConcurrent::run(search_results::directory_entries, active_path, generation,
-                                             active_generation, usage, favorites));
+                                             active_generation, usage, favorites, !compact));
 }
 
 void SearchResults::activate_current() {

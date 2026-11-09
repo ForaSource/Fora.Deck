@@ -12,6 +12,7 @@
 #include <QListView>
 #include <QTimer>
 
+#include "FileManager.h"
 #include "LibraryModel.h"
 #include "PathHelpers.h"
 #include "SearchQuery.h"
@@ -41,7 +42,8 @@ inline constexpr int scan_limit = 20000;
 inline QVector<search_entry> directory_entries(const QString &request,
                                                const std::shared_ptr<std::atomic<quint64>> &generation,
                                                const quint64 expected, const QHash<QString, usage_record> &usage = {},
-                                               const QSet<QString> &favorites = {}) {
+                                               const QSet<QString> &favorites = {},
+                                               const bool working_files_only = false) {
     const auto cancelled = [&] { return generation->load() != expected; };
     if (cancelled())
         return {};
@@ -96,6 +98,8 @@ inline QVector<search_entry> directory_entries(const QString &request,
                     : !name.startsWith(prefix, Qt::CaseInsensitive))
             continue;
         const auto file = iterator.fileInfo();
+        if (working_files_only && !file.isDir() && !FileManager::accepts_file(file.absoluteFilePath()))
+            continue;
         search_entry entry{file.isDir() ? search_entry::kind::directory : search_entry::kind::file, name,
                            file.absoluteFilePath(), 0};
         const auto key = normalized_path(entry.path);
@@ -138,7 +142,9 @@ class SearchResults : public QListView {
     QTimer file_delay;
     int pending_file_queries = 0;
     QVector<search_entry> application_entries;
+    QVector<file_match> file_matches;
     void update_files();
+    void update_entries();
     bool path_busy = false;
     quint64 pending_launch = 0;
     QMenu *action_menu = nullptr;

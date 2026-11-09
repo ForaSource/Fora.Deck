@@ -59,6 +59,7 @@ public:
     void search(const QString &text, quint64 request, QObject *receiver,
                 std::function<void(quint64, QVector<file_match>)> completed,
                 std::shared_ptr<std::atomic<quint64>> field_generation, const QHash<QString, usage_record> &usage = {});
+    static QVector<file_match> filter_matches(const QString &text, QVector<file_match> matches);
     void saved_files(QObject *receiver, std::function<void(QVector<file_match>)> completed);
     void set_saved(const QString &path, bool saved);
     bool is_saving() const { return pending_saves > 0; }
