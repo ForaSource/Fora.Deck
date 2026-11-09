@@ -285,7 +285,7 @@ void MainWindow::create_actions() {
         context.actions.value(id)->setAutoRepeat(false);
     add("refresh_availability", QCoreApplication::translate("XLibrary", "Refresh availability"), "refresh",
         [this] { service.refresh_availability(); });
-    add("discover", QCoreApplication::translate("XLibrary", "Find installed applications"), "refresh", [this] {
+    add("discover", QCoreApplication::translate("XLibrary", "Find installed applications"), "search", [this] {
         if (service.is_discovering())
             service.cancel_discovery();
         else

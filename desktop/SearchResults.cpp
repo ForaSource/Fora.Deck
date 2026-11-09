@@ -7,6 +7,7 @@
 #include <QMenu>
 #include <QMessageBox>
 #include <QPainter>
+#include <QScrollBar>
 #include <QStyledItemDelegate>
 #include <QtConcurrent/QtConcurrentRun>
 #include <QUrl>
@@ -131,8 +132,14 @@ SearchResults::SearchResults(DesktopService &service, QLineEdit &input, const bo
     });
     connect(&service.model, &QAbstractItemModel::dataChanged, viewport(), qOverload<>(&QWidget::update));
     connect(&service, &DesktopService::catalog_changed, this, [this] {
-        file_matches.clear();
-        update_query();
+        if (special) {
+            update_query();
+            return;
+        }
+        application_entries.clear();
+        if (this->compact)
+            update_applications();
+        update_entries();
     });
     connect(&service, &DesktopService::navigation_changed, this, [this] {
         if (!this->compact)
@@ -201,12 +208,21 @@ void SearchResults::replace_entries(QVector<search_entry> entries) {
                         {},
                         0});
     }
-    const auto previous = currentIndex().isValid() ? results->entries[currentIndex().row()].path : QString{};
+    const bool preserve_position = property("rendered_query").isValid() &&
+                                   property("rendered_query").toString() == input.text();
+    const auto top_index = indexAt(QPoint(0, 0));
+    const auto top_entry = top_index.isValid() ? results->entries[top_index.row()] : search_entry{};
+    const auto top_offset = top_index.isValid() ? visualRect(top_index).top() : 0;
+    const auto scroll_position = verticalScrollBar()->value();
+    const auto previous = currentIndex().isValid() ? results->entries[currentIndex().row()] : search_entry{};
+    const auto same_entry = [](const search_entry &a, const search_entry &b) {
+        return a.type == b.type && a.path == b.path && a.application_id == b.application_id;
+    };
     results->replace(std::move(entries));
     int selected = 0;
-    if (!previous.isEmpty())
+    if (preserve_position && !previous.path.isEmpty())
         for (qsizetype i = 0; i < results->entries.size(); ++i)
-            if (results->entries[i].path == previous) {
+            if (same_entry(results->entries[i], previous)) {
                 selected = static_cast<int>(i);
                 break;
             }
@@ -214,6 +230,18 @@ void SearchResults::replace_entries(QVector<search_entry> entries) {
     const auto rows = qMin(results->rowCount(), 5);
     setFixedHeight(rows * appearance::scaled(service.settings, 52) + (rows ? 4 : 0));
     setVisible(rows > 0);
+    if (preserve_position) {
+        doItemsLayout();
+        verticalScrollBar()->setValue(scroll_position);
+        if (top_index.isValid())
+            for (int row = 0; row < results->rowCount(); ++row)
+                if (same_entry(results->entries[row], top_entry)) {
+                    scrollTo(results->index(row, 0), QAbstractItemView::PositionAtTop);
+                    verticalScrollBar()->setValue(verticalScrollBar()->value() - top_offset);
+                    break;
+                }
+    }
+    setProperty("rendered_query", input.text());
     emit height_changed();
 }
 
@@ -281,7 +309,8 @@ void SearchResults::update_query() {
         action_menu->close();
     pending_launch = 0;
     file_delay.stop();
-    setCurrentIndex({});
+    if (property("rendered_query").toString() != input.text())
+        setCurrentIndex({});
     ++*generation;
     pending_path.clear();
     const auto text = input.text().trimmed();

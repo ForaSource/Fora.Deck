@@ -19,6 +19,7 @@
 #include <QPushButton>
 #include <QResizeEvent>
 #include <QSignalBlocker>
+#include <QScrollBar>
 #include <QStackedLayout>
 #include <QStyledItemDelegate>
 #include <QTreeView>
@@ -799,7 +800,13 @@ QWidget *library(const ui_context &context, QWidget *const parent) {
         clear_selection->setEnabled(!ids.isEmpty());
     };
     auto resetting = std::make_shared<bool>(false);
-    QObject::connect(&service->filter, &QAbstractItemModel::modelAboutToBeReset, widget, [=] { *resetting = true; });
+    auto top_application = std::make_shared<qint64>(0);
+    auto scroll_position = std::make_shared<int>(0);
+    QObject::connect(&service->filter, &QAbstractItemModel::modelAboutToBeReset, widget, [=] {
+        *resetting = true;
+        *top_application = view->indexAt(QPoint(0, 0)).data(LibraryModel::id_role).toLongLong();
+        *scroll_position = view->verticalScrollBar()->value();
+    });
     QObject::connect(view->selectionModel(), &QItemSelectionModel::selectionChanged, widget, [=] {
         if (!*resetting)
             synchronize_selection();
@@ -903,6 +910,17 @@ QWidget *library(const ui_context &context, QWidget *const parent) {
     QObject::connect(&service->filter, &QAbstractItemModel::rowsRemoved, widget, update);
     QObject::connect(&service->filter, &QAbstractItemModel::rowsInserted, widget, update);
     QObject::connect(&service->filter, &QAbstractItemModel::modelReset, widget, update);
+    QObject::connect(&service->filter, &QAbstractItemModel::modelReset, widget, [=] {
+        view->doItemsLayout();
+        view->verticalScrollBar()->setValue(*scroll_position);
+        for (int row = 0; *top_application && row < service->filter.rowCount(); ++row) {
+            const auto index = service->filter.index(row, 0);
+            if (index.data(LibraryModel::id_role).toLongLong() == *top_application) {
+                view->scrollTo(index, QAbstractItemView::PositionAtTop);
+                break;
+            }
+        }
+    });
     QObject::connect(&service->filter, &QAbstractItemModel::layoutChanged, widget, update);
     QObject::connect(service, &DesktopService::navigation_changed, widget, [=] {
         title->setText(service->section() == "favorites" ? QCoreApplication::translate("XLibrary", "Favorites")
