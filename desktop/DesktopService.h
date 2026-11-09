@@ -214,6 +214,7 @@ public:
     void apply_filter(const saved_filter &record);
     void clear_filters();
     void clear_history();
+    void record_file_use(const QString &path);
     QKeySequence target_shortcut(bool scenario, qint64 id) const;
     bool validate_target_shortcut(bool scenario, qint64 id, const QKeySequence &sequence, QString &error) const;
     bool set_target_shortcut(bool scenario, qint64 id, const QKeySequence &sequence, QString &error);

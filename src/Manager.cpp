@@ -644,7 +644,7 @@ QStringList Manager::scenario_issues(const scenario_record &record, const QVecto
 void Manager::clear_history() {
     this->store->clear_history();
     this->refresh();
-    emit this->notification(QCoreApplication::translate("XLibrary", "Launch history cleared."));
+    emit this->notification(QCoreApplication::translate("XLibrary", "Usage history cleared."));
 }
 
 void Manager::preview_profile(const QString &path) {

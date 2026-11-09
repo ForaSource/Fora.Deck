@@ -187,6 +187,7 @@ SearchQuery::SearchQuery(const QString &text) {
         }
     }
     phrase = names.join(' ');
+    alternate_phrase = search_query::switch_layout(phrase);
     abbreviations_enabled =
         phrase.size() >= 2 && phrase.size() <= maximum_fuzzy_length &&
         std::all_of(phrase.begin(), phrase.end(), [](const QChar character) { return character.isLetterOrNumber(); });
@@ -244,7 +245,7 @@ int SearchQuery::rank(const QString &name, const QString &file_name, const QStri
     return rank(prepare(name, file_name, tags, aliases));
 }
 
-int SearchQuery::rank(const SearchableData &data) const {
+int SearchQuery::rank(const SearchableData &data, const bool suggestions) const {
     if (incomplete_tag)
         return -1;
     for (const auto &tag : required_tags)
@@ -258,7 +259,6 @@ int SearchQuery::rank(const SearchableData &data) const {
     const auto any_field = [&data](const auto &matches) {
         return matches(data.file_name) || std::any_of(data.names.begin(), data.names.end(), matches);
     };
-    const auto alternate_phrase = search_query::switch_layout(phrase);
     if (!data.names.isEmpty()) {
         if (data.names.front().text == phrase)
             return 0;
@@ -288,7 +288,9 @@ int SearchQuery::rank(const SearchableData &data) const {
     }
     if (all_direct)
         return direct_rank;
-    if (abbreviations_enabled && any_field([this, &alternate_phrase](const auto &field) {
+    if (!suggestions)
+        return -1;
+    if (abbreviations_enabled && any_field([this](const auto &field) {
             return abbreviation_match(phrase, field) || abbreviation_match(alternate_phrase, field);
         }))
         return abbreviation_rank;

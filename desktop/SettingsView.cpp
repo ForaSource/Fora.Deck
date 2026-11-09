@@ -357,12 +357,12 @@ QWidget *library_settings(const ui_context &context, QWidget *) {
         if (!path.isEmpty())
             service->export_catalog(path);
     });
-    auto *clear = button(QCoreApplication::translate("XLibrary", "Clear launch history"));
+    auto *clear = button(QCoreApplication::translate("XLibrary", "Clear usage history"));
     widget->layout()->addWidget(clear);
     QObject::connect(clear, &QPushButton::clicked, widget, [=] {
-        if (confirm(widget, QCoreApplication::translate("XLibrary", "Launch history"),
-                    QCoreApplication::translate(
-                        "XLibrary", "Clear the most recent launch times? Applications and tags will be kept."),
+        if (confirm(widget, QCoreApplication::translate("XLibrary", "Usage history"),
+                    QCoreApplication::translate("XLibrary", "Clear application and file usage counts and recent launch "
+                                                            "times? Applications and tags will be kept."),
                     QCoreApplication::translate("XLibrary", "Clear")))
             service->clear_history();
     });

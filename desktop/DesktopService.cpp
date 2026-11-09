@@ -1080,6 +1080,15 @@ void DesktopService::clear_history() {
     enqueue("history", [](Manager &worker) { worker.clear_history(); });
 }
 
+void DesktopService::record_file_use(const QString &path) {
+    if (!is_ready() || profile_busy() || restart_pending)
+        return;
+    enqueue("history", [path](Manager &worker) {
+        worker.store->record_file_use(path);
+        worker.refresh();
+    });
+}
+
 void DesktopService::notify(const QString &text) {
     emit message(text);
 }

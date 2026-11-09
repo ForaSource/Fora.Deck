@@ -10,8 +10,10 @@
 #include <QFutureWatcher>
 #include <QLineEdit>
 #include <QListView>
+#include <QTimer>
 
 #include "LibraryModel.h"
+#include "PathHelpers.h"
 #include "SearchQuery.h"
 
 class DesktopService;
@@ -24,6 +26,11 @@ struct search_entry {
     QString path;
     qint64 application_id = 0;
     bool saved = false;
+    int rank = 0;
+    qint64 use_count = 0;
+    qint64 last_used = 0;
+    int location = 2;
+    int depth = 0;
 };
 
 namespace search_results {
@@ -33,7 +40,8 @@ inline constexpr int scan_limit = 20000;
 
 inline QVector<search_entry> directory_entries(const QString &request,
                                                const std::shared_ptr<std::atomic<quint64>> &generation,
-                                               const quint64 expected) {
+                                               const quint64 expected, const QHash<QString, usage_record> &usage = {},
+                                               const QSet<QString> &favorites = {}) {
     const auto cancelled = [&] { return generation->load() != expected; };
     if (cancelled())
         return {};
@@ -55,6 +63,14 @@ inline QVector<search_entry> directory_entries(const QString &request,
     if (!directory.exists() || !QFileInfo(path).isReadable())
         return {{search_entry::kind::message, QCoreApplication::translate("XLibrary", "Folder unavailable"), {}, 0}};
     const auto better = [](const search_entry &left, const search_entry &right) {
+        if (left.rank != right.rank)
+            return left.rank < right.rank;
+        if (left.saved != right.saved)
+            return left.saved;
+        if (left.use_count != right.use_count)
+            return left.use_count > right.use_count;
+        if (left.last_used != right.last_used)
+            return left.last_used > right.last_used;
         if (left.type != right.type)
             return left.type == search_entry::kind::directory;
         const auto comparison = QString::compare(left.title, right.title, Qt::CaseInsensitive);
@@ -82,6 +98,12 @@ inline QVector<search_entry> directory_entries(const QString &request,
         const auto file = iterator.fileInfo();
         search_entry entry{file.isDir() ? search_entry::kind::directory : search_entry::kind::file, name,
                            file.absoluteFilePath(), 0};
+        const auto key = normalized_path(entry.path);
+        const auto history = usage.value(key);
+        entry.saved = favorites.contains(key);
+        entry.use_count = history.count;
+        entry.last_used = history.last_used;
+        entry.rank = pattern || prefix.isEmpty() || name.compare(prefix, Qt::CaseInsensitive) == 0 ? 0 : 1;
         // Keep the best bounded subset, independent of enumeration order within the scanned portion.
         const auto position = std::lower_bound(entries.begin(), entries.end(), entry, better);
         entries.insert(position, std::move(entry));
@@ -113,6 +135,7 @@ class SearchResults : public QListView {
     quint64 active_generation = 0;
     bool special = false;
     bool files_enabled = false;
+    QTimer file_delay;
     int pending_file_queries = 0;
     QVector<search_entry> application_entries;
     void update_files();

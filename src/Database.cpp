@@ -1,3 +1,4 @@
+#include <limits>
 #include <stdexcept>
 #include <string>
 
@@ -330,7 +331,7 @@ catalog_snapshot Database::read() const {
     auto *connection = get_connection();
     xlibrary::SqliteStatement applications(connection, R"(
         SELECT a.id, a.name, c.path, c.arguments, c.working_directory,
-               coalesce(d.favorite,0), coalesce(d.last_launch,0),c.id,c.target_id,t.kind,c.installation_directory,c.icon_path,coalesce(d.default_launch_profile,''),c.executable_path
+               coalesce(d.favorite,0), coalesce(d.last_launch,0),c.id,c.target_id,t.kind,c.installation_directory,c.icon_path,coalesce(d.default_launch_profile,''),c.executable_path,coalesce(d.launch_count,0)
         FROM applications a JOIN launch_configuration c ON c.id=a.configuration_id
         JOIN launch_target t ON t.id=c.target_id
         LEFT JOIN desktop_application d ON a.id = d.application_id ORDER BY a.id;
@@ -352,6 +353,7 @@ catalog_snapshot Database::read() const {
         record.icon_path = applications.qtext(11);
         record.default_launch_profile = applications.qtext(12);
         record.executable_path = applications.qtext(13);
+        record.launch_count = applications.number(14);
         record.available = Application::target_available(record);
         rows.insert(record.id, result.applications.size());
         result.applications.append(std::move(record));
@@ -413,6 +415,9 @@ catalog_snapshot Database::read() const {
         "SELECT scenario_id IS NOT NULL,coalesce(application_id,scenario_id),sequence FROM target_shortcut;");
     while (shortcuts.next())
         result.target_shortcuts.append({shortcuts.number(0) != 0, shortcuts.number(1), shortcuts.qtext(2)});
+    xlibrary::SqliteStatement usage(connection, "SELECT path,use_count,last_used FROM file_usage;");
+    while (usage.next())
+        result.file_usage.insert(usage.qtext(0), {usage.number(1), usage.number(2)});
     return result;
 }
 
@@ -665,10 +670,11 @@ void Database::undo_removal() {
         insert.bind(3, record.configuration_id);
         insert.next();
         write_metadata(record.id, record);
-        xlibrary::SqliteStatement history(connection,
-                                          "UPDATE desktop_application SET last_launch=? WHERE application_id=?;");
+        xlibrary::SqliteStatement history(
+            connection, "UPDATE desktop_application SET last_launch=?,launch_count=? WHERE application_id=?;");
         history.bind(1, record.last_launch);
-        history.bind(2, record.id);
+        history.bind(2, record.launch_count);
+        history.bind(3, record.id);
         history.next();
     }
     for (const auto &shortcut : last_removal.target_shortcuts)
@@ -864,9 +870,23 @@ void Database::remove_scenario(const qint64 id) {
 
 void Database::record_launch(const qint64 id) {
     xlibrary::SqliteStatement statement(get_connection(),
-                                        "INSERT INTO desktop_application(application_id,last_launch) VALUES(?,?) ON "
-                                        "CONFLICT(application_id) DO UPDATE SET last_launch=excluded.last_launch;");
+                                        "INSERT INTO desktop_application(application_id,last_launch,launch_count) "
+                                        "VALUES(?,?,1) ON CONFLICT(application_id) DO UPDATE SET "
+                                        "last_launch=excluded.last_launch,"
+                                        "launch_count=min(launch_count,9223372036854775806)+1;");
     statement.bind(1, id);
+    statement.bind(2, QDateTime::currentSecsSinceEpoch());
+    statement.next();
+}
+
+void Database::record_file_use(const QString &path) {
+    if (!QFileInfo(path).isAbsolute() || path.contains(QChar::Null))
+        throw std::invalid_argument("Invalid file history path");
+    xlibrary::SqliteStatement statement(get_connection(),
+                                        "INSERT INTO file_usage(path,use_count,last_used) VALUES(?,1,?) "
+                                        "ON CONFLICT(path) DO UPDATE SET "
+                                        "use_count=min(use_count,9223372036854775806)+1,last_used=excluded.last_used;");
+    statement.bind(1, normalized_path(path));
     statement.bind(2, QDateTime::currentSecsSinceEpoch());
     statement.next();
 }
@@ -876,7 +896,14 @@ QString Database::path() const {
 }
 
 void Database::clear_history() {
-    xlibrary::sqlite_execute(get_connection(), "UPDATE desktop_application SET last_launch = 0;");
+    Transaction transaction(get_connection());
+    xlibrary::sqlite_execute(get_connection(), "UPDATE desktop_application SET last_launch=0,launch_count=0; "
+                                               "DELETE FROM file_usage;");
+    transaction.commit();
+    for (auto &record : last_removal.applications) {
+        record.last_launch = 0;
+        record.launch_count = 0;
+    }
 }
 
 void Database::consolidate_discovered_application(const qint64 configuration_id, const app_record &record) {
@@ -919,11 +946,15 @@ void Database::consolidate_discovered_application(const qint64 configuration_id,
             continue;
         combined.favorite |= existing.favorite;
         combined.last_launch = std::max(combined.last_launch, existing.last_launch);
+        combined.launch_count =
+            std::min(combined.launch_count, std::numeric_limits<qint64>::max() - existing.launch_count) +
+            existing.launch_count;
         write_metadata(combined.id, combined);
-        xlibrary::SqliteStatement history(get_connection(),
-                                          "UPDATE desktop_application SET last_launch=? WHERE application_id=?;");
+        xlibrary::SqliteStatement history(
+            get_connection(), "UPDATE desktop_application SET last_launch=?,launch_count=? WHERE application_id=?;");
         history.bind(1, combined.last_launch);
-        history.bind(2, combined.id);
+        history.bind(2, combined.launch_count);
+        history.bind(3, combined.id);
         history.next();
         xlibrary::SqliteStatement sources(get_connection(),
                                           "INSERT OR IGNORE INTO discovery_source(configuration_id,kind,source_key) "

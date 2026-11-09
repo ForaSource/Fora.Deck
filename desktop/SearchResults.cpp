@@ -106,6 +106,9 @@ public:
 SearchResults::SearchResults(DesktopService &service, QLineEdit &input, const bool compact, QWidget *const parent)
     : QListView(parent), service(service), input(input), compact(compact), results(new SearchResultModel(this)) {
     setObjectName("search_results");
+    file_delay.setSingleShot(true);
+    file_delay.setInterval(100);
+    connect(&file_delay, &QTimer::timeout, this, &SearchResults::update_files);
     setAccessibleName(QCoreApplication::translate("XLibrary", "Search results"));
     setModel(results);
     setItemDelegate(new SearchDelegate(service, this));
@@ -128,6 +131,10 @@ SearchResults::SearchResults(DesktopService &service, QLineEdit &input, const bo
     });
     connect(&service.model, &QAbstractItemModel::dataChanged, viewport(), qOverload<>(&QWidget::update));
     connect(&service, &DesktopService::catalog_changed, this, &SearchResults::update_query);
+    connect(&service, &DesktopService::navigation_changed, this, [this] {
+        if (!this->compact)
+            update_query();
+    });
     connect(&service, &DesktopService::profile_state_changed, this,
             [this] { setEnabled(!this->service.profile_busy() && !this->service.restart_required()); });
     connect(&service, &DesktopService::appearance_changed, this, &SearchResults::update_query);
@@ -171,12 +178,13 @@ SearchResults::SearchResults(DesktopService &service, QLineEdit &input, const bo
     connect(service.files, &FileManager::index_updated, this, [this] {
         if (!action_menu && !pending_file_queries && files_enabled && !special &&
             !this->input.text().trimmed().isEmpty())
-            update_files();
+            file_delay.start();
     });
     update_query();
 }
 
 SearchResults::~SearchResults() {
+    file_delay.stop();
     ++*generation;
 }
 
@@ -210,6 +218,14 @@ void SearchResults::update_applications() {
     const auto better = [this](const auto &left, const auto &right) {
         if (left.second != right.second)
             return left.second < right.second;
+        const auto &a = service.model.at(left.first);
+        const auto &b = service.model.at(right.first);
+        if (a.favorite != b.favorite)
+            return a.favorite;
+        if (a.launch_count != b.launch_count)
+            return a.launch_count > b.launch_count;
+        if (a.last_launch != b.last_launch)
+            return a.last_launch > b.last_launch;
         const auto comparison =
             QString::localeAwareCompare(service.model.search_name(left.first), service.model.search_name(right.first));
         return comparison == 0 ? service.model.at(left.first).id < service.model.at(right.first).id : comparison < 0;
@@ -217,7 +233,11 @@ void SearchResults::update_applications() {
     // Keep only the five best matches in O(n), rather than sorting an entire second catalog on each key.
     for (int row = 0; row < service.model.rowCount(); ++row) {
         const auto &record = service.model.at(row);
-        if (input.text().trimmed().isEmpty() && !record.favorite)
+        if (!compact && ((service.section() == "favorites" && !record.favorite) ||
+                         (service.section() == "running" && !record.running) ||
+                         (!service.tag().isEmpty() && !has_tag(record.tags, service.tag()))))
+            continue;
+        if (input.text().trimmed().isEmpty() && !record.favorite && !record.launch_count)
             continue;
         const auto rank = query.rank(service.model.search_data(row));
         if (rank < 0)
@@ -245,16 +265,18 @@ void SearchResults::update_applications() {
                                         .arg(QFileInfo(record.default_launch_profile.mid(8)).fileName());
             title += " · " + mode;
         }
-        entries.append({search_entry::kind::application, title, record.path, record.id});
+        entries.append({search_entry::kind::application, title, record.path, record.id, record.favorite,
+                        candidate.second, record.launch_count, record.last_launch, 0, 0});
     }
     application_entries = entries;
-    replace_entries(std::move(entries));
+    replace_entries(compact ? std::move(entries) : QVector<search_entry>{});
 }
 
 void SearchResults::update_query() {
     if (action_menu)
         action_menu->close();
     pending_launch = 0;
+    file_delay.stop();
     setCurrentIndex({});
     ++*generation;
     pending_path.clear();
@@ -279,12 +301,12 @@ void SearchResults::update_query() {
             replace_entries({{search_entry::kind::message, QCoreApplication::translate("XLibrary", "—"), {}, 0}});
     } else {
         application_entries.clear();
-        if (compact)
+        if (compact || (files_enabled && !text.isEmpty()))
             update_applications();
         else
             replace_entries({});
         if (files_enabled && !text.isEmpty())
-            update_files();
+            file_delay.start();
     }
 }
 
@@ -301,15 +323,38 @@ void SearchResults::update_files() {
             --pending_file_queries;
             if (request != generation->load() || !files_enabled)
                 return;
-            auto entries = application_entries;
+            auto entries = compact || !matches.isEmpty() ? application_entries : QVector<search_entry>{};
             for (const auto &match : matches)
                 entries.append({search_entry::kind::working_file,
                                 (match.saved ? QStringLiteral("★ ") : QString{}) + match.name + QStringLiteral(" · ") +
                                     QDir::toNativeSeparators(QFileInfo(match.path).absolutePath()),
-                                match.path, 0, match.saved});
+                                match.path, 0, match.saved, match.rank, match.use_count, match.last_used,
+                                match.location, match.depth});
+            std::sort(entries.begin(), entries.end(), [](const search_entry &a, const search_entry &b) {
+                if (a.rank != b.rank)
+                    return a.rank < b.rank;
+                if (a.saved != b.saved)
+                    return a.saved;
+                if (a.use_count != b.use_count)
+                    return a.use_count > b.use_count;
+                if (a.last_used != b.last_used)
+                    return a.last_used > b.last_used;
+                if (a.location != b.location)
+                    return a.location < b.location;
+                if (a.depth != b.depth)
+                    return a.depth < b.depth;
+                const auto comparison = QString::compare(a.title, b.title, Qt::CaseInsensitive);
+                if (comparison != 0)
+                    return comparison < 0;
+                return a.path == b.path ? a.application_id < b.application_id : a.path < b.path;
+            });
+            if (!entries.isEmpty()) {
+                const auto best = entries.front().rank;
+                entries.removeIf([best](const auto &entry) { return !SearchQuery::accepts_rank(entry.rank, best); });
+            }
             replace_entries(std::move(entries));
         },
-        generation);
+        generation, service.catalog().file_usage);
 }
 
 void SearchResults::read_path() {
@@ -318,8 +363,15 @@ void SearchResults::read_path() {
     pending_path.clear();
     active_generation = generation->load();
     // Only one disk request is active per field; newer input replaces the pending request.
-    path_watcher.setFuture(
-        QtConcurrent::run(search_results::directory_entries, active_path, generation, active_generation));
+    auto usage = service.catalog().file_usage;
+    QSet<QString> favorites;
+    for (const auto &record : service.model.applications()) {
+        usage.insert(normalized_path(record.path), {record.launch_count, record.last_launch});
+        if (record.favorite)
+            favorites.insert(normalized_path(record.path));
+    }
+    path_watcher.setFuture(QtConcurrent::run(search_results::directory_entries, active_path, generation,
+                                             active_generation, usage, favorites));
 }
 
 void SearchResults::activate_current() {
@@ -330,9 +382,9 @@ void SearchResults::activate_current() {
         return;
     const auto entry = results->entries[row];
     if (entry.type == search_entry::kind::open_folder) {
-        if (desktop_platform::open_url(QUrl::fromLocalFile(entry.path)))
+        if (desktop_platform::open_url(QUrl::fromLocalFile(entry.path))) {
             emit application_activated();
-        else
+        } else
             service.notify(QCoreApplication::translate("XLibrary", "Could not open the folder."));
     } else if (entry.type == search_entry::kind::directory) {
         input.setText(QDir::toNativeSeparators(entry.path + '/'));
@@ -345,9 +397,10 @@ void SearchResults::activate_current() {
             update_query();
             return;
         }
-        if (desktop_platform::open_url(QUrl::fromLocalFile(entry.path)))
+        if (desktop_platform::open_url(QUrl::fromLocalFile(entry.path))) {
+            service.record_file_use(entry.path);
             emit application_activated();
-        else
+        } else
             service.notify(QCoreApplication::translate("XLibrary", "Could not open the file."));
     } else if (entry.type == search_entry::kind::calculation)
         QApplication::clipboard()->setText(entry.path);
@@ -371,9 +424,10 @@ void SearchResults::show_actions() {
                                                                    "The file is unavailable or its type is excluded."));
                         return;
                     }
-                    if (desktop_platform::open_url(QUrl::fromLocalFile(entry.path)))
+                    if (desktop_platform::open_url(QUrl::fromLocalFile(entry.path))) {
+                        service.record_file_use(entry.path);
                         emit application_activated();
-                    else
+                    } else
                         service.notify(QCoreApplication::translate("XLibrary", "Could not open the file."));
                 });
         connect(menu->addAction(QCoreApplication::translate("XLibrary", "Open folder")), &QAction::triggered, this,
@@ -394,7 +448,7 @@ void SearchResults::show_actions() {
         menu->setActiveAction(menu->actions().first());
         return;
     }
-    if (!compact || !isEnabled() || service.profile_busy() || service.restart_required() || row < 0 ||
+    if (!isEnabled() || service.profile_busy() || service.restart_required() || row < 0 ||
         row >= results->entries.size() || results->entries[row].type != search_entry::kind::application)
         return;
     const auto id = results->entries[row].application_id;

@@ -4,11 +4,15 @@
 #include <atomic>
 #include <functional>
 #include <memory>
+#include <QCache>
 #include <QObject>
 #include <QStringList>
 #include <QThreadPool>
 #include <QTimer>
 #include <QVector>
+
+#include "CatalogTypes.h"
+#include "SearchQuery.h"
 
 struct file_match {
     QString path;
@@ -16,6 +20,10 @@ struct file_match {
     int rank = 0;
     bool saved = false;
     bool available = true;
+    qint64 use_count = 0;
+    qint64 last_used = 0;
+    int location = 2;
+    int depth = 0;
 };
 Q_DECLARE_METATYPE(QVector<file_match>)
 
@@ -26,6 +34,9 @@ class FileManager : public QObject {
     QString scope;
     QThreadPool scan_pool;
     QThreadPool query_pool;
+    // Accessed only by the single query worker; duplicate filenames share prepared search data.
+    std::shared_ptr<QCache<QString, SearchQuery::SearchableData>> search_cache =
+        std::make_shared<QCache<QString, SearchQuery::SearchableData>>(20000);
     QTimer refresh;
     QTimer progress_timer;
     std::shared_ptr<std::atomic<quint64>> scan_generation = std::make_shared<std::atomic<quint64>>(0);
@@ -47,7 +58,7 @@ public:
     QStringList persisted_saved_paths() const;
     void search(const QString &text, quint64 request, QObject *receiver,
                 std::function<void(quint64, QVector<file_match>)> completed,
-                std::shared_ptr<std::atomic<quint64>> field_generation);
+                std::shared_ptr<std::atomic<quint64>> field_generation, const QHash<QString, usage_record> &usage = {});
     void saved_files(QObject *receiver, std::function<void(QVector<file_match>)> completed);
     void set_saved(const QString &path, bool saved);
     bool is_saving() const { return pending_saves > 0; }

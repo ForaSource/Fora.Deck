@@ -4,8 +4,8 @@
 <context>
     <name>XLibrary</name>
     <message>
-        <source>Search applications, calculate or enter a path</source>
-        <translation>Поиск приложений, вычисление или ввод пути</translation>
+        <source>Search applications and files, calculate or enter a path</source>
+        <translation>Поиск приложений и файлов, вычисление или ввод пути</translation>
     </message>
     <message>
         <source>Search, calculate or enter a path</source>
@@ -352,8 +352,8 @@
         <translation>ожидается пустая строка или абсолютный путь</translation>
     </message>
     <message>
-        <source>Launch history cleared.</source>
-        <translation>История запусков очищена.</translation>
+        <source>Usage history cleared.</source>
+        <translation>История использования очищена.</translation>
     </message>
     <message>
         <source>Edit application</source>
@@ -1186,16 +1186,16 @@ Applications: %1</source>
         <translation>Экспорт библиотеки</translation>
     </message>
     <message>
-        <source>Clear launch history</source>
-        <translation>Очистить историю запусков</translation>
+        <source>Clear usage history</source>
+        <translation>Очистить историю использования</translation>
     </message>
     <message>
-        <source>Launch history</source>
-        <translation>История запусков</translation>
+        <source>Usage history</source>
+        <translation>История использования</translation>
     </message>
     <message>
-        <source>Clear the most recent launch times? Applications and tags will be kept.</source>
-        <translation>Очистить время последних запусков? Приложения и теги сохранятся.</translation>
+        <source>Clear application and file usage counts and recent launch times? Applications and tags will be kept.</source>
+        <translation>Очистить счётчики использования приложений и файлов и время последних запусков? Приложения и теги будут сохранены.</translation>
     </message>
     <message>
         <source>Clear</source>

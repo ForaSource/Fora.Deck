@@ -352,6 +352,15 @@ QWidget *my_files(const ui_context &context, QWidget *const parent) {
         service->files->saved_files(widget, [=](QVector<file_match> entries) {
             if (request != *sequence)
                 return;
+            std::sort(entries.begin(), entries.end(), [=](const file_match &a, const file_match &b) {
+                const auto a_usage = service->catalog().file_usage.value(normalized_path(a.path));
+                const auto b_usage = service->catalog().file_usage.value(normalized_path(b.path));
+                if (a_usage.count != b_usage.count)
+                    return a_usage.count > b_usage.count;
+                if (a_usage.last_used != b_usage.last_used)
+                    return a_usage.last_used > b_usage.last_used;
+                return a.path < b.path;
+            });
             list->clear();
             for (const auto &entry : entries) {
                 auto *item = new QTreeWidgetItem(list, {entry.name, QDir::toNativeSeparators(entry.path)});
@@ -365,6 +374,10 @@ QWidget *my_files(const ui_context &context, QWidget *const parent) {
         });
     };
     QObject::connect(service->files, &FileManager::saved_paths_changed, widget, [=] {
+        if (service->section() == "files")
+            reload();
+    });
+    QObject::connect(service, &DesktopService::catalog_changed, widget, [=] {
         if (service->section() == "files")
             reload();
     });
@@ -384,6 +397,8 @@ QWidget *my_files(const ui_context &context, QWidget *const parent) {
     const auto open = [=](const QString &path) {
         if (!FileManager::accepts_file(path) || !desktop_platform::open_url(QUrl::fromLocalFile(path)))
             service->notify(QCoreApplication::translate("XLibrary", "Could not open the file."));
+        else
+            service->record_file_use(path);
     };
     action(QCoreApplication::translate("XLibrary", "Open"), open);
     action(QCoreApplication::translate("XLibrary", "Open folder"), [](const QString &path) {
@@ -416,7 +431,7 @@ QWidget *search_bar(const ui_context &context, QWidget *const parent) {
     search->setMaxLength(static_cast<int>(catalog_limits::text_length));
     search->setObjectName("search_input");
     search->setAccessibleName(
-        QCoreApplication::translate("XLibrary", "Search applications, calculate or enter a path"));
+        QCoreApplication::translate("XLibrary", "Search applications and files, calculate or enter a path"));
     search->setPlaceholderText(QCoreApplication::translate("XLibrary", "Search, calculate or enter a path"));
     search->setClearButtonEnabled(true);
     search->setMinimumHeight(26);

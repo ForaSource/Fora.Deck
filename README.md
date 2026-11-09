@@ -148,7 +148,7 @@ mounts are distinguished from missing files; an unknown missing location is kept
 ## Search and saved filters
 
 Search matches names, filenames, and user-defined aliases from **Edit application**.
-Ties keep a stable sort order.
+Matches sort by text relevance, favorites, usage count, and most recent use before the selected sort mode.
 Case, repeated spaces, Unicode normalization, and English/Russian keyboard layout are
 handled by the same cached search rules in the library and quick launcher. Initials (`vsc`),
 word prefixes (`vscode`) and limited typo correction (`discrod`, `dicsor`, `chrme`, `stema`) are supported.
@@ -440,3 +440,21 @@ The recoverable `file-index.sqlite` cache is stored beside `settings.ini`. Saved
 are also stored in profile settings, so rebuilding the index does not lose them.
 Only names and paths are indexed locally; document contents are neither indexed nor
 uploaded. A small header sample is read to reject executables and binary text files.
+
+### Search and usage in 0.8.0
+
+File indexing visits Desktop and Documents first when they belong to the configured scope,
+then uses breadth-first traversal to reach shallow files sooner across the existing disk/folder scope.
+At equal text relevance, saved files and favorite applications rank first, followed by local usage
+counts and recent use; file ties prefer Desktop, Documents, then shallower paths. The quick launcher
+merges applications and files using these rules. My files and direct folder browsing also use usage.
+
+Queries wait 100 ms after typing, reuse a bounded cache of prepared filenames, and defer typo and
+abbreviation matching until there are no direct matches. Wildcards, extension filters, custom
+roots, saved files, and periodic index refresh remain available. File contents are rechecked only
+for the final bounded result set.
+
+Successful application launches and file-open requests update usage in the profile database;
+merely typing a query does not. Full profile backups preserve it. Settings → Clear usage history
+clears application counts, recent launches, and file counts. Existing launch times migrate as one
+use per previously launched application, with an automatic database backup before schema v9.

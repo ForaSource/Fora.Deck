@@ -2,6 +2,7 @@
 #include <sys/stat.h>
 #endif
 #include <algorithm>
+#include <deque>
 #include <functional>
 #include <QCoreApplication>
 #include <QCryptographicHash>
@@ -13,6 +14,7 @@
 #include <QFutureWatcher>
 #include <QRegularExpression>
 #include <QSet>
+#include <QStandardPaths>
 #include <QStorageInfo>
 #include <QtConcurrent/QtConcurrentRun>
 
@@ -132,8 +134,8 @@ bool excluded_directory(const QFileInfo &info) {
 bool FileManager::accepts_file(const QString &path) {
     const QFileInfo info(path);
     const auto name = info.fileName();
-    if (name.startsWith('.') || name.startsWith('~') || name.endsWith('~') || info.isHidden() || info.isSymLink() ||
-        !info.isFile() || !info.isReadable() || !extensions().contains(info.suffix().toLower()))
+    if (!extensions().contains(info.suffix().toLower()) || name.startsWith('.') || name.startsWith('~') ||
+        name.endsWith('~') || info.isHidden() || info.isSymLink() || !info.isFile() || !info.isReadable())
         return false;
     const auto lower = name.toLower();
     for (const auto &part : {".tmp.", ".temp.", ".bak.", ".backup.", ".lock.", ".part.", ".download."})
@@ -281,13 +283,35 @@ void FileManager::start_scan() {
         try {
             auto db = open_index(path);
             const auto seen = QDateTime::currentMSecsSinceEpoch();
-            QStringList pending;
+            std::deque<QString> pending;
             QSet<QString> visited;
             quint64 skipped = 0;
-            for (const auto &root : roots) {
+            QStringList ordered_roots;
+            for (const auto &preferred :
+                 {QStandardPaths::writableLocation(QStandardPaths::DesktopLocation),
+                  QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation), QDir::homePath()}) {
+                if (preferred.isEmpty() || QFileInfo(preferred).isSymLink())
+                    continue;
+                const auto canonical_preferred = QFileInfo(preferred).canonicalFilePath();
+                if (canonical_preferred.isEmpty())
+                    continue;
+                const auto key = identity(canonical_preferred);
+                if (std::any_of(roots.cbegin(), roots.cend(), [&key](const auto &root) {
+                        const auto canonical_root = QFileInfo(root).canonicalFilePath();
+                        if (canonical_root.isEmpty())
+                            return false;
+                        const auto normalized = identity(canonical_root);
+                        return key == normalized ||
+                               key.startsWith(normalized.endsWith('/') ? normalized : normalized + '/');
+                    }))
+                    ordered_roots.append(canonical_preferred);
+            }
+            ordered_roots += roots;
+            ordered_roots.removeDuplicates();
+            for (const auto &root : ordered_roots) {
                 const auto canonical = QFileInfo(root).canonicalFilePath();
                 if (!canonical.isEmpty() && !excluded_directory(QFileInfo(canonical)))
-                    pending.append(canonical);
+                    pending.push_back(canonical);
                 else
                     ++skipped;
             }
@@ -313,8 +337,9 @@ void FileManager::start_scan() {
                 batch.clear();
                 batch_age.restart();
             };
-            while (!pending.isEmpty() && !cancelled()) {
-                const auto directory = pending.takeLast();
+            while (!pending.empty() && !cancelled()) {
+                const auto directory = std::move(pending.front());
+                pending.pop_front();
                 if (std::any_of(blocked_mounts.cbegin(), blocked_mounts.cend(), [&](const auto &mount) {
                         return directory == mount || directory.startsWith(mount + '/');
                     }))
@@ -343,7 +368,7 @@ void FileManager::start_scan() {
                     const auto info = entries.fileInfo();
                     if (info.isDir()) {
                         if (!excluded_directory(info))
-                            pending.append(info.absoluteFilePath());
+                            pending.push_back(info.absoluteFilePath());
                     } else if (accepts_file(info.absoluteFilePath())) {
                         batch.append({identity(info.absoluteFilePath()), info.fileName()});
                         if (batch.size() >= 256 || batch_age.elapsed() > 100)
@@ -370,8 +395,8 @@ void FileManager::start_scan() {
 
 void FileManager::search(const QString &text, const quint64 request, QObject *receiver,
                          std::function<void(quint64, QVector<file_match>)> completed,
-                         std::shared_ptr<std::atomic<quint64>> field_generation) {
-    // Separate cancellation tokens belong to each search field, supplied by its receiver lifetime below.
+                         std::shared_ptr<std::atomic<quint64>> field_generation,
+                         const QHash<QString, usage_record> &usage) {
     auto *watcher = new QFutureWatcher<QVector<file_match>>(receiver);
     connect(watcher, &QFutureWatcher<QVector<file_match>>::finished, receiver,
             [watcher, request, completed = std::move(completed)] {
@@ -379,11 +404,12 @@ void FileManager::search(const QString &text, const quint64 request, QObject *re
                 watcher->deleteLater();
             });
     const auto expected = query_generation->load();
-    watcher->setFuture(QtConcurrent::run(&query_pool, [path = database_path, scope = scope, text,
-                                                       generation = query_generation, expected, field_generation,
-                                                       request] {
+    watcher->setFuture(QtConcurrent::run(&query_pool, [path = database_path, scope = scope, text, usage,
+                                                       cache = search_cache, generation = query_generation, expected,
+                                                       field_generation, request] {
         QVector<file_match> matches;
-        if (text.trimmed().isEmpty() || field_generation->load() != request)
+        const auto cancelled = [&] { return generation->load() != expected || field_generation->load() != request; };
+        if (text.trimmed().isEmpty() || cancelled())
             return matches;
         try {
             auto db = open_index(path);
@@ -412,44 +438,110 @@ void FileManager::search(const QString &text, const quint64 request, QObject *re
                 }
             }
             const SearchQuery query(query_text.trimmed());
-            xlibrary::SqliteStatement rows(
-                db.get(), "SELECT f.path,f.name,EXISTS(SELECT 1 FROM saved s WHERE s.path=f.path) "
-                          "FROM files f WHERE f.scope=? OR EXISTS(SELECT 1 FROM saved s WHERE s.path=f.path) "
-                          "UNION ALL SELECT s.path,'',1 FROM saved s WHERE NOT EXISTS(SELECT 1 FROM files f WHERE "
-                          "f.path=s.path)");
-            rows.bind(1, scope);
+            const bool has_query = !query_text.trimmed().isEmpty();
+            QStringList preferred{QStandardPaths::writableLocation(QStandardPaths::DesktopLocation),
+                                  QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation)};
+            for (auto &root : preferred)
+                if (!root.isEmpty())
+                    root = identity(root);
             const auto better = [](const file_match &a, const file_match &b) {
                 if (a.rank != b.rank)
                     return a.rank < b.rank;
                 if (a.saved != b.saved)
                     return a.saved;
+                if (a.use_count != b.use_count)
+                    return a.use_count > b.use_count;
+                if (a.last_used != b.last_used)
+                    return a.last_used > b.last_used;
+                if (a.location != b.location)
+                    return a.location < b.location;
+                if (a.depth != b.depth)
+                    return a.depth < b.depth;
                 return a.path < b.path;
             };
-            while (rows.next()) {
-                if (generation->load() != expected || field_generation->load() != request)
-                    return QVector<file_match>{};
-                const auto file_path = rows.qtext(0);
-                const auto name = rows.qtext(1).isEmpty() ? QFileInfo(file_path).fileName() : rows.qtext(1);
-                if (!extension.isEmpty() && QFileInfo(name).suffix().compare(extension, Qt::CaseInsensitive) != 0)
-                    continue;
-                int rank = 0;
-                if (pattern) {
-                    if (!pattern->match(name.normalized(QString::NormalizationForm_C)).hasMatch())
-                        continue;
-                } else if (!query_text.trimmed().isEmpty())
-                    rank = query.rank(name, name, {});
-                if (rank < 0)
-                    continue;
-                file_match match{file_path, name, rank, rows.number(2) != 0, true};
-                auto position = std::lower_bound(matches.begin(), matches.end(), match, better);
-                if (position != matches.end() || matches.size() < 30) {
-                    // Validate only competitive matches, never every indexed file on each keystroke.
-                    if (!accepts_file(file_path))
-                        continue;
-                    matches.insert(position, std::move(match));
-                    if (matches.size() > 30)
-                        matches.removeLast();
+            // Direct queries never pay for edit distance across the full disk index.
+            // Only a query with no direct matches needs the abbreviation/typo pass.
+            QSet<QString> inspected;
+            for (const bool suggestions : {false, true}) {
+                if (suggestions && (!matches.isEmpty() || pattern || !has_query))
+                    break;
+                for (;;) {
+                    const auto capacity = 30 - matches.size();
+                    QVector<file_match> candidates;
+                    xlibrary::SqliteStatement rows(
+                        db.get(),
+                        "SELECT f.path,f.name,EXISTS(SELECT 1 FROM saved s WHERE s.path=f.path) "
+                        "FROM files f WHERE f.scope=? OR EXISTS(SELECT 1 FROM saved s WHERE s.path=f.path) "
+                        "UNION ALL SELECT s.path,'',1 FROM saved s WHERE NOT EXISTS(SELECT 1 FROM files f WHERE "
+                        "f.path=s.path)");
+                    rows.bind(1, scope);
+                    while (rows.next()) {
+                        if (cancelled())
+                            return QVector<file_match>{};
+                        const auto file_path = rows.qtext(0);
+                        if (inspected.contains(file_path))
+                            continue;
+                        const auto stored_name = rows.qtext(1);
+                        const auto name = stored_name.isEmpty() ? QFileInfo(file_path).fileName() : stored_name;
+                        if (!extension.isEmpty() &&
+                            QFileInfo(name).suffix().compare(extension, Qt::CaseInsensitive) != 0)
+                            continue;
+                        int rank = 0;
+                        if (pattern) {
+                            if (!pattern->match(name.normalized(QString::NormalizationForm_C)).hasMatch())
+                                continue;
+                        } else if (has_query) {
+                            auto *prepared = cache->object(name);
+                            std::optional<SearchQuery::SearchableData> uncached;
+                            if (!prepared) {
+                                auto data = SearchQuery::prepare(name, {}, {});
+                                // Retain the warm prefix instead of thrashing on indexes larger than the cache.
+                                if (cache->totalCost() < cache->maxCost()) {
+                                    prepared = new SearchQuery::SearchableData(std::move(data));
+                                    cache->insert(name, prepared);
+                                } else {
+                                    uncached = std::move(data);
+                                    prepared = &*uncached;
+                                }
+                            }
+                            rank = query.rank(*prepared, suggestions);
+                        }
+                        if (rank < 0)
+                            continue;
+                        const auto history = usage.value(file_path);
+                        file_match match{file_path,        name, rank, rows.number(2) != 0, true, history.count,
+                                         history.last_used};
+                        match.depth = static_cast<int>(file_path.count('/'));
+                        for (int location = 0; location < preferred.size(); ++location)
+                            if (!preferred[location].isEmpty() && file_path.startsWith(preferred[location] + '/')) {
+                                match.location = location;
+                                match.depth =
+                                    static_cast<int>(file_path.mid(preferred[location].size() + 1).count('/'));
+                                break;
+                            }
+                        auto position = std::lower_bound(candidates.begin(), candidates.end(), match, better);
+                        if (position != candidates.end() || candidates.size() < capacity) {
+                            // Content checks belong to indexing and the final bounded subset, not every competitive row.
+                            const QFileInfo info(file_path);
+                            if (!info.isFile() || !info.isReadable())
+                                continue;
+                            candidates.insert(position, std::move(match));
+                            if (candidates.size() > capacity)
+                                candidates.removeLast();
+                        }
+                    }
+                    for (const auto &entry : candidates) {
+                        if (cancelled())
+                            return QVector<file_match>{};
+                        inspected.insert(entry.path);
+                        if (accepts_file(entry.path))
+                            matches.append(entry);
+                    }
+                    // Refill after rejected candidates without reading every matching file's contents.
+                    if (matches.size() == 30 || candidates.size() < capacity)
+                        break;
                 }
+                std::sort(matches.begin(), matches.end(), better);
             }
             if (!matches.isEmpty()) {
                 const auto best = matches.first().rank;
@@ -457,7 +549,7 @@ void FileManager::search(const QString &text, const quint64 request, QObject *re
             }
         } catch (const std::exception &) { /* Index status exposes persistent storage failures. */
         }
-        return matches;
+        return cancelled() ? QVector<file_match>{} : matches;
     }));
 }
 void FileManager::saved_files(QObject *receiver, std::function<void(QVector<file_match>)> completed) {
