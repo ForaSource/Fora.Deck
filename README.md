@@ -10,369 +10,77 @@
 
 <p align="center">
   <a href="https://github.com/lappland-open/XLibrary/actions/workflows/windows-build.yml"><img src="https://github.com/lappland-open/XLibrary/actions/workflows/windows-build.yml/badge.svg" alt="Windows build"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-68717C" alt="License: MIT"></a>
   <a href="https://github.com/lappland-open/XLibrary/actions/workflows/linux-build.yml"><img src="https://github.com/lappland-open/XLibrary/actions/workflows/linux-build.yml/badge.svg" alt="Linux build"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-68717C" alt="License: MIT"></a>
   <img src="https://img.shields.io/badge/platform-Windows%20%2F%20Linux-68717C" alt="Platform: Windows and Linux">
 </p>
 
 <p align="center">
   <a href="#features">Features</a> ·
-  <a href="#search">Search</a> ·
-  <a href="#development">Development</a> ·
-  <a href="#contributing">Contributing</a> ·
-  <a href="https://github.com/lappland-open/XLibrary/issues">Feedback</a>
+  <a href="#get-xlibrary">Download</a> ·
+  <a href="#quick-start">Quick start</a> ·
+  <a href="docs/README.md">Documentation</a> ·
+  <a href="#contributing">Contributing</a>
 </p>
 
-## XLibrary
+# XLibrary
 
-XLibrary is an open-source application launcher and organizer for Windows and Linux. Bring your everyday tools, games, and portable apps into one library, organize them with tags, and launch them from a single place.
+XLibrary brings your everyday tools, games, and portable apps into one library on Windows and Linux.
+Organize them with tags, find them from a compact launcher, and open everything you need for a project with a launch scenario.
 
-An app can belong to more than one part of your day. Give your browser both `#work` and `#personal`, keep development tools under `#dev`, or create a launch scenario that opens everything you need for a project.
+Give your browser both `#work` and `#personal`, keep development tools under `#dev`, and find a document without leaving search.
+Your catalog and settings stay on your computer. The interface supports English and Russian.
 
-> **Under active development.** Features and interfaces are still evolving. Early feedback and contributions are welcome.
-
-<p align="center">
-  <h3 align="center"><a href="https://github.com/lappland-open/XLibrary/releases">Download Latest Release</a></h3>
-</p>
+> **Under active development.** Features and interfaces are still evolving. Feedback and contributions are welcome.
 
 ## Features
 
-On first launch, choose discovery, manual entry, or complete profile restoration from the
-welcome screen, or take the four-step tour. Reopen the welcome screen in **Settings → General**
-and the tour in **Settings → Quick help**. Settings also includes local data paths, a
-portable-mode explanation, optional interface animations, and a confirmed preference reset
-that keeps the catalog. Restart after resetting preferences.
-
-Before running a scenario, review its missing targets or invalid launch options. Each step
-shows waiting, delay, launching, success, error, or skipped; stopping keeps opened apps running.
-Launch success means the command was accepted, rather than that the application's UI is ready.
-
 | | What you can do |
 | --- | --- |
-| **One application library** | Discover Windows system apps, registry and Start menu entries, Linux desktop entries, and installed Steam games across local libraries. |
-| **Tags and filters** | Assign multiple tags to an app and combine them with text search and exclusions. |
-| **Favorites and recent launches** | Keep frequently used apps close and sort your library by last launch. |
-| **Running apps** | See what is running, switch to an existing window when available, or open a new instance. |
-| **Launch scenarios** | Open a group of apps in a defined order, with optional delays between steps. |
-| **Quick search** | Open a compact launcher with Ctrl+Alt+Space, calculate expressions, or browse a folder directly. |
-| **Desktop integration** | Assign global hotkeys to the library, quick search, individual applications, and launch scenarios. |
-| **Browser profiles** | Choose normal, private, or detected local profiles for Chrome, Edge, Firefox and Brave, including in scenarios. |
-| **Appearance** | Choose a light, dark, or system theme and adjust the text size. |
-| **Local storage** | Keep your catalog in SQLite. Import and export application entries, tags, and favorites as JSON. |
+| **One library** | Discover installed applications and Steam games, or add your own launch configurations. |
+| **Tags and favorites** | Organize apps your way and combine text search with tag filters and exclusions. |
+| **Quick search** | Find apps by name, filename, or alias, with typo and English/Russian keyboard layout correction. |
+| **Files and calculations** | Search supported documents and media by filename, save them to My files, browse folders, or calculate an expression. |
+| **Launch scenarios** | Open a group of apps in a defined order, with optional delays and browser profiles. |
+| **Desktop integration** | Assign shortcuts, switch to running apps where supported, or launch a new instance. |
+| **Make it yours** | Choose a light, dark, or system theme, adjust text size, and use English or Russian. |
+| **Keep your library** | Transfer application entries as JSON or create a complete profile backup. |
 
-## Import and discovery
+## Get XLibrary
 
-JSON format 1 stores application names, typed launch targets, launch arguments, working directories,
-browser defaults, aliases, favorites, and assigned tags. Executable targets use absolute paths;
-system URI, AUMID and Steam targets use their own validated identifiers. Older catalogs remain supported.
-Linux executable paths do not need a filename extension. Optional
-fields may be omitted; supplied fields must have the expected JSON types. Import validates the
-entire file before writing and reports the record number, field, and reason on invalid input.
-An import error leaves the catalog unchanged. Files are limited to 32 MiB and 50,000 applications.
+Download a package from [GitHub Releases](https://github.com/lappland-open/XLibrary/releases).
+Pre-releases are development builds; read the release notes before upgrading.
 
-Discovery, JSON import, and files dropped onto the main window open a preview with checkboxes,
-search, **Select all**, **Clear selection**, and a selected count. Review names, sources, targets,
-arguments, and working directories before choosing **Import selected**. Select/clear applies to
-visible search results; hidden rows keep their selection. Cancelling the preview imports nothing.
-Windows accepts EXE, LNK, BAT, and CMD files; Linux accepts desktop entries and executable files.
-Rejected files are listed with a reason. Discovery remembers unchecked configurations by default;
-**Settings → Library → Reset discovery exclusions** makes them eligible again.
-
-At every normal startup, installed applications are checked in a background thread using the selected
-sources, without scan progress or scan-result notifications. Only the removal/addition review windows
-open when needed; actual changes produce a short application-count notification. Cancelling or making
-no changes produces no notification. Startup checks and manual discovery share the **New applications** window: names, paths,
-and checkboxes, all checked initially. Existing launch configurations are hidden; their discovered
-locations and sources are refreshed without changing names, tags, favorites, history, or launch options.
-Applications removed manually from the library are remembered and are not offered again, including
-other discovered launch modes for the same target. Resetting discovery exclusions clears this history.
-Cancelling a selection does not remember unchecked applications.
-
-**Settings → Library → Ask before removing uninstalled applications from the library** is enabled by
-default. Review the names and paths, remove the checked entries, or choose **Keep all**. Disable it to
-remove confirmed missing entries automatically. Absence is checked in the background and again before
-removal, against the same local volume where that path was previously seen. Paths that have not yet been
-observed as available, network/removable drives, access errors, broken symlinks, and uncertain shell targets are kept.
-Steam removal requires both its manifest and installation folder to be missing; a missing Linux desktop
-entry also requires its previously recorded executable to be missing. Uncertain cases remain unavailable
-in the library for manual review. Removal supports the existing undo action and does not suppress a
-subsequent reinstall. `--check-startup` does not scan the computer.
-
-JSON conflicts are skipped by default. The explicit replacement policy replaces the matching
-entry's name, search aliases, assigned tags, and favorite while preserving its ID, history,
-and scenario links.
-Discovery always preserves existing metadata. For repeated configurations within one JSON file,
-the first selected entry wins with skip; the last selected entry wins with replacement.
-
-Discovery keeps a report in the library and in Settings → Library. Open **Last scan details** to
-read or copy it. The summary separates additions, duplicates, skipped entries, and errors.
-Repeated launch configurations are skipped; existing entries keep their metadata and collect
-discovery sources. Names may repeat, and one EXE may have multiple argument/working-directory
-profiles. Symlinks share a canonical target while retaining their invocation paths.
-On Windows, an omitted working directory and the executable's own folder describe the same
-launch configuration. A shortcut that incorrectly uses its target EXE as the working directory
-also uses the executable's folder. Discovery prefers a Start menu shortcut over an App Paths entry with
-the same name and executable, keeping the shortcut's arguments. Reimporting that shortcut
-also consolidates existing same-name cards with equivalent launch configurations, preserving
-tags, aliases, favorites, launch history, sources, and scenario steps. Cards stay separate if
-their combined metadata exceeds catalog limits. Different arguments or effective working
-directories remain separate profiles. Manual addition rejects a configuration already in the library.
-Cancelling discovery before its transaction is committed rolls back all additions. Once commit
-starts, cancellation is unavailable. JSON import and discovery never launch applications.
-
-Windows discovery includes available Settings pages, File Explorer, Calculator, Microsoft Store,
-Task Manager, Control Panel and Windows Terminal. Unavailable components are skipped.
-Steam discovery reads local `libraryfolders.vdf` and `appmanifest_*.acf` files, including additional
-libraries. The local `appcache/appinfo.vdf` supplies the game's executable and cached client icon;
-the executable's icon is used when no cached icon is available. Cards show and copy the executable
-path, and open the installation folder. Games still launch through `steam://run/<appid>`; moving
-a game and rescanning preserves its card ID, tags and favorites. Rescan to enrich existing cards.
-If launch metadata is missing or unsupported, the installation folder is shown without guessing
-between executable files. Steam files are never changed, and no Web API or login is required.
-
-JSON export transfers application cards. Use a complete `.xlprofile` backup for scenarios,
-global hotkey assignments, unused tags, saved filters, settings, and launch history.
-
-Use Ctrl/Shift to select several library entries. The selection bar shows the count, clears the
-selection, and opens a bulk editor with searchable tags, usage counts, and favorite state.
-Mixed values remain unchanged until explicitly checked or unchecked. Bulk removal asks for the
-entry count and deletes only catalog entries. **Undo removal** restores the last deletion in the
-current session, including metadata and scenario steps. It refuses to overwrite changed linked
-scenarios or conflicting new entries. Undo is also offered in the shared notification banner.
-
-Application details offer path/argument copying. Discovery sources are kept internally for import matching.
-Availability refreshes
-periodically without removing entries. Unavailable Windows drives and previously observed Linux
-mounts are distinguished from missing files; an unknown missing location is kept as unavailable.
-
-## Search and saved filters
-
-Search matches names, filenames, and user-defined aliases from **Edit application**.
-Matches sort by text relevance, favorites, usage count, and most recent use before the selected sort mode.
-Case, repeated spaces, Unicode normalization, and English/Russian keyboard layout are
-handled by the same cached search rules in the library and quick launcher. Initials (`vsc`),
-word prefixes (`vscode`) and limited typo correction (`discrod`, `dicsor`, `chrme`, `stema`) are supported.
-Whole words rank first, followed by word prefixes, internal or trailing substrings, and abbreviations.
-Within each group, matches closer to the start of the application name rank higher, including after
-keyboard layout correction. If nothing matches directly, only the closest typo suggestions are shown;
-the quick launcher does not pad its five slots with weaker matches. Tags stay exact, and the entered query is preserved.
-Aliases also travel with JSON catalogs; older catalogs without aliases remain importable.
-
-Use `#tag` to require a tag and `-#tag` to exclude it; every condition must match.
-The tag selector near search inserts suggestions. An incomplete `#` shows a prompt;
-an unknown required tag produces no matches, and unknown exclusions hide nothing.
-The active summary shows the query, section, selected tag, and sort order.
-**Clear all filters** returns to the full library with the default sort, including from **No results**.
-
-**Save filter** stores the current query, exclusions, section, selected tag, and sorting.
-Choose it from **Saved filters** to apply it; the adjacent actions rename or remove it.
-Renaming a tag updates saved and active queries. Removing a tag removes its conditions
-from saved and active filters, as explained in the confirmation. Saved filters are stored
-in the profile database and included in complete `.xlprofile` backups and their preview.
-
-## Profile backup and recovery
-
-**Settings → Profile** creates a complete `.xlprofile` backup with applications, launch
-configurations, search aliases, saved filters, all tags, scenarios, settings, discovery sources,
-and launch history. Before restoration, XLibrary checks the format, schema, date, contents, and file fingerprint and shows
-a preview. Replacing the profile preserves its previous database, journals, settings, and a
-complete backup when readable. An interrupted replacement rolls back at the next startup;
-after a successful restore, restart XLibrary to apply all settings.
-
-Backups contain private paths and arguments. Native plugin binaries and OS-stored GitHub tokens
-are not transferred; the local token remains local. JSON catalog import/export remains separate.
-Schema migrations are sequential and transactional; an unsupported newer schema is refused
-without changing it. Existing profiles receive a `.before-schema-v4.*.bak` snapshot before migration.
-
-Start `XLibrary --safe-mode` to use the built-in interface without loading user plugins. Disable
-the faulty module in **Settings → Plugins**, save, and restart. The profile page shows database
-and settings locations, schema/product versions, portable/installed mode, and the last error.
-Its diagnostic export excludes catalog contents, arguments, settings values, tokens, and raw errors.
-
-Native UI modules in `plugins/` beside the executable require explicit opt-in in **Settings → Plugins**.
-Before instantiation, XLibrary checks Qt's embedded metadata: the interface IID must be
-`org.xlibrary.desktop.UiPlugin/1.0`, the Qt major version must match, and the module must not
-require a newer Qt minor version. Existing IID 1.0 modules without custom metadata remain
-supported under this explicit compatibility policy; Qt's standard IID/version metadata is required.
-Optional custom `MetaData` fields `name`, `version`, and `author` (strings; `Name`, `Version`,
-and `Author` are also accepted) are displayed in Settings → Plugins. Missing fields fall back
-to the module filename. Reading this metadata does not execute a disabled module.
-Build modules against the matching XLibrary headers, architecture, compiler and runtime ABI;
-metadata checks cannot prove binary compatibility. Qt also applies its own platform/build checks.
-Incompatible modules and load/configuration failures are shown with a reason in settings.
-A C++ exception during configuration discards that module's registry changes and allows startup
-to continue. `configure()` receives the live registry at its stable address, preserving existing
-IID 1.0 callbacks that retain a reference to it. Failed configuration restores the registry's
-previous factories and styles. Rollback cannot undo a module's other side effects. Safe mode also lists saved enabled
-modules so a faulty module can be disabled without loading it.
-
-These are trusted native modules running inside XLibrary, with the application's access to the
-profile and system. There is no sandbox: a segfault, undefined behavior, a crash in a module's
-callback, or other native code failure can still terminate or corrupt the process. Enable only
-modules from trusted sources and keep profile backups. Loaded libraries stay mapped while their
-callbacks can exist; changes to enabled modules take effect after restarting XLibrary.
-
-For a missing application, use **Locate application…** in its details. **Settings → Profile →
-Recover moved folder…** previews replacements for a moved directory before applying selected
-valid entries together. Card IDs, tags, favorites, history, arguments, and scenario references
-are preserved.
-
-Backend code lives in `src/` and is built into `xlibrary_core`. `Database` owns the
-connection, schema migrations, cards and their relations. `Manager` owns the catalog,
-worker operations, request results and launch history. `Application` handles discovery,
-resolution and launch on both platforms; `Heartbeat` monitors running applications.
-`WindowManager` provides theme policy and native window activation. The desktop layer
-owns widgets, models, UI state, scenario timers and native interface integration, and
-connects these to the backend through `DesktopService`. Linux user arguments share
-one core parser; freedesktop `Exec` retains its separate standard format.
-
-## Updates
-
-XLibrary checks this project's GitHub Releases at startup. If a newer version is available,
-an in-app notification links to **Settings → Update**, where you can confirm the update.
-You can also use **Settings → Update → Check for updates** at any time.
-The notification stays visible while checking and then shows the result, including when
-the latest version is already installed, no releases are found, or the check fails or is cancelled.
-You can optionally enter your own GitHub Personal Access Token in the same section.
-For this public repository, a token without additional permissions is sufficient.
-Click **Save token** to store it in Windows Credential Manager or the Linux secret store
-(Secret Service/KWallet); **Delete token** restores unauthenticated checks. These two
-buttons take effect immediately, independently of the settings dialog's Save/Cancel buttons.
-The token is sent only to `api.github.com`, including subsequent release-list pages, and
-is never attached to installer downloads. It is not written to `settings.ini` or catalog exports.
-If the secret store is unavailable or locked, XLibrary reports the error and never falls back
-to plaintext storage. A saved token belongs to the OS user and local profile path; enter it
-again after moving a portable profile. A token is optional; checks work without one.
-
-Check results are cached locally for **60 seconds without a token** or **5 seconds with
-a token**, measured from completion. Repeated clicks return the cached result without
-new GitHub requests. Errors and cancellations use the same interval. The cache stays in
-memory for the application session, including when Settings is closed and reopened.
-Each update channel, unauthenticated checks and each personal token have separate cache entries; tokens
-themselves are not stored in the cache. Reading a cached result does not extend its lifetime.
-
-**Settings → Update → Update channel** defaults to **Stable**, which considers only
-published releases whose GitHub `prerelease` flag is false. **Preview** also considers
-pre-releases. Versions use Semantic Versioning, so `1.0.0` is newer than `1.0.0-rc.1`;
-downgrades are never offered. Drafts and unsupported version tags are ignored.
-Changing channels cancels the current check/download and clears its available installer;
-a new check uses that channel's separate cache. Existing profiles default to Stable
-without a database migration. Updates still require confirmation.
-
-On Windows x64, an installer-managed copy can download the matching MinGW or MSVC installer
-after confirmation. XLibrary verifies its size and GitHub-provided SHA-256 before starting
-the installation wizard in the existing installation directory, then exits normally. The
-wizard completes the update and offers to reopen XLibrary; the library and settings stay
-in the existing profile. Downloads can be cancelled; closing Settings cancels checks and downloads
-started from that dialog. The automatic startup check continues if Settings is closed.
-
-Portable copies, Linux installations, and releases without a matching installer and SHA-256
-open the release in your browser after confirmation. Follow its update instructions and keep
-your portable data folder; on Linux, use the appropriate package or AppImage workflow.
-No downloads or installations happen in the background.
-
-## Search
-
-Search by app name or executable filename, then narrow the results with your own tags.
-Exact names rank first, followed by prefixes and other matches. Russian/English keyboard
-layout mistakes work in both directions: `пщщпду` also finds `google`. Within each match
-class, the literal spelling takes priority over the corrected layout.
-
-| Query | Result |
+| Platform | Package |
 | --- | --- |
-| `code` | Apps with “code” in their name or filename |
-| `#dev` | Apps tagged `dev` |
-| `#work #chat` | Apps with both tags |
-| `#work -#games` | Apps tagged `work`, excluding those tagged `games` |
-| `#dev code` | Apps tagged `dev` that also match “code” |
+| **Windows 10/11 x64** | Use the installer, or extract the portable ZIP into a writable folder and run `XLibrary.exe`. |
+| **Linux x86_64** | Use the DEB on Debian 13, or the AppImage on a compatible system. See [Linux setup](docs/usage.md#linux-setup). |
 
-Press <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>Space</kbd> for quick search, or
-<kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>Shift</kbd> + <kbd>Space</kbd> for the full library.
-<kbd>Ctrl</kbd> + <kbd>K</kbd> focuses search inside the library. These shortcuts can be changed
-in settings. Upgrading moves the former default full-library shortcut to Ctrl+Alt+Shift+Space;
-other custom bindings are preserved. On Wayland, assign `XLibrary --overlay` or `XLibrary`
-in your desktop's shortcut settings; these commands also address an already running instance.
+For a portable upgrade, keep the existing profile data. See [profiles and backups](docs/profile.md) and [updates](docs/updates.md).
+To build from source, start with [BUILDING.md](BUILDING.md).
 
-Quick search opens with a 200 ms reveal and shows up to five matching applications.
-Use ↑/↓ and Enter to launch. Tab or Shift+F10 opens the selected application's actions;
-↑/↓ and Enter select and run an action, Escape returns to search. Actions include browser profiles,
-new instances, window switching, folder/path operations, favorites, editors, hotkeys and confirmed removal,
-where applicable. Windows executable entries also offer an explicit administrator launch.
-Use Escape or the global shortcut again to dismiss search, and the
-small button on the right to open the full library with the same query. System animation
-preferences are respected. XLibrary must be running for its built-in global shortcuts.
+## Quick start
 
-Both search fields also support:
+1. Open XLibrary and choose discovery, manual entry, or profile restoration on the welcome screen.
+2. Add tags and favorites to the apps you use most.
+3. Open quick search with <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>Space</kbd>, type a name, and press <kbd>Enter</kbd>.
+   On Wayland, configure a shortcut first; see [Linux setup](docs/usage.md#linux-setup).
 
-- Arithmetic such as `2+3*4`, `sqrt(81)`, `√(16)`, `2^8`, `2**8`, and `(12+6)/3`.
-  Operators include `+ - * / % ^`; powers associate to the right. Enter copies the result.
-  Division by zero, non-real results, and incomplete expressions do not produce a number.
-- Absolute folder paths, `~/`, `%USERPROFILE%`, and `$HOME/`. Results contain only direct
-  children, including hidden entries, and can be scrolled. A partial final filename filters
-  that folder. Enter on a folder browses it; Enter on a file opens it with its system handler.
-  Registered applications use their library launch configuration. Directory reads happen in
-  the background; slow disks or unavailable network shares can delay their results.
+Try `code`, `#dev code`, or `#work -#games`. Turn on file search to find `*.pdf`, or enter `(2 + 3) * 4` to calculate and copy a result.
+The full library opens with <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>Shift</kbd> + <kbd>Space</kbd>.
+Shortcuts can be changed in settings, and XLibrary must be running for its built-in global shortcuts.
 
-For the selected application:
-
-| Shortcut | Action |
-| --- | --- |
-| <kbd>Enter</kbd> | Launch or switch to the running application, according to the launch settings |
-| <kbd>Ctrl</kbd> + <kbd>Enter</kbd> | Launch a new instance |
-| <kbd>Alt</kbd> + <kbd>Enter</kbd> | Open the application folder |
-| <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>C</kbd> | Copy the application path |
-| <kbd>Delete</kbd> | Remove the entry from the library after confirmation; application files are kept |
-
-Change or clear these bindings in Settings → Keyboard shortcuts. Switch between the **Global shortcuts**, **Navigation**, and **Application actions** tabs at the top. Both main and numeric keypad Enter are supported. Text editing keys keep their usual behavior in text fields. Use ↑/↓ in search to select an application; Escape clears the search and cannot be reassigned. Duplicate shortcuts are rejected when saving settings, and the tab containing the conflicting field opens automatically.
-
-Application and scenario editors also accept a global hotkey. The **Applications** and **Scenarios**
-keyboard settings tabs list these assignments. Conflicts and synchronous OS registration failures
-preserve the previous binding. Portal registration completes asynchronously; a refused binding
-stays saved for retry but is inactive. Deleting a target removes its binding; full profile backups retain assignments.
-On Wayland, configured bindings request permission through the GlobalShortcuts portal (interface
-version 1 or later). The portal may offer a different binding; user approval and a successful
-BindShortcuts response are required. Each binding has its own session, closed when cleared,
-replaced, deleted or on exit. A failure banner reports unsupported services, denial and lost sessions.
-For system shortcuts use `XLibrary --launch-id ID` or `XLibrary --scenario-id ID`;
-the editor shows the persistent ID command. No Wayland key interception is used.
-
-Quick search uses normal window-manager activation on Linux. Wayland defaults remain unassigned;
-configure a binding in XLibrary to request portal permission, or create a system shortcut whose
-command is `XLibrary --overlay` (use the full executable path if it is not on PATH):
-
-- **KDE Plasma:** System Settings → Keyboard → Shortcuts → Add New → Command or Script.
-- **GNOME:** Settings → Keyboard → View and Customize Shortcuts → Custom Shortcuts → Add.
-- **Xfce/X11:** Settings → Keyboard → Application Shortcuts → Add.
-
-Choose an unused key combination. `XLibrary` opens the library; both commands address the running
-instance. System shortcut labels vary between desktop versions. Portal availability depends on
-the installed desktop backend, not just the presence of xdg-desktop-portal.
-Existing-instance commands and portal activations forward an available XDG activation token to
-Qt's Wayland activation request; Qt 6.5–6.8 consumes it through the supported environment handoff
-and `QWindow::requestActivate()`. A token is single-use and is cleared after the request.
-Focus and fullscreen stacking remain subject to compositor policy. A banner explains refused
-Wayland activation and disappears if focus arrives later. XLibrary does not repeatedly force focus
-or permanently pin the overlay above windows. X11 continues to use its existing native hotkeys.
-KDE Wayland, GNOME Wayland, Xfce/X11, foreground browser/editor/Steam and multi-monitor behavior
-require manual verification on those desktops; they are **not tested** in the headless build environment.
-
-## Development
-
-XLibrary is built with **C++23**, **Qt 6 Widgets**, and **SQLite**. It targets **Windows 10/11 and Linux**. The interface supports English and Russian. It follows the system's preferred supported language by default and falls back to English. Choose a language in Settings → General and restart XLibrary to apply it. The application translation is embedded in the executable.
-
-Building from source requires a C++23 compiler, **CMake 3.21+**, and **Qt 6.5+** with the Widgets, Concurrent, and Network modules, and the LinguistTools build tools (plus DBus on Linux). CMake downloads SQLite during the initial configuration. See [Building on Windows and Linux](BUILDING.md) for CLion presets, GCC/Clang and MSVC/MinGW builds, portable packages, installers, and release verification.
-
-Planned work includes further search improvements and extensibility. These are development directions rather than a release schedule.
+See the [user guide](docs/usage.md) for search, file indexing, shortcuts, and scenarios, or [catalog management](docs/catalog.md) for discovery and import.
 
 ## Contributing
 
-Help shape a library you would want to use every day. Bug reports, interface feedback, documentation improvements, and code contributions are all welcome.
+Bug reports, interface feedback, documentation improvements, and focused pull requests are welcome.
 
-- **Report a bug:** [open an issue](https://github.com/lappland-open/XLibrary/issues/new) with steps to reproduce, your OS and desktop session, and screenshots where useful.
-- **Suggest an improvement:** [share your idea](https://github.com/lappland-open/XLibrary/issues) and describe the workflow it would help with.
-- **Contribute code:** submit a pull request with a focused change. Please discuss larger features in an issue first.
+- [Report a bug](https://github.com/lappland-open/XLibrary/issues/new) with reproduction steps, your OS and desktop session, and relevant screenshots.
+- [Suggest an improvement](https://github.com/lappland-open/XLibrary/issues) and describe the workflow it would help with. Discuss larger changes before implementing them.
+- For code contributions, read the [architecture](docs/architecture.md), [build instructions](BUILDING.md), and [verification guide](docs/testing.md).
 
-If you would like to follow the project, star the repository or watch it for updates.
+XLibrary is built with C++23, Qt 6 Widgets, and SQLite. See the [documentation index](docs/README.md) for technical guides.
 
 ## License
 

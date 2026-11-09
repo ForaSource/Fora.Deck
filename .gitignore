@@ -36,6 +36,8 @@
 
 #Local documents
 local-docs/*
+docs/superpowers/*
+docs/archive/*
 
 # aqtinstall writes its diagnostic log in the checkout during Qt setup.
 /aqtinstall.log
