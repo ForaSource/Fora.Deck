@@ -9,6 +9,7 @@
 #include <QScopeGuard>
 #include <stdexcept>
 
+#include "LaunchArguments.h"
 #include "Manager.h"
 
 Q_LOGGING_CATEGORY(poll_log, "xlibrary.poll", QtWarningMsg)
@@ -576,10 +577,74 @@ void Manager::import_catalog(const QString &path) {
     emit this->preview_ready(this->request_id, records, {});
 }
 
+QStringList Manager::scenario_issues(const scenario_record &record, const QVector<app_record> &applications) {
+    QStringList issues;
+    QHash<QString, QString> checked_targets;
+    bool enabled = false;
+    for (qsizetype index = 0; index < record.steps.size(); ++index) {
+        const auto &step = record.steps[index];
+        if (!step.enabled)
+            continue;
+        enabled = true;
+        QString reason;
+        QString name;
+        QString key;
+        const auto found = std::find_if(applications.cbegin(), applications.cend(),
+                                        [&](const auto &app) { return app.id == step.application_id; });
+        try {
+            if (found == applications.cend())
+                throw std::invalid_argument(
+                    QCoreApplication::translate("XLibrary", "Missing application").toStdString());
+            name = found->name;
+            if (step.delay_ms < 0)
+                throw std::invalid_argument(
+                    QCoreApplication::translate("XLibrary", "Invalid step delay").toStdString());
+            const auto profile = step.launch_profile.isEmpty() ? found->default_launch_profile : step.launch_profile;
+            key = QString::number(step.application_id) + ':' + profile;
+            if (checked_targets.contains(key)) {
+                reason = checked_targets.value(key);
+                if (!reason.isEmpty())
+                    issues.append(
+                        QCoreApplication::translate("XLibrary", "Step %1 · %2: %3").arg(index + 1).arg(name, reason));
+                continue;
+            }
+            const auto app = Application::with_launch_profile(*found, profile);
+            Database::validate_application(app);
+            if (!Application::target_available(app))
+                throw std::invalid_argument(
+                    QCoreApplication::translate("XLibrary", "The application file is unavailable.").toStdString());
+            if (!app.working_directory.isEmpty() && !QFileInfo(app.working_directory).isDir())
+                throw std::invalid_argument(
+                    QCoreApplication::translate("XLibrary", "The working directory is unavailable.").toStdString());
+#ifdef Q_OS_LINUX
+            if (Application::file_target(app)) {
+                const auto resolved = Application::resolve_application(app.path);
+                if (app.working_directory.isEmpty() && !resolved.working_directory.isEmpty() &&
+                    !QFileInfo(resolved.working_directory).isDir())
+                    throw std::invalid_argument(
+                        QCoreApplication::translate("XLibrary", "The working directory is unavailable.").toStdString());
+            }
+            (void)xlibrary::split_launch_arguments(app.arguments.toStdString());
+#endif
+        } catch (const std::exception &error) {
+            reason = QString::fromUtf8(error.what());
+        }
+        if (!key.isEmpty())
+            checked_targets.insert(key, reason);
+        if (!reason.isEmpty())
+            issues.append(QCoreApplication::translate("XLibrary", "Step %1 · %2: %3")
+                              .arg(index + 1)
+                              .arg(name.isEmpty() ? QString::number(step.application_id) : name, reason));
+    }
+    if (!enabled)
+        issues.append(QCoreApplication::translate("XLibrary", "The scenario has no enabled applications."));
+    return issues;
+}
+
 void Manager::clear_history() {
     this->store->clear_history();
     this->refresh();
-    emit this->notification(QCoreApplication::translate("XLibrary", "Launch history cleared."));
+    emit this->notification(QCoreApplication::translate("XLibrary", "Usage history cleared."));
 }
 
 void Manager::preview_profile(const QString &path) {

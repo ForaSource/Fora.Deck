@@ -5,7 +5,7 @@
 #include <sqlite3.h>
 
 namespace xlibrary {
-inline constexpr int profile_schema_version = 8;
+inline constexpr int profile_schema_version = 9;
 int read_schema_version(sqlite3 *connection);
 void validate_profile(sqlite3 *connection);
 void backup_database(sqlite3 *connection, const std::filesystem::path &destination);

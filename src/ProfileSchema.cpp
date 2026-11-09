@@ -185,6 +185,17 @@ void validate_columns(sqlite3 *const connection, const int version) {
         if (invalid.next())
             throw std::runtime_error("Profile contains an invalid target shortcut");
     }
+    if (version >= 9) {
+        SqliteStatement usage(connection, "SELECT d.launch_count,f.path,f.use_count,f.last_used "
+                                          "FROM desktop_application d,file_usage f LIMIT 0;");
+        usage.next();
+        require_unique(connection, "file_usage", {"path"});
+        SqliteStatement invalid(connection, "SELECT 1 FROM desktop_application WHERE launch_count<0 "
+                                            "UNION ALL SELECT 1 FROM file_usage WHERE use_count<0 OR last_used<0 "
+                                            "OR length(path)=0 LIMIT 1;");
+        if (invalid.next())
+            throw std::runtime_error("Profile contains invalid usage history");
+    }
     check_integrity(connection);
 }
 
@@ -408,6 +419,16 @@ void xlibrary::migrate_profile(sqlite3 *const connection, const std::filesystem:
             case 7:
                 sqlite_execute(connection,
                                "ALTER TABLE launch_configuration ADD COLUMN executable_path TEXT NOT NULL DEFAULT '';");
+                break;
+            case 8:
+                sqlite_execute(connection, R"(
+                    ALTER TABLE desktop_application ADD COLUMN launch_count INTEGER NOT NULL DEFAULT 0
+                        CHECK(launch_count>=0);
+                    UPDATE desktop_application SET launch_count=1 WHERE last_launch>0;
+                    CREATE TABLE file_usage(path TEXT PRIMARY KEY NOT NULL,
+                        use_count INTEGER NOT NULL CHECK(use_count>=0),
+                        last_used INTEGER NOT NULL CHECK(last_used>=0));
+                )");
                 break;
             default:
                 throw std::runtime_error("Missing profile migration");

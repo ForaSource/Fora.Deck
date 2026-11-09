@@ -1,3 +1,4 @@
+#include <QAbstractButton>
 #include <QAction>
 #include <QApplication>
 #include <QCursor>
@@ -20,6 +21,7 @@
 #include "PlatformIntegration.h"
 #include "SearchOverlay.h"
 #include "SearchResults.h"
+#include "SearchTools.h"
 
 SearchOverlay::SearchOverlay(DesktopService &service, QWidget *const parent)
     : QWidget(parent,
@@ -51,7 +53,8 @@ SearchOverlay::SearchOverlay(DesktopService &service, QWidget *const parent)
     input->setObjectName("overlay_search_input");
     input->setMaxLength(static_cast<int>(catalog_limits::text_length));
     input->setPlaceholderText(QCoreApplication::translate("XLibrary", "Search"));
-    input->setAccessibleName(QCoreApplication::translate("XLibrary", "Search applications, calculate or enter a path"));
+    input->setAccessibleName(
+        QCoreApplication::translate("XLibrary", "Search applications and files, calculate or enter a path"));
     input->setToolTip(
         QCoreApplication::translate("XLibrary", "#tag includes a tag; -#tag excludes it. All conditions apply."));
     input->setClearButtonEnabled(true);
@@ -61,6 +64,9 @@ SearchOverlay::SearchOverlay(DesktopService &service, QWidget *const parent)
     open_button->setAccessibleName(QCoreApplication::translate("XLibrary", "Open XLibrary"));
     open_button->setToolTip(open_button->accessibleName());
     open_button->setCursor(Qt::PointingHandCursor);
+    auto *files = file_search_switch(false, contents);
+    row->addWidget(files);
+    connect(files, &QAbstractButton::toggled, results, &SearchResults::set_files_enabled);
     row->addWidget(open_button);
     layout->addLayout(row);
     layout->addWidget(results);
@@ -168,6 +174,15 @@ void SearchOverlay::update_surface() {
     const qreal animated_height = 8 + (surface_height - 8) * progress;
     const QRectF surface((width() - surface_width) / 2, center_y * (1 - progress) + 8 * progress - 4 * (1 - progress),
                          surface_width, animated_height);
+    // Without an X11 compositor, alpha pixels outside the panel are displayed as black.
+    // A native window shape removes those pixels; composited desktops keep the soft shadow.
+    if (!translucent_surface) {
+        QPainterPath window_clip;
+        window_clip.addRoundedRect(surface, qMin(22.0, animated_height / 2), qMin(22.0, animated_height / 2));
+        setMask(QRegion(window_clip.toFillPolygon().toPolygon()));
+    } else if (!mask().isEmpty()) {
+        clearMask();
+    }
     QPainterPath clip;
     clip.addRoundedRect(surface.translated(-inset, -inset), qMin(22.0, animated_height / 2),
                         qMin(22.0, animated_height / 2));
@@ -241,6 +256,7 @@ void SearchOverlay::show_search() {
     reveal->stop();
     height_animation->stop();
     activation_check->stop();
+    translucent_surface = desktop_platform::translucent_windows_supported();
     dismiss_on_deactivate = isVisible() && isActiveWindow();
     progress = 0;
     input->clear();

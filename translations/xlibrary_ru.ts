@@ -4,8 +4,8 @@
 <context>
     <name>XLibrary</name>
     <message>
-        <source>Search applications, calculate or enter a path</source>
-        <translation>Поиск приложений, вычисление или ввод пути</translation>
+        <source>Search applications and files, calculate or enter a path</source>
+        <translation>Поиск приложений и файлов, вычисление или ввод пути</translation>
     </message>
     <message>
         <source>Search, calculate or enter a path</source>
@@ -352,8 +352,8 @@
         <translation>ожидается пустая строка или абсолютный путь</translation>
     </message>
     <message>
-        <source>Launch history cleared.</source>
-        <translation>История запусков очищена.</translation>
+        <source>Usage history cleared.</source>
+        <translation>История использования очищена.</translation>
     </message>
     <message>
         <source>Edit application</source>
@@ -1186,16 +1186,16 @@ Applications: %1</source>
         <translation>Экспорт библиотеки</translation>
     </message>
     <message>
-        <source>Clear launch history</source>
-        <translation>Очистить историю запусков</translation>
+        <source>Clear usage history</source>
+        <translation>Очистить историю использования</translation>
     </message>
     <message>
-        <source>Launch history</source>
-        <translation>История запусков</translation>
+        <source>Usage history</source>
+        <translation>История использования</translation>
     </message>
     <message>
-        <source>Clear the most recent launch times? Applications and tags will be kept.</source>
-        <translation>Очистить время последних запусков? Приложения и теги сохранятся.</translation>
+        <source>Clear application and file usage counts and recent launch times? Applications and tags will be kept.</source>
+        <translation>Очистить счётчики использования приложений и файлов и время последних запусков? Приложения и теги будут сохранены.</translation>
     </message>
     <message>
         <source>Clear</source>
@@ -2838,6 +2838,384 @@ Technical reason: %3</source>
     <message>
         <source>Refresh availability</source>
         <translation>Обновить доступность</translation>
+    </message>
+    <message>
+        <source>Add an application manually</source>
+        <translation>Добавить приложение вручную</translation>
+    </message>
+    <message>
+        <source>Choose a file and customize its name, tags and launch options.</source>
+        <translation>Выберите файл, задайте название, теги и параметры запуска.</translation>
+    </message>
+    <message>
+        <source>Choose how to start. You can return to this screen in Settings.</source>
+        <translation>Выберите, с чего начать. Этот экран можно снова открыть в настройках.</translation>
+    </message>
+    <message>
+        <source>Find my applications</source>
+        <translation>Найти мои приложения</translation>
+    </message>
+    <message>
+        <source>Open welcome screen</source>
+        <translation>Открыть экран приветствия</translation>
+    </message>
+    <message>
+        <source>Preview and restore a complete .xlprofile backup.</source>
+        <translation>Проверьте и восстановите полную резервную копию .xlprofile.</translation>
+    </message>
+    <message>
+        <source>Restore my library</source>
+        <translation>Восстановить мою библиотеку</translation>
+    </message>
+    <message>
+        <source>Review installed applications and choose what to keep.</source>
+        <translation>Просмотрите установленные приложения и выберите нужные.</translation>
+    </message>
+    <message>
+        <source>Start with an empty library</source>
+        <translation>Начать с пустой библиотеки</translation>
+    </message>
+    <message>
+        <source>Welcome to XLibrary</source>
+        <translation>Добро пожаловать в XLibrary</translation>
+    </message>
+    <message>
+        <source>Your applications. One home.</source>
+        <translation>Все приложения — в одном месте.</translation>
+    </message>
+    <message>
+        <source>Catalog database</source>
+        <translation>База данных каталога</translation>
+    </message>
+    <message>
+        <source>Current mode: installed</source>
+        <translation>Текущий режим: установленное приложение</translation>
+    </message>
+    <message>
+        <source>Current mode: portable</source>
+        <translation>Текущий режим: portable</translation>
+    </message>
+    <message>
+        <source>Installed mode uses your operating system&apos;s user data folders. A portable.flag next to the executable selects the data folder beside it. An AppImage uses &lt;AppImage&gt;.data beside the image. Moving the executable alone does not transfer installed-mode data; use a complete profile backup to move your library.</source>
+        <translation>Установленное приложение использует пользовательские каталоги данных ОС. Файл portable.flag рядом с исполняемым файлом выбирает папку data рядом с ним. AppImage использует папку &lt;AppImage&gt;.data рядом с образом. Перемещение одного исполняемого файла не переносит данные установленной программы; для переноса библиотеки используйте полную резервную копию профиля.</translation>
+    </message>
+    <message>
+        <source>Local data</source>
+        <translation>Локальные данные</translation>
+    </message>
+    <message>
+        <source>Settings file</source>
+        <translation>Файл настроек</translation>
+    </message>
+    <message>
+        <source>Your library, tags, scenarios and settings are stored on this computer. XLibrary does not upload your catalog. Update checks contact GitHub; your saved access token is kept in the system credential store.</source>
+        <translation>Библиотека, теги, сценарии и настройки хранятся на этом компьютере. XLibrary не загружает каталог в сеть. Проверка обновлений обращается к GitHub; сохранённый токен доступа хранится в системном хранилище учётных данных.</translation>
+    </message>
+    <message>
+        <source>Delay</source>
+        <translation>Задержка</translation>
+    </message>
+    <message>
+        <source>Launching</source>
+        <translation>Запуск</translation>
+    </message>
+    <message>
+        <source>Missing application</source>
+        <translation>Приложение отсутствует</translation>
+    </message>
+    <message>
+        <source>Step status</source>
+        <translation>Состояние шага</translation>
+    </message>
+    <message>
+        <source>Success</source>
+        <translation>Успех</translation>
+    </message>
+    <message>
+        <source>Waiting</source>
+        <translation>Ожидание</translation>
+    </message>
+    <message>
+        <source>Fix the scenario before running it:</source>
+        <translation>Исправьте сценарий перед запуском:</translation>
+    </message>
+    <message>
+        <source>Invalid step delay</source>
+        <translation>Некорректная задержка шага</translation>
+    </message>
+    <message>
+        <source>Step %1 · %2: %3</source>
+        <translation>Шаг %1 · %2: %3</translation>
+    </message>
+    <message>
+        <source>The scenario was not found.</source>
+        <translation>Сценарий не найден.</translation>
+    </message>
+    <message>
+        <source>The working directory is unavailable.</source>
+        <translation>Рабочая папка недоступна.</translation>
+    </message>
+    <message>
+        <source>Create a scenario from the Scenarios section. Add applications in launch order, set each delay and choose a launch profile. Disabled steps are skipped. Fix the listed problems before running. Success means the launch request was accepted, not that the application finished loading. Stop skips remaining steps and keeps already opened applications running.</source>
+        <translation>Создайте сценарий в разделе «Сценарии». Добавьте приложения по порядку, задайте задержки и профили запуска. Выключенные шаги пропускаются. Перед запуском исправьте перечисленные проблемы. Успех означает принятие команды запуска, а не завершение загрузки приложения. Остановка пропускает оставшиеся шаги; уже открытые приложения продолжают работать.</translation>
+    </message>
+    <message>
+        <source>Create tags in the sidebar or application editor. A tag has up to 64 characters without spaces, commas or #. Select several applications with Ctrl or Shift to edit their tags together. Removing a tag keeps the applications.</source>
+        <translation>Создавайте теги в боковом меню или редакторе приложения. Тег содержит до 64 символов без пробелов, запятых и #. Выделите несколько приложений с Ctrl или Shift для изменения тегов сразу у всех. Удаление тега сохраняет приложения.</translation>
+    </message>
+    <message>
+        <source>Open Settings → Keyboard shortcuts to see or change the current bindings. Clear a binding to disable it. Assign application and scenario shortcuts in their editors. A shortcut already used by XLibrary or another application may be refused. On Wayland, system permission or a desktop shortcut may be required.</source>
+        <translation>Откройте «Настройки → Горячие клавиши» для просмотра и изменения сочетаний. Очистите поле, чтобы отключить сочетание. Клавиши для приложений и сценариев назначаются в их редакторах. Занятое сочетание может быть отклонено. На Wayland может потребоваться системное разрешение или настройка сочетания в среде рабочего стола.</translation>
+    </message>
+    <message>
+        <source>Quick help</source>
+        <translation>Краткая справка</translation>
+    </message>
+    <message>
+        <source>Type an application name, alias or filename. Use #work to require a tag and -#games to exclude one; combine them with text. Clear filters to search the whole library. Quick search also accepts file paths and calculations such as (2 + 3) * 4; Enter copies the result.</source>
+        <translation>Введите название, псевдоним или имя файла приложения. #работа требует тег, а -#игры исключает его; их можно сочетать с текстом. Сбросьте фильтры для поиска по всей библиотеке. Быстрый поиск также принимает пути и выражения вроде (2 + 3) * 4; Enter копирует результат.</translation>
+    </message>
+    <message>
+        <source>Copy version and environment</source>
+        <translation>Копировать версию и окружение</translation>
+    </message>
+    <message>
+        <source>Open documentation ↗</source>
+        <translation>Открыть документацию ↗</translation>
+    </message>
+    <message>
+        <source>Version and environment copied.</source>
+        <translation>Версия и сведения об окружении скопированы.</translation>
+    </message>
+    <message>
+        <source>XLibrary %1
+OS: %2
+Architecture: %3
+Qt: %4
+Session: %5
+Mode: %6</source>
+        <translation>XLibrary %1
+ОС: %2
+Архитектура: %3
+Qt: %4
+Сессия: %5
+Режим: %6</translation>
+    </message>
+    <message>
+        <source>Finish current operations before resetting settings.</source>
+        <translation>Завершите текущие операции перед сбросом настроек.</translation>
+    </message>
+    <message>
+        <source>Reset</source>
+        <translation>Сбросить</translation>
+    </message>
+    <message>
+        <source>Reset settings</source>
+        <translation>Сброс настроек</translation>
+    </message>
+    <message>
+        <source>Reset settings…</source>
+        <translation>Сбросить настройки…</translation>
+    </message>
+    <message>
+        <source>Restore default interface, shortcuts, sources and behavior settings? Applications, tags, scenarios, history and saved credentials will be kept. XLibrary will need a restart.</source>
+        <translation>Восстановить стандартные настройки интерфейса, сочетаний клавиш, источников и поведения? Приложения, теги, сценарии, история и сохранённые учётные данные останутся. Потребуется перезапуск XLibrary.</translation>
+    </message>
+    <message>
+        <source>Settings reset. Restart XLibrary to apply the defaults. Your catalog was kept.</source>
+        <translation>Настройки сброшены. Перезапустите XLibrary для применения значений по умолчанию. Каталог сохранён.</translation>
+    </message>
+    <message>
+        <source>Settings were reset. Restart XLibrary now?</source>
+        <translation>Настройки сброшены. Перезапустить XLibrary сейчас?</translation>
+    </message>
+    <message>
+        <source>Author: %1</source>
+        <translation>Автор: %1</translation>
+    </message>
+    <message>
+        <source>Version %1</source>
+        <translation>Версия %1</translation>
+    </message>
+    <message>
+        <source>Enable interface animations</source>
+        <translation>Включить анимации интерфейса</translation>
+    </message>
+    <message>
+        <source>A quick tour of XLibrary</source>
+        <translation>Короткое обучение XLibrary</translation>
+    </message>
+    <message>
+        <source>Add → Edit → Tags → Favorites</source>
+        <translation>Добавить → Изменить → Теги → Избранное</translation>
+    </message>
+    <message>
+        <source>Add an application from a file or find installed applications. Edit its name, arguments and tags. Use Ctrl or Shift to select several entries and edit them together. Removing an entry keeps its files.</source>
+        <translation>Добавьте приложение из файла или найдите установленные программы. Измените название, аргументы и теги. Ctrl и Shift помогают выделять несколько записей для общего редактирования. Удаление записи сохраняет её файлы.</translation>
+    </message>
+    <message>
+        <source>Back</source>
+        <translation>Назад</translation>
+    </message>
+    <message>
+        <source>Create a scenario, choose applications and set a delay before each launch. Review problems before starting and follow each step&apos;s status. Stop leaves already opened applications running.</source>
+        <translation>Создайте сценарий, выберите приложения и задержку перед каждым запуском. Исправьте проблемы перед стартом и следите за состоянием шагов. При остановке уже открытые приложения продолжают работать.</translation>
+    </message>
+    <message>
+        <source>Find it in a few keystrokes</source>
+        <translation>Находите за пару нажатий</translation>
+    </message>
+    <message>
+        <source>Finish</source>
+        <translation>Готово</translation>
+    </message>
+    <message>
+        <source>Keep XLibrary close</source>
+        <translation>Держите XLibrary под рукой</translation>
+    </message>
+    <message>
+        <source>Make the library yours</source>
+        <translation>Настройте библиотеку под себя</translation>
+    </message>
+    <message>
+        <source>Next</source>
+        <translation>Далее</translation>
+    </message>
+    <message>
+        <source>Open your workspace in order</source>
+        <translation>Открывайте рабочие приложения по порядку</translation>
+    </message>
+    <message>
+        <source>Search by name, alias or filename. Add #work to narrow results or -#games to exclude a tag. Quick search can also browse a path or calculate an expression.</source>
+        <translation>Ищите по названию, псевдониму или имени файла. Добавьте #работа для сужения результатов или -#игры для исключения тега. Быстрый поиск также открывает пути и вычисляет выражения.</translation>
+    </message>
+    <message>
+        <source>Settings → Keyboard shortcuts / Quick help</source>
+        <translation>Настройки → Горячие клавиши / Краткая справка</translation>
+    </message>
+    <message>
+        <source>Settings → Keyboard shortcuts shows your current bindings for the library, quick search and individual applications or scenarios. Settings also contains local data information, profile backups and quick help.</source>
+        <translation>В разделе «Настройки → Горячие клавиши» показаны сочетания для библиотеки, быстрого поиска, приложений и сценариев. В настройках также есть сведения о локальных данных, резервные копии профиля и краткая справка.</translation>
+    </message>
+    <message>
+        <source>Step %1 of %2</source>
+        <translation>Шаг %1 из %2</translation>
+    </message>
+    <message>
+        <source>Take a quick tour</source>
+        <translation>Пройти короткое обучение</translation>
+    </message>
+    <message>
+        <source>Waiting → Delay → Launching → Success</source>
+        <translation>Ожидание → Задержка → Запуск → Успех</translation>
+    </message>
+    <message>
+        <source>Restart</source>
+        <translation>Перезапустить</translation>
+    </message>
+    <message>
+        <source>Check again</source>
+        <translation>Проверить снова</translation>
+    </message>
+    <message>
+        <source>Checking scenario…</source>
+        <translation>Проверка сценария…</translation>
+    </message>
+    <message>
+        <source>Could not check the scenario.</source>
+        <translation>Не удалось проверить сценарий.</translation>
+    </message>
+    <message>
+        <source>Scenario issues</source>
+        <translation>Проблемы сценария</translation>
+    </message>
+    <message>
+        <source>Files</source>
+        <translation>Файлы</translation>
+    </message>
+    <message>
+        <source>Search working files</source>
+        <translation>Искать рабочие файлы</translation>
+    </message>
+    <message>
+        <source>File search</source>
+        <translation>Файловый поиск</translation>
+    </message>
+    <message>
+        <source>My files</source>
+        <translation>Свои файлы</translation>
+    </message>
+    <message>
+        <source>Save to My files</source>
+        <translation>Сохранить в свои файлы</translation>
+    </message>
+    <message>
+        <source>Remove from My files</source>
+        <translation>Убрать из своих файлов</translation>
+    </message>
+    <message>
+        <source>File search folders</source>
+        <translation>Папки файлового поиска</translation>
+    </message>
+    <message>
+        <source>Add folder</source>
+        <translation>Добавить папку</translation>
+    </message>
+    <message>
+        <source>Add drive</source>
+        <translation>Добавить диск</translation>
+    </message>
+    <message>
+        <source>Filename masks: * matches any number of characters; ? matches one character. Examples: *.pdf, report-??.txt. Other characters are literal.</source>
+        <translation>Маски имени файла: * — любое число символов; ? — один символ. Примеры: *.pdf, report-??.txt. Остальные символы ищутся буквально.</translation>
+    </message>
+    <message>
+        <source>Remove folder</source>
+        <translation>Убрать папку</translation>
+    </message>
+    <message>
+        <source>Search all drives</source>
+        <translation>Искать на всех дисках</translation>
+    </message>
+    <message>
+        <source>Refresh file index</source>
+        <translation>Обновить файловый индекс</translation>
+    </message>
+    <message>
+        <source>A file search folder is unavailable.</source>
+        <translation>Папка файлового поиска недоступна.</translation>
+    </message>
+    <message>
+        <source>Indexing files: %1</source>
+        <translation>Индексация файлов: %1</translation>
+    </message>
+    <message>
+        <source>File indexing cancelled</source>
+        <translation>Индексация файлов отменена</translation>
+    </message>
+    <message>
+        <source>Indexed %1 files; inaccessible folders: %2</source>
+        <translation>Проиндексировано файлов: %1; недоступных папок: %2</translation>
+    </message>
+    <message>
+        <source>File index error: %1</source>
+        <translation>Ошибка файлового индекса: %1</translation>
+    </message>
+    <message>
+        <source>The file is unavailable or its type is excluded.</source>
+        <translation>Файл недоступен или его тип исключён.</translation>
+    </message>
+    <message>
+        <source>By default, all accessible local drives are indexed. Add folders below to search only those locations. System folders, caches, hidden files and unsupported file types are excluded. Indexing runs in the background even when file search is off.</source>
+        <translation>По умолчанию индексируются все доступные локальные диски. Добавьте папки ниже, чтобы ограничить поиск ими. Системные папки, кэши, скрытые файлы и неподдерживаемые типы исключаются. Индексация работает в фоне, даже когда файловый поиск выключен.</translation>
+    </message>
+    <message>
+        <source>Folder changes take effect after Save. An empty list means all drives. The index refreshes every 15 minutes; unavailable locations are skipped. Right-click a search result to save it to My files.</source>
+        <translation>Изменения папок применяются после сохранения. Пустой список означает все диски. Индекс обновляется каждые 15 минут; недоступные папки пропускаются. Нажмите на результат правой кнопкой мыши, чтобы сохранить его в свои файлы.</translation>
+    </message>
+    <message>
+        <source>Save files from search results using the context menu. Removing a saved file keeps it on disk.</source>
+        <translation>Сохраняйте файлы из результатов поиска через контекстное меню. Удаление из списка не удаляет файл с диска.</translation>
     </message>
 </context>
 </TS>

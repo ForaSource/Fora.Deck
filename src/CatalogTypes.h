@@ -2,6 +2,7 @@
 #define XLIBRARY_CATALOG_TYPES_H
 
 #include <atomic>
+#include <QHash>
 #include <QMetaType>
 #include <QStringList>
 #include <QVector>
@@ -58,6 +59,12 @@ struct app_record {
     QString discovery_source;
     QStringList discovery_sources;
     qint64 last_launch = 0;
+    qint64 launch_count = 0;
+};
+
+struct usage_record {
+    qint64 count = 0;
+    qint64 last_used = 0;
 };
 
 struct discovery_progress {
@@ -133,6 +140,7 @@ struct target_shortcut {
 
 struct catalog_snapshot {
     QVector<app_record> applications;
+    QHash<QString, usage_record> file_usage;
     QStringList tags;
     QVector<scenario_record> scenarios;
     QVector<saved_filter> filters;

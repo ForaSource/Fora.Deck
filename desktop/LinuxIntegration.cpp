@@ -439,6 +439,23 @@ GlobalHotkey::GlobalHotkey(QObject *const parent) : QObject(parent) {
 
 GlobalHotkey::~GlobalHotkey() = default;
 
+bool desktop_platform::translucent_windows_supported() {
+    if (QGuiApplication::platformName() != "xcb")
+        return true;
+#if defined(XLIBRARY_HAVE_X11) && QT_CONFIG(xcb)
+    if (const auto *native = qGuiApp->nativeInterface<QNativeInterface::QX11Application>()) {
+        const std::lock_guard lock(x11_mutex);
+        auto *display = native->display();
+        X11ErrorScope errors(display);
+        const auto name = QByteArray("_NET_WM_CM_S") + QByteArray::number(DefaultScreen(display));
+        const auto selection = XInternAtom(display, name.constData(), True);
+        const bool supported = selection && XGetSelectionOwner(display, selection) != 0;
+        return errors.succeeded() && supported;
+    }
+#endif
+    return false;
+}
+
 void desktop_platform::activate_overlay(QWidget *const window) {
     window->raise();
 #if defined(XLIBRARY_HAVE_X11) && QT_CONFIG(xcb)
@@ -698,6 +715,8 @@ QImage desktop_platform::application_icon(const QString &path) {
 }
 
 bool desktop_platform::animations_enabled() {
+    if (qApp->property("xlibrary_disable_animations").toBool())
+        return false;
     return qApp->style()->styleHint(QStyle::SH_Widget_Animate) != 0;
 }
 

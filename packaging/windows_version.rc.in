@@ -12,11 +12,11 @@ BEGIN
     BEGIN
         BLOCK "040904b0"
         BEGIN
-            VALUE "CompanyName", "Lappland-Julia"
+            VALUE "CompanyName", "lappland-open"
             VALUE "FileDescription", "XLibrary application library"
             VALUE "FileVersion", "@XLIBRARY_RELEASE_VERSION@"
             VALUE "InternalName", "XLibrary"
-            VALUE "LegalCopyright", "Copyright (c) 2026 Lappland-Julia"
+            VALUE "LegalCopyright", "Copyright (c) 2026 lappland-open"
             VALUE "OriginalFilename", "XLibrary.exe"
             VALUE "ProductName", "XLibrary"
             VALUE "ProductVersion", "@XLIBRARY_RELEASE_VERSION@"

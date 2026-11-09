@@ -1,20 +1,26 @@
 #include <memory>
 #include <QButtonGroup>
 #include <QCheckBox>
+#include <QClipboard>
 #include <QComboBox>
 #include <QCoreApplication>
 #include <QDialogButtonBox>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QHeaderView>
 #include <QKeySequenceEdit>
 #include <QLineEdit>
+#include <QListWidget>
+#include <QMenu>
 #include <QProgressBar>
 #include <QRegularExpressionValidator>
 #include <QStackedWidget>
+#include <QSysInfo>
 #include <QTabBar>
 #include <QTreeWidget>
 #include <QUrl>
 
+#include "ApplicationPaths.h"
 #include "DesktopService.h"
 #include "GithubTokenStore.h"
 #include "localization.h"
@@ -60,6 +66,7 @@ void choices(QWidget *const page, QSettings &settings, const QString &key, const
 QWidget *general(const ui_context &context, QWidget *) {
     auto *widget = page(QCoreApplication::translate("XLibrary", "Application behavior"));
     auto &settings = *context.settings;
+    widget->layout()->addWidget(action_button(context.actions.value("welcome")));
     choices(
         widget, settings, "interface/language", QCoreApplication::translate("XLibrary", "Interface language"),
         {{QCoreApplication::translate("XLibrary", "System language"), "system"}, {"English", "en"}, {"Русский", "ru"}},
@@ -82,6 +89,26 @@ QWidget *general(const ui_context &context, QWidget *) {
             {{QCoreApplication::translate("XLibrary", "Show the library"), "show"},
              {QCoreApplication::translate("XLibrary", "Start in the tray"), "tray"}},
             "show");
+    auto *reset = button(QCoreApplication::translate("XLibrary", "Reset settings…"), "danger");
+    widget->layout()->addWidget(reset);
+    QObject::connect(reset, &QPushButton::clicked, widget, [=] {
+        auto *service = static_cast<DesktopService *>(context.service);
+        if (!confirm(widget, QCoreApplication::translate("XLibrary", "Reset settings"),
+                     QCoreApplication::translate("XLibrary",
+                                                 "Restore default interface, shortcuts, sources and behavior settings? "
+                                                 "Applications, tags, scenarios, history and saved credentials will be "
+                                                 "kept. XLibrary will need a restart."),
+                     QCoreApplication::translate("XLibrary", "Reset")))
+            return;
+        if (!service->reset_settings())
+            return;
+        if (confirm(widget, QCoreApplication::translate("XLibrary", "Restart XLibrary"),
+                    QCoreApplication::translate("XLibrary", "Settings were reset. Restart XLibrary now?"),
+                    QCoreApplication::translate("XLibrary", "Restart")))
+            service->restart_application();
+        if (auto *dialog = qobject_cast<QDialog *>(widget->window()))
+            dialog->reject();
+    });
     static_cast<QVBoxLayout *>(widget->layout())->addStretch();
     return widget;
 }
@@ -104,6 +131,8 @@ QWidget *appearance_page(const ui_context &context, QWidget *) {
 #endif
     choices(widget, settings, "appearance/text_scale", QCoreApplication::translate("XLibrary", "Text size"),
             {{"100%", 100}, {"125%", 125}, {"150%", 150}, {"200%", 200}}, 100);
+    checkbox(widget, settings, "appearance/animations",
+             QCoreApplication::translate("XLibrary", "Enable interface animations"), true);
     widget->layout()->addWidget(
         label(QCoreApplication::translate("XLibrary",
                                           "Short, smooth transitions follow available system animation settings."),
@@ -328,16 +357,133 @@ QWidget *library_settings(const ui_context &context, QWidget *) {
         if (!path.isEmpty())
             service->export_catalog(path);
     });
-    auto *clear = button(QCoreApplication::translate("XLibrary", "Clear launch history"));
+    auto *clear = button(QCoreApplication::translate("XLibrary", "Clear usage history"));
     widget->layout()->addWidget(clear);
     QObject::connect(clear, &QPushButton::clicked, widget, [=] {
-        if (confirm(widget, QCoreApplication::translate("XLibrary", "Launch history"),
-                    QCoreApplication::translate(
-                        "XLibrary", "Clear the most recent launch times? Applications and tags will be kept."),
+        if (confirm(widget, QCoreApplication::translate("XLibrary", "Usage history"),
+                    QCoreApplication::translate("XLibrary", "Clear application and file usage counts and recent launch "
+                                                            "times? Applications and tags will be kept."),
                     QCoreApplication::translate("XLibrary", "Clear")))
             service->clear_history();
     });
     static_cast<QVBoxLayout *>(widget->layout())->addStretch();
+    return widget;
+}
+
+QWidget *storage_page(const ui_context &context, QWidget *) {
+    auto *service = static_cast<DesktopService *>(context.service);
+    auto *widget = page(QCoreApplication::translate("XLibrary", "Local data"));
+    widget->layout()->addWidget(
+        label(QCoreApplication::translate(
+                  "XLibrary",
+                  "Your library, tags, scenarios and settings are stored on this computer. XLibrary does not upload "
+                  "your catalog. Update checks contact GitHub; your saved access token is kept in the system "
+                  "credential store."),
+              "muted"));
+    const auto add_path = [=](const QString &title, const QString &path) {
+        widget->layout()->addWidget(label(title, "subheading"));
+        auto *value = label(QDir::toNativeSeparators(path), "muted");
+        value->setTextInteractionFlags(Qt::TextSelectableByMouse | Qt::TextSelectableByKeyboard);
+        widget->layout()->addWidget(value);
+    };
+    add_path(QCoreApplication::translate("XLibrary", "Settings file"), context.settings->fileName());
+    auto *database = label("", "muted");
+    database->setTextInteractionFlags(Qt::TextSelectableByMouse | Qt::TextSelectableByKeyboard);
+    widget->layout()->addWidget(label(QCoreApplication::translate("XLibrary", "Catalog database"), "subheading"));
+    widget->layout()->addWidget(database);
+    const auto update_path = [=] { database->setText(QDir::toNativeSeparators(service->library_path())); };
+    QObject::connect(service, &DesktopService::catalog_changed, widget, update_path);
+    update_path();
+    widget->layout()->addWidget(label(application_paths::portable_mode()
+                                          ? QCoreApplication::translate("XLibrary", "Current mode: portable")
+                                          : QCoreApplication::translate("XLibrary", "Current mode: installed"),
+                                      "subheading"));
+    widget->layout()->addWidget(label(
+        QCoreApplication::translate(
+            "XLibrary",
+            "Installed mode uses your operating system's user data folders. A portable.flag next to the executable "
+            "selects the data folder beside it. An AppImage uses <AppImage>.data beside the image. Moving the "
+            "executable "
+            "alone does not transfer installed-mode data; use a complete profile backup to move your library."),
+        "muted"));
+    auto *folder = button(QCoreApplication::translate("XLibrary", "Open profile folder"));
+    widget->layout()->addWidget(folder);
+    QObject::connect(folder, &QPushButton::clicked, service, &DesktopService::open_profile_folder);
+    static_cast<QVBoxLayout *>(widget->layout())->addStretch();
+    return widget;
+}
+
+QWidget *file_settings(const ui_context &context, QWidget *) {
+    auto *service = static_cast<DesktopService *>(context.service);
+    auto *widget = page(QCoreApplication::translate("XLibrary", "File search"));
+    widget->layout()->addWidget(label(
+        QCoreApplication::translate(
+            "XLibrary",
+            "By default, all accessible local drives are indexed. Add folders below to search only those locations. "
+            "System folders, caches, hidden files and unsupported file types are excluded. "
+            "Indexing runs in the background even when file search is off."),
+        "muted"));
+    auto *roots = new QListWidget;
+    roots->setObjectName("file_search_roots");
+    roots->setProperty("setting_key", "files/roots");
+    roots->setAccessibleName(QCoreApplication::translate("XLibrary", "File search folders"));
+    roots->addItems(context.settings->value("files/roots").toStringList());
+    widget->layout()->addWidget(roots);
+    auto *tools = new QHBoxLayout;
+    auto *add = button(QCoreApplication::translate("XLibrary", "Add folder"));
+    auto *drive = button(QCoreApplication::translate("XLibrary", "Add drive"));
+    auto *remove = button(QCoreApplication::translate("XLibrary", "Remove folder"));
+    auto *all = button(QCoreApplication::translate("XLibrary", "Search all drives"));
+    tools->addWidget(add);
+    tools->addWidget(drive);
+    tools->addWidget(remove);
+    tools->addWidget(all);
+    static_cast<QVBoxLayout *>(widget->layout())->addLayout(tools);
+    QObject::connect(add, &QPushButton::clicked, widget, [=] {
+        const auto path =
+            QFileDialog::getExistingDirectory(widget, QCoreApplication::translate("XLibrary", "Add folder"));
+        if (!path.isEmpty() && roots->findItems(path, Qt::MatchExactly).isEmpty())
+            roots->addItem(path);
+    });
+    auto *drives = new QMenu(drive);
+    drive->setMenu(drives);
+    QObject::connect(drives, &QMenu::aboutToShow, widget, [=] {
+        drives->clear();
+        for (const auto &path : FileManager::volume_roots()) {
+            auto *action = drives->addAction(QDir::toNativeSeparators(path));
+            const auto canonical = QFileInfo(path).canonicalFilePath();
+            bool selected = false;
+            for (int i = 0; i < roots->count(); ++i)
+                if (QFileInfo(roots->item(i)->text()).canonicalFilePath() == canonical) {
+                    selected = true;
+                    break;
+                }
+            action->setEnabled(!selected);
+            QObject::connect(action, &QAction::triggered, roots,
+                             [=] { roots->addItem(QDir::toNativeSeparators(path)); });
+        }
+    });
+    QObject::connect(remove, &QPushButton::clicked, widget, [=] { delete roots->takeItem(roots->currentRow()); });
+    QObject::connect(all, &QPushButton::clicked, roots, &QListWidget::clear);
+    auto *status = label(service->files->status(), "muted");
+    status->setObjectName("file_index_status");
+    widget->layout()->addWidget(status);
+    QObject::connect(service->files, &FileManager::status_changed, widget,
+                     [=] { status->setText(service->files->status()); });
+    auto *scan = button(QCoreApplication::translate("XLibrary", "Refresh file index"));
+    widget->layout()->addWidget(scan);
+    QObject::connect(scan, &QPushButton::clicked, service->files, &FileManager::rescan);
+    widget->layout()->addWidget(label(
+        QCoreApplication::translate("XLibrary",
+                                    "Filename masks: * matches any number of characters; ? matches one character. "
+                                    "Examples: *.pdf, report-??.txt. Other characters are literal."),
+        "muted"));
+    widget->layout()->addWidget(
+        label(QCoreApplication::translate("XLibrary",
+                                          "Folder changes take effect after Save. An empty list means all drives. "
+                                          "The index refreshes every 15 minutes; unavailable locations are skipped. "
+                                          "Right-click a search result to save it to My files."),
+              "muted"));
     return widget;
 }
 
@@ -363,11 +509,31 @@ QWidget *plugins(const ui_context &context, QWidget *) {
                 available.append(id);
     }
     const auto errors = context.parameters.value("plugin_errors").toMap();
+    const auto metadata = context.parameters.value("plugin_metadata").toMap();
     for (const auto &id : available) {
-        auto *control = new QCheckBox(id);
+        const auto details = metadata.value(id).toMap();
+        const auto value = [&](const QString &key, const QString &alternate) {
+            auto text = details.value(key);
+            if (!text.isValid())
+                text = details.value(alternate);
+            return text.metaType().id() == QMetaType::QString ? text.toString().trimmed().left(256) : QString{};
+        };
+        const auto name = value("name", "Name");
+        const auto version = value("version", "Version");
+        const auto author = value("author", "Author");
+        auto *control = new QCheckBox(name.isEmpty() ? id : name);
         control->setProperty("plugin_id", id);
         control->setChecked(enabled.contains(id));
         widget->layout()->addWidget(control);
+        QStringList information;
+        if (!name.isEmpty())
+            information.append(id);
+        if (!version.isEmpty())
+            information.append(QCoreApplication::translate("XLibrary", "Version %1").arg(version));
+        if (!author.isEmpty())
+            information.append(QCoreApplication::translate("XLibrary", "Author: %1").arg(author));
+        if (!information.isEmpty())
+            widget->layout()->addWidget(label(information.join(" · "), "muted"));
         const auto error = errors.value(id).toString();
         if (!error.isEmpty()) {
             control->setToolTip(error);
@@ -382,6 +548,43 @@ QWidget *plugins(const ui_context &context, QWidget *) {
             label(QCoreApplication::translate("XLibrary",
                                               "No modules installed. Folder: plugins next to the XLibrary executable."),
                   "muted"));
+    static_cast<QVBoxLayout *>(widget->layout())->addStretch();
+    return widget;
+}
+
+QWidget *help_page(const ui_context &context, QWidget *) {
+    auto *widget = page(QCoreApplication::translate("XLibrary", "Quick help"));
+    widget->layout()->addWidget(action_button(context.actions.value("tutorial")));
+    const QList<QPair<QString, QString>> topics{
+        {QCoreApplication::translate("XLibrary", "Search"),
+         QCoreApplication::translate("XLibrary",
+                                     "Type an application name, alias or filename. Use #work to require a tag and "
+                                     "-#games to exclude one; combine them with text. "
+                                     "Clear filters to search the whole library. Quick search also accepts file paths "
+                                     "and calculations such as (2 + 3) * 4; Enter copies the result.")},
+        {QCoreApplication::translate("XLibrary", "Tags"),
+         QCoreApplication::translate("XLibrary", "Create tags in the sidebar or application editor. A tag has up to 64 "
+                                                 "characters without spaces, commas or #. "
+                                                 "Select several applications with Ctrl or Shift to edit their tags "
+                                                 "together. Removing a tag keeps the applications.")},
+        {QCoreApplication::translate("XLibrary", "Scenarios"),
+         QCoreApplication::translate("XLibrary", "Create a scenario from the Scenarios section. Add applications in "
+                                                 "launch order, set each delay and choose a launch profile. "
+                                                 "Disabled steps are skipped. Fix the listed problems before running. "
+                                                 "Success means the launch request was accepted, "
+                                                 "not that the application finished loading. Stop skips remaining "
+                                                 "steps and keeps already opened applications running.")},
+        {QCoreApplication::translate("XLibrary", "Keyboard shortcuts"),
+         QCoreApplication::translate(
+             "XLibrary",
+             "Open Settings → Keyboard shortcuts to see or change the current bindings. Clear a binding to disable it. "
+             "Assign application and scenario shortcuts in their editors. A shortcut already used by XLibrary or "
+             "another application "
+             "may be refused. On Wayland, system permission or a desktop shortcut may be required.")}};
+    for (const auto &topic : topics) {
+        widget->layout()->addWidget(label(topic.first, "subheading"));
+        widget->layout()->addWidget(label(topic.second, "muted"));
+    }
     static_cast<QVBoxLayout *>(widget->layout())->addStretch();
     return widget;
 }
@@ -415,12 +618,31 @@ QWidget *about(const ui_context &context, QWidget *) {
         "muted"));
     auto *github = button(QCoreApplication::translate("XLibrary", "Open GitHub ↗"));
     auto *issues = button(QCoreApplication::translate("XLibrary", "Report an issue ↗"));
+    auto *documentation = button(QCoreApplication::translate("XLibrary", "Open documentation ↗"));
+    auto *copy = button(QCoreApplication::translate("XLibrary", "Copy version and environment"));
     card_layout->addWidget(github);
     card_layout->addWidget(issues);
+    card_layout->addWidget(documentation);
+    card_layout->addWidget(copy);
     QObject::connect(github, &QPushButton::clicked, widget,
                      [] { desktop_platform::open_url(QUrl("https://github.com/lappland-open/XLibrary")); });
     QObject::connect(issues, &QPushButton::clicked, widget,
                      [] { desktop_platform::open_url(QUrl("https://github.com/lappland-open/XLibrary/issues")); });
+    QObject::connect(documentation, &QPushButton::clicked, widget, [] {
+        desktop_platform::open_url(QUrl("https://github.com/lappland-open/XLibrary/blob/main/README.md"));
+    });
+    QObject::connect(copy, &QPushButton::clicked, widget, [=] {
+        const auto text =
+            QCoreApplication::translate("XLibrary",
+                                        "XLibrary %1\nOS: %2\nArchitecture: %3\nQt: %4\nSession: %5\nMode: %6")
+                .arg(QCoreApplication::applicationVersion(), QSysInfo::prettyProductName(),
+                     QSysInfo::currentCpuArchitecture(), QString::fromLatin1(qVersion()),
+                     QGuiApplication::platformName(),
+                     application_paths::portable_mode() ? QStringLiteral("portable") : QStringLiteral("installed"));
+        QGuiApplication::clipboard()->setText(text);
+        static_cast<DesktopService *>(context.service)
+            ->notify(QCoreApplication::translate("XLibrary", "Version and environment copied."));
+    });
     widget->layout()->addWidget(card);
     widget->layout()->addWidget(
         label(QCoreApplication::translate("XLibrary", "Technologies and licenses"), "subheading"));
@@ -708,12 +930,23 @@ QDialog *settings_dialog(const ui_context &context, QWidget *const parent) {
         {QCoreApplication::translate("XLibrary", "Keyboard shortcuts"), "settings_hotkeys"},
         {QCoreApplication::translate("XLibrary", "Library"), "settings_library"},
         {QCoreApplication::translate("XLibrary", "Profile"), "settings_profile"},
+        {QCoreApplication::translate("XLibrary", "Local data"), "settings_storage"},
+        {QCoreApplication::translate("XLibrary", "File search"), "settings_files"},
         {QCoreApplication::translate("XLibrary", "Plugins"), "settings_plugins"},
         {QCoreApplication::translate("XLibrary", "Update"), "settings_update"},
+        {QCoreApplication::translate("XLibrary", "Quick help"), "settings_help"},
         {QCoreApplication::translate("XLibrary", "About"), "settings_about"}};
     for (const auto &section : sections) {
         const auto index = pages->count();
         auto *item = new SelectionButton(section.first);
+        const QHash<QString, QString> icons{
+            {"settings_general", "settings"}, {"settings_appearance", "palette"}, {"settings_hotkeys", "keyboard"},
+            {"settings_library", "library"},  {"settings_profile", "profile"},    {"settings_storage", "database"},
+            {"settings_files", "file"},       {"settings_plugins", "plugin"},     {"settings_update", "refresh"},
+            {"settings_help", "help"},        {"settings_about", "info"}};
+        item->setIcon(appearance::icon(icons.value(section.second), item->palette().color(QPalette::ButtonText)));
+        const auto icon_size = appearance::scaled(*context.settings, 20);
+        item->setIconSize({icon_size, icon_size});
         item->setObjectName(section.second + "_category");
         categories->addButton(item, index);
         navigation_layout->addWidget(item);
@@ -782,6 +1015,19 @@ QDialog *settings_dialog(const ui_context &context, QWidget *const parent) {
                 values.insert(key, box->isChecked());
             if (auto *combo = qobject_cast<QComboBox *>(control))
                 values.insert(key, combo->currentData());
+            if (auto *list = qobject_cast<QListWidget *>(control)) {
+                QStringList paths;
+                for (int i = 0; i < list->count(); ++i) {
+                    const QFileInfo folder(list->item(i)->text());
+                    if (!folder.isAbsolute() || !folder.isDir() || !folder.isReadable()) {
+                        show_error(QCoreApplication::translate("XLibrary", "A file search folder is unavailable."));
+                        return;
+                    }
+                    paths.append(folder.canonicalFilePath());
+                }
+                paths.removeDuplicates();
+                values.insert(key, paths);
+            }
             if (auto *edit = qobject_cast<QKeySequenceEdit *>(control)) {
                 const auto value = edit->keySequence().toString(QKeySequence::PortableText);
                 values.insert(key, value);
@@ -871,6 +1117,8 @@ QDialog *settings_dialog(const ui_context &context, QWidget *const parent) {
             show_error(QCoreApplication::translate("XLibrary", "Could not save the settings file."));
             return;
         }
+        if (previous.value("files/roots") != values.value("files/roots"))
+            service->files->configure(values.value("files/roots").toStringList());
         emit service->appearance_changed();
         dialog->accept();
     });
@@ -885,7 +1133,10 @@ void register_settings_views(UiRegistry &registry) {
     registry.add_default("settings_hotkeys", hotkeys);
     registry.add_default("settings_library", library_settings);
     registry.add_default("settings_profile", profile_view);
+    registry.add_default("settings_storage", storage_page);
+    registry.add_default("settings_files", file_settings);
     registry.add_default("settings_plugins", plugins);
     registry.add_default("settings_update", update_page);
     registry.add_default("settings_about", about);
+    registry.add_default("settings_help", help_page);
 }

@@ -24,6 +24,9 @@ private:
     QSystemTrayIcon tray;
     std::vector<std::unique_ptr<QPluginLoader>> plugins;
     bool quitting = false;
+    bool welcome_offered = false;
+    void show_welcome();
+    void show_tutorial();
     void create_actions();
     void refresh_actions();
     void apply_settings();

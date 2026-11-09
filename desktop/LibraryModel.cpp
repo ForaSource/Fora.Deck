@@ -352,6 +352,10 @@ bool LibraryFilter::lessThan(const QModelIndex &left, const QModelIndex &right) 
     // The proxy reverses comparisons for descending order; keep favorites pinned within each relevance rank.
     if (a.favorite != b.favorite)
         return sortOrder() == Qt::AscendingOrder ? a.favorite : b.favorite;
+    if (a.launch_count != b.launch_count)
+        return sortOrder() == Qt::AscendingOrder ? a.launch_count > b.launch_count : a.launch_count < b.launch_count;
+    if (a.launch_count > 0 && a.last_launch != b.last_launch)
+        return sortOrder() == Qt::AscendingOrder ? a.last_launch > b.last_launch : a.last_launch < b.last_launch;
     if (sort_mode == 3) {
         const auto &a_tags = model->tag_names(left.row());
         const auto &b_tags = model->tag_names(right.row());

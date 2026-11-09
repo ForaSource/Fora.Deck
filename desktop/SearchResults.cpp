@@ -7,6 +7,7 @@
 #include <QMenu>
 #include <QMessageBox>
 #include <QPainter>
+#include <QScrollBar>
 #include <QStyledItemDelegate>
 #include <QtConcurrent/QtConcurrentRun>
 #include <QUrl>
@@ -106,6 +107,9 @@ public:
 SearchResults::SearchResults(DesktopService &service, QLineEdit &input, const bool compact, QWidget *const parent)
     : QListView(parent), service(service), input(input), compact(compact), results(new SearchResultModel(this)) {
     setObjectName("search_results");
+    file_delay.setSingleShot(true);
+    file_delay.setInterval(100);
+    connect(&file_delay, &QTimer::timeout, this, &SearchResults::update_files);
     setAccessibleName(QCoreApplication::translate("XLibrary", "Search results"));
     setModel(results);
     setItemDelegate(new SearchDelegate(service, this));
@@ -127,7 +131,20 @@ SearchResults::SearchResults(DesktopService &service, QLineEdit &input, const bo
         }
     });
     connect(&service.model, &QAbstractItemModel::dataChanged, viewport(), qOverload<>(&QWidget::update));
-    connect(&service, &DesktopService::catalog_changed, this, &SearchResults::update_query);
+    connect(&service, &DesktopService::catalog_changed, this, [this] {
+        if (special) {
+            update_query();
+            return;
+        }
+        application_entries.clear();
+        if (this->compact)
+            update_applications();
+        update_entries();
+    });
+    connect(&service, &DesktopService::navigation_changed, this, [this] {
+        if (!this->compact)
+            update_query();
+    });
     connect(&service, &DesktopService::profile_state_changed, this,
             [this] { setEnabled(!this->service.profile_busy() && !this->service.restart_required()); });
     connect(&service, &DesktopService::appearance_changed, this, &SearchResults::update_query);
@@ -145,14 +162,15 @@ SearchResults::SearchResults(DesktopService &service, QLineEdit &input, const bo
             auto entries = path_watcher.result();
             // Resolve library identities in memory on the GUI thread, preserving launch configurations.
             QHash<QString, qint64> known;
-            for (const auto &record : this->service.model.applications()) {
-                const auto path = normalized_path(record.path);
-                // A file path cannot identify which arguments or working directory the user wants.
-                if (known.contains(path))
-                    known[path] = 0;
-                else
-                    known.insert(path, record.id);
-            }
+            if (this->compact)
+                for (const auto &record : this->service.model.applications()) {
+                    const auto path = normalized_path(record.path);
+                    // A file path cannot identify which arguments or working directory the user wants.
+                    if (known.contains(path))
+                        known[path] = 0;
+                    else
+                        known.insert(path, record.id);
+                }
             for (auto &entry : entries)
                 if (entry.type == search_entry::kind::file) {
                     entry.application_id = known.value(normalized_path(entry.path));
@@ -164,10 +182,21 @@ SearchResults::SearchResults(DesktopService &service, QLineEdit &input, const bo
         if (!pending_path.isEmpty())
             read_path();
     });
+    connect(service.files, &FileManager::changed, this, [this] {
+        file_matches.clear();
+        if (!action_menu)
+            update_query();
+    });
+    connect(service.files, &FileManager::index_updated, this, [this] {
+        if (!action_menu && !pending_file_queries && files_enabled && !special &&
+            !this->input.text().trimmed().isEmpty())
+            file_delay.start();
+    });
     update_query();
 }
 
 SearchResults::~SearchResults() {
+    file_delay.stop();
     ++*generation;
 }
 
@@ -179,11 +208,40 @@ void SearchResults::replace_entries(QVector<search_entry> entries) {
                         {},
                         0});
     }
+    const bool preserve_position =
+        property("rendered_query").isValid() && property("rendered_query").toString() == input.text();
+    const auto top_index = indexAt(QPoint(0, 0));
+    const auto top_entry = top_index.isValid() ? results->entries[top_index.row()] : search_entry{};
+    const auto top_offset = top_index.isValid() ? visualRect(top_index).top() : 0;
+    const auto scroll_position = verticalScrollBar()->value();
+    const auto previous = currentIndex().isValid() ? results->entries[currentIndex().row()] : search_entry{};
+    const auto same_entry = [](const search_entry &a, const search_entry &b) {
+        return a.type == b.type && a.path == b.path && a.application_id == b.application_id;
+    };
     results->replace(std::move(entries));
-    setCurrentIndex(results->index(0, 0));
+    int selected = 0;
+    if (preserve_position && !previous.path.isEmpty())
+        for (qsizetype i = 0; i < results->entries.size(); ++i)
+            if (same_entry(results->entries[i], previous)) {
+                selected = static_cast<int>(i);
+                break;
+            }
+    setCurrentIndex(results->index(selected, 0));
     const auto rows = qMin(results->rowCount(), 5);
     setFixedHeight(rows * appearance::scaled(service.settings, 52) + (rows ? 4 : 0));
     setVisible(rows > 0);
+    if (preserve_position) {
+        doItemsLayout();
+        verticalScrollBar()->setValue(scroll_position);
+        if (top_index.isValid())
+            for (int row = 0; row < results->rowCount(); ++row)
+                if (same_entry(results->entries[row], top_entry)) {
+                    scrollTo(results->index(row, 0), QAbstractItemView::PositionAtTop);
+                    verticalScrollBar()->setValue(verticalScrollBar()->value() - top_offset);
+                    break;
+                }
+    }
+    setProperty("rendered_query", input.text());
     emit height_changed();
 }
 
@@ -193,6 +251,14 @@ void SearchResults::update_applications() {
     const auto better = [this](const auto &left, const auto &right) {
         if (left.second != right.second)
             return left.second < right.second;
+        const auto &a = service.model.at(left.first);
+        const auto &b = service.model.at(right.first);
+        if (a.favorite != b.favorite)
+            return a.favorite;
+        if (a.launch_count != b.launch_count)
+            return a.launch_count > b.launch_count;
+        if (a.last_launch != b.last_launch)
+            return a.last_launch > b.last_launch;
         const auto comparison =
             QString::localeAwareCompare(service.model.search_name(left.first), service.model.search_name(right.first));
         return comparison == 0 ? service.model.at(left.first).id < service.model.at(right.first).id : comparison < 0;
@@ -200,7 +266,11 @@ void SearchResults::update_applications() {
     // Keep only the five best matches in O(n), rather than sorting an entire second catalog on each key.
     for (int row = 0; row < service.model.rowCount(); ++row) {
         const auto &record = service.model.at(row);
-        if (input.text().trimmed().isEmpty() && !record.favorite)
+        if (!compact && ((service.section() == "favorites" && !record.favorite) ||
+                         (service.section() == "running" && !record.running) ||
+                         (!service.tag().isEmpty() && !has_tag(record.tags, service.tag()))))
+            continue;
+        if (input.text().trimmed().isEmpty() && !record.favorite && !record.launch_count)
             continue;
         const auto rank = query.rank(service.model.search_data(row));
         if (rank < 0)
@@ -228,20 +298,25 @@ void SearchResults::update_applications() {
                                         .arg(QFileInfo(record.default_launch_profile.mid(8)).fileName());
             title += " · " + mode;
         }
-        entries.append({search_entry::kind::application, title, record.path, record.id});
+        entries.append({search_entry::kind::application, title, record.path, record.id, record.favorite,
+                        candidate.second, record.launch_count, record.last_launch, 0, 0});
     }
-    replace_entries(std::move(entries));
+    application_entries = entries;
 }
 
 void SearchResults::update_query() {
     if (action_menu)
         action_menu->close();
     pending_launch = 0;
+    file_delay.stop();
+    if (property("rendered_query").toString() != input.text())
+        setCurrentIndex({});
     ++*generation;
     pending_path.clear();
     const auto text = input.text().trimmed();
-    special = search_query::is_path(text);
+    special = (compact || files_enabled) && search_query::is_path(text);
     if (special) {
+        file_matches.clear();
         pending_path = search_query::expanded_path(text);
         replace_entries({{search_entry::kind::message, QCoreApplication::translate("XLibrary", "…"), {}, 0}});
         if (!path_busy)
@@ -249,17 +324,84 @@ void SearchResults::update_query() {
         return;
     }
     const auto calculation = search_query::calculate(text);
-    special = calculation.recognized;
+    // A numeric filename mask such as "2026*" is also an incomplete calculation.
+    special = calculation.recognized &&
+              !(files_enabled && !calculation.value && search_query::file_pattern(text).has_value());
     if (special) {
+        file_matches.clear();
         if (calculation.value) {
             const auto number = QString::number(*calculation.value, 'g', 15);
             replace_entries({{search_entry::kind::calculation, "= " + number, number, 0}});
         } else
             replace_entries({{search_entry::kind::message, QCoreApplication::translate("XLibrary", "—"), {}, 0}});
-    } else if (compact)
-        update_applications();
-    else
-        replace_entries({});
+    } else {
+        if (!files_enabled || text.isEmpty())
+            file_matches.clear();
+        application_entries.clear();
+        if (compact)
+            update_applications();
+        update_entries();
+        if (files_enabled && !text.isEmpty())
+            file_delay.start();
+    }
+}
+
+void SearchResults::set_files_enabled(const bool enabled) {
+    files_enabled = enabled;
+    update_query();
+}
+void SearchResults::update_files() {
+    const auto expected = generation->load();
+    ++pending_file_queries;
+    service.files->search(
+        input.text(), expected, this,
+        [this](quint64 request, QVector<file_match> matches) {
+            --pending_file_queries;
+            if (request != generation->load() || !files_enabled)
+                return;
+            file_matches = std::move(matches);
+            update_entries();
+        },
+        generation, service.catalog().file_usage);
+}
+
+void SearchResults::update_entries() {
+    // Refine the last completed file search while its replacement is still pending.
+    const auto matches = FileManager::filter_matches(input.text(), file_matches);
+    if (matches.isEmpty()) {
+        replace_entries(compact ? application_entries : QVector<search_entry>{});
+        return;
+    }
+    auto entries = application_entries;
+    for (const auto &match : matches)
+        entries.append({search_entry::kind::working_file,
+                        (match.saved ? QStringLiteral("★ ") : QString{}) + match.name + QStringLiteral(" · ") +
+                            QDir::toNativeSeparators(QFileInfo(match.path).absolutePath()),
+                        match.path, 0, match.saved, match.rank, match.use_count, match.last_used, match.location,
+                        match.depth});
+    std::sort(entries.begin(), entries.end(), [](const search_entry &a, const search_entry &b) {
+        if (a.rank != b.rank)
+            return a.rank < b.rank;
+        if (a.saved != b.saved)
+            return a.saved;
+        if (a.use_count != b.use_count)
+            return a.use_count > b.use_count;
+        if (a.last_used != b.last_used)
+            return a.last_used > b.last_used;
+        if (a.location != b.location)
+            return a.location < b.location;
+        if (a.depth != b.depth)
+            return a.depth < b.depth;
+        const auto comparison = QString::compare(a.title, b.title, Qt::CaseInsensitive);
+        if (comparison != 0)
+            return comparison < 0;
+        return a.path == b.path ? a.application_id < b.application_id : a.path < b.path;
+    });
+    if (!entries.isEmpty()) {
+        const auto best = entries.front().rank;
+        entries.removeIf([best](const auto &entry) { return !SearchQuery::accepts_rank(entry.rank, best); });
+    }
+    replace_entries(std::move(entries));
 }
 
 void SearchResults::read_path() {
@@ -268,8 +410,16 @@ void SearchResults::read_path() {
     pending_path.clear();
     active_generation = generation->load();
     // Only one disk request is active per field; newer input replaces the pending request.
-    path_watcher.setFuture(
-        QtConcurrent::run(search_results::directory_entries, active_path, generation, active_generation));
+    auto usage = service.catalog().file_usage;
+    QSet<QString> favorites;
+    if (compact)
+        for (const auto &record : service.model.applications()) {
+            usage.insert(normalized_path(record.path), {record.launch_count, record.last_launch});
+            if (record.favorite)
+                favorites.insert(normalized_path(record.path));
+        }
+    path_watcher.setFuture(QtConcurrent::run(search_results::directory_entries, active_path, generation,
+                                             active_generation, usage, favorites, !compact));
 }
 
 void SearchResults::activate_current() {
@@ -280,19 +430,25 @@ void SearchResults::activate_current() {
         return;
     const auto entry = results->entries[row];
     if (entry.type == search_entry::kind::open_folder) {
-        if (desktop_platform::open_url(QUrl::fromLocalFile(entry.path)))
+        if (desktop_platform::open_url(QUrl::fromLocalFile(entry.path))) {
             emit application_activated();
-        else
+        } else
             service.notify(QCoreApplication::translate("XLibrary", "Could not open the folder."));
     } else if (entry.type == search_entry::kind::directory) {
         input.setText(QDir::toNativeSeparators(entry.path + '/'));
         input.setFocus();
     } else if (entry.type == search_entry::kind::application) {
         pending_launch = service.request_launch(entry.application_id);
-    } else if (entry.type == search_entry::kind::file) {
-        if (desktop_platform::open_url(QUrl::fromLocalFile(entry.path)))
+    } else if ((entry.type == search_entry::kind::file || entry.type == search_entry::kind::working_file)) {
+        if (entry.type == search_entry::kind::working_file && !FileManager::accepts_file(entry.path)) {
+            service.notify(QCoreApplication::translate("XLibrary", "The file is unavailable or its type is excluded."));
+            update_query();
+            return;
+        }
+        if (desktop_platform::open_url(QUrl::fromLocalFile(entry.path))) {
+            service.record_file_use(entry.path);
             emit application_activated();
-        else
+        } else
             service.notify(QCoreApplication::translate("XLibrary", "Could not open the file."));
     } else if (entry.type == search_entry::kind::calculation)
         QApplication::clipboard()->setText(entry.path);
@@ -300,7 +456,47 @@ void SearchResults::activate_current() {
 
 void SearchResults::show_actions() {
     const auto row = currentIndex().row();
-    if (!compact || !isEnabled() || service.profile_busy() || service.restart_required() || row < 0 ||
+    if (row >= 0 && row < results->entries.size() &&
+        (results->entries[row].type == search_entry::kind::file ||
+         results->entries[row].type == search_entry::kind::working_file) &&
+        isEnabled() && !service.profile_busy() && !service.restart_required()) {
+        const auto entry = results->entries[row];
+        if (action_menu)
+            action_menu->close();
+        auto *menu = new QMenu(this);
+        action_menu = menu;
+        connect(menu->addAction(QCoreApplication::translate("XLibrary", "Open")), &QAction::triggered, this,
+                [this, entry] {
+                    if (entry.type == search_entry::kind::working_file && !FileManager::accepts_file(entry.path)) {
+                        service.notify(QCoreApplication::translate("XLibrary",
+                                                                   "The file is unavailable or its type is excluded."));
+                        return;
+                    }
+                    if (desktop_platform::open_url(QUrl::fromLocalFile(entry.path))) {
+                        service.record_file_use(entry.path);
+                        emit application_activated();
+                    } else
+                        service.notify(QCoreApplication::translate("XLibrary", "Could not open the file."));
+                });
+        connect(menu->addAction(QCoreApplication::translate("XLibrary", "Open folder")), &QAction::triggered, this,
+                [entry] { desktop_platform::open_url(QUrl::fromLocalFile(QFileInfo(entry.path).absolutePath())); });
+        connect(menu->addAction(QCoreApplication::translate("XLibrary", "Copy path")), &QAction::triggered, this,
+                [entry] { QApplication::clipboard()->setText(QDir::toNativeSeparators(entry.path)); });
+        const bool saved = entry.saved;
+        connect(menu->addAction(
+                    QCoreApplication::translate("XLibrary", saved ? "Remove from My files" : "Save to My files")),
+                &QAction::triggered, this, [this, entry, saved] { service.files->set_saved(entry.path, !saved); });
+        connect(menu, &QMenu::aboutToHide, this, [this, menu] {
+            if (action_menu == menu)
+                action_menu = nullptr;
+            menu->deleteLater();
+            input.setFocus();
+        });
+        menu->popup(viewport()->mapToGlobal(visualRect(currentIndex()).bottomLeft()));
+        menu->setActiveAction(menu->actions().first());
+        return;
+    }
+    if (!isEnabled() || service.profile_busy() || service.restart_required() || row < 0 ||
         row >= results->entries.size() || results->entries[row].type != search_entry::kind::application)
         return;
     const auto id = results->entries[row].application_id;
@@ -386,14 +582,17 @@ void SearchResults::show_actions() {
 }
 
 bool SearchResults::eventFilter(QObject *const object, QEvent *const event) {
-    if (object == &input && (compact || special)) {
+    if (object == &input && (compact || special || (files_enabled && results->rowCount() > 0))) {
         if (event->type() == QEvent::ShortcutOverride || event->type() == QEvent::KeyPress) {
             auto *key = static_cast<QKeyEvent *>(event);
             const bool plain = !(key->modifiers() & ~Qt::KeypadModifier);
-            const bool actions_key = compact && ((plain && key->key() == Qt::Key_Tab) ||
-                                                 (key->key() == Qt::Key_F10 && key->modifiers() == Qt::ShiftModifier));
+            const bool actions_key =
+                (compact || files_enabled) && ((plain && key->key() == Qt::Key_Tab) ||
+                                               (key->key() == Qt::Key_F10 && key->modifiers() == Qt::ShiftModifier));
             if (actions_key && currentIndex().isValid() &&
-                results->entries[currentIndex().row()].type == search_entry::kind::application) {
+                (results->entries[currentIndex().row()].type == search_entry::kind::application ||
+                 results->entries[currentIndex().row()].type == search_entry::kind::file ||
+                 results->entries[currentIndex().row()].type == search_entry::kind::working_file)) {
                 if (event->type() == QEvent::KeyPress)
                     show_actions();
                 event->accept();

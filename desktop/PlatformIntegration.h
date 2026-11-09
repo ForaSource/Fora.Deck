@@ -34,6 +34,7 @@ QImage application_icon(const QString &path);
 
 bool set_autostart(bool enabled, QString &error);
 bool animations_enabled();
+bool translucent_windows_supported();
 void apply_backdrop(QWidget *window, bool dark, bool glass);
 }
 

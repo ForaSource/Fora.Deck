@@ -18,10 +18,13 @@
 #include <QProgressBar>
 #include <QPushButton>
 #include <QResizeEvent>
+#include <QScrollBar>
 #include <QSignalBlocker>
 #include <QStackedLayout>
 #include <QStyledItemDelegate>
 #include <QTreeView>
+#include <QTreeWidget>
+#include <QUrl>
 
 #include "appearance.h"
 #include "Application.h"
@@ -235,7 +238,8 @@ QWidget *navigation(const ui_context &context, QWidget *const parent) {
     const QList<QStringList> links{{"library", QCoreApplication::translate("XLibrary", "Library"), "library"},
                                    {"favorites", QCoreApplication::translate("XLibrary", "Favorites"), "favorite"},
                                    {"running", QCoreApplication::translate("XLibrary", "Running applications"), "play"},
-                                   {"scenarios", QCoreApplication::translate("XLibrary", "Scenarios"), "scenarios"}};
+                                   {"scenarios", QCoreApplication::translate("XLibrary", "Scenarios"), "scenarios"},
+                                   {"files", QCoreApplication::translate("XLibrary", "My files"), "file"}};
     for (const auto &link : links) {
         auto *item = new SelectionButton(link[1]);
         item->setIcon(appearance::icon(link[2]));
@@ -325,6 +329,95 @@ QWidget *navigation(const ui_context &context, QWidget *const parent) {
     return widget;
 }
 
+QWidget *my_files(const ui_context &context, QWidget *const parent) {
+    auto *service = static_cast<DesktopService *>(context.service);
+    auto *widget = new QWidget(parent);
+    auto *layout = new QVBoxLayout(widget);
+    layout->addWidget(label(QCoreApplication::translate("XLibrary", "My files"), "heading"));
+    layout->addWidget(
+        label(QCoreApplication::translate(
+                  "XLibrary",
+                  "Save files from search results using the context menu. Removing a saved file keeps it on disk."),
+              "muted"));
+    auto *list = new QTreeWidget;
+    list->setObjectName("my_files_list");
+    list->setAccessibleName(QCoreApplication::translate("XLibrary", "My files"));
+    list->setRootIsDecorated(false);
+    list->setHeaderLabels(
+        {QCoreApplication::translate("XLibrary", "Name"), QCoreApplication::translate("XLibrary", "Path")});
+    list->header()->setSectionResizeMode(QHeaderView::Stretch);
+    layout->addWidget(list, 1);
+    auto sequence = std::make_shared<quint64>(0);
+    const auto reload = [=] {
+        const auto request = ++*sequence;
+        service->files->saved_files(widget, [=](QVector<file_match> entries) {
+            if (request != *sequence)
+                return;
+            std::sort(entries.begin(), entries.end(), [=](const file_match &a, const file_match &b) {
+                const auto a_usage = service->catalog().file_usage.value(normalized_path(a.path));
+                const auto b_usage = service->catalog().file_usage.value(normalized_path(b.path));
+                if (a_usage.count != b_usage.count)
+                    return a_usage.count > b_usage.count;
+                if (a_usage.last_used != b_usage.last_used)
+                    return a_usage.last_used > b_usage.last_used;
+                return a.path < b.path;
+            });
+            list->clear();
+            for (const auto &entry : entries) {
+                auto *item = new QTreeWidgetItem(list, {entry.name, QDir::toNativeSeparators(entry.path)});
+                item->setData(0, Qt::UserRole, entry.path);
+                item->setToolTip(0, entry.path);
+                if (!entry.available) {
+                    item->setText(0, entry.name + " · " + QCoreApplication::translate("XLibrary", "Unavailable"));
+                    item->setForeground(0, list->palette().color(QPalette::PlaceholderText));
+                }
+            }
+        });
+    };
+    QObject::connect(service->files, &FileManager::saved_paths_changed, widget, [=] {
+        if (service->section() == "files")
+            reload();
+    });
+    QObject::connect(service, &DesktopService::catalog_changed, widget, [=] {
+        if (service->section() == "files")
+            reload();
+    });
+    QObject::connect(service, &DesktopService::navigation_changed, widget, [=] {
+        if (service->section() == "files")
+            reload();
+    });
+    auto *tools = new QHBoxLayout;
+    const auto action = [=](const QString &title, const std::function<void(QString)> &callback) {
+        auto *control = button(title);
+        tools->addWidget(control);
+        QObject::connect(control, &QPushButton::clicked, widget, [=] {
+            if (!service->profile_busy() && !service->restart_required() && list->currentItem())
+                callback(list->currentItem()->data(0, Qt::UserRole).toString());
+        });
+    };
+    const auto open = [=](const QString &path) {
+        if (!FileManager::accepts_file(path) || !desktop_platform::open_url(QUrl::fromLocalFile(path)))
+            service->notify(QCoreApplication::translate("XLibrary", "Could not open the file."));
+        else
+            service->record_file_use(path);
+    };
+    action(QCoreApplication::translate("XLibrary", "Open"), open);
+    action(QCoreApplication::translate("XLibrary", "Open folder"), [](const QString &path) {
+        desktop_platform::open_url(QUrl::fromLocalFile(QFileInfo(path).absolutePath()));
+    });
+    action(QCoreApplication::translate("XLibrary", "Copy path"),
+           [](const QString &path) { QApplication::clipboard()->setText(QDir::toNativeSeparators(path)); });
+    action(QCoreApplication::translate("XLibrary", "Remove from My files"),
+           [=](const QString &path) { service->files->set_saved(path, false); });
+    QObject::connect(list, &QTreeWidget::itemActivated, widget, [=](QTreeWidgetItem *item, int) {
+        if (!service->profile_busy() && !service->restart_required())
+            open(item->data(0, Qt::UserRole).toString());
+    });
+    layout->addLayout(tools);
+    reload();
+    return widget;
+}
+
 QWidget *search_bar(const ui_context &context, QWidget *const parent) {
     auto *service = static_cast<DesktopService *>(context.service);
     auto *widget = new QWidget(parent);
@@ -339,7 +432,7 @@ QWidget *search_bar(const ui_context &context, QWidget *const parent) {
     search->setMaxLength(static_cast<int>(catalog_limits::text_length));
     search->setObjectName("search_input");
     search->setAccessibleName(
-        QCoreApplication::translate("XLibrary", "Search applications, calculate or enter a path"));
+        QCoreApplication::translate("XLibrary", "Search applications and files, calculate or enter a path"));
     search->setPlaceholderText(QCoreApplication::translate("XLibrary", "Search, calculate or enter a path"));
     search->setClearButtonEnabled(true);
     search->setMinimumHeight(26);
@@ -383,8 +476,13 @@ QWidget *search_bar(const ui_context &context, QWidget *const parent) {
     auto *settings = action_button(context.actions.value("settings"), false, "");
     settings->setAccessibleName(QCoreApplication::translate("XLibrary", "Settings"));
     settings->setFixedWidth(44);
+    auto *files = file_search_switch(true, widget);
+    layout->addWidget(files);
     layout->addWidget(settings);
-    root->addWidget(new SearchResults(*service, *search, false, widget));
+    auto *results = new SearchResults(*service, *search, false, widget);
+    results->set_files_enabled(true);
+    QObject::connect(files, &QAbstractButton::toggled, results, &SearchResults::set_files_enabled);
+    root->addWidget(results);
     root->addWidget(search_tools(*service, *search, widget));
     return widget;
 }
@@ -702,7 +800,13 @@ QWidget *library(const ui_context &context, QWidget *const parent) {
         clear_selection->setEnabled(!ids.isEmpty());
     };
     auto resetting = std::make_shared<bool>(false);
-    QObject::connect(&service->filter, &QAbstractItemModel::modelAboutToBeReset, widget, [=] { *resetting = true; });
+    auto top_application = std::make_shared<qint64>(0);
+    auto scroll_position = std::make_shared<int>(0);
+    QObject::connect(&service->filter, &QAbstractItemModel::modelAboutToBeReset, widget, [=] {
+        *resetting = true;
+        *top_application = view->indexAt(QPoint(0, 0)).data(LibraryModel::id_role).toLongLong();
+        *scroll_position = view->verticalScrollBar()->value();
+    });
     QObject::connect(view->selectionModel(), &QItemSelectionModel::selectionChanged, widget, [=] {
         if (!*resetting)
             synchronize_selection();
@@ -806,6 +910,17 @@ QWidget *library(const ui_context &context, QWidget *const parent) {
     QObject::connect(&service->filter, &QAbstractItemModel::rowsRemoved, widget, update);
     QObject::connect(&service->filter, &QAbstractItemModel::rowsInserted, widget, update);
     QObject::connect(&service->filter, &QAbstractItemModel::modelReset, widget, update);
+    QObject::connect(&service->filter, &QAbstractItemModel::modelReset, widget, [=] {
+        view->doItemsLayout();
+        view->verticalScrollBar()->setValue(*scroll_position);
+        for (int row = 0; *top_application && row < service->filter.rowCount(); ++row) {
+            const auto index = service->filter.index(row, 0);
+            if (index.data(LibraryModel::id_role).toLongLong() == *top_application) {
+                view->scrollTo(index, QAbstractItemView::PositionAtTop);
+                break;
+            }
+        }
+    });
     QObject::connect(&service->filter, &QAbstractItemModel::layoutChanged, widget, update);
     QObject::connect(service, &DesktopService::navigation_changed, widget, [=] {
         title->setText(service->section() == "favorites" ? QCoreApplication::translate("XLibrary", "Favorites")
@@ -1060,14 +1175,86 @@ QWidget *scenarios(const ui_context &context, QWidget *const parent) {
     root->addWidget(empty);
     auto *status = label("", "muted");
     root->addWidget(status);
+    auto *steps = new QTreeWidget;
+    steps->setRootIsDecorated(false);
+    steps->setHeaderLabels({QCoreApplication::translate("XLibrary", "Application"),
+                            QCoreApplication::translate("XLibrary", "Step status")});
+    steps->header()->setSectionResizeMode(0, QHeaderView::Stretch);
+    steps->header()->setSectionResizeMode(1, QHeaderView::Stretch);
+    steps->setMinimumHeight(appearance::scaled(*context.settings, 150));
+    root->addWidget(steps, 1);
+    const auto rebuild_steps = [=] {
+        steps->clear();
+        if (!list->currentItem())
+            return;
+        const auto id = list->currentItem()->data(Qt::UserRole).toLongLong();
+        QVector<scenario_step> records;
+        const bool has_run = id == service->scenario_run_id();
+        if (has_run)
+            records = service->scenario_run_steps();
+        else
+            for (const auto &record : service->catalog().scenarios)
+                if (record.id == id) {
+                    records = record.steps;
+                    break;
+                }
+        for (qsizetype index = 0; index < records.size(); ++index) {
+            const auto &step = records[index];
+            const auto *app = service->model.find(step.application_id);
+            const auto name = app ? app->name : QCoreApplication::translate("XLibrary", "Missing application");
+            const auto state = has_run        ? service->scenario_step_status(index)
+                               : step.enabled ? QCoreApplication::translate("XLibrary", "Waiting")
+                                              : QCoreApplication::translate("XLibrary", "Skipped");
+            auto *item = new QTreeWidgetItem(steps, {QString::number(index + 1) + ". " + name, state});
+            item->setToolTip(1, state);
+        }
+    };
+    QObject::connect(service, &DesktopService::scenario_steps_changed, widget, rebuild_steps);
+    QObject::connect(service, &DesktopService::catalog_changed, widget, rebuild_steps);
+    QObject::connect(list, &QListWidget::currentRowChanged, widget, [=] { rebuild_steps(); });
     auto *tools = new QHBoxLayout;
     auto *run = button(QCoreApplication::translate("XLibrary", "Run scenario"), "primary");
     auto *edit = button(QCoreApplication::translate("XLibrary", "Edit"));
     auto *remove = button(QCoreApplication::translate("XLibrary", "Remove"));
     auto *stop = button(QCoreApplication::translate("XLibrary", "Stop"));
+    auto *issues = new QPlainTextEdit;
+    issues->setReadOnly(true);
+    issues->setAccessibleName(QCoreApplication::translate("XLibrary", "Scenario issues"));
+    issues->setMinimumHeight(appearance::scaled(*context.settings, 60));
+    issues->setMaximumHeight(appearance::scaled(*context.settings, 150));
+    auto *recheck = button(QCoreApplication::translate("XLibrary", "Check again"));
+    root->addWidget(issues);
+    const auto check_selected = [=] {
+        const auto id = list->currentItem() ? list->currentItem()->data(Qt::UserRole).toLongLong() : 0;
+        const bool can_check = id && !service->is_scenario_active() && service->section() == "scenarios";
+        if (can_check)
+            service->check_scenario(id);
+        const bool checked = service->scenario_checked(id);
+        const auto problems = service->scenario_issues(id);
+        issues->setPlainText(!checked ? QCoreApplication::translate("XLibrary", "Checking scenario…")
+                             : problems.isEmpty()
+                                 ? QString{}
+                                 : QCoreApplication::translate("XLibrary", "Fix the scenario before running it:") +
+                                       "\n" + problems.join('\n'));
+        issues->setVisible(can_check && (!checked || !problems.isEmpty()));
+        run->setEnabled(can_check && checked && problems.isEmpty());
+        recheck->setEnabled(can_check && checked);
+    };
+    QObject::connect(list, &QListWidget::currentRowChanged, widget, [=] { check_selected(); });
+    QObject::connect(service, &DesktopService::navigation_changed, widget, check_selected);
+    QObject::connect(service, &DesktopService::scenario_check_changed, widget, [=](const qint64 id) {
+        if (!id || (list->currentItem() && list->currentItem()->data(Qt::UserRole).toLongLong() == id))
+            check_selected();
+    });
+    QObject::connect(recheck, &QPushButton::clicked, widget, [=] {
+        if (list->currentItem())
+            service->check_scenario(list->currentItem()->data(Qt::UserRole).toLongLong(), true);
+        check_selected();
+    });
     tools->addWidget(run);
     tools->addWidget(edit);
     tools->addWidget(remove);
+    tools->addWidget(recheck);
     tools->addStretch();
     tools->addWidget(stop);
     root->addLayout(tools);
@@ -1092,6 +1279,7 @@ QWidget *scenarios(const ui_context &context, QWidget *const parent) {
         remove->setEnabled(has);
         empty->setVisible(!has);
         stop->setEnabled(service->is_scenario_active());
+        check_selected();
     };
     auto run_selected = [=] {
         if (list->currentItem())
@@ -1122,6 +1310,7 @@ QWidget *scenarios(const ui_context &context, QWidget *const parent) {
         status->setText(text);
         run->setEnabled(list->count() > 0 && !service->is_scenario_active());
         stop->setEnabled(service->is_scenario_active());
+        check_selected();
     });
     rebuild();
     return widget;
@@ -1132,6 +1321,7 @@ void register_library_views(UiRegistry &registry) {
     registry.add_default("discovery_progress", discovery_status);
     registry.add_default("navigation", navigation);
     registry.add_default("search_bar", search_bar);
+    registry.add_default("my_files", my_files);
     registry.add_default("library", library);
     registry.add_default("details", details);
     registry.add_default("details_dialog", [](const ui_context &context, QWidget *const parent) {

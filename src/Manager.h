@@ -96,6 +96,7 @@ public:
     void save_tag(const QString &old_name, const QString &new_name);
     void remove_tag(const QString &name);
     void save_scenario(const scenario_record &record);
+    static QStringList scenario_issues(const scenario_record &record, const QVector<app_record> &applications);
     void remove_scenario(qint64 id);
     void export_catalog(const QString &path);
     void import_catalog(const QString &path);
