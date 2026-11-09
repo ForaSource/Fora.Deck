@@ -18,8 +18,8 @@
 #include <QProgressBar>
 #include <QPushButton>
 #include <QResizeEvent>
-#include <QSignalBlocker>
 #include <QScrollBar>
+#include <QSignalBlocker>
 #include <QStackedLayout>
 #include <QStyledItemDelegate>
 #include <QTreeView>

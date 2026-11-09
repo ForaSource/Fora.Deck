@@ -208,8 +208,8 @@ void SearchResults::replace_entries(QVector<search_entry> entries) {
                         {},
                         0});
     }
-    const bool preserve_position = property("rendered_query").isValid() &&
-                                   property("rendered_query").toString() == input.text();
+    const bool preserve_position =
+        property("rendered_query").isValid() && property("rendered_query").toString() == input.text();
     const auto top_index = indexAt(QPoint(0, 0));
     const auto top_entry = top_index.isValid() ? results->entries[top_index.row()] : search_entry{};
     const auto top_offset = top_index.isValid() ? visualRect(top_index).top() : 0;
