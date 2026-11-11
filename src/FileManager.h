@@ -50,7 +50,9 @@ class FileManager : public QObject {
     int pending_saves = 0;
     bool rescan_pending = false;
     QString state;
+    qint64 last_refresh = 0;
     void start_scan();
+    void schedule_refresh();
 
 public:
     explicit FileManager(const QString &profile_directory, const QStringList &saved_paths = {},

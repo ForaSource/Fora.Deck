@@ -48,7 +48,8 @@ DesktopService::DesktopService(QObject *const parent, const QString &profile_pat
     });
     QTimer::singleShot(0, this, [this] {
         files->configure(FileManager::mode_from_setting(settings.value("files/mode", "off").toString()),
-                         settings.value("files/roots").toStringList(), settings.value("files/exclusions").toStringList());
+                         settings.value("files/roots").toStringList(),
+                         settings.value("files/exclusions").toStringList());
     });
     startup_inventory_pending = settings.value("onboarding/completed", false).toBool();
     updates.set_channel(settings.value("updates/channel", "stable").toString());
