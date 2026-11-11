@@ -26,6 +26,7 @@
 #endif
 
 namespace {
+constexpr int refresh_interval_ms = 6 * 60 * 60 * 1000;
 using connection = std::unique_ptr<sqlite3, decltype(&sqlite3_close)>;
 connection open_index(const QString &path) {
     sqlite3 *raw = nullptr;
@@ -259,9 +260,8 @@ void FileManager::configure(const file_search_mode selected_mode, const QStringL
             emit error(QString::fromUtf8(e.what()));
         }
     }
-    constexpr qint64 refresh_interval = 6 * 60 * 60 * 1000;
-    rescan_pending =
-        is_enabled() && (!last_refresh || QDateTime::currentMSecsSinceEpoch() - last_refresh >= refresh_interval);
+    rescan_pending = is_enabled() && (scanning || !last_refresh ||
+                                      QDateTime::currentMSecsSinceEpoch() - last_refresh >= refresh_interval_ms);
     if (!is_enabled()) {
         state = QCoreApplication::translate("XLibrary", "File search is off");
         emit status_changed();
@@ -279,9 +279,10 @@ void FileManager::configure(const file_search_mode selected_mode, const QStringL
 void FileManager::schedule_refresh() {
     if (!is_enabled())
         return;
-    constexpr qint64 interval = 6 * 60 * 60 * 1000;
     const auto elapsed = QDateTime::currentMSecsSinceEpoch() - last_refresh;
-    refresh.start(static_cast<int>(last_refresh ? qBound<qint64>(1, interval - elapsed, interval) : interval));
+    refresh.start(static_cast<int>(last_refresh
+                                       ? std::clamp<qint64>(refresh_interval_ms - elapsed, 1, refresh_interval_ms)
+                                       : refresh_interval_ms));
 }
 void FileManager::rescan() {
     if (scanning || !is_enabled())
@@ -312,6 +313,8 @@ void FileManager::start_scan() {
         }
         if (rescan_pending)
             start_scan();
+        else if (expected == scan_generation->load() && !result.second && is_enabled())
+            refresh.start(refresh_interval_ms);
         else
             schedule_refresh();
     });
@@ -327,9 +330,17 @@ void FileManager::start_scan() {
             for (const auto &volume : QStorageInfo::mountedVolumes())
                 if (!local_volume(volume))
                     blocked_mounts.append(identity(volume.rootPath()));
+#ifndef Q_OS_WIN
+            // Qt may omit virtual filesystems from mountedVolumes().
+            blocked_mounts += QStringList{"/proc", "/sys", "/dev"};
+#endif
             const auto cancelled = [&] { return generation->load() != expected; };
             try {
                 auto db = open_index(path);
+                // Each batch rewrites scope ownership, so other scope timestamps become invalid immediately.
+                xlibrary::SqliteStatement invalidate(db.get(), "DELETE FROM scan_state WHERE scope<>?");
+                invalidate.bind(1, scope);
+                invalidate.next();
                 const auto seen = QDateTime::currentMSecsSinceEpoch();
                 std::deque<QPair<QString, int>> pending;
                 QHash<QString, int> visited;
@@ -384,14 +395,22 @@ void FileManager::start_scan() {
                 while (!pending.empty() && !cancelled()) {
                     const auto [directory, remaining_depth] = std::move(pending.front());
                     pending.pop_front();
-                    if (std::any_of(blocked_mounts.cbegin(), blocked_mounts.cend(),
-                                    [&](const auto &mount) { return contains_path(mount, identity(directory)); }))
+                    const auto directory_path = identity(directory);
+                    if (std::any_of(blocked_mounts.cbegin(), blocked_mounts.cend(), [&](const auto &mount) {
+                            if (!contains_path(mount, directory_path))
+                                return false;
+                            // Local disks can be mounted below a virtual parent, e.g. /run/media.
+                            return !std::any_of(roots.cbegin(), roots.cend(), [&](const auto &root) {
+                                return root.size() > mount.size() && contains_path(mount, root) &&
+                                       contains_path(root, directory_path);
+                            });
+                        }))
                         continue;
                     if (batch_age.elapsed() > 100)
                         flush();
                     auto key = identity(directory);
 #ifndef Q_OS_WIN
-                    struct stat metadata{};
+                    struct stat metadata {};
                     if (::stat(QFile::encodeName(directory).constData(), &metadata) != 0) {
                         ++skipped;
                         continue;
@@ -583,7 +602,8 @@ void FileManager::search(const QString &text, const quint64 request, QObject *re
                         if (cancelled())
                             return QVector<file_match>{};
                         inspected.insert(entry.path);
-                        if (accepts_file(entry.path))
+                        if (accepts_file(entry.path) &&
+                            !excluded_path(exclusions, QFileInfo(entry.path).canonicalFilePath()))
                             matches.append(entry);
                     }
                     // Refill after rejected candidates without reading every matching file's contents.

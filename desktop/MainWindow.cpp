@@ -41,7 +41,8 @@ QWidget *shell(const ui_context &context, QWidget *const parent) {
     auto *body = new QVBoxLayout(center);
     body->setContentsMargins(20, 16, 20, 16);
     body->setSpacing(0);
-    body->addWidget(context.registry->create("search_bar", context, center));
+    auto *search_bar = context.registry->create("search_bar", context, center);
+    body->addWidget(search_bar);
     body->addSpacing(20);
     auto *pages = new QStackedWidget;
     pages->addWidget(context.registry->create("library", context, pages));
@@ -49,6 +50,14 @@ QWidget *shell(const ui_context &context, QWidget *const parent) {
     pages->addWidget(context.registry->create("my_files", context, pages));
     auto *transition = new PageTransition(pages);
     body->addWidget(transition, 1);
+    const auto update_mode = [=] {
+        const auto active = service->file_search_active();
+        transition->setVisible(!active);
+        body->setStretch(0, active ? 1 : 0);
+    };
+    QObject::connect(service->files, &FileManager::configuration_changed, widget, update_mode);
+    QObject::connect(service, &DesktopService::navigation_changed, widget, update_mode);
+    update_mode();
     auto *notice = new NotificationBanner(*context.settings, 20);
     QObject::connect(service, &DesktopService::appearance_changed, notice, &NotificationBanner::refresh_appearance);
     body->addWidget(notice);
@@ -116,6 +125,10 @@ MainWindow::MainWindow(DesktopService &service)
             service.settings.setValue("shortcuts/global", desktop_platform::default_global_shortcut());
         service.settings.setValue("shortcuts/overlay", desktop_platform::default_overlay_shortcut());
     }
+    connect(service.files, &FileManager::configuration_changed, this, [this] {
+        refresh_actions();
+        update_layout();
+    });
     setWindowTitle("XLibrary");
     setWindowIcon(appearance::logo());
     const auto available = screen()->availableGeometry().size() - QSize(32, 64);
@@ -317,10 +330,12 @@ void MainWindow::refresh_actions() {
     for (const auto &id : {"launch", "new_instance", "edit_application", "remove_application", "favorite",
                            "open_folder", "copy_path", "copy_arguments", "details"})
         context.actions.value(id)->setEnabled(profile_available && record != nullptr &&
-                                              service.section() != "scenarios" && service.section() != "files");
+                                              service.section() != "scenarios" && service.section() != "files" &&
+                                              !service.file_search_active());
     auto *new_instance = context.actions.value("new_instance");
     const bool can_start = profile_available && record && record->available && record->new_instance_error.isEmpty();
-    new_instance->setEnabled(can_start && service.section() != "scenarios" && service.section() != "files");
+    new_instance->setEnabled(can_start && service.section() != "scenarios" && service.section() != "files" &&
+                             !service.file_search_active());
     new_instance->setText(QCoreApplication::translate("XLibrary", "Request new instance"));
     new_instance->setToolTip(
         record && !record->new_instance_error.isEmpty()
@@ -330,7 +345,8 @@ void MainWindow::refresh_actions() {
     context.actions.value("add_application")->setEnabled(profile_available && service.is_ready());
     context.actions.value("refresh_availability")->setEnabled(profile_available && service.is_ready());
     context.actions.value("bulk_edit")
-        ->setEnabled(profile_available && service.is_ready() && !service.selections().isEmpty());
+        ->setEnabled(profile_available && service.is_ready() && !service.file_search_active() &&
+                     !service.selections().isEmpty());
     context.actions.value("undo_removal")
         ->setEnabled(profile_available && service.can_undo_removal() && !service.is_scenario_active());
     context.actions.value("add_tag")->setEnabled(profile_available && service.is_ready());
@@ -445,7 +461,8 @@ void MainWindow::update_layout() {
     if (centralWidget())
         for (auto *splitter : centralWidget()->findChildren<QSplitter *>("library_splitter"))
             if (auto *library = dynamic_cast<LibrarySplitter *>(splitter))
-                library->update_layout(service.section() != "scenarios" && service.section() != "files");
+                library->update_layout(service.section() != "scenarios" && service.section() != "files" &&
+                                       !service.file_search_active());
 }
 
 void MainWindow::show_library() {

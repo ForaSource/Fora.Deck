@@ -245,6 +245,15 @@ QWidget *navigation(const ui_context &context, QWidget *const parent) {
         item->setIcon(appearance::icon(link[2]));
         item->setProperty("navigation_section", link[0]);
         item->setChecked(link[0] == "library");
+        if (link[0] == "library") {
+            const auto update_mode = [=] {
+                item->setText(service->files->is_enabled() ? QCoreApplication::translate("XLibrary", "Files")
+                                                           : QCoreApplication::translate("XLibrary", "Library"));
+                item->setIcon(appearance::icon(service->files->is_enabled() ? "file" : "library"));
+            };
+            QObject::connect(service->files, &FileManager::configuration_changed, widget, update_mode);
+            update_mode();
+        }
         item->setMinimumHeight(30);
         group->addButton(item);
         layout->addWidget(item);
@@ -476,14 +485,25 @@ QWidget *search_bar(const ui_context &context, QWidget *const parent) {
     auto *settings = action_button(context.actions.value("settings"), false, "");
     settings->setAccessibleName(QCoreApplication::translate("XLibrary", "Settings"));
     settings->setFixedWidth(44);
-    auto *files = file_search_switch(true, widget);
-    layout->addWidget(files);
     layout->addWidget(settings);
+    auto *heading = label(QCoreApplication::translate("XLibrary", "Files"), "heading");
+    root->addWidget(heading);
     auto *results = new SearchResults(*service, *search, false, widget);
-    results->set_files_enabled(true);
-    QObject::connect(files, &QAbstractButton::toggled, results, &SearchResults::set_files_enabled);
     root->addWidget(results);
-    root->addWidget(search_tools(*service, *search, widget));
+    auto *tools = search_tools(*service, *search, widget);
+    root->addWidget(tools);
+    const auto update_mode = [=] {
+        const auto active = service->file_search_active();
+        heading->setVisible(active);
+        tools->setVisible(!active);
+        root->setStretch(2, active ? 1 : 0);
+        search->setToolTip(active ? QCoreApplication::translate("XLibrary", "Search indexed files by filename")
+                                  : QCoreApplication::translate(
+                                        "XLibrary", "#tag includes a tag; -#tag excludes it. All conditions apply."));
+    };
+    QObject::connect(service->files, &FileManager::configuration_changed, widget, update_mode);
+    QObject::connect(service, &DesktopService::navigation_changed, widget, update_mode);
+    update_mode();
     return widget;
 }
 

@@ -7,7 +7,4 @@ class QWidget;
 
 QWidget *search_tools(DesktopService &service, QLineEdit &input, QWidget *parent);
 
-class QAbstractButton;
-QAbstractButton *file_search_switch(bool enabled, QWidget *parent);
-
 #endif

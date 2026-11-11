@@ -1,11 +1,8 @@
-#include <QAbstractButton>
 #include <QComboBox>
 #include <QDialogButtonBox>
 #include <QLineEdit>
-#include <QPainter>
 #include <QRegularExpression>
 #include <QSignalBlocker>
-#include <QVariantAnimation>
 
 #include "DesktopService.h"
 #include "PlatformIntegration.h"
@@ -237,71 +234,4 @@ QWidget *search_tools(DesktopService &service, QLineEdit &input, QWidget *const 
     });
     refresh();
     return widget;
-}
-
-namespace {
-class FileSearchSwitch : public QAbstractButton {
-    QVariantAnimation motion;
-    qreal progress;
-
-public:
-    FileSearchSwitch(const bool enabled, QWidget *parent)
-        : QAbstractButton(parent), motion(this), progress(enabled ? 1 : 0) {
-        setObjectName("file_search_switch");
-        setText(QCoreApplication::translate("XLibrary", "Files"));
-        setAccessibleName(QCoreApplication::translate("XLibrary", "Search working files"));
-        setToolTip(accessibleName());
-        setCheckable(true);
-        setChecked(enabled);
-        setCursor(Qt::PointingHandCursor);
-        setFocusPolicy(Qt::StrongFocus);
-        setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
-        motion.setDuration(170);
-        motion.setEasingCurve(QEasingCurve::OutCubic);
-        connect(&motion, &QVariantAnimation::valueChanged, this, [this](const QVariant &value) {
-            progress = value.toReal();
-            update();
-        });
-        connect(this, &QAbstractButton::toggled, this, [this](bool checked) {
-            motion.stop();
-            if (!desktop_platform::animations_enabled() || !isVisible()) {
-                progress = checked ? 1 : 0;
-                update();
-                return;
-            }
-            motion.setStartValue(progress);
-            motion.setEndValue(checked ? 1.0 : 0.0);
-            motion.start();
-        });
-    }
-    QSize sizeHint() const override {
-        return {fontMetrics().horizontalAdvance(text()) + 66, qMax(34, fontMetrics().height() + 14)};
-    }
-    void paintEvent(QPaintEvent *) override {
-        QPainter painter(this);
-        painter.setRenderHint(QPainter::Antialiasing);
-        const auto foreground = palette().color(isEnabled() ? QPalette::Active : QPalette::Disabled, QPalette::Text);
-        painter.setPen(foreground);
-        painter.drawText(rect().adjusted(8, 0, -50, 0), Qt::AlignVCenter | Qt::AlignLeft, text());
-        const QRectF track(width() - 44, (height() - 22) / 2.0, 38, 22);
-        auto base = palette().color(QPalette::Mid);
-        const auto accent = palette().color(QPalette::Highlight);
-        base.setRedF(base.redF() * (1 - progress) + accent.redF() * progress);
-        base.setGreenF(base.greenF() * (1 - progress) + accent.greenF() * progress);
-        base.setBlueF(base.blueF() * (1 - progress) + accent.blueF() * progress);
-        painter.setPen(Qt::NoPen);
-        painter.setBrush(base);
-        painter.drawRoundedRect(track, 11, 11);
-        painter.setBrush(Qt::white);
-        painter.drawEllipse(QRectF(track.left() + 3 + progress * 16, track.top() + 3, 16, 16));
-        if (hasFocus()) {
-            painter.setBrush(Qt::NoBrush);
-            painter.setPen(QPen(accent, 2));
-            painter.drawRoundedRect(QRectF(rect()).adjusted(1, 1, -1, -1), 8, 8);
-        }
-    }
-};
-}
-QAbstractButton *file_search_switch(const bool enabled, QWidget *parent) {
-    return new FileSearchSwitch(enabled, parent);
 }

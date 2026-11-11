@@ -77,10 +77,13 @@ Use a disposable profile and a small folder of documents, images, unsupported ex
 
 1. Check names, aliases, tag combinations, exclusions, initials, typo suggestions, and English/Russian layout correction in both search surfaces.
    Compare match categories and positions before checking favorites and usage ordering. Clear the query and sidebar filters when checking the full catalog.
-2. Set a custom file-search folder, save, and refresh the index. Check plain names, extension filters, `*.pdf` and `report-??.txt` masks;
+2. Enable Basic file search, add an additional recursive folder and file/folder exclusions, save, and refresh the index. Check plain names, extension filters, `*.pdf` and `report-??.txt` masks;
    excluded files must stay absent, and an empty query must not show indexed files.
-3. Toggle file results off during scanning, then back on. Indexing should continue. Change the query and folder scope while work is pending;
-   old results must not overwrite the new query or scope.
+3. Switch file search Off during scanning, then back to Basic or Full. Off must stop indexing; enabled modes must resume it. Change the query and folder scope while work is pending;
+   old results must not overwrite the new query or scope. Check Basic depth limits and recursive standard/additional folders.
+   Confirm Full is marked not recommended, the main Files workspace and quick search show no application results, and the input has no file switch.
+   Search during scanning and keep a query open: progress and application discovery must not move its results.
+   Restart after a completed scan: the cached index must be searchable without another scan before six hours; manual refresh must bypass the interval.
 4. Save a result to My files, restart, and check persistence. Removing it from My files must keep the disk file.
    Open files to check usage ordering, then clear usage history. Restore a full profile backup and confirm saved paths and history return.
 5. Check keyboard result actions, calculator copying, and direct folder browsing separately from indexed search.

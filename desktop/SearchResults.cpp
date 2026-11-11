@@ -132,6 +132,8 @@ SearchResults::SearchResults(DesktopService &service, QLineEdit &input, const bo
     });
     connect(&service.model, &QAbstractItemModel::dataChanged, viewport(), qOverload<>(&QWidget::update));
     connect(&service, &DesktopService::catalog_changed, this, [this] {
+        if (files_enabled)
+            return;
         if (special) {
             update_query();
             return;
@@ -162,7 +164,7 @@ SearchResults::SearchResults(DesktopService &service, QLineEdit &input, const bo
             auto entries = path_watcher.result();
             // Resolve library identities in memory on the GUI thread, preserving launch configurations.
             QHash<QString, qint64> known;
-            if (this->compact)
+            if (this->compact && !files_enabled)
                 for (const auto &record : this->service.model.applications()) {
                     const auto path = normalized_path(record.path);
                     // A file path cannot identify which arguments or working directory the user wants.
@@ -187,11 +189,12 @@ SearchResults::SearchResults(DesktopService &service, QLineEdit &input, const bo
         if (!action_menu)
             update_query();
     });
-    connect(service.files, &FileManager::index_updated, this, [this] {
-        if (!action_menu && !pending_file_queries && files_enabled && !special &&
-            !this->input.text().trimmed().isEmpty())
-            file_delay.start();
-    });
+    const auto configure_files = [this] {
+        set_files_enabled(this->service.files->is_enabled() && (this->compact || this->service.file_search_active()));
+    };
+    connect(service.files, &FileManager::configuration_changed, this, configure_files);
+    connect(&service, &DesktopService::navigation_changed, this, configure_files);
+    configure_files();
     update_query();
 }
 
@@ -201,7 +204,12 @@ SearchResults::~SearchResults() {
 }
 
 void SearchResults::replace_entries(QVector<search_entry> entries) {
-    if (entries.isEmpty() && (special || (compact && !input.text().trimmed().isEmpty()))) {
+    if (entries.isEmpty() && files_enabled && input.text().trimmed().isEmpty())
+        entries.append({search_entry::kind::message,
+                        QCoreApplication::translate("XLibrary", "Enter a filename to search indexed files"),
+                        {},
+                        0});
+    if (entries.isEmpty() && (special || files_enabled || (compact && !input.text().trimmed().isEmpty()))) {
         const auto hint = special ? QString{} : SearchQuery(input.text()).tag_hint(service.catalog().tags);
         entries.append({search_entry::kind::message,
                         hint.isEmpty() ? QCoreApplication::translate("XLibrary", "No results") : hint,
@@ -228,8 +236,15 @@ void SearchResults::replace_entries(QVector<search_entry> entries) {
             }
     setCurrentIndex(results->index(selected, 0));
     const auto rows = qMin(results->rowCount(), 5);
-    setFixedHeight(rows * appearance::scaled(service.settings, 52) + (rows ? 4 : 0));
-    setVisible(rows > 0);
+    if (!compact && files_enabled) {
+        setMinimumHeight(0);
+        setMaximumHeight(QWIDGETSIZE_MAX);
+        setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+        setVisible(true);
+    } else {
+        setFixedHeight(rows * appearance::scaled(service.settings, 52) + (rows ? 4 : 0));
+        setVisible(rows > 0);
+    }
     if (preserve_position) {
         doItemsLayout();
         verticalScrollBar()->setValue(scroll_position);
@@ -338,7 +353,7 @@ void SearchResults::update_query() {
         if (!files_enabled || text.isEmpty())
             file_matches.clear();
         application_entries.clear();
-        if (compact)
+        if (compact && !files_enabled)
             update_applications();
         update_entries();
         if (files_enabled && !text.isEmpty())
@@ -347,16 +362,17 @@ void SearchResults::update_query() {
 }
 
 void SearchResults::set_files_enabled(const bool enabled) {
+    if (files_enabled == enabled)
+        return;
     files_enabled = enabled;
+    file_matches.clear();
     update_query();
 }
 void SearchResults::update_files() {
     const auto expected = generation->load();
-    ++pending_file_queries;
     service.files->search(
         input.text(), expected, this,
         [this](quint64 request, QVector<file_match> matches) {
-            --pending_file_queries;
             if (request != generation->load() || !files_enabled)
                 return;
             file_matches = std::move(matches);
@@ -412,14 +428,14 @@ void SearchResults::read_path() {
     // Only one disk request is active per field; newer input replaces the pending request.
     auto usage = service.catalog().file_usage;
     QSet<QString> favorites;
-    if (compact)
+    if (compact && !files_enabled)
         for (const auto &record : service.model.applications()) {
             usage.insert(normalized_path(record.path), {record.launch_count, record.last_launch});
             if (record.favorite)
                 favorites.insert(normalized_path(record.path));
         }
     path_watcher.setFuture(QtConcurrent::run(search_results::directory_entries, active_path, generation,
-                                             active_generation, usage, favorites, !compact));
+                                             active_generation, usage, favorites, !compact || files_enabled));
 }
 
 void SearchResults::activate_current() {

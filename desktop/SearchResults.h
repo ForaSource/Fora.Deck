@@ -140,7 +140,6 @@ class SearchResults : public QListView {
     bool special = false;
     bool files_enabled = false;
     QTimer file_delay;
-    int pending_file_queries = 0;
     QVector<search_entry> application_entries;
     QVector<file_match> file_matches;
     void update_files();

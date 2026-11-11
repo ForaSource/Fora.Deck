@@ -77,7 +77,6 @@ public:
 signals:
     void changed();
     void configuration_changed();
-    void index_updated();
     void busy_changed();
     void saved_paths_changed(const QStringList &paths);
     void status_changed();

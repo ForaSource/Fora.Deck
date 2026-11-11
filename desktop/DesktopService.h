@@ -187,6 +187,9 @@ public:
     void preview_files(const QStringList &paths);
     void clear_discovery_exclusions();
     QString section() const { return current_section; }
+    bool file_search_active() const {
+        return files->is_enabled() && current_section == "library" && current_tag.isEmpty();
+    }
     QString tag() const { return current_tag; }
     Q_INVOKABLE void select(qint64 id);
     Q_INVOKABLE void navigate(const QString &section, const QString &tag = {});

@@ -66,7 +66,7 @@ To build from source, start with [BUILDING.md](BUILDING.md).
 3. Open quick search with <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>Space</kbd>, type a name, and press <kbd>Enter</kbd>.
    On Wayland, configure a shortcut first; see [Linux setup](docs/usage.md#linux-setup).
 
-Try `code`, `#dev code`, or `#work -#games`. Turn on file search to find `*.pdf`, or enter `(2 + 3) * 4` to calculate and copy a result.
+Try `code`, `#dev code`, or `#work -#games`. Enable file search in Settings to find `*.pdf`, or enter `(2 + 3) * 4` to calculate and copy a result.
 The full library opens with <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>Shift</kbd> + <kbd>Space</kbd>.
 Shortcuts can be changed in settings, and XLibrary must be running for its built-in global shortcuts.
 
