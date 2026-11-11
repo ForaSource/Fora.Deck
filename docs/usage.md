@@ -62,9 +62,13 @@ Deleting an application or scenario removes its assignment. Complete profile bac
 
 ## File search and My files
 
-File search is **Off** by default. Enable it in **Settings → File search**; there is no switch beside the search field.
-When enabled, quick search shows files instead of applications, and **Files** replaces the main **Library** workspace.
+File search is **Off** by default. Enable it in **Settings → File search** to reveal the **Files** switch beside
+the search field in the main window and quick search. The switch selects either applications (off) or files (on);
+the two result types are never mixed. Both windows share the selection, starting with applications.
+Selecting files opens the main **Files** workspace instead of the application list.
+The details pane keeps its width and shows “Nothing to display here :(” in file mode or when no application is selected.
 Favorites, running applications, tags, scenarios and My files remain available as separate sections.
+Opening one of these sections returns search to applications. Disabling file search hides the switch and shows applications.
 An empty query prompts for a filename. The file workspace uses the full available height.
 
 Search supports filenames, layout correction, typo suggestions, and extension filters such as `.pdf` or `report.pdf`.
@@ -104,10 +108,10 @@ Enter arithmetic such as `2+3*4`, `sqrt(81)`, `√(16)`, `2^8`, `2**8`, or `(12+
 Enter copies the result. Operators include `+ - * / % ^`; powers associate to the right.
 Division by zero, non-real results, and incomplete expressions do not produce a number.
 
-Quick search also accepts absolute folder paths, `~/`, `%USERPROFILE%`, and `$HOME/`.
-Folder browsing in the main workspace requires an enabled file-search mode. Results show direct children, including hidden entries;
+With the **Files** switch on, both search surfaces accept absolute folder paths, `~/`, `%USERPROFILE%`, and `$HOME/`.
+Folder browsing requires an enabled file-search mode. Results show direct children, including hidden entries;
 a partial final filename filters that folder. Enter on a folder browses it; Enter on a file opens its system handler.
-Registered applications in quick-search folder results use their library launch configuration.
+Folder results include working files and folders; applications remain in application search.
 Directory reads run in the background, but slow disks or network shares can delay results.
 
 ## Launch scenarios and browser profiles

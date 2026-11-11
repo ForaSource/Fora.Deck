@@ -461,8 +461,7 @@ void MainWindow::update_layout() {
     if (centralWidget())
         for (auto *splitter : centralWidget()->findChildren<QSplitter *>("library_splitter"))
             if (auto *library = dynamic_cast<LibrarySplitter *>(splitter))
-                library->update_layout(service.section() != "scenarios" && service.section() != "files" &&
-                                       !service.file_search_active());
+                library->update_layout(service.section() != "scenarios" && service.section() != "files");
 }
 
 void MainWindow::show_library() {

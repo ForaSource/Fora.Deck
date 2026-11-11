@@ -13,10 +13,13 @@ a surface; spacing and thin dividers separate groups. Primary launch actions use
 tone and placement for emphasis. Status color belongs to a small indicator or
 message, with text describing the state.
 
-When file search is enabled, the main Files workspace replaces the application
-list and details with a file-only result list that fills the available height.
+When file search is enabled and selected, the main Files workspace replaces the application
+list with a file-only result list that fills the available height.
+The details pane keeps its width and shows “Nothing to display here :(” in file mode or when no application is selected,
+so switching between applications and files does not move the search controls.
 Application-specific sections, including tags, remain available separately.
-The search field has no file toggle; indexing mode belongs to Settings.
+Both search fields show the shared Files switch only while indexing mode is Basic or Full.
+The switch selects applications or files exclusively; indexing mode belongs to Settings.
 
 The compact launcher has a search field, a button to open the full library and
 the results relevant to the query. Its height follows its contents. Application

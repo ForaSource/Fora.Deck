@@ -640,11 +640,11 @@ QWidget *about(const ui_context &context, QWidget *) {
     card_layout->addWidget(documentation);
     card_layout->addWidget(copy);
     QObject::connect(github, &QPushButton::clicked, widget,
-                     [] { desktop_platform::open_url(QUrl("https://github.com/lappland-open/XLibrary")); });
+                     [] { desktop_platform::open_url(QUrl("https://github.com/ForaSource/Fora.Deck")); });
     QObject::connect(issues, &QPushButton::clicked, widget,
-                     [] { desktop_platform::open_url(QUrl("https://github.com/lappland-open/XLibrary/issues")); });
+                     [] { desktop_platform::open_url(QUrl("https://github.com/ForaSource/Fora.Deck/issues")); });
     QObject::connect(documentation, &QPushButton::clicked, widget, [] {
-        desktop_platform::open_url(QUrl("https://github.com/lappland-open/XLibrary/blob/main/README.md"));
+        desktop_platform::open_url(QUrl("https://github.com/ForaSource/Fora.Deck/blob/main/README.md"));
     });
     QObject::connect(copy, &QPushButton::clicked, widget, [=] {
         const auto text =

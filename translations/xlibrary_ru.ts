@@ -416,6 +416,10 @@
         <translation>Выберите приложение</translation>
     </message>
     <message>
+        <source>Nothing to display here :(</source>
+        <translation>Здесь пока ничего нет :(</translation>
+    </message>
+    <message>
         <source>Applications (*.exe *.lnk *.bat *.cmd);;All files (*)</source>
         <translation>Приложения (*.exe *.lnk *.bat *.cmd);;Все файлы (*)</translation>
     </message>

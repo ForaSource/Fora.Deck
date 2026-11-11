@@ -104,6 +104,7 @@ private:
     qint64 selected_id = 0;
     QString current_section = "library";
     QString current_tag;
+    bool files_selected = false;
     catalog_snapshot snapshot;
     quint64 begin_operation(const QString &operation);
     void publish_result(const operation_result &result);
@@ -187,8 +188,10 @@ public:
     void preview_files(const QStringList &paths);
     void clear_discovery_exclusions();
     QString section() const { return current_section; }
+    bool searching_files() const { return files->is_enabled() && files_selected; }
+    void set_searching_files(bool selected);
     bool file_search_active() const {
-        return files->is_enabled() && current_section == "library" && current_tag.isEmpty();
+        return searching_files() && current_section == "library" && current_tag.isEmpty();
     }
     QString tag() const { return current_tag; }
     Q_INVOKABLE void select(qint64 id);

@@ -161,25 +161,7 @@ SearchResults::SearchResults(DesktopService &service, QLineEdit &input, const bo
     connect(&path_watcher, &QFutureWatcher<QVector<search_entry>>::finished, this, [this] {
         path_busy = false;
         if (active_generation == generation->load() && special && search_query::is_path(this->input.text())) {
-            auto entries = path_watcher.result();
-            // Resolve library identities in memory on the GUI thread, preserving launch configurations.
-            QHash<QString, qint64> known;
-            if (this->compact && !files_enabled)
-                for (const auto &record : this->service.model.applications()) {
-                    const auto path = normalized_path(record.path);
-                    // A file path cannot identify which arguments or working directory the user wants.
-                    if (known.contains(path))
-                        known[path] = 0;
-                    else
-                        known.insert(path, record.id);
-                }
-            for (auto &entry : entries)
-                if (entry.type == search_entry::kind::file) {
-                    entry.application_id = known.value(normalized_path(entry.path));
-                    if (entry.application_id)
-                        entry.type = search_entry::kind::application;
-                }
-            replace_entries(std::move(entries));
+            replace_entries(path_watcher.result());
         }
         if (!pending_path.isEmpty())
             read_path();
@@ -190,7 +172,7 @@ SearchResults::SearchResults(DesktopService &service, QLineEdit &input, const bo
             update_query();
     });
     const auto configure_files = [this] {
-        set_files_enabled(this->service.files->is_enabled() && (this->compact || this->service.file_search_active()));
+        set_files_enabled(this->compact ? this->service.searching_files() : this->service.file_search_active());
     };
     connect(service.files, &FileManager::configuration_changed, this, configure_files);
     connect(&service, &DesktopService::navigation_changed, this, configure_files);
@@ -329,7 +311,7 @@ void SearchResults::update_query() {
     ++*generation;
     pending_path.clear();
     const auto text = input.text().trimmed();
-    special = (compact || files_enabled) && search_query::is_path(text);
+    special = files_enabled && search_query::is_path(text);
     if (special) {
         file_matches.clear();
         pending_path = search_query::expanded_path(text);
@@ -382,13 +364,17 @@ void SearchResults::update_files() {
 }
 
 void SearchResults::update_entries() {
-    // Refine the last completed file search while its replacement is still pending.
-    const auto matches = FileManager::filter_matches(input.text(), file_matches);
-    if (matches.isEmpty()) {
+    if (!files_enabled) {
         replace_entries(compact ? application_entries : QVector<search_entry>{});
         return;
     }
-    auto entries = application_entries;
+    // Refine the last completed file search while its replacement is still pending.
+    const auto matches = FileManager::filter_matches(input.text(), file_matches);
+    if (matches.isEmpty()) {
+        replace_entries({});
+        return;
+    }
+    QVector<search_entry> entries;
     for (const auto &match : matches)
         entries.append({search_entry::kind::working_file,
                         (match.saved ? QStringLiteral("★ ") : QString{}) + match.name + QStringLiteral(" · ") +
@@ -428,14 +414,8 @@ void SearchResults::read_path() {
     // Only one disk request is active per field; newer input replaces the pending request.
     auto usage = service.catalog().file_usage;
     QSet<QString> favorites;
-    if (compact && !files_enabled)
-        for (const auto &record : service.model.applications()) {
-            usage.insert(normalized_path(record.path), {record.launch_count, record.last_launch});
-            if (record.favorite)
-                favorites.insert(normalized_path(record.path));
-        }
     path_watcher.setFuture(QtConcurrent::run(search_results::directory_entries, active_path, generation,
-                                             active_generation, usage, favorites, !compact || files_enabled));
+                                             active_generation, usage, favorites, true));
 }
 
 void SearchResults::activate_current() {

@@ -1,6 +1,6 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: XLibrary
-Source: https://github.com/lappland-open/XLibrary
+Source: https://github.com/ForaSource/Fora.Deck
 
 Files: *
 Copyright: 2026 lappland-open

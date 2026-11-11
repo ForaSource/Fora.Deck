@@ -81,7 +81,12 @@ Use a disposable profile and a small folder of documents, images, unsupported ex
    excluded files must stay absent, and an empty query must not show indexed files.
 3. Switch file search Off during scanning, then back to Basic or Full. Off must stop indexing; enabled modes must resume it. Change the query and folder scope while work is pending;
    old results must not overwrite the new query or scope. Check Basic depth limits and recursive standard/additional folders.
-   Confirm Full is marked not recommended, the main Files workspace and quick search show no application results, and the input has no file switch.
+   Confirm Full is marked not recommended. The Files switch must appear in both search surfaces only in Basic and Full.
+   Toggle it with a query and a pending file request: off shows only applications, on shows only files, and both windows stay synchronized.
+   In file mode, the main workspace hides application rows and keeps the details pane with “Nothing to display here :(”.
+   Check the same placeholder with an empty application list; switching modes must not move the Files switch.
+   Disable indexing while files are selected:
+   both switches must disappear and application search must return. Re-enable indexing and check the switch again.
    Search during scanning and keep a query open: progress and application discovery must not move its results.
    Restart after a completed scan: the cached index must be searchable without another scan before six hours; manual refresh must bypass the interval.
 4. Save a result to My files, restart, and check persistence. Removing it from My files must keep the disk file.

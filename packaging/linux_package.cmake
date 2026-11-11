@@ -47,7 +47,7 @@ set(CPACK_PACKAGE_VERSION "${XLIBRARY_RELEASE_VERSION}")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Application launcher and organizer")
 set(CPACK_PACKAGE_DESCRIPTION
         "XLibrary organizes desktop applications, tags and launch scenarios in a Qt interface.")
-set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/lappland-open/XLibrary")
+set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/ForaSource/Fora.Deck")
 set(CPACK_RESOURCE_FILE_LICENSE "${PROJECT_SOURCE_DIR}/LICENSE")
 set(CPACK_GENERATOR "DEB")
 set(CPACK_PACKAGING_INSTALL_PREFIX "/usr")

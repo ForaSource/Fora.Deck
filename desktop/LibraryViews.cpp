@@ -247,11 +247,12 @@ QWidget *navigation(const ui_context &context, QWidget *const parent) {
         item->setChecked(link[0] == "library");
         if (link[0] == "library") {
             const auto update_mode = [=] {
-                item->setText(service->files->is_enabled() ? QCoreApplication::translate("XLibrary", "Files")
-                                                           : QCoreApplication::translate("XLibrary", "Library"));
-                item->setIcon(appearance::icon(service->files->is_enabled() ? "file" : "library"));
+                item->setText(service->searching_files() ? QCoreApplication::translate("XLibrary", "Files")
+                                                         : QCoreApplication::translate("XLibrary", "Library"));
+                item->setIcon(appearance::icon(service->searching_files() ? "file" : "library"));
             };
             QObject::connect(service->files, &FileManager::configuration_changed, widget, update_mode);
+            QObject::connect(service, &DesktopService::navigation_changed, widget, update_mode);
             update_mode();
         }
         item->setMinimumHeight(30);
@@ -485,6 +486,7 @@ QWidget *search_bar(const ui_context &context, QWidget *const parent) {
     auto *settings = action_button(context.actions.value("settings"), false, "");
     settings->setAccessibleName(QCoreApplication::translate("XLibrary", "Settings"));
     settings->setFixedWidth(44);
+    layout->addWidget(file_search_switch(*service, widget));
     layout->addWidget(settings);
     auto *heading = label(QCoreApplication::translate("XLibrary", "Files"), "heading");
     root->addWidget(heading);
@@ -495,7 +497,6 @@ QWidget *search_bar(const ui_context &context, QWidget *const parent) {
     const auto update_mode = [=] {
         const auto active = service->file_search_active();
         heading->setVisible(active);
-        tools->setVisible(!active);
         root->setStretch(2, active ? 1 : 0);
         search->setToolTip(active ? QCoreApplication::translate("XLibrary", "Search indexed files by filename")
                                   : QCoreApplication::translate(
@@ -1048,8 +1049,22 @@ QWidget *details(const ui_context &context, QWidget *const parent) {
     remove->setProperty("danger", true);
     root->addWidget(remove);
     root->addStretch();
+    auto *container = new QWidget;
+    container->setProperty("panel", true);
+    auto *pages = new QStackedLayout(container);
+    pages->setContentsMargins(0, 0, 0, 0);
+    pages->addWidget(contents);
+    auto *empty = new QWidget;
+    auto *empty_layout = new QVBoxLayout(empty);
+    empty_layout->setContentsMargins(20, 24, 20, 24);
+    auto *empty_text = label(QCoreApplication::translate("XLibrary", "Nothing to display here :("), "heading");
+    empty_text->setProperty("muted", true);
+    empty_text->setAlignment(Qt::AlignCenter);
+    empty_layout->addWidget(empty_text, 1);
+    pages->addWidget(empty);
     auto update = [=] {
-        const auto *record = service->selected();
+        const auto *record = service->file_search_active() ? nullptr : service->selected();
+        pages->setCurrentWidget(record ? contents : empty);
         name->setText(record ? record->name : QCoreApplication::translate("XLibrary", "Select an application"));
         status->setText(record ? record->running     ? QCoreApplication::translate("XLibrary", "● Running")
                                  : record->available ? QCoreApplication::translate("XLibrary", "Not running")
@@ -1108,12 +1123,13 @@ QWidget *details(const ui_context &context, QWidget *const parent) {
             update();
     });
     QObject::connect(service, &DesktopService::selection_changed, contents, update);
+    QObject::connect(service, &DesktopService::navigation_changed, contents, update);
     QObject::connect(service, &DesktopService::profile_state_changed, contents, update);
     QObject::connect(service, &DesktopService::discovery_changed, contents, update);
     QObject::connect(service, &DesktopService::scenario_changed, contents, [=] { update(); });
     QObject::connect(&service->model, &QAbstractItemModel::dataChanged, contents, [=] { update(); });
     update();
-    auto *result = scroll(contents);
+    auto *result = scroll(container);
     result->setParent(parent);
     result->setProperty("panel", true);
     return result;
