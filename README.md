@@ -9,8 +9,8 @@
 <p align="center"><strong>Your apps, organized your way.</strong></p>
 
 <p align="center">
-  <a href="https://github.com/lappland-open/XLibrary/actions/workflows/windows-build.yml"><img src="https://github.com/lappland-open/XLibrary/actions/workflows/windows-build.yml/badge.svg" alt="Windows build"></a>
-  <a href="https://github.com/lappland-open/XLibrary/actions/workflows/linux-build.yml"><img src="https://github.com/lappland-open/XLibrary/actions/workflows/linux-build.yml/badge.svg" alt="Linux build"></a>
+  <a href="https://github.com/ForaSource/Fora.Deck/actions/workflows/windows-build.yml"><img src="https://github.com/ForaSource/Fora.Deck/actions/workflows/windows-build.yml/badge.svg" alt="Windows build"></a>
+  <a href="https://github.com/ForaSource/Fora.Deck/actions/workflows/linux-build.yml"><img src="https://github.com/ForaSource/Fora.Deck/actions/workflows/linux-build.yml/badge.svg" alt="Linux build"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-68717C" alt="License: MIT"></a>
   <img src="https://img.shields.io/badge/platform-Windows%20%2F%20Linux-68717C" alt="Platform: Windows and Linux">
 </p>
@@ -48,7 +48,7 @@ Your catalog and settings stay on your computer. The interface supports English 
 
 ## Get XLibrary
 
-Download a package from [GitHub Releases](https://github.com/lappland-open/XLibrary/releases).
+Download a package from [GitHub Releases](https://github.com/ForaSource/Fora.Deck/releases).
 Pre-releases are development builds; read the release notes before upgrading.
 
 | Platform | Package |
@@ -66,7 +66,7 @@ To build from source, start with [BUILDING.md](BUILDING.md).
 3. Open quick search with <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>Space</kbd>, type a name, and press <kbd>Enter</kbd>.
    On Wayland, configure a shortcut first; see [Linux setup](docs/usage.md#linux-setup).
 
-Try `code`, `#dev code`, or `#work -#games`. Turn on file search to find `*.pdf`, or enter `(2 + 3) * 4` to calculate and copy a result.
+Try `code`, `#dev code`, or `#work -#games`. Enable file search in Settings to find `*.pdf`, or enter `(2 + 3) * 4` to calculate and copy a result.
 The full library opens with <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>Shift</kbd> + <kbd>Space</kbd>.
 Shortcuts can be changed in settings, and XLibrary must be running for its built-in global shortcuts.
 
@@ -76,8 +76,8 @@ See the [user guide](docs/usage.md) for search, file indexing, shortcuts, and sc
 
 Bug reports, interface feedback, documentation improvements, and focused pull requests are welcome.
 
-- [Report a bug](https://github.com/lappland-open/XLibrary/issues/new) with reproduction steps, your OS and desktop session, and relevant screenshots.
-- [Suggest an improvement](https://github.com/lappland-open/XLibrary/issues) and describe the workflow it would help with. Discuss larger changes before implementing them.
+- [Report a bug](https://github.com/ForaSource/Fora.Deck/issues/new) with reproduction steps, your OS and desktop session, and relevant screenshots.
+- [Suggest an improvement](https://github.com/ForaSource/Fora.Deck/issues) and describe the workflow it would help with. Discuss larger changes before implementing them.
 - For code contributions, read the [architecture](docs/architecture.md), [build instructions](BUILDING.md), and [verification guide](docs/testing.md).
 
 XLibrary is built with C++23, Qt 6 Widgets, and SQLite. See the [documentation index](docs/README.md) for technical guides.

@@ -62,24 +62,40 @@ Deleting an application or scenario removes its assignment. Complete profile bac
 
 ## File search and My files
 
-The file switch includes indexed working files in search. It starts on in the full library and off in quick search.
-An empty query does not show indexed files. Files remain separate from application cards, tags, favorites, and scenarios.
+File search is **Off** by default. Enable it in **Settings → File search** to reveal the **Files** switch beside
+the search field in the main window and quick search. The switch selects either applications (off) or files (on);
+the two result types are never mixed. Both windows share the selection, starting with applications.
+Selecting files opens the main **Files** workspace instead of the application list.
+The details pane keeps its width and shows “Nothing to display here :(” in file mode or when no application is selected.
+Favorites, running applications, tags, scenarios and My files remain available as separate sections.
+Opening one of these sections returns search to applications. Disabling file search hides the switch and shows applications.
+An empty query prompts for a filename. The file workspace uses the full available height.
 
 Search supports filenames, layout correction, typo suggestions, and extension filters such as `.pdf` or `report.pdf`.
 Filename masks use `*` for any number of characters and `?` for one: `*.pdf`, `report-??.txt`.
 Other mask characters are literal. Matching files show their folder to distinguish identical names.
 Saved files and frequently opened files receive priority within comparable search matches.
 
-In **Settings → File search**:
+In **Settings → File search**, select a mode and choose **Save**:
 
-- An empty folder list means all accessible local drives. Add folders or drives to restrict the scope, then choose **Save**.
-- **Search all drives** clears the custom list. Network locations require an explicitly added folder.
-- **Refresh file index** starts another scan; status appears on the same page. The index also refreshes every 15 minutes.
+- **Off** stops indexing and automatic refreshes.
+- **Basic** indexes Desktop, Documents and Downloads recursively. Other accessible local drives are checked at their root
+  and one directory level below it (`max-depth=1`).
+- **Full (not recommended)** checks all accessible local drives recursively, including system, hidden and build folders.
+  This can take a long time.
+- **Additional recursive folders** extend the recursive scope in either enabled mode.
+- **Excluded folders and files** are checked after selecting the scope. Exclusions always win, including inside additional folders;
+  excluding a folder prunes its whole subtree. They also hide matching saved paths from indexed search without deleting saved entries.
 
-Indexing continues in the background when the search switch is off. Results appear as the index fills;
-unavailable locations are skipped. Supported formats include documents, spreadsheets, images, design files, and media.
-System and hidden folders, caches, dependencies, build output, executables, and unsupported file types are excluded.
-The index stores paths and metadata locally. Search is by filename; document contents are not indexed or uploaded.
+The index stores paths and metadata locally and survives restart. A completed index refreshes automatically no sooner than
+six hours later; restarting the application does not reset that age. Changing scope builds the newly selected index.
+**Refresh file index** bypasses the interval manually. Apply settings before using it.
+Indexing and querying use separate background workers: the rest of the application and searches remain available.
+Index progress does not replace the visible results; discovered files appear on the next query.
+
+Supported formats include documents, spreadsheets, images, design files, and media. Unsupported, hidden, temporary and executable
+files remain excluded. Directory traversal does not follow symbolic links or Windows reparse points; unavailable locations and
+virtual/network filesystems are skipped. Search is by filename; document contents are not indexed or uploaded.
 
 Right-click a result, or use Shift+F10, to open it, open its folder, copy its path, or **Save to My files**.
 The **My files** section retains saved paths after restart, independently of the index's folder scope.
@@ -92,10 +108,10 @@ Enter arithmetic such as `2+3*4`, `sqrt(81)`, `√(16)`, `2^8`, `2**8`, or `(12+
 Enter copies the result. Operators include `+ - * / % ^`; powers associate to the right.
 Division by zero, non-real results, and incomplete expressions do not produce a number.
 
-Quick search also accepts absolute folder paths, `~/`, `%USERPROFILE%`, and `$HOME/`.
-Folder browsing in the full library requires the file switch. Results show direct children, including hidden entries;
+With the **Files** switch on, both search surfaces accept absolute folder paths, `~/`, `%USERPROFILE%`, and `$HOME/`.
+Folder browsing requires an enabled file-search mode. Results show direct children, including hidden entries;
 a partial final filename filters that folder. Enter on a folder browses it; Enter on a file opens its system handler.
-Registered applications in quick-search folder results use their library launch configuration.
+Folder results include working files and folders; applications remain in application search.
 Directory reads run in the background, but slow disks or network shares can delay results.
 
 ## Launch scenarios and browser profiles

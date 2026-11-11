@@ -416,6 +416,10 @@
         <translation>Выберите приложение</translation>
     </message>
     <message>
+        <source>Nothing to display here :(</source>
+        <translation>Здесь пока ничего нет :(</translation>
+    </message>
+    <message>
         <source>Applications (*.exe *.lnk *.bat *.cmd);;All files (*)</source>
         <translation>Приложения (*.exe *.lnk *.bat *.cmd);;Все файлы (*)</translation>
     </message>
@@ -3216,6 +3220,66 @@ Qt: %4
     <message>
         <source>Save files from search results using the context menu. Removing a saved file keeps it on disk.</source>
         <translation>Сохраняйте файлы из результатов поиска через контекстное меню. Удаление из списка не удаляет файл с диска.</translation>
+    </message>
+    <message>
+        <source>Off</source>
+        <translation>Выключен</translation>
+    </message>
+    <message>
+        <source>Basic</source>
+        <translation>Базовый</translation>
+    </message>
+    <message>
+        <source>Full (not recommended)</source>
+        <translation>Полный (не рекомендуется)</translation>
+    </message>
+    <message>
+        <source>Indexing mode</source>
+        <translation>Режим индексации</translation>
+    </message>
+    <message>
+        <source>Off by default. Basic: Desktop, Documents and Downloads, including all subfolders; other local drives are checked only at the root and one folder level below it (max-depth=1). Full: all accessible local drives recursively. Not recommended: indexing can take a long time.</source>
+        <translation>По умолчанию выключен. Базовый: рабочий стол, документы и загрузки со всеми вложенными папками; остальные локальные диски — только корень и один уровень папок (max-depth=1). Полный: все доступные локальные диски рекурсивно. Не рекомендуется: индексация может занять много времени.</translation>
+    </message>
+    <message>
+        <source>Additional recursive folders</source>
+        <translation>Дополнительные папки для рекурсивной проверки</translation>
+    </message>
+    <message>
+        <source>Excluded folders and files</source>
+        <translation>Исключённые папки и файлы</translation>
+    </message>
+    <message>
+        <source>Add file</source>
+        <translation>Добавить файл</translation>
+    </message>
+    <message>
+        <source>Additional folders expand the selected scope. Exclusions are applied afterwards and always win, including inside additional folders. Excluding a folder excludes all its subfolders. These rules take effect after Save.</source>
+        <translation>Дополнительные папки расширяют область проверки. Исключения применяются после выбора области и всегда имеют приоритет, в том числе внутри дополнительных папок. Исключение папки исключает все вложенные папки. Правила применяются после сохранения.</translation>
+    </message>
+    <message>
+        <source>The index is saved locally and refreshes no sooner than every 6 hours, or on manual request. Search remains available during indexing. New files appear on your next search; the current results stay in place. Supported working-file formats are indexed; unavailable locations and symbolic links are skipped.</source>
+        <translation>Индекс сохраняется локально и обновляется не чаще раза в 6 часов или по ручному запросу. Во время индексации поиск доступен. Новые файлы появятся при следующем поиске; текущая выдача остаётся на месте. Индексируются поддерживаемые форматы рабочих файлов; недоступные пути и символические ссылки пропускаются.</translation>
+    </message>
+    <message>
+        <source>Choose an absolute file or folder path.</source>
+        <translation>Выберите абсолютный путь к файлу или папке.</translation>
+    </message>
+    <message>
+        <source>Enter a filename to search indexed files</source>
+        <translation>Введите имя файла для поиска в индексе</translation>
+    </message>
+    <message>
+        <source>Search indexed files by filename</source>
+        <translation>Поиск файлов в индексе по имени</translation>
+    </message>
+    <message>
+        <source>File search is off</source>
+        <translation>Файловый поиск выключен</translation>
+    </message>
+    <message>
+        <source>File index is up to date</source>
+        <translation>Файловый индекс актуален</translation>
     </message>
 </context>
 </TS>

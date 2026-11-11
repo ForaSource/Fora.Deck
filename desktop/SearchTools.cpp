@@ -302,6 +302,15 @@ public:
     }
 };
 }
-QAbstractButton *file_search_switch(const bool enabled, QWidget *parent) {
-    return new FileSearchSwitch(enabled, parent);
+QAbstractButton *file_search_switch(DesktopService &service, QWidget *parent) {
+    auto *button = new FileSearchSwitch(service.searching_files(), parent);
+    const auto refresh = [button, &service] {
+        button->setVisible(service.files->is_enabled());
+        button->setChecked(service.searching_files());
+    };
+    QObject::connect(button, &QAbstractButton::clicked, &service, &DesktopService::set_searching_files);
+    QObject::connect(service.files, &FileManager::configuration_changed, button, refresh);
+    QObject::connect(&service, &DesktopService::navigation_changed, button, refresh);
+    refresh();
+    return button;
 }

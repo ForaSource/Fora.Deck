@@ -40,13 +40,21 @@ DesktopService::DesktopService(QObject *const parent, const QString &profile_pat
                             this);
     connect(files, &FileManager::error, this, &DesktopService::notify);
     connect(files, &FileManager::busy_changed, this, &DesktopService::profile_state_changed);
+    connect(files, &FileManager::configuration_changed, this, [this] {
+        if (!files->is_enabled())
+            set_searching_files(false);
+    });
     connect(files, &FileManager::saved_paths_changed, this, [this](const QStringList &paths) {
         settings.setValue("files/saved", paths);
         settings.sync();
         if (settings.status() != QSettings::NoError)
             notify(QCoreApplication::translate("XLibrary", "Could not save the settings file."));
     });
-    QTimer::singleShot(0, this, [this] { files->configure(settings.value("files/roots").toStringList()); });
+    QTimer::singleShot(0, this, [this] {
+        files->configure(FileManager::mode_from_setting(settings.value("files/mode", "off").toString()),
+                         settings.value("files/roots").toStringList(),
+                         settings.value("files/exclusions").toStringList());
+    });
     startup_inventory_pending = settings.value("onboarding/completed", false).toBool();
     updates.set_channel(settings.value("updates/channel", "stable").toString());
     connect(&updates, &UpdateChecker::channel_changed, this,
@@ -454,8 +462,21 @@ void DesktopService::select(const qint64 id) {
 void DesktopService::navigate(const QString &section, const QString &tag) {
     current_section = section;
     current_tag = tag;
+    if (section != "library" || !tag.isEmpty())
+        files_selected = false;
     filter.set_section(section, tag);
     emit navigation_changed();
+}
+
+void DesktopService::set_searching_files(const bool selected) {
+    const bool enabled = selected && files->is_enabled();
+    if (files_selected == enabled)
+        return;
+    files_selected = enabled;
+    if (enabled)
+        navigate("library");
+    else
+        emit navigation_changed();
 }
 
 quint64 DesktopService::save_application(app_record record) {

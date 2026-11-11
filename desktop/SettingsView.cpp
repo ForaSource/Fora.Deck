@@ -416,74 +416,89 @@ QWidget *storage_page(const ui_context &context, QWidget *) {
 QWidget *file_settings(const ui_context &context, QWidget *) {
     auto *service = static_cast<DesktopService *>(context.service);
     auto *widget = page(QCoreApplication::translate("XLibrary", "File search"));
-    widget->layout()->addWidget(label(
-        QCoreApplication::translate(
-            "XLibrary",
-            "By default, all accessible local drives are indexed. Add folders below to search only those locations. "
-            "System folders, caches, hidden files and unsupported file types are excluded. "
-            "Indexing runs in the background even when file search is off."),
-        "muted"));
-    auto *roots = new QListWidget;
-    roots->setObjectName("file_search_roots");
-    roots->setProperty("setting_key", "files/roots");
-    roots->setAccessibleName(QCoreApplication::translate("XLibrary", "File search folders"));
-    roots->addItems(context.settings->value("files/roots").toStringList());
-    widget->layout()->addWidget(roots);
-    auto *tools = new QHBoxLayout;
-    auto *add = button(QCoreApplication::translate("XLibrary", "Add folder"));
-    auto *drive = button(QCoreApplication::translate("XLibrary", "Add drive"));
-    auto *remove = button(QCoreApplication::translate("XLibrary", "Remove folder"));
-    auto *all = button(QCoreApplication::translate("XLibrary", "Search all drives"));
-    tools->addWidget(add);
-    tools->addWidget(drive);
-    tools->addWidget(remove);
-    tools->addWidget(all);
-    static_cast<QVBoxLayout *>(widget->layout())->addLayout(tools);
-    QObject::connect(add, &QPushButton::clicked, widget, [=] {
-        const auto path =
-            QFileDialog::getExistingDirectory(widget, QCoreApplication::translate("XLibrary", "Add folder"));
-        if (!path.isEmpty() && roots->findItems(path, Qt::MatchExactly).isEmpty())
-            roots->addItem(path);
-    });
-    auto *drives = new QMenu(drive);
-    drive->setMenu(drives);
-    QObject::connect(drives, &QMenu::aboutToShow, widget, [=] {
-        drives->clear();
-        for (const auto &path : FileManager::volume_roots()) {
-            auto *action = drives->addAction(QDir::toNativeSeparators(path));
-            const auto canonical = QFileInfo(path).canonicalFilePath();
-            bool selected = false;
-            for (int i = 0; i < roots->count(); ++i)
-                if (QFileInfo(roots->item(i)->text()).canonicalFilePath() == canonical) {
-                    selected = true;
-                    break;
-                }
-            action->setEnabled(!selected);
-            QObject::connect(action, &QAction::triggered, roots,
-                             [=] { roots->addItem(QDir::toNativeSeparators(path)); });
+    auto *mode = new QComboBox;
+    mode->setObjectName("file_search_mode");
+    mode->setProperty("setting_key", "files/mode");
+    mode->addItem(QCoreApplication::translate("XLibrary", "Off"), "off");
+    mode->addItem(QCoreApplication::translate("XLibrary", "Basic"), "basic");
+    mode->addItem(QCoreApplication::translate("XLibrary", "Full (not recommended)"), "full");
+    mode->setCurrentIndex(qMax(0, mode->findData(context.settings->value("files/mode", "off").toString())));
+    field(static_cast<QVBoxLayout *>(widget->layout()), QCoreApplication::translate("XLibrary", "Indexing mode"), mode);
+    widget->layout()->addWidget(
+        label(QCoreApplication::translate(
+                  "XLibrary",
+                  "Off by default. Basic: Desktop, Documents and Downloads, including all subfolders; "
+                  "other local drives are checked only at the root and one folder level below it (max-depth=1). "
+                  "Full: all accessible local drives recursively. Not recommended: indexing can take a long time."),
+              "muted"));
+    const auto path_list = [=](const QString &title, const QString &key, const bool allow_files) {
+        widget->layout()->addWidget(label(title, "subheading"));
+        auto *paths = new QListWidget;
+        paths->setObjectName(allow_files ? "file_search_exclusions" : "file_search_roots");
+        paths->setProperty("setting_key", key);
+        paths->setAccessibleName(title);
+        paths->setMaximumHeight(120);
+        paths->addItems(context.settings->value(key).toStringList());
+        widget->layout()->addWidget(paths);
+        auto *tools = new QHBoxLayout;
+        auto *add = button(QCoreApplication::translate("XLibrary", "Add folder"));
+        auto *remove = button(QCoreApplication::translate("XLibrary", "Remove selected"));
+        tools->addWidget(add);
+        const auto append = [=](const QString &path) {
+            if (!path.isEmpty() && paths->findItems(path, Qt::MatchExactly).isEmpty())
+                paths->addItem(path);
+        };
+        QObject::connect(add, &QPushButton::clicked, widget, [=] {
+            append(QFileDialog::getExistingDirectory(widget, QCoreApplication::translate("XLibrary", "Add folder")));
+        });
+        if (allow_files) {
+            auto *file = button(QCoreApplication::translate("XLibrary", "Add file"));
+            tools->addWidget(file);
+            QObject::connect(file, &QPushButton::clicked, widget, [=] {
+                const auto selected =
+                    QFileDialog::getOpenFileNames(widget, QCoreApplication::translate("XLibrary", "Add file"));
+                for (const auto &path : selected)
+                    append(path);
+            });
         }
-    });
-    QObject::connect(remove, &QPushButton::clicked, widget, [=] { delete roots->takeItem(roots->currentRow()); });
-    QObject::connect(all, &QPushButton::clicked, roots, &QListWidget::clear);
+        tools->addWidget(remove);
+        tools->addStretch();
+        QObject::connect(remove, &QPushButton::clicked, widget, [=] { delete paths->takeItem(paths->currentRow()); });
+        static_cast<QVBoxLayout *>(widget->layout())->addLayout(tools);
+    };
+    path_list(QCoreApplication::translate("XLibrary", "Additional recursive folders"), "files/roots", false);
+    path_list(QCoreApplication::translate("XLibrary", "Excluded folders and files"), "files/exclusions", true);
+    widget->layout()->addWidget(
+        label(QCoreApplication::translate(
+                  "XLibrary",
+                  "Additional folders expand the selected scope. Exclusions are applied afterwards and always win, "
+                  "including inside additional folders. Excluding a folder excludes all its subfolders. "
+                  "These rules take effect after Save."),
+              "muted"));
     auto *status = label(service->files->status(), "muted");
     status->setObjectName("file_index_status");
     widget->layout()->addWidget(status);
     QObject::connect(service->files, &FileManager::status_changed, widget,
                      [=] { status->setText(service->files->status()); });
     auto *scan = button(QCoreApplication::translate("XLibrary", "Refresh file index"));
+    scan->setEnabled(service->files->is_enabled());
     widget->layout()->addWidget(scan);
+    QObject::connect(service->files, &FileManager::configuration_changed, scan,
+                     [=] { scan->setEnabled(service->files->is_enabled()); });
     QObject::connect(scan, &QPushButton::clicked, service->files, &FileManager::rescan);
+    widget->layout()->addWidget(
+        label(QCoreApplication::translate(
+                  "XLibrary",
+                  "The index is saved locally and refreshes no sooner than every 6 hours, or on manual request. "
+                  "Search remains available during indexing. New files appear on your next search; the current results "
+                  "stay in place. "
+                  "Supported working-file formats are indexed; unavailable locations and symbolic links are skipped."),
+              "muted"));
     widget->layout()->addWidget(label(
         QCoreApplication::translate("XLibrary",
                                     "Filename masks: * matches any number of characters; ? matches one character. "
                                     "Examples: *.pdf, report-??.txt. Other characters are literal."),
         "muted"));
-    widget->layout()->addWidget(
-        label(QCoreApplication::translate("XLibrary",
-                                          "Folder changes take effect after Save. An empty list means all drives. "
-                                          "The index refreshes every 15 minutes; unavailable locations are skipped. "
-                                          "Right-click a search result to save it to My files."),
-              "muted"));
     return widget;
 }
 
@@ -625,11 +640,11 @@ QWidget *about(const ui_context &context, QWidget *) {
     card_layout->addWidget(documentation);
     card_layout->addWidget(copy);
     QObject::connect(github, &QPushButton::clicked, widget,
-                     [] { desktop_platform::open_url(QUrl("https://github.com/lappland-open/XLibrary")); });
+                     [] { desktop_platform::open_url(QUrl("https://github.com/ForaSource/Fora.Deck")); });
     QObject::connect(issues, &QPushButton::clicked, widget,
-                     [] { desktop_platform::open_url(QUrl("https://github.com/lappland-open/XLibrary/issues")); });
+                     [] { desktop_platform::open_url(QUrl("https://github.com/ForaSource/Fora.Deck/issues")); });
     QObject::connect(documentation, &QPushButton::clicked, widget, [] {
-        desktop_platform::open_url(QUrl("https://github.com/lappland-open/XLibrary/blob/main/README.md"));
+        desktop_platform::open_url(QUrl("https://github.com/ForaSource/Fora.Deck/blob/main/README.md"));
     });
     QObject::connect(copy, &QPushButton::clicked, widget, [=] {
         const auto text =
@@ -1018,12 +1033,13 @@ QDialog *settings_dialog(const ui_context &context, QWidget *const parent) {
             if (auto *list = qobject_cast<QListWidget *>(control)) {
                 QStringList paths;
                 for (int i = 0; i < list->count(); ++i) {
-                    const QFileInfo folder(list->item(i)->text());
-                    if (!folder.isAbsolute() || !folder.isDir() || !folder.isReadable()) {
-                        show_error(QCoreApplication::translate("XLibrary", "A file search folder is unavailable."));
+                    const QFileInfo entry(list->item(i)->text());
+                    if (!entry.isAbsolute() || (key == "files/roots" && entry.exists() && !entry.isDir())) {
+                        show_error(QCoreApplication::translate("XLibrary", "Choose an absolute file or folder path."));
                         return;
                     }
-                    paths.append(folder.canonicalFilePath());
+                    const auto canonical = entry.canonicalFilePath();
+                    paths.append(canonical.isEmpty() ? QDir::cleanPath(entry.absoluteFilePath()) : canonical);
                 }
                 paths.removeDuplicates();
                 values.insert(key, paths);
@@ -1117,8 +1133,12 @@ QDialog *settings_dialog(const ui_context &context, QWidget *const parent) {
             show_error(QCoreApplication::translate("XLibrary", "Could not save the settings file."));
             return;
         }
-        if (previous.value("files/roots") != values.value("files/roots"))
-            service->files->configure(values.value("files/roots").toStringList());
+        if (previous.value("files/roots") != values.value("files/roots") ||
+            previous.value("files/exclusions") != values.value("files/exclusions") ||
+            previous.value("files/mode") != values.value("files/mode"))
+            service->files->configure(FileManager::mode_from_setting(values.value("files/mode").toString()),
+                                      values.value("files/roots").toStringList(),
+                                      values.value("files/exclusions").toStringList());
         emit service->appearance_changed();
         dialog->accept();
     });

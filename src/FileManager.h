@@ -27,10 +27,14 @@ struct file_match {
 };
 Q_DECLARE_METATYPE(QVector<file_match>)
 
+enum class file_search_mode { off, basic, full };
+
 class FileManager : public QObject {
     Q_OBJECT
     QString database_path;
     QStringList custom_roots;
+    QStringList excluded_paths;
+    file_search_mode mode = file_search_mode::off;
     QString scope;
     QThreadPool scan_pool;
     QThreadPool query_pool;
@@ -46,13 +50,17 @@ class FileManager : public QObject {
     int pending_saves = 0;
     bool rescan_pending = false;
     QString state;
+    qint64 last_refresh = 0;
     void start_scan();
+    void schedule_refresh();
 
 public:
     explicit FileManager(const QString &profile_directory, const QStringList &saved_paths = {},
                          QObject *parent = nullptr);
     ~FileManager() override;
-    void configure(const QStringList &roots);
+    void configure(file_search_mode selected_mode, const QStringList &roots = {}, const QStringList &exclusions = {});
+    bool is_enabled() const { return mode != file_search_mode::off; }
+    static file_search_mode mode_from_setting(const QString &value);
     void rescan();
     void shutdown();
     QStringList persisted_saved_paths() const;
@@ -68,7 +76,7 @@ public:
     static QStringList volume_roots();
 signals:
     void changed();
-    void index_updated();
+    void configuration_changed();
     void busy_changed();
     void saved_paths_changed(const QStringList &paths);
     void status_changed();

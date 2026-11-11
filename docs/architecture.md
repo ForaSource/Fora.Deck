@@ -69,7 +69,9 @@ for storage locations and backup operations, and [verification](testing.md#start
 for startup checks.
 
 The file index is managed by `FileManager` separately from the application
-catalog. Saved-file state is synchronized with profile settings. Shared types and
+catalog. It owns traversal scope, exclusions, cached rows and completed-scan
+timestamps, with separate scan and query workers. Scan progress updates status
+without republishing the visible query. Saved-file state is synchronized with profile settings. Shared types and
 limits live in [`CatalogTypes.h`](../src/CatalogTypes.h) and
 [`OperationTypes.h`](../src/OperationTypes.h).
 

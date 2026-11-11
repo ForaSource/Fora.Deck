@@ -20,7 +20,7 @@ QJsonObject release(const QString &tag, bool preview = false) {
             {"draft", false},
             {"prerelease", preview},
             {"published_at", "2026-11-05T12:00:00Z"},
-            {"html_url", "https://github.com/lappland-open/XLibrary/releases/tag/" + tag}};
+            {"html_url", "https://github.com/ForaSource/Fora.Deck/releases/tag/" + tag}};
 }
 QByteArray json(const QJsonArray &releases) {
     return QJsonDocument(releases).toJson();
