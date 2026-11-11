@@ -1118,7 +1118,9 @@ QDialog *settings_dialog(const ui_context &context, QWidget *const parent) {
             return;
         }
         if (previous.value("files/roots") != values.value("files/roots"))
-            service->files->configure(values.value("files/roots").toStringList());
+            service->files->configure(FileManager::mode_from_setting(service->settings.value("files/mode", "off").toString()),
+                                      values.value("files/roots").toStringList(),
+                                      service->settings.value("files/exclusions").toStringList());
         emit service->appearance_changed();
         dialog->accept();
     });

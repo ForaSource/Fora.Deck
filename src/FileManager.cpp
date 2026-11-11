@@ -97,60 +97,23 @@ QString file_query_text(const QString &text, QString &extension) {
     }
     return query_text.trimmed();
 }
-bool excluded_directory(const QFileInfo &info) {
-    // Windows marks volume roots hidden/system; those attributes must not exclude an entire drive.
-    if (info.isRoot())
+bool contains_path(const QString &root, const QString &path) {
+    return root == path || path.startsWith(root.endsWith('/') ? root : root + '/');
+}
+bool excluded_path(const QStringList &exclusions, const QString &path) {
+    return std::any_of(exclusions.cbegin(), exclusions.cend(), [&](const auto &root) {
+        return contains_path(root, identity(path));
+    });
+}
+bool traversable_directory(const QFileInfo &info) {
+    if (!info.isDir() || info.isSymLink())
         return false;
-    static const QSet<QString> names = {"windows",
-                                        "program files",
-                                        "program files (x86)",
-                                        "programdata",
-                                        "appdata",
-                                        "$recycle.bin",
-                                        "system volume information",
-                                        "recovery",
-                                        "config.msi",
-                                        "node_modules",
-                                        "vendor",
-                                        "bower_components",
-                                        "__pycache__",
-                                        "venv",
-                                        ".venv",
-                                        "env",
-                                        "build",
-                                        "dist",
-                                        "target",
-                                        "cache",
-                                        "caches",
-                                        "tmp",
-                                        "temp",
-                                        "logs",
-                                        "log",
-                                        ".git",
-                                        ".svn",
-                                        ".hg",
-                                        ".cache",
-                                        ".local",
-                                        ".config",
-                                        ".npm",
-                                        ".cargo",
-                                        ".rustup",
-                                        "lost+found"};
-    const auto name = info.fileName().toCaseFolded();
-    if (info.isSymLink() || info.isHidden() || names.contains(name) || name.startsWith("cmake-build-") ||
-        name.startsWith("build-") || name.startsWith('.'))
-        return true;
 #ifdef Q_OS_WIN
     const auto attrs = GetFileAttributesW(reinterpret_cast<LPCWSTR>(info.absoluteFilePath().utf16()));
-    if (attrs == INVALID_FILE_ATTRIBUTES || (attrs & (FILE_ATTRIBUTE_SYSTEM | FILE_ATTRIBUTE_REPARSE_POINT)))
-        return true;
-#else
-    static const QStringList system = {"/proc",  "/sys", "/dev", "/run", "/bin",  "/sbin", "/lib",
-                                       "/lib64", "/usr", "/etc", "/var", "/boot", "/snap"};
-    if (system.contains(info.absoluteFilePath()))
-        return true;
+    if (attrs == INVALID_FILE_ATTRIBUTES || (attrs & FILE_ATTRIBUTE_REPARSE_POINT))
+        return false;
 #endif
-    return false;
+    return true;
 }
 }
 
@@ -189,8 +152,7 @@ QStringList FileManager::volume_roots() {
     for (const auto &volume : QStorageInfo::mountedVolumes()) {
         if (!volume.isValid() || !volume.isReady() || !local_volume(volume))
             continue;
-        if (!excluded_directory(QFileInfo(volume.rootPath())))
-            roots.append(identity(volume.rootPath()));
+        roots.append(identity(volume.rootPath()));
     }
     if (roots.isEmpty())
         roots.append(QDir::rootPath());
@@ -231,7 +193,6 @@ FileManager::FileManager(const QString &directory, const QStringList &saved_path
     } catch (const std::exception &e) {
         state = QString::fromUtf8(e.what());
     }
-    refresh.start();
 }
 FileManager::~FileManager() {
     shutdown();
@@ -255,24 +216,52 @@ QStringList FileManager::persisted_saved_paths() const {
         paths.append(rows.qtext(0));
     return paths;
 }
-void FileManager::configure(const QStringList &roots) {
-    custom_roots = roots;
+file_search_mode FileManager::mode_from_setting(const QString &value) {
+    if (value == "basic")
+        return file_search_mode::basic;
+    if (value == "full")
+        return file_search_mode::full;
+    return file_search_mode::off;
+}
+void FileManager::configure(const file_search_mode selected_mode, const QStringList &roots,
+                            const QStringList &exclusions) {
+    mode = selected_mode;
+    const auto normalized_paths = [](const QStringList &paths) {
+        QStringList result;
+        for (const auto &path : paths) {
+            if (path.trimmed().isEmpty() || !QFileInfo(path).isAbsolute())
+                continue;
+            const auto canonical = QFileInfo(path).canonicalFilePath();
+            result.append(identity(canonical.isEmpty() ? path : canonical));
+        }
+        result.removeDuplicates();
+        result.sort();
+        return result;
+    };
+    custom_roots = normalized_paths(roots);
+    excluded_paths = normalized_paths(exclusions);
     ++*scan_generation;
     ++*query_generation;
-    // Scope is stable across launches, so a warm cache is immediately searchable.
-    auto paths = roots.isEmpty() ? QStringList{QStringLiteral("all-local-volumes")} : roots;
-    paths.sort();
-    scope =
-        QString::fromLatin1(QCryptographicHash::hash(paths.join('\n').toUtf8(), QCryptographicHash::Sha256).toHex());
-    rescan_pending = true;
+    const auto scope_data = QString::number(static_cast<int>(mode)) + '\n' + custom_roots.join('\n') +
+                            "\n--exclusions--\n" + excluded_paths.join('\n');
+    scope = QString::fromLatin1(QCryptographicHash::hash(scope_data.toUtf8(), QCryptographicHash::Sha256).toHex());
+    rescan_pending = is_enabled();
+    if (is_enabled())
+        refresh.start();
+    else {
+        refresh.stop();
+        state = QCoreApplication::translate("XLibrary", "File search is off");
+        emit status_changed();
+    }
+    emit configuration_changed();
     emit changed();
-    if (!scanning)
+    if (rescan_pending && !scanning)
         start_scan();
 }
 void FileManager::rescan() {
-    if (scanning)
+    if (scanning || !is_enabled())
         return;
-    configure(custom_roots);
+    start_scan();
 }
 void FileManager::start_scan() {
     rescan_pending = false;
@@ -294,50 +283,48 @@ void FileManager::start_scan() {
     });
     const auto expected = scan_generation->load();
     const auto requested_roots = custom_roots;
+    const auto selected_mode = mode;
+    const auto exclusions = excluded_paths;
     watcher->setFuture(QtConcurrent::run(&scan_pool, [path = database_path, scope = scope, requested_roots,
+                                                      selected_mode, exclusions,
                                                       generation = scan_generation, expected, count = indexed] {
-        const auto roots = requested_roots.isEmpty() ? volume_roots() : requested_roots;
+        const auto roots = volume_roots();
         QStringList blocked_mounts;
-        if (requested_roots.isEmpty())
-            for (const auto &volume : QStorageInfo::mountedVolumes())
-                if (!local_volume(volume))
-                    blocked_mounts.append(QDir::cleanPath(volume.rootPath()));
+        for (const auto &volume : QStorageInfo::mountedVolumes())
+            if (!local_volume(volume))
+                blocked_mounts.append(identity(volume.rootPath()));
         const auto cancelled = [&] { return generation->load() != expected; };
         try {
             auto db = open_index(path);
             const auto seen = QDateTime::currentMSecsSinceEpoch();
-            std::deque<QString> pending;
-            QSet<QString> visited;
+            std::deque<QPair<QString, int>> pending;
+            QHash<QString, int> visited;
             quint64 skipped = 0;
-            QStringList ordered_roots;
-            for (const auto &preferred :
-                 {QStandardPaths::writableLocation(QStandardPaths::DesktopLocation),
-                  QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation), QDir::homePath()}) {
-                if (preferred.isEmpty() || QFileInfo(preferred).isSymLink())
-                    continue;
-                const auto canonical_preferred = QFileInfo(preferred).canonicalFilePath();
-                if (canonical_preferred.isEmpty())
-                    continue;
-                const auto key = identity(canonical_preferred);
-                if (std::any_of(roots.cbegin(), roots.cend(), [&key](const auto &root) {
-                        const auto canonical_root = QFileInfo(root).canonicalFilePath();
-                        if (canonical_root.isEmpty())
-                            return false;
-                        const auto normalized = identity(canonical_root);
-                        return key == normalized ||
-                               key.startsWith(normalized.endsWith('/') ? normalized : normalized + '/');
-                    }))
-                    ordered_roots.append(canonical_preferred);
-            }
-            ordered_roots += roots;
-            ordered_roots.removeDuplicates();
-            for (const auto &root : ordered_roots) {
-                const auto canonical = QFileInfo(root).canonicalFilePath();
-                if (!canonical.isEmpty() && !excluded_directory(QFileInfo(canonical)))
-                    pending.push_back(canonical);
+            QStringList recursive_roots = requested_roots;
+            if (selected_mode == file_search_mode::basic)
+                for (const auto location : {QStandardPaths::DesktopLocation, QStandardPaths::DocumentsLocation,
+                                            QStandardPaths::DownloadLocation}) {
+                    const auto preferred = QStandardPaths::writableLocation(location);
+                    if (!preferred.isEmpty())
+                        recursive_roots.append(preferred);
+                }
+            else
+                recursive_roots += roots;
+            recursive_roots.removeDuplicates();
+            const auto add_root = [&](const QString &root, const int depth) {
+                const QFileInfo info(root);
+                const auto canonical = info.canonicalFilePath();
+                if (!canonical.isEmpty() && traversable_directory(info) && !excluded_path(exclusions, root) &&
+                    !excluded_path(exclusions, canonical))
+                    pending.emplace_back(canonical, depth);
                 else
                     ++skipped;
-            }
+            };
+            for (const auto &root : recursive_roots)
+                add_root(root, -1);
+            if (selected_mode == file_search_mode::basic)
+                for (const auto &root : roots)
+                    add_root(root, 1);
             QVector<QPair<QString, QString>> batch;
             QElapsedTimer batch_age;
             batch_age.start();
@@ -361,10 +348,10 @@ void FileManager::start_scan() {
                 batch_age.restart();
             };
             while (!pending.empty() && !cancelled()) {
-                const auto directory = std::move(pending.front());
+                const auto [directory, remaining_depth] = std::move(pending.front());
                 pending.pop_front();
                 if (std::any_of(blocked_mounts.cbegin(), blocked_mounts.cend(), [&](const auto &mount) {
-                        return directory == mount || directory.startsWith(mount + '/');
+                        return contains_path(mount, identity(directory));
                     }))
                     continue;
                 if (batch_age.elapsed() > 100)
@@ -378,9 +365,11 @@ void FileManager::start_scan() {
                 }
                 key = QString::number(metadata.st_dev) + ':' + QString::number(metadata.st_ino);
 #endif
-                if (visited.contains(key))
+                const auto previous_depth = visited.constFind(key);
+                if (previous_depth != visited.cend() &&
+                    (previous_depth.value() < 0 || (remaining_depth >= 0 && previous_depth.value() >= remaining_depth)))
                     continue;
-                visited.insert(key);
+                visited.insert(key, remaining_depth);
                 if (!QFileInfo(directory).isReadable()) {
                     ++skipped;
                     continue;
@@ -389,9 +378,11 @@ void FileManager::start_scan() {
                 while (entries.hasNext() && !cancelled()) {
                     entries.next();
                     const auto info = entries.fileInfo();
+                    if (excluded_path(exclusions, info.absoluteFilePath()))
+                        continue;
                     if (info.isDir()) {
-                        if (!excluded_directory(info))
-                            pending.push_back(info.absoluteFilePath());
+                        if (remaining_depth != 0 && traversable_directory(info))
+                            pending.emplace_back(info.absoluteFilePath(), remaining_depth < 0 ? -1 : remaining_depth - 1);
                     } else if (accepts_file(info.absoluteFilePath())) {
                         batch.append({identity(info.absoluteFilePath()), info.fileName()});
                         if (batch.size() >= 256 || batch_age.elapsed() > 100)
@@ -427,12 +418,13 @@ void FileManager::search(const QString &text, const quint64 request, QObject *re
                 watcher->deleteLater();
             });
     const auto expected = query_generation->load();
-    watcher->setFuture(QtConcurrent::run(&query_pool, [path = database_path, scope = scope, text, usage,
+    const auto enabled = is_enabled();
+    watcher->setFuture(QtConcurrent::run(&query_pool, [path = database_path, scope = scope, text, usage, enabled, exclusions = excluded_paths,
                                                        cache = search_cache, generation = query_generation, expected,
                                                        field_generation, request] {
         QVector<file_match> matches;
         const auto cancelled = [&] { return generation->load() != expected || field_generation->load() != request; };
-        if (text.trimmed().isEmpty() || cancelled())
+        if (!enabled || text.trimmed().isEmpty() || cancelled())
             return matches;
         try {
             auto db = open_index(path);
@@ -481,7 +473,7 @@ void FileManager::search(const QString &text, const quint64 request, QObject *re
                         if (cancelled())
                             return QVector<file_match>{};
                         const auto file_path = rows.qtext(0);
-                        if (inspected.contains(file_path))
+                        if (excluded_path(exclusions, file_path) || inspected.contains(file_path))
                             continue;
                         const auto stored_name = rows.qtext(1);
                         const auto name = stored_name.isEmpty() ? QFileInfo(file_path).fileName() : stored_name;
@@ -624,17 +616,7 @@ void FileManager::set_saved(const QString &path, const bool saved) {
                         return {
                             QCoreApplication::translate("XLibrary", "The file is unavailable or its type is excluded."),
                             {}};
-                    auto folder = QFileInfo(path).absolutePath();
-                    for (;;) {
-                        if (excluded_directory(QFileInfo(folder)))
-                            return {QCoreApplication::translate("XLibrary",
-                                                                "The file is unavailable or its type is excluded."),
-                                    {}};
-                        const auto parent = QFileInfo(folder).absolutePath();
-                        if (parent == folder)
-                            break;
-                        folder = parent;
-                    }
+
                 }
                 auto db = open_index(database);
                 xlibrary::SqliteStatement statement(db.get(), saved ? "INSERT OR IGNORE INTO saved VALUES(?)"
