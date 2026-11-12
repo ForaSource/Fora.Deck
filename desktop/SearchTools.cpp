@@ -275,25 +275,30 @@ public:
         });
     }
     QSize sizeHint() const override {
-        return {fontMetrics().horizontalAdvance(text()) + 66, qMax(34, fontMetrics().height() + 14)};
+        const auto scale = qMax(14, font().pixelSize()) / 14.0;
+        return {fontMetrics().horizontalAdvance(text()) + qRound(66 * scale),
+                qMax(qRound(34 * scale), fontMetrics().height() + qRound(14 * scale))};
     }
     void paintEvent(QPaintEvent *) override {
         QPainter painter(this);
         painter.setRenderHint(QPainter::Antialiasing);
+        const auto scale = qMax(14, font().pixelSize()) / 14.0;
         const auto foreground = palette().color(isEnabled() ? QPalette::Active : QPalette::Disabled, QPalette::Text);
         painter.setPen(foreground);
-        painter.drawText(rect().adjusted(8, 0, -50, 0), Qt::AlignVCenter | Qt::AlignLeft, text());
-        const QRectF track(width() - 44, (height() - 22) / 2.0, 38, 22);
+        painter.drawText(rect().adjusted(qRound(8 * scale), 0, -qRound(50 * scale), 0),
+                         Qt::AlignVCenter | Qt::AlignLeft, text());
+        const QRectF track(width() - 44 * scale, (height() - 22 * scale) / 2.0, 38 * scale, 22 * scale);
         auto base = palette().color(QPalette::Mid);
-        const auto accent = palette().color(QPalette::Highlight);
+        const auto accent = palette().color(isEnabled() ? QPalette::Link : QPalette::Mid);
         base.setRedF(base.redF() * (1 - progress) + accent.redF() * progress);
         base.setGreenF(base.greenF() * (1 - progress) + accent.greenF() * progress);
         base.setBlueF(base.blueF() * (1 - progress) + accent.blueF() * progress);
         painter.setPen(Qt::NoPen);
         painter.setBrush(base);
-        painter.drawRoundedRect(track, 11, 11);
+        painter.drawRoundedRect(track, 11 * scale, 11 * scale);
         painter.setBrush(Qt::white);
-        painter.drawEllipse(QRectF(track.left() + 3 + progress * 16, track.top() + 3, 16, 16));
+        painter.drawEllipse(
+            QRectF(track.left() + (3 + progress * 16) * scale, track.top() + 3 * scale, 16 * scale, 16 * scale));
         if (hasFocus()) {
             painter.setBrush(Qt::NoBrush);
             painter.setPen(QPen(accent, 2));

@@ -220,6 +220,10 @@ endif()
 qt_add_resources(XLibrary application_images
         PREFIX "/"
         FILES assets/xlibrary.ico
+        assets/fonts/inter-regular.ttf
+        assets/fonts/inter-medium.ttf
+        assets/fonts/inter-semibold.ttf
+        assets/fonts/OFL.txt
 )
 target_compile_definitions(XLibrary PRIVATE XLIBRARY_VERSION="${XLIBRARY_RELEASE_VERSION}")
 
@@ -279,6 +283,11 @@ if(XLIBRARY_ENABLE_CLANG_TIDY)
 endif()
 
 install(TARGETS XLibrary RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+if(WIN32)
+    install(FILES assets/fonts/OFL.txt DESTINATION licenses/inter)
+else()
+    install(FILES assets/fonts/OFL.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/XLibrary/inter)
+endif()
 if(WIN32)
     install(IMPORTED_RUNTIME_ARTIFACTS Qt6::Concurrent RUNTIME DESTINATION .)
     # Deploy Qt only during install; the packager adds the CRT from the selected toolchain.

@@ -28,7 +28,7 @@ private:
     mutable QSet<QString> pending_icons;
     QThreadPool icon_pool;
     QIcon fallback_icon(const QString &kind) const;
-    void request_icon(const app_record &record, const QString &key, const QString &kind) const;
+    void request_icon(const app_record &record, const QString &key) const;
 
 public:
     enum role { id_role = Qt::UserRole + 1, record_role, tags_role, running_role, favorite_role, available_role };

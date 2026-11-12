@@ -53,16 +53,9 @@ public:
 namespace {
 class SearchDelegate : public QStyledItemDelegate {
     DesktopService &service;
-    QIcon app_icon;
-    QIcon file_icon;
-    QIcon folder_icon;
-    QIcon copy_icon;
 
 public:
-    SearchDelegate(DesktopService &service, QObject *const parent)
-        : QStyledItemDelegate(parent), service(service), app_icon(appearance::icon("app")),
-          file_icon(appearance::icon("file")), folder_icon(appearance::icon("folder")),
-          copy_icon(appearance::icon("copy")) {}
+    SearchDelegate(DesktopService &service, QObject *const parent) : QStyledItemDelegate(parent), service(service) {}
     QSize sizeHint(const QStyleOptionViewItem &, const QModelIndex &) const override {
         return {0, appearance::scaled(service.settings, 52)};
     }
@@ -73,14 +66,22 @@ public:
         painter->setRenderHint(QPainter::Antialiasing);
         const auto area = option.rect.adjusted(2, 2, -2, -2);
         if (option.state & QStyle::State_Selected)
-            appearance::paint_selection(*painter, area, option.palette, 12);
-        const auto icon_size = appearance::scaled(service.settings, 24);
+            appearance::paint_selection(*painter, area, option.palette, appearance::scaled(service.settings, 8),
+                                        option.state & QStyle::State_HasFocus);
+        else if (option.state & QStyle::State_MouseOver) {
+            painter->setBrush(option.palette.alternateBase());
+            painter->setPen(Qt::NoPen);
+            painter->drawRoundedRect(area, appearance::scaled(service.settings, 8),
+                                     appearance::scaled(service.settings, 8));
+        }
+        const auto icon_size = appearance::scaled(service.settings, 32);
         const QRect icon_rect(area.left() + 14, area.center().y() - icon_size / 2, icon_size, icon_size);
-        auto icon = entry.type == search_entry::kind::application ? app_icon
-                    : (entry.type == search_entry::kind::directory || entry.type == search_entry::kind::open_folder)
-                        ? folder_icon
-                    : entry.type == search_entry::kind::calculation ? copy_icon
-                                                                    : file_icon;
+        const auto *icon_name =
+            entry.type == search_entry::kind::application                                                    ? "app"
+            : (entry.type == search_entry::kind::directory || entry.type == search_entry::kind::open_folder) ? "folder"
+            : entry.type == search_entry::kind::calculation ? "calculator"
+                                                            : "file";
+        auto icon = appearance::icon(icon_name, option.palette.color(QPalette::PlaceholderText));
         if (entry.type == search_entry::kind::application) {
             // Reuse the model's asynchronous icon cache; painting never touches the disk.
             const auto row = service.model.row_for_id(entry.application_id);
@@ -118,6 +119,7 @@ SearchResults::SearchResults(DesktopService &service, QLineEdit &input, const bo
     setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
     setEditTriggers(QAbstractItemView::NoEditTriggers);
     setFocusPolicy(Qt::NoFocus);
+    setMouseTracking(true);
     setFrameShape(QFrame::NoFrame);
     input.installEventFilter(this);
     connect(&input, &QLineEdit::textChanged, this, &SearchResults::update_query);

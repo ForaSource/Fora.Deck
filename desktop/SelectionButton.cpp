@@ -1,6 +1,7 @@
 #include <QStyleOptionButton>
 #include <QStylePainter>
 
+#include "appearance.h"
 #include "PlatformIntegration.h"
 #include "SelectionButton.h"
 
@@ -34,6 +35,10 @@ SelectionButton::SelectionButton(const QString &text, QWidget *const parent)
 void SelectionButton::paintEvent(QPaintEvent *) {
     QStyleOptionButton option;
     initStyleOption(&option);
+    const auto icon_name = property("appearance_icon").toString();
+    if (!icon_name.isEmpty())
+        option.icon =
+            appearance::icon(icon_name, option.palette.color(isChecked() ? QPalette::Link : QPalette::PlaceholderText));
     // Drawing through QStyle preserves support for plugin-provided styles.
     if (!(option.state & QStyle::State_KeyboardFocusChange))
         option.state &= ~QStyle::State_HasFocus;
@@ -51,6 +56,7 @@ void SelectionButton::paintEvent(QPaintEvent *) {
     option.state = state;
     option.rect = style()->subElementRect(QStyle::SE_PushButtonContents, &option, this);
     option.text = fontMetrics().elidedText(
-        text(), Qt::ElideRight, qMax(0, option.rect.width() - (icon().isNull() ? 0 : iconSize().width() + 8)));
+        text(), Qt::ElideRight,
+        qMax(0, option.rect.width() - (option.icon.isNull() ? 0 : option.iconSize.width() + 8)));
     painter.drawControl(QStyle::CE_PushButtonLabel, option);
 }

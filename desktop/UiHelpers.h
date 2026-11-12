@@ -203,11 +203,18 @@ inline QPushButton *action_button(QAction *const action, const bool quiet = fals
     result->setIcon(action->icon());
     result->setEnabled(action->isEnabled());
     result->setToolTip(action->toolTip());
+    result->setProperty("icon_only", !text.isNull() && text.isEmpty());
+    if (result->property("icon_only").toBool())
+        result->setFixedWidth(qRound(qMax(14, result->font().pixelSize()) * 44 / 14.0));
+    result->setIconSize(QSize(qRound(qMax(14, result->font().pixelSize()) * 20 / 14.0),
+                              qRound(qMax(14, result->font().pixelSize()) * 20 / 14.0)));
     QObject::connect(result, &QPushButton::clicked, action, &QAction::trigger);
     QObject::connect(action, &QAction::changed, result, [action, result, text] {
         result->setText(text.isNull() ? action->text() : text);
         result->setEnabled(action->isEnabled());
-        result->setIcon(action->icon());
+        result->setIcon(result->property("primary").toBool()
+                            ? appearance::icon(action->property("appearance_icon").toString(), QColor("#181A1D"))
+                            : action->icon());
         result->setToolTip(action->toolTip());
     });
     return result;

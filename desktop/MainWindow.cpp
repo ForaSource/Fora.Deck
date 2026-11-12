@@ -187,7 +187,7 @@ MainWindow::MainWindow(DesktopService &service)
     connect(&service, &DesktopService::appearance_changed, this, &MainWindow::apply_settings);
     connect(qApp->styleHints(), &QStyleHints::colorSchemeChanged, this, [this] {
         if (this->service.settings.value("appearance/theme").toString() == "system")
-            apply_settings();
+            emit this->service.appearance_changed();
     });
     connect(&service, &DesktopService::launch_succeeded, this, [this] {
         const auto behavior = this->service.settings.value("behavior/after_launch", "keep").toString();
@@ -216,6 +216,7 @@ void MainWindow::create_actions() {
     auto add = [this](const QString &id, const QString &title, const QString &icon, const auto &callback) {
         auto *action = new QAction(appearance::icon(icon), title, this);
         action->setObjectName(id);
+        action->setProperty("appearance_icon", icon);
         context.actions.insert(id, action);
         addAction(action);
         connect(action, &QAction::triggered, this, callback);
@@ -225,7 +226,7 @@ void MainWindow::create_actions() {
         if (service.selection())
             service.launch(service.selection());
     });
-    add("new_instance", QCoreApplication::translate("XLibrary", "New instance"), "play", [this] {
+    add("new_instance", QCoreApplication::translate("XLibrary", "New instance"), "new_instance", [this] {
         if (service.selection())
             service.launch(service.selection(), true);
     });
@@ -249,7 +250,7 @@ void MainWindow::create_actions() {
         [this] { open_dialog("application_editor", context); });
     add("welcome", QCoreApplication::translate("XLibrary", "Open welcome screen"), "app", [this] { show_welcome(); });
     add("tutorial", QCoreApplication::translate("XLibrary", "Take a quick tour"), "help", [this] { show_tutorial(); });
-    add("edit_application", QCoreApplication::translate("XLibrary", "Edit"), "settings", [this] {
+    add("edit_application", QCoreApplication::translate("XLibrary", "Edit"), "edit", [this] {
         if (const auto *record = service.selected()) {
             auto edit_context = context;
             edit_context.parameters.insert("record", QVariant::fromValue(*record));
@@ -288,9 +289,9 @@ void MainWindow::create_actions() {
         if (const auto *record = service.selected())
             QApplication::clipboard()->setText(record->arguments);
     });
-    add("bulk_edit", QCoreApplication::translate("XLibrary", "Edit selected applications"), "settings",
+    add("bulk_edit", QCoreApplication::translate("XLibrary", "Edit selected applications"), "edit",
         [this] { show_bulk_editor(context); });
-    add("undo_removal", QCoreApplication::translate("XLibrary", "Undo removal"), "refresh",
+    add("undo_removal", QCoreApplication::translate("XLibrary", "Undo removal"), "undo",
         [this] { service.undo_removal(); });
     connect(&service, &DesktopService::undo_removal_changed, this, &MainWindow::refresh_actions);
     connect(&service, &DesktopService::selections_changed, this, &MainWindow::refresh_actions);
@@ -298,7 +299,7 @@ void MainWindow::create_actions() {
         context.actions.value(id)->setAutoRepeat(false);
     add("refresh_availability", QCoreApplication::translate("XLibrary", "Refresh availability"), "refresh",
         [this] { service.refresh_availability(); });
-    add("discover", QCoreApplication::translate("XLibrary", "Find installed applications"), "search", [this] {
+    add("discover", QCoreApplication::translate("XLibrary", "Find installed applications"), "scan", [this] {
         if (service.is_discovering())
             service.cancel_discovery();
         else
@@ -358,6 +359,7 @@ void MainWindow::refresh_actions() {
     context.actions.value("discover")
         ->setText(service.is_discovering() ? QCoreApplication::translate("XLibrary", "Cancel discovery")
                                            : QCoreApplication::translate("XLibrary", "Find installed applications"));
+    context.actions.value("discover")->setIcon(appearance::icon(service.is_discovering() ? "stop" : "scan"));
     context.actions.value("launch")->setText(
         record && record->running && service.settings.value("behavior/relaunch", "activate").toString() == "activate"
             ? QCoreApplication::translate("XLibrary", "Switch to window")
@@ -365,10 +367,22 @@ void MainWindow::refresh_actions() {
     context.actions.value("favorite")
         ->setText(record && record->favorite ? QCoreApplication::translate("XLibrary", "Remove from favorites")
                                              : QCoreApplication::translate("XLibrary", "Add to favorites"));
+    context.actions.value("favorite")
+        ->setIcon(
+            appearance::icon(record && record->favorite ? "favorite_filled" : "favorite",
+                             palette().color(record && record->favorite ? QPalette::Link : QPalette::PlaceholderText)));
 }
 
 void MainWindow::apply_settings() {
     appearance::apply(service.settings, registry.style_sheet());
+    for (auto *action : context.actions)
+        if (const auto icon_name = action->property("appearance_icon").toString(); !icon_name.isEmpty())
+            action->setIcon(appearance::icon(icon_name));
+    for (auto *control : findChildren<QAbstractButton *>()) {
+        control->setIconSize(QSize(appearance::scaled(service.settings, 20), appearance::scaled(service.settings, 20)));
+        if (control->property("icon_only").toBool())
+            control->setFixedWidth(appearance::scaled(service.settings, 44));
+    }
     QString error;
     if (!hotkey.set_sequence(
             QKeySequence::fromString(

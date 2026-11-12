@@ -1,3 +1,4 @@
+#include <QApplication>
 #include <QDir>
 #include <QFileInfo>
 #include <QFutureWatcher>
@@ -39,33 +40,34 @@ int LibraryModel::columnCount(const QModelIndex &parent) const {
 }
 
 QIcon LibraryModel::fallback_icon(const QString &kind) const {
-    const auto cached = fallback_icons.constFind(kind);
+    const auto cache_key = kind + ':' + qApp->palette().color(QPalette::PlaceholderText).name();
+    const auto cached = fallback_icons.constFind(cache_key);
     if (cached != fallback_icons.cend())
         return *cached;
     const auto icon = kind == "steam"        ? QIcon::fromTheme("steam", appearance::icon("library"))
                       : kind == "system_uri" ? QIcon::fromTheme("preferences-system", appearance::icon("settings"))
                       : kind == "aumid" || kind == "executable" || kind == "desktop" ? appearance::icon("app")
                                                                                      : appearance::icon("external");
-    fallback_icons.insert(kind, icon);
+    fallback_icons.insert(cache_key, icon);
     return icon;
 }
 
-void LibraryModel::request_icon(const app_record &record, const QString &key, const QString &kind) const {
+void LibraryModel::request_icon(const app_record &record, const QString &key) const {
     if (key.startsWith("kind:") || pending_icons.contains(key) || pending_icons.size() >= 32) {
         return;
     }
     const auto image_file = key.startsWith("image:");
     const auto path = image_file ? record.icon_path : key.mid(5);
-    const auto fallback = fallback_icon(kind);
     pending_icons.insert(key);
     auto *self = const_cast<LibraryModel *>(this);
 #ifdef Q_OS_LINUX
     // System icon engines use QPixmap and must run on the GUI thread.
     if (!image_file) {
-        QTimer::singleShot(0, self, [self, key, path, fallback] {
+        QTimer::singleShot(0, self, [self, key, path] {
             const auto image = desktop_platform::application_icon(path);
             self->pending_icons.remove(key);
-            self->icons.insert(key, new QIcon(image.isNull() ? fallback : QIcon(QPixmap::fromImage(image))));
+            // Cache failed reads without capturing a theme-dependent fallback icon.
+            self->icons.insert(key, new QIcon(image.isNull() ? QIcon{} : QIcon(QPixmap::fromImage(image))));
             for (int row = 0; row < self->records.size(); ++row) {
                 if (self->icon_keys[row] == key)
                     emit self->dataChanged(self->index(row, 0), self->index(row, 0), {Qt::DecorationRole});
@@ -75,10 +77,10 @@ void LibraryModel::request_icon(const app_record &record, const QString &key, co
     }
 #endif
     auto *watcher = new QFutureWatcher<QImage>(self);
-    connect(watcher, &QFutureWatcher<QImage>::finished, self, [self, watcher, key, fallback] {
+    connect(watcher, &QFutureWatcher<QImage>::finished, self, [self, watcher, key] {
         const auto image = watcher->result();
         self->pending_icons.remove(key);
-        self->icons.insert(key, new QIcon(image.isNull() ? fallback : QIcon(QPixmap::fromImage(image))));
+        self->icons.insert(key, new QIcon(image.isNull() ? QIcon{} : QIcon(QPixmap::fromImage(image))));
         watcher->deleteLater();
         for (int row = 0; row < self->records.size(); ++row) {
             if (self->icon_keys[row] == key) {
@@ -111,8 +113,8 @@ QVariant LibraryModel::data(const QModelIndex &index, const int requested_role) 
     case Qt::DecorationRole:
         if (index.column() == 0) {
             if (const auto *icon = icons.object(icon_keys[index.row()]))
-                return *icon;
-            request_icon(record, icon_keys[index.row()], icon_kinds[index.row()]);
+                return icon->isNull() ? fallback_icon(icon_kinds[index.row()]) : *icon;
+            request_icon(record, icon_keys[index.row()]);
             return fallback_icon(icon_kinds[index.row()]);
         }
         return {};

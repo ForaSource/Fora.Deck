@@ -21,6 +21,7 @@
 #include <QScrollBar>
 #include <QSignalBlocker>
 #include <QStackedLayout>
+#include <QStyle>
 #include <QStyledItemDelegate>
 #include <QTreeView>
 #include <QTreeWidget>
@@ -51,6 +52,10 @@ public:
 protected:
     bool event(QEvent *const event) override {
         const bool handled = QLineEdit::event(event);
+        if (event->type() == QEvent::PaletteChange)
+            for (auto *action : actions())
+                if (action->property("appearance_icon").toString() == "search")
+                    action->setIcon(appearance::icon("search", palette().color(QPalette::PlaceholderText)));
         if (event->type() == QEvent::ShortcutOverride && !event->isAccepted() && synchronize_search) {
             const auto *key_event = static_cast<QKeyEvent *>(event);
             const QKeySequence sequence(key_event->keyCombination());
@@ -105,9 +110,6 @@ public:
 };
 
 class ApplicationDelegate : public QStyledItemDelegate {
-    const QIcon fallback_icon = appearance::icon("app");
-    const QIcon favorite_icon = appearance::icon("favorite");
-
     static int scaled_size(const QStyleOptionViewItem &option, const int size) {
         return qRound(size * qMax(14, option.font.pixelSize()) / 14.0);
     }
@@ -126,20 +128,21 @@ public:
         const auto rect = option.rect.adjusted(0, inset, 0, -inset);
         const bool selected = option.state & QStyle::State_Selected;
         const bool hover = option.state & QStyle::State_MouseOver;
+        const bool focused = option.state & QStyle::State_HasFocus;
         auto row_rect = rect;
         if (const auto *view = qobject_cast<const QTreeView *>(parent())) {
             row_rect.setLeft(inset);
             row_rect.setRight(view->viewport()->width() - inset - 1);
         }
         painter->setClipRect(option.rect, Qt::IntersectClip);
-        if (selected || hover) {
-            const auto radius = 10;
+        if (selected || hover || focused) {
+            const auto radius = scaled_size(option, 8);
             if (selected)
                 appearance::paint_selection(*painter, QRectF(row_rect).adjusted(0.5, 0.5, -0.5, -0.5), option.palette,
-                                            radius);
+                                            radius, focused);
             else {
-                painter->setBrush(option.palette.alternateBase());
-                painter->setPen(Qt::NoPen);
+                painter->setBrush(hover ? option.palette.alternateBase() : QBrush(Qt::NoBrush));
+                painter->setPen(focused ? QPen(option.palette.color(QPalette::Link), 2) : QPen(Qt::NoPen));
                 painter->drawRoundedRect(row_rect, radius, radius);
             }
         }
@@ -151,17 +154,22 @@ public:
             const QRect icon_rect(text_rect.left(), rect.center().y() - size / 2, size, size);
             auto icon = qvariant_cast<QIcon>(index.data(Qt::DecorationRole));
             if (icon.isNull())
-                icon = fallback_icon;
+                icon = appearance::icon("app", option.palette.color(QPalette::PlaceholderText));
             icon.paint(painter, icon_rect);
             text_rect.setLeft(icon_rect.right() + padding);
-            if (index.data(LibraryModel::favorite_role).toBool()) {
+            {
+                const auto favorite = index.data(LibraryModel::favorite_role).toBool();
+                const auto favorite_icon =
+                    appearance::icon(favorite ? "favorite_filled" : "favorite",
+                                     option.palette.color(favorite ? QPalette::Link : QPalette::PlaceholderText));
                 const auto star_size = scaled_size(option, 16);
                 favorite_icon.paint(painter, QRect(text_rect.right() - star_size, rect.center().y() - star_size / 2,
                                                    star_size, star_size));
                 text_rect.adjust(0, 0, -scaled_size(option, 24), 0);
             }
             auto name_font = option.font;
-            name_font.setPixelSize(scaled_size(option, 15));
+            name_font.setPixelSize(scaled_size(option, 14));
+            name_font.setWeight(QFont::Medium);
             painter->setFont(name_font);
             painter->drawText(
                 text_rect, Qt::AlignVCenter,
@@ -201,7 +209,10 @@ public:
             const bool running = index.data(LibraryModel::running_role).toBool();
             const bool available = index.data(LibraryModel::available_role).toBool();
             painter->setPen(Qt::NoPen);
-            painter->setBrush(QColor(running ? "#85A28A" : available ? "#80828A" : "#C2AA7D"));
+            const bool dark = option.palette.color(QPalette::Window).lightness() < 128;
+            painter->setBrush(running     ? QColor(dark ? "#7CCDA6" : "#237A55")
+                              : available ? option.palette.color(QPalette::PlaceholderText)
+                                          : QColor(dark ? "#E7BD6A" : "#8A5D00"));
             const auto radius = scaled_size(option, 7) / 2.0;
             painter->drawEllipse(QPointF(text_rect.left() + scaled_size(option, 4), rect.center().y()), radius, radius);
             text_rect.adjust(scaled_size(option, 16), 0, 0, 0);
@@ -227,10 +238,19 @@ QWidget *navigation(const ui_context &context, QWidget *const parent) {
     auto *brand = new QHBoxLayout;
     brand->setSpacing(10);
     auto *logo = new QLabel;
-    logo->setPixmap(appearance::logo().pixmap(32, 32));
-    logo->setFixedSize(32, 32);
+    const auto update_logo = [=] {
+        const auto size = appearance::scaled(service->settings, 32);
+        logo->setPixmap(appearance::logo().pixmap(size, size));
+        logo->setFixedSize(size, size);
+    };
+    QObject::connect(service, &DesktopService::appearance_changed, logo, update_logo);
+    update_logo();
     brand->addWidget(logo);
-    brand->addWidget(label("XLibrary", "brand"), 1);
+    auto *wordmark = label("Fora<span style=\"color:#F16647\">.</span>Deck", "brand");
+    wordmark->setTextFormat(Qt::RichText);
+    wordmark->setWordWrap(false);
+    wordmark->setAccessibleName("Fora.Deck");
+    brand->addWidget(wordmark, 1);
     layout->addLayout(brand);
     layout->addSpacing(16);
     auto *group = new QButtonGroup(widget);
@@ -243,6 +263,7 @@ QWidget *navigation(const ui_context &context, QWidget *const parent) {
     for (const auto &link : links) {
         auto *item = new SelectionButton(link[1]);
         item->setIcon(appearance::icon(link[2]));
+        item->setProperty("appearance_icon", link[2]);
         item->setProperty("navigation_section", link[0]);
         item->setChecked(link[0] == "library");
         if (link[0] == "library") {
@@ -250,12 +271,13 @@ QWidget *navigation(const ui_context &context, QWidget *const parent) {
                 item->setText(service->searching_files() ? QCoreApplication::translate("XLibrary", "Files")
                                                          : QCoreApplication::translate("XLibrary", "Library"));
                 item->setIcon(appearance::icon(service->searching_files() ? "file" : "library"));
+                item->setProperty("appearance_icon", service->searching_files() ? "file" : "library");
             };
             QObject::connect(service->files, &FileManager::configuration_changed, widget, update_mode);
             QObject::connect(service, &DesktopService::navigation_changed, widget, update_mode);
             update_mode();
         }
-        item->setMinimumHeight(30);
+        item->setMinimumHeight(appearance::scaled(service->settings, 40));
         group->addButton(item);
         layout->addWidget(item);
         QObject::connect(item, &QPushButton::clicked, widget, [=] { service->navigate(link[0]); });
@@ -445,8 +467,8 @@ QWidget *search_bar(const ui_context &context, QWidget *const parent) {
         QCoreApplication::translate("XLibrary", "Search applications and files, calculate or enter a path"));
     search->setPlaceholderText(QCoreApplication::translate("XLibrary", "Search, calculate or enter a path"));
     search->setClearButtonEnabled(true);
-    search->setMinimumHeight(26);
-    search->addAction(appearance::icon("search"), QLineEdit::LeadingPosition);
+    auto *search_icon = search->addAction(appearance::icon("search"), QLineEdit::LeadingPosition);
+    search_icon->setProperty("appearance_icon", "search");
     auto *timer = new QTimer(widget);
     timer->setInterval(35);
     timer->setSingleShot(true);
@@ -485,7 +507,7 @@ QWidget *search_bar(const ui_context &context, QWidget *const parent) {
     layout->addWidget(search, 1);
     auto *settings = action_button(context.actions.value("settings"), false, "");
     settings->setAccessibleName(QCoreApplication::translate("XLibrary", "Settings"));
-    settings->setFixedWidth(44);
+    settings->setFixedWidth(appearance::scaled(service->settings, 44));
     layout->addWidget(file_search_switch(*service, widget));
     layout->addWidget(settings);
     auto *heading = label(QCoreApplication::translate("XLibrary", "Files"), "heading");
@@ -641,6 +663,15 @@ QWidget *library(const ui_context &context, QWidget *const parent) {
          QCoreApplication::translate("XLibrary", "By status")});
     sort->setAccessibleName(QCoreApplication::translate("XLibrary", "Application sort order"));
     sort->setCurrentIndex(qBound(0, service->settings.value("library/sort", 0).toInt(), 4));
+    for (int index = 0; index < sort->count(); ++index)
+        sort->setItemIcon(index, appearance::icon("sort"));
+    QObject::connect(
+        service, &DesktopService::appearance_changed, sort,
+        [=] {
+            for (int index = 0; index < sort->count(); ++index)
+                sort->setItemIcon(index, appearance::icon("sort"));
+        },
+        Qt::QueuedConnection);
     const auto order =
         service->settings.value("library/sort_order", 0).toInt() == 1 ? Qt::DescendingOrder : Qt::AscendingOrder;
     service->filter.set_sort_mode(sort->currentIndex(), order);
@@ -654,11 +685,11 @@ QWidget *library(const ui_context &context, QWidget *const parent) {
     header->addWidget(remove);
     auto *refresh = action_button(context.actions.value("refresh_availability"), false, "");
     refresh->setAccessibleName(QCoreApplication::translate("XLibrary", "Refresh availability"));
-    refresh->setFixedWidth(44);
+    refresh->setFixedWidth(appearance::scaled(service->settings, 44));
     header->addWidget(refresh);
     auto *scan = action_button(context.actions.value("discover"), false, "");
     scan->setAccessibleName(QCoreApplication::translate("XLibrary", "Find installed applications"));
-    scan->setFixedWidth(44);
+    scan->setFixedWidth(appearance::scaled(service->settings, 44));
     header->addWidget(scan);
     root->addLayout(header);
     auto *progress = context.registry->create("discovery_progress", context, widget);
@@ -962,7 +993,7 @@ QWidget *details(const ui_context &context, QWidget *const parent) {
     root->setContentsMargins(20, 24, 20, 24);
     root->setSpacing(12);
     auto *icon = new QLabel;
-    icon->setFixedSize(56, 56);
+    icon->setFixedSize(appearance::scaled(service->settings, 56), appearance::scaled(service->settings, 56));
     auto *name = label(QCoreApplication::translate("XLibrary", "Select an application"), "application_title");
     auto *status = label("", "muted");
     auto *identity = new QHBoxLayout;
@@ -974,6 +1005,9 @@ QWidget *details(const ui_context &context, QWidget *const parent) {
     identity_text->addWidget(status);
     identity->addLayout(identity_text, 1);
     root->addLayout(identity);
+    auto *launch = action_button(context.actions.value("launch"));
+    launch->setProperty("primary", true);
+    root->addWidget(launch);
     root->addSpacing(8);
     auto *tag_header = new QHBoxLayout;
     tag_header->addWidget(label(QCoreApplication::translate("XLibrary", "Tags"), "muted"), 1);
@@ -995,7 +1029,7 @@ QWidget *details(const ui_context &context, QWidget *const parent) {
     path_row->addWidget(path, 1);
     auto *folder = action_button(context.actions.value("open_folder"), false, "");
     folder->setAccessibleName(QCoreApplication::translate("XLibrary", "Open application folder"));
-    folder->setFixedWidth(44);
+    folder->setFixedWidth(appearance::scaled(service->settings, 44));
     path_row->addWidget(folder);
     root->addLayout(path_row);
     auto *recover_path = button(QCoreApplication::translate("XLibrary", "Locate application…"));
@@ -1016,9 +1050,6 @@ QWidget *details(const ui_context &context, QWidget *const parent) {
         text->setMinimumWidth(0);
     }
     root->addSpacing(8);
-    auto *launch = action_button(context.actions.value("launch"));
-    launch->setProperty("primary", true);
-    root->addWidget(launch);
     auto *profile_actions = new QWidget;
     auto *profile_layout = new QVBoxLayout(profile_actions);
     profile_layout->setContentsMargins(0, 0, 0, 0);
@@ -1029,7 +1060,7 @@ QWidget *details(const ui_context &context, QWidget *const parent) {
     profile_layout->addWidget(launch_selected_profile);
     auto *default_profile = button(QCoreApplication::translate("XLibrary", "Set as default"));
     profile_layout->addWidget(default_profile);
-    root->addWidget(profile_actions);
+    root->insertWidget(root->indexOf(launch) + 1, profile_actions);
     QObject::connect(launch_selected_profile, &QPushButton::clicked, contents, [=] {
         if (const auto *record = service->selected())
             service->request_launch_profile(record->id, profiles->currentData().toString().isEmpty()
@@ -1045,8 +1076,13 @@ QWidget *details(const ui_context &context, QWidget *const parent) {
     });
     root->addWidget(action_button(context.actions.value("edit_application")));
     root->addWidget(action_button(context.actions.value("favorite")));
+    root->addSpacing(12);
+    auto *separator = new QFrame;
+    separator->setFrameShape(QFrame::HLine);
+    root->addWidget(separator);
     auto *remove = action_button(context.actions.value("remove_application"));
     remove->setProperty("danger", true);
+    remove->setProperty("quiet", true);
     root->addWidget(remove);
     root->addStretch();
     auto *container = new QWidget;
@@ -1057,10 +1093,15 @@ QWidget *details(const ui_context &context, QWidget *const parent) {
     auto *empty = new QWidget;
     auto *empty_layout = new QVBoxLayout(empty);
     empty_layout->setContentsMargins(20, 24, 20, 24);
-    auto *empty_text = label(QCoreApplication::translate("XLibrary", "Nothing to display here :("), "heading");
+    auto *empty_icon = new QLabel;
+    empty_icon->setAlignment(Qt::AlignCenter);
+    auto *empty_text = label(QCoreApplication::translate("XLibrary", "Details will appear here."));
     empty_text->setProperty("muted", true);
     empty_text->setAlignment(Qt::AlignCenter);
-    empty_layout->addWidget(empty_text, 1);
+    empty_layout->addStretch();
+    empty_layout->addWidget(empty_icon);
+    empty_layout->addWidget(empty_text);
+    empty_layout->addStretch();
     pages->addWidget(empty);
     auto update = [=] {
         const auto *record = service->file_search_active() ? nullptr : service->selected();
@@ -1116,13 +1157,23 @@ QWidget *details(const ui_context &context, QWidget *const parent) {
                     break;
                 }
             }
-        icon->setPixmap(image.pixmap(56, 56));
+        const auto icon_size = appearance::scaled(service->settings, 56);
+        icon->setFixedSize(icon_size, icon_size);
+        icon->setPixmap(image.pixmap(icon_size, icon_size));
+        const auto empty_icon_size = appearance::scaled(service->settings, 24);
+        empty_icon->setPixmap(appearance::icon("app").pixmap(empty_icon_size, empty_icon_size));
+        status->setProperty("status_kind", record && record->running      ? "running"
+                                           : record && !record->available ? "warning"
+                                                                          : "neutral");
+        status->style()->unpolish(status);
+        status->style()->polish(status);
     };
     QObject::connect(service, &DesktopService::launch_profiles_changed, contents, [=](const QString &changed_path) {
         if (const auto *record = service->selected(); record && record->path == changed_path)
             update();
     });
     QObject::connect(service, &DesktopService::selection_changed, contents, update);
+    QObject::connect(service, &DesktopService::appearance_changed, contents, update, Qt::QueuedConnection);
     QObject::connect(service, &DesktopService::navigation_changed, contents, update);
     QObject::connect(service, &DesktopService::profile_state_changed, contents, update);
     QObject::connect(service, &DesktopService::discovery_changed, contents, update);
