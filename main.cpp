@@ -34,6 +34,7 @@ int main(int argc, char *argv[]) {
     localization.apply();
     application.setOrganizationName("XLibrary");
     application.setApplicationName("XLibrary");
+    application.setApplicationDisplayName("Fora.Deck");
     application.setApplicationVersion(XLIBRARY_VERSION);
     application.setWindowIcon(appearance::logo());
     application.setQuitOnLastWindowClosed(false);
@@ -70,11 +71,11 @@ int main(int argc, char *argv[]) {
         const auto appimage = check_startup ? QString{} : application_paths::appimage_file();
         const auto profile = check_startup         ? startup_profile->path()
                              : !appimage.isEmpty() ? appimage + ".data"
-                             : portable            ? application.applicationDirPath() + "/data"
+                             : portable ? application.applicationDirPath() + "/data"
                                         : QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
         if (!QDir().mkpath(profile))
             throw std::runtime_error(
-                QCoreApplication::translate("XLibrary", "Could not create the XLibrary settings folder.")
+                QCoreApplication::translate("XLibrary", "Could not create the Fora.Deck settings folder.")
                     .toStdString());
         const auto profile_identity = normalized_path(QFileInfo(profile).canonicalFilePath());
         const auto server_name =
@@ -87,7 +88,7 @@ int main(int argc, char *argv[]) {
             if (instance_lock.error() != QLockFile::LockFailedError)
                 throw std::runtime_error(
                     QCoreApplication::translate(
-                        "XLibrary", "Could not write the XLibrary profile lock file. Check access permissions.")
+                        "XLibrary", "Could not write the Fora.Deck profile lock file. Check access permissions.")
                         .toStdString());
             QLocalSocket socket;
             socket.connectToServer(server_name);
@@ -97,9 +98,9 @@ int main(int argc, char *argv[]) {
                 socket.waitForBytesWritten(100);
                 return 0;
             }
-            QMessageBox::information(
-                nullptr, "XLibrary",
-                QCoreApplication::translate("XLibrary", "Another instance of XLibrary is starting or not responding."));
+            QMessageBox::information(nullptr, QGuiApplication::applicationDisplayName(),
+                                     QCoreApplication::translate(
+                                         "XLibrary", "Another instance of Fora.Deck is starting or not responding."));
             return 1;
         }
         const auto database_path =
@@ -120,12 +121,12 @@ int main(int argc, char *argv[]) {
         server.setSocketOptions(QLocalServer::UserAccessOption);
         if (!server.listen(server_name))
             throw std::runtime_error(
-                QCoreApplication::translate("XLibrary", "Could not open the XLibrary local channel.").toStdString());
+                QCoreApplication::translate("XLibrary", "Could not open the Fora.Deck local channel.").toStdString());
         // Portable mode and startup checks use their own directory without replacing the child process environment.
         DesktopService service(nullptr, profile, database_path);
         if (!service.settings.isWritable())
             throw std::runtime_error(
-                QCoreApplication::translate("XLibrary", "Cannot write XLibrary settings. Choose a writable folder.")
+                QCoreApplication::translate("XLibrary", "Cannot write Fora.Deck settings. Choose a writable folder.")
                     .toStdString());
         MainWindow window(service);
         const auto handle_invocation = [&window, &service](const QJsonObject &request) {
@@ -233,7 +234,7 @@ int main(int argc, char *argv[]) {
         if (check_startup)
             qCritical("%s", error.what());
         else
-            QMessageBox::critical(nullptr, QCoreApplication::translate("XLibrary", "XLibrary error"),
+            QMessageBox::critical(nullptr, QCoreApplication::translate("XLibrary", "Fora.Deck error"),
                                   QString::fromUtf8(error.what()));
         return 1;
     }

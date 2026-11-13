@@ -62,7 +62,7 @@ SearchOverlay::SearchOverlay(DesktopService &service, QWidget *const parent)
     search_icon->setObjectName("overlay_search_icon");
     row->addWidget(input, 1);
     open_button->setIcon(appearance::icon("external"));
-    open_button->setAccessibleName(QCoreApplication::translate("XLibrary", "Open XLibrary"));
+    open_button->setAccessibleName(QCoreApplication::translate("XLibrary", "Open Fora.Deck"));
     open_button->setToolTip(open_button->accessibleName());
     open_button->setCursor(Qt::PointingHandCursor);
     row->addWidget(file_search_switch(service, contents));

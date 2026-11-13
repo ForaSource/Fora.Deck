@@ -222,7 +222,8 @@ def collect_licenses(appdir: Path, config: dict, cache: Path, repository: Path) 
             shutil.copyfile(archive, sources / archive.name)
             source_records.append(dict(info, file=archive.name))
     shutil.copytree("/usr/share/common-licenses", licenses / "common-licenses", dirs_exist_ok=True)
-    notices = ("XLibrary is distributed under the MIT license; see licenses/XLibrary-MIT.txt.\n"
+    notices = ("Fora.Deck by ForaSource is distributed under the MIT license; see licenses/XLibrary-MIT.txt.\n"
+               "Inter is distributed under SIL OFL 1.1; see ../licenses/XLibrary/inter/OFL.txt.\n"
                "SQLite is statically linked and in the public domain: https://sqlite.org/copyright.html\n"
                "Qt is dynamically linked under LGPLv3. Exact corresponding source is in sources/; "
                "see THIRD_PARTY_MANIFEST.json for source versions and SHA256 values.\n"

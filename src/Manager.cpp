@@ -886,7 +886,7 @@ void Manager::restore_profile(const QString &path, const QString &database_path,
         if (!this->store)
             throw std::runtime_error(
                 QCoreApplication::translate("XLibrary",
-                                            "The profile was restored but could not be opened. Restart XLibrary.")
+                                            "The profile was restored but could not be opened. Restart Fora.Deck.")
                     .toStdString());
     } catch (...) {
         const auto failure = std::current_exception();

@@ -170,6 +170,36 @@ QIcon appearance::icon(const QString &name, const QColor &requested_color) {
         painter.drawLine(QPointF(3, 8), QPointF(21, 8));
         painter.drawEllipse(QPointF(16, 16), 4, 4);
         painter.drawLine(QPointF(19, 19), QPointF(22, 22));
+    } else if (name == "download") {
+        painter.drawLine(QPointF(12, 3), QPointF(12, 15));
+        painter.drawPolyline(QPolygonF{QPointF(7, 10), QPointF(12, 15), QPointF(17, 10)});
+        painter.drawPolyline(QPolygonF{QPointF(4, 16), QPointF(4, 21), QPointF(20, 21), QPointF(20, 16)});
+    } else if (name == "export" || name == "import") {
+        QPainterPath path;
+        if (name == "export") {
+            path.moveTo(10, 3);
+            path.lineTo(3, 3);
+            path.lineTo(3, 21);
+            path.lineTo(21, 21);
+            path.lineTo(21, 14);
+            path.moveTo(13, 3);
+            path.lineTo(21, 3);
+            path.lineTo(21, 11);
+            path.moveTo(21, 3);
+            path.lineTo(10, 14);
+        } else {
+            path.moveTo(14, 3);
+            path.lineTo(21, 3);
+            path.lineTo(21, 21);
+            path.lineTo(3, 21);
+            path.lineTo(3, 14);
+            path.moveTo(3, 3);
+            path.lineTo(14, 14);
+            path.moveTo(7, 14);
+            path.lineTo(14, 14);
+            path.lineTo(14, 7);
+        }
+        painter.drawPath(path);
     } else if (name == "stop") {
         painter.drawRoundedRect(QRectF(5, 5, 14, 14), 1, 1);
     } else if (name == "calculator") {
@@ -347,15 +377,19 @@ void appearance::apply(const QSettings &settings, const QString &additional_styl
         QMenu::item { padding: 8px 24px 8px 12px; border: 1px solid transparent; border-radius: 10px; }
         QMenu::item:selected { background: %7; border-color: %16; }
         QMenu::separator { height: 1px; background: %6; margin: 4px 8px; }
-        QCheckBox { spacing: 8px; padding: 6px 0px; }
-        QCheckBox::indicator { width: 18px; height: 18px; }
+        QCheckBox { spacing: 8px; padding: 4px 0px; border: 2px solid transparent; border-radius: 8px; }
+        QCheckBox:focus { border-color: %16; }
+        QCheckBox::indicator { width: @indicator_size@px; height: @indicator_size@px; border: 2px solid @input_border@; border-radius: 4px; background: %5; }
+        QCheckBox::indicator:checked { border-color: #F16647; background: #F16647; image: url(:/assets/checkbox-check.png); }
+        QCheckBox::indicator:focus { border-color: %16; }
+        QCheckBox::indicator:disabled { border-color: %6; background: %5; }
         QLabel[error="true"] { color: %15; }
         QFrame[card="true"] { background: %3; border: 1px solid %6; border-radius: 12px; }
         QFrame[card="true"] QLabel { background: transparent; border: none; }
         QFrame#settings_surface { background: %2; }
         QToolTip { background: %3; color: %1; border: 1px solid %6; padding: 6px; }
         QStatusBar { background: %2; color: %4; }
-        QFrame#notification { background: %5; border: 1px solid %16; border-radius: 12px; }
+        QFrame#notification { background: %5; border: 1px solid %6; border-radius: 12px; }
         QToolButton#notification_dismiss { background: transparent; border: 1px solid transparent; border-radius: 7px; padding: 0; min-height: 0; }
         QToolButton#notification_dismiss:hover { background: %7; border-color: %6; }
         QToolButton#notification_dismiss:pressed { background: %3; }
@@ -386,5 +420,6 @@ void appearance::apply(const QSettings &settings, const QString &additional_styl
     style.replace("@warning@", dark ? "#E7BD6A" : "#8A5D00");
     style.replace("@launch_height@", QString::number(scaled(settings, 44) - 16));
     style.replace("@navigation_height@", QString::number(scaled(settings, 40) - 20));
+    style.replace("@indicator_size@", QString::number(scaled(settings, 18) - 4));
     qApp->setStyleSheet(style + additional_style);
 }

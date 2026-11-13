@@ -17,10 +17,10 @@
 
 [Setup]
 AppId={{2B7F5CF1-ABF4-4992-899D-B0A17F8DA51E}
-AppName=XLibrary
+AppName=Fora.Deck
 AppVersion={#AppVersion}
-AppVerName=XLibrary {#AppVersion}
-AppPublisher=lappland-open
+AppVerName=Fora.Deck {#AppVersion}
+AppPublisher=ForaSource
 AppPublisherURL=https://github.com/ForaSource/Fora.Deck
 DefaultDirName={localappdata}\Programs\XLibrary
 DefaultGroupName=XLibrary
@@ -54,13 +54,30 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [InstallDelete]
 Type: files; Name: "{app}\portable.flag"
+Type: files; Name: "{group}\XLibrary.lnk"
+Type: files; Name: "{autodesktop}\XLibrary.lnk"
 
 [Files]
 Source: "{#PackageDir}\*"; DestDir: "{app}"; Excludes: "portable.flag,data\*"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\XLibrary"; Filename: "{app}\XLibrary.exe"
-Name: "{autodesktop}\XLibrary"; Filename: "{app}\XLibrary.exe"; Tasks: desktopicon
+Name: "{group}\Fora.Deck"; Filename: "{app}\XLibrary.exe"
+Name: "{autodesktop}\Fora.Deck"; Filename: "{app}\XLibrary.exe"; Check: ShouldCreateDesktopShortcut
 
 [Run]
-Filename: "{app}\XLibrary.exe"; Description: "{cm:LaunchProgram,XLibrary}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\XLibrary.exe"; Description: "{cm:LaunchProgram,Fora.Deck}"; Flags: nowait postinstall skipifsilent
+
+[Code]
+var
+  HadDesktopShortcut: Boolean;
+
+procedure InitializeWizard;
+begin
+  { Record the old shortcut before InstallDelete removes its former name. }
+  HadDesktopShortcut := FileExists(ExpandConstant('{autodesktop}\XLibrary.lnk'));
+end;
+
+function ShouldCreateDesktopShortcut: Boolean;
+begin
+  Result := HadDesktopShortcut or WizardIsTaskSelected('desktopicon');
+end;

@@ -48,7 +48,7 @@ NotificationBanner::NotificationBanner(QSettings &settings, const int spacing, c
 
 void NotificationBanner::refresh_appearance() {
     const bool dark = appearance::is_dark(settings);
-    const QColor color(dark ? "#A8A9AF" : "#555B64");
+    const QColor color(dark ? "#AEB5BF" : "#56606D");
     const auto icon_size = appearance::scaled(settings, 20);
     message_icon->setPixmap(appearance::icon("info", color).pixmap(icon_size, icon_size));
     message_icon->setFixedSize(icon_size, icon_size);
@@ -71,7 +71,7 @@ void NotificationBanner::refresh_appearance() {
     if (!link_text.isEmpty())
         text += QString("<p style=\"margin-top: 6px; margin-bottom: 0;\"><a href=\"report\" "
                         "style=\"color: %1;\">%2</a></p>")
-                    .arg(dark ? "#EBEBED" : "#22252A", link_text.toHtmlEscaped());
+                    .arg(dark ? "#F16647" : "#B63F2B", link_text.toHtmlEscaped());
     message_label->setTextFormat(Qt::RichText);
     message_label->setText(text);
 }

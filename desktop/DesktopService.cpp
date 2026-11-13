@@ -142,7 +142,7 @@ DesktopService::DesktopService(QObject *const parent, const QString &profile_pat
         }
         emit profile_state_changed();
         notify(QCoreApplication::translate(
-                   "XLibrary", "Profile restored. Restart XLibrary to apply all settings. Previous profile: %1")
+                   "XLibrary", "Profile restored. Restart Fora.Deck to apply all settings. Previous profile: %1")
                    .arg(recovery));
     });
     connect(worker, &Manager::result, this, &DesktopService::publish_result);
@@ -1269,7 +1269,7 @@ bool DesktopService::reset_settings() {
     GithubTokenStore::lock_profile(settings, true);
     emit profile_state_changed();
     notify(QCoreApplication::translate(
-        "XLibrary", "Settings reset. Restart XLibrary to apply the defaults. Your catalog was kept."));
+        "XLibrary", "Settings reset. Restart Fora.Deck to apply the defaults. Your catalog was kept."));
     return true;
 }
 
@@ -1282,7 +1282,7 @@ void DesktopService::restart_application() {
         arguments.append("--wait-for-profile");
     if (!QProcess::startDetached(QCoreApplication::applicationFilePath(), arguments,
                                  QCoreApplication::applicationDirPath())) {
-        notify(QCoreApplication::translate("XLibrary", "Could not restart XLibrary. Close and open it manually."));
+        notify(QCoreApplication::translate("XLibrary", "Could not restart Fora.Deck. Close and open it manually."));
         return;
     }
     QCoreApplication::quit();

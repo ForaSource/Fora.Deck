@@ -72,7 +72,7 @@ QWidget *general(const ui_context &context, QWidget *) {
         {{QCoreApplication::translate("XLibrary", "System language"), "system"}, {"English", "en"}, {"Русский", "ru"}},
         "system");
     widget->layout()->addWidget(label(
-        QCoreApplication::translate("XLibrary", "Language changes take effect after restarting XLibrary."), "muted"));
+        QCoreApplication::translate("XLibrary", "Language changes take effect after restarting Fora.Deck."), "muted"));
     checkbox(widget, settings, "behavior/autostart", QCoreApplication::translate("XLibrary", "Start at login"), false);
     checkbox(widget, settings, "behavior/close_to_tray",
              QCoreApplication::translate("XLibrary", "Minimize to tray on close"), true);
@@ -97,13 +97,13 @@ QWidget *general(const ui_context &context, QWidget *) {
                      QCoreApplication::translate("XLibrary",
                                                  "Restore default interface, shortcuts, sources and behavior settings? "
                                                  "Applications, tags, scenarios, history and saved credentials will be "
-                                                 "kept. XLibrary will need a restart."),
+                                                 "kept. Fora.Deck will need a restart."),
                      QCoreApplication::translate("XLibrary", "Reset")))
             return;
         if (!service->reset_settings())
             return;
-        if (confirm(widget, QCoreApplication::translate("XLibrary", "Restart XLibrary"),
-                    QCoreApplication::translate("XLibrary", "Settings were reset. Restart XLibrary now?"),
+        if (confirm(widget, QCoreApplication::translate("XLibrary", "Restart Fora.Deck"),
+                    QCoreApplication::translate("XLibrary", "Settings were reset. Restart Fora.Deck now?"),
                     QCoreApplication::translate("XLibrary", "Restart")))
             service->restart_application();
         if (auto *dialog = qobject_cast<QDialog *>(widget->window()))
@@ -339,21 +339,21 @@ QWidget *library_settings(const ui_context &context, QWidget *) {
                   "before importing. Matching configurations are skipped by default. Applications are never launched "
                   "automatically."),
               "muted"));
-    auto *import = button(QCoreApplication::translate("XLibrary", "Import…"));
-    auto *export_button = button(QCoreApplication::translate("XLibrary", "Export…"));
+    auto *import = button(QCoreApplication::translate("XLibrary", "Import…"), nullptr, "import");
+    auto *export_button = button(QCoreApplication::translate("XLibrary", "Export…"), nullptr, "export");
     widget->layout()->addWidget(import);
     widget->layout()->addWidget(export_button);
     QObject::connect(import, &QPushButton::clicked, widget, [=] {
         const auto path =
             QFileDialog::getOpenFileName(widget, QCoreApplication::translate("XLibrary", "Import library"), {},
-                                         QCoreApplication::translate("XLibrary", "XLibrary catalog (*.json)"));
+                                         QCoreApplication::translate("XLibrary", "Fora.Deck catalog (*.json)"));
         if (!path.isEmpty())
             service->import_catalog(path);
     });
     QObject::connect(export_button, &QPushButton::clicked, widget, [=] {
         const auto path = QFileDialog::getSaveFileName(
             widget, QCoreApplication::translate("XLibrary", "Export library"), "xlibrary.json",
-            QCoreApplication::translate("XLibrary", "XLibrary catalog (*.json)"));
+            QCoreApplication::translate("XLibrary", "Fora.Deck catalog (*.json)"));
         if (!path.isEmpty())
             service->export_catalog(path);
     });
@@ -376,7 +376,7 @@ QWidget *storage_page(const ui_context &context, QWidget *) {
     widget->layout()->addWidget(
         label(QCoreApplication::translate(
                   "XLibrary",
-                  "Your library, tags, scenarios and settings are stored on this computer. XLibrary does not upload "
+                  "Your library, tags, scenarios and settings are stored on this computer. Fora.Deck does not upload "
                   "your catalog. Update checks contact GitHub; your saved access token is kept in the system "
                   "credential store."),
               "muted"));
@@ -509,7 +509,7 @@ QWidget *plugins(const ui_context &context, QWidget *) {
         label(QCoreApplication::translate(
                   "XLibrary",
                   "Native plugins can change interface areas and appearance. Enable only trusted modules; they run "
-                  "inside XLibrary. Changes take effect after restart."),
+                  "inside Fora.Deck. Changes take effect after restart."),
               "muted"));
     auto available = context.parameters.value("available_plugins").toStringList();
     const auto enabled = context.settings->value("plugins/enabled").toStringList();
@@ -560,8 +560,8 @@ QWidget *plugins(const ui_context &context, QWidget *) {
     }
     if (available.isEmpty() && !service->safe_mode())
         widget->layout()->addWidget(
-            label(QCoreApplication::translate("XLibrary",
-                                              "No modules installed. Folder: plugins next to the XLibrary executable."),
+            label(QCoreApplication::translate(
+                      "XLibrary", "No modules installed. Folder: plugins next to the Fora.Deck executable."),
                   "muted"));
     static_cast<QVBoxLayout *>(widget->layout())->addStretch();
     return widget;
@@ -593,7 +593,7 @@ QWidget *help_page(const ui_context &context, QWidget *) {
          QCoreApplication::translate(
              "XLibrary",
              "Open Settings → Keyboard shortcuts to see or change the current bindings. Clear a binding to disable it. "
-             "Assign application and scenario shortcuts in their editors. A shortcut already used by XLibrary or "
+             "Assign application and scenario shortcuts in their editors. A shortcut already used by Fora.Deck or "
              "another application "
              "may be refused. On Wayland, system permission or a desktop shortcut may be required.")}};
     for (const auto &topic : topics) {
@@ -618,11 +618,12 @@ QWidget *about(const ui_context &context, QWidget *) {
     logo->setPixmap(appearance::logo().pixmap(logo_size, logo_size));
     identity->addWidget(logo, 0, Qt::AlignTop);
     auto *title = new QVBoxLayout;
-    title->addWidget(label("XLibrary", "heading"));
+    title->addWidget(label(QGuiApplication::applicationDisplayName(), "heading"));
     auto *version =
         label(QCoreApplication::translate("XLibrary", "Version ") + QCoreApplication::applicationVersion(), "muted");
     version->setTextInteractionFlags(Qt::TextSelectableByMouse | Qt::TextSelectableByKeyboard);
     title->addWidget(version);
+    title->addWidget(label(QCoreApplication::translate("XLibrary", "By ForaSource"), "muted"));
     identity->addLayout(title, 1);
     card_layout->addLayout(identity);
     card_layout->addWidget(
@@ -649,7 +650,7 @@ QWidget *about(const ui_context &context, QWidget *) {
     QObject::connect(copy, &QPushButton::clicked, widget, [=] {
         const auto text =
             QCoreApplication::translate("XLibrary",
-                                        "XLibrary %1\nOS: %2\nArchitecture: %3\nQt: %4\nSession: %5\nMode: %6")
+                                        "Fora.Deck %1\nOS: %2\nArchitecture: %3\nQt: %4\nSession: %5\nMode: %6")
                 .arg(QCoreApplication::applicationVersion(), QSysInfo::prettyProductName(),
                      QSysInfo::currentCpuArchitecture(), QString::fromLatin1(qVersion()),
                      QGuiApplication::platformName(),
@@ -661,11 +662,12 @@ QWidget *about(const ui_context &context, QWidget *) {
     widget->layout()->addWidget(card);
     widget->layout()->addWidget(
         label(QCoreApplication::translate("XLibrary", "Technologies and licenses"), "subheading"));
-    widget->layout()->addWidget(label(
-        QString(QCoreApplication::translate("XLibrary", "Qt %1 · C++23 · SQLite · QtKeychain\nXLibrary — "
-                                                        "MIT\nThird-party licenses are included with the application."))
-            .arg(QString::fromLatin1(qVersion())),
-        "muted"));
+    widget->layout()->addWidget(
+        label(QString(QCoreApplication::translate(
+                          "XLibrary", "Qt %1 · C++23 · SQLite · QtKeychain · Inter\nFora.Deck — "
+                                      "MIT; Inter — OFL 1.1\nThird-party licenses are included with the application."))
+                  .arg(QString::fromLatin1(qVersion())),
+              "muted"));
     static_cast<QVBoxLayout *>(widget->layout())->addStretch();
     return widget;
 }
@@ -748,9 +750,10 @@ QWidget *update_page(const ui_context &context, QWidget *) {
     update_progress->hide();
     auto *cancel_update = button(QCoreApplication::translate("XLibrary", "Cancel"));
     cancel_update->hide();
-    auto *release_button = button(QCoreApplication::translate("XLibrary", "Open release on GitHub ↗"));
+    auto *release_button =
+        button(QCoreApplication::translate("XLibrary", "Open release on GitHub ↗"), nullptr, "external");
     release_button->hide();
-    auto *install_update = button(QCoreApplication::translate("XLibrary", "Update now"));
+    auto *install_update = button(QCoreApplication::translate("XLibrary", "Update now"), "primary", "download");
     install_update->setAutoDefault(false);
     install_update->hide();
     card_layout->addWidget(check_update);
@@ -863,6 +866,9 @@ QWidget *update_page(const ui_context &context, QWidget *) {
         release_button->show();
         install_update->setText(
             QCoreApplication::translate("XLibrary", updates->can_install() ? "Update now" : "Open release"));
+        const auto icon_name = updates->can_install() ? "download" : "external";
+        install_update->setProperty("appearance_icon", icon_name);
+        install_update->setIcon(appearance::icon(icon_name, QColor("#181A1D")));
         install_update->show();
         update_status->setText(QCoreApplication::translate("XLibrary", "New version available: %1 (%2 channel)")
                                    .arg(updates->available_version(), channel->currentText()));
@@ -881,10 +887,10 @@ QWidget *update_page(const ui_context &context, QWidget *) {
         if (updates->is_busy() || tokens->is_busy() || updates->available_version().isEmpty())
             return;
         if (updates->can_install()) {
-            if (confirm(widget, QCoreApplication::translate("XLibrary", "XLibrary update"),
+            if (confirm(widget, QCoreApplication::translate("XLibrary", "Fora.Deck update"),
                         QCoreApplication::translate(
                             "XLibrary", "A new version is available: %1 (current: %2). Update now?\n\n"
-                                        "XLibrary will download and verify the installer, then close. "
+                                        "Fora.Deck will download and verify the installer, then close. "
                                         "Complete the update in the installation wizard. Your library and settings "
                                         "will be kept. Save any unsaved edits before continuing.")
                             .arg(updates->available_version(), QCoreApplication::applicationVersion()),
@@ -892,7 +898,7 @@ QWidget *update_page(const ui_context &context, QWidget *) {
                 *request_started = true;
                 updates->download();
             }
-        } else if (confirm(widget, QCoreApplication::translate("XLibrary", "XLibrary update"),
+        } else if (confirm(widget, QCoreApplication::translate("XLibrary", "Fora.Deck update"),
                            QCoreApplication::translate(
                                "XLibrary",
                                "A new version is available: %1 (current: %2). Open the release on GitHub?\n\n"
@@ -922,14 +928,14 @@ QDialog *settings_dialog(const ui_context &context, QWidget *const parent) {
     auto *hotkey = static_cast<GlobalHotkey *>(context.parameters.value("hotkey").value<QObject *>());
     auto *overlay_hotkey = static_cast<GlobalHotkey *>(context.parameters.value("overlay_hotkey").value<QObject *>());
     auto *dialog = new QDialog(parent);
-    dialog->setWindowTitle(QCoreApplication::translate("XLibrary", "XLibrary settings"));
+    dialog->setWindowTitle(QCoreApplication::translate("XLibrary", "Fora.Deck settings"));
     prepare_dialog(dialog, context, {960, 700}, {640, 420});
     auto *root = new QVBoxLayout(dialog);
     root->setContentsMargins(24, 20, 24, 20);
     root->setSpacing(16);
     root->addWidget(label(QCoreApplication::translate("XLibrary", "Settings"), "heading"));
     root->addWidget(
-        label(QCoreApplication::translate("XLibrary", "XLibrary appearance, behavior, and features"), "muted"));
+        label(QCoreApplication::translate("XLibrary", "Fora.Deck appearance, behavior, and features"), "muted"));
     auto *body = new QHBoxLayout;
     body->setSpacing(16);
     auto *categories = new QButtonGroup(dialog);
@@ -960,6 +966,7 @@ QDialog *settings_dialog(const ui_context &context, QWidget *const parent) {
             {"settings_files", "file"},       {"settings_plugins", "plugin"},     {"settings_update", "refresh"},
             {"settings_help", "help"},        {"settings_about", "info"}};
         item->setIcon(appearance::icon(icons.value(section.second), item->palette().color(QPalette::ButtonText)));
+        item->setProperty("appearance_icon", icons.value(section.second));
         const auto icon_size = appearance::scaled(*context.settings, 20);
         item->setIconSize({icon_size, icon_size});
         item->setObjectName(section.second + "_category");

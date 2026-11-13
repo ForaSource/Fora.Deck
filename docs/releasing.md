@@ -48,7 +48,7 @@ The existing [Windows packager](../packaging/build_release.ps1) builds Release, 
 
 Choose one command per output directory. The default is `release/v<VERSION>-<compiler>/`, containing `XLibrary-<VERSION>-windows-x64-<compiler>-portable.zip`, optional `*-setup.exe`, `build-info.json` and `SHA256SUMS.txt`. The release workflow builds Windows assets with **MinGW**, preserving the toolchain-specific installer selection used by existing clients. MSVC packaging remains supported locally.
 
-Close XLibrary if it is running from the selected build directory, including its tray process, before packaging: Windows locks that executable. A copy running from a different directory does not block rebuilding. Configure/build/install output is saved to `<BuildPath>/packaging-release.log`; failed staging remains under `build/release-<id>`.
+Close Fora.Deck if it is running from the selected build directory, including its tray process, before packaging: Windows locks that executable. A copy running from a different directory does not block rebuilding. Configure/build/install output is saved to `<BuildPath>/packaging-release.log`; failed staging remains under `build/release-<id>`.
 
 MSVC needs an x64 developer shell or `-MsvcRuntimePath <CRT directory>`; the default CRT path is `VCToolsRedistDir/x64/Microsoft.VC143.CRT`. MinGW runtime DLLs are located using the configured `g++.exe`; licenses are searched in its installation. Use `-CompilerLicensePath` for a nonstandard layout. Missing mandatory runtime/license files stop packaging.
 
@@ -97,6 +97,13 @@ Before publication, install the DEB in a **clean Debian 13 without Qt SDK or bui
 ## Dependency materials
 
 The application is MIT licensed; dependencies retain their own licenses. Do not remove distribution `licenses/`, `sources/` or `THIRD_PARTY_NOTICES.txt` from bundled packages. Qt stays dynamically replaceable. Check applicable redistribution terms, including the compiler runtime and QtKeychain notices.
+
+Inter Regular/Medium/SemiBold are embedded font resources under SIL OFL 1.1. CMake installs the
+original [font license](../assets/fonts/OFL.txt) as `licenses/inter/OFL.txt` on Windows and
+`share/licenses/XLibrary/inter/OFL.txt` on Linux. The Debian copyright file also includes its full
+text. Keep these notices in ZIP, installer, AppImage and DEB distributions; see the
+[font provenance](../assets/fonts/README.md). Product and author labels are Fora.Deck and ForaSource;
+technical package filenames, the `XLibrary` CMake target and installer AppId retain their existing values.
 
 [qt_sources.json](../packaging/qt_sources.json) pins hashes for supported official Qt source archives; unknown versions/modules require verified manifest entries matching the binaries. Windows accepts `-QtSourceManifest` and `-QtSourceCache` (default `build/windows-packaging-cache`), including through the combined packager. Cached archives are verified again. Windows source downloads use `curl.exe`, at most three attempts of 300 seconds; license extraction uses the configured `cmake -E tar`, with a 120-second limit per archive and diagnostics in the packaging log. SBOM files are included when the Qt installation supplies them.
 

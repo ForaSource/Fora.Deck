@@ -276,7 +276,7 @@ private slots:
                      QVariant::fromValue(PortalShortcuts{
                          {action_id,
                           {{"description",
-                            QCoreApplication::translate("XLibrary", "XLibrary shortcut") + " (" + trigger + ')'},
+                            QCoreApplication::translate("XLibrary", "Fora.Deck shortcut") + " (" + trigger + ')'},
                            {"preferred_trigger", trigger}}}}),
                      QString{}},
                     {});
@@ -650,7 +650,7 @@ bool GlobalHotkey::set_sequence(const QKeySequence &value, QString &error) {
     return true;
 #else
     error = QCoreApplication::translate(
-        "XLibrary", "The global shortcut requires an X11-enabled build. Assign XLibrary using system settings.");
+        "XLibrary", "The global shortcut requires an X11-enabled build. Assign Fora.Deck using system settings.");
     return false;
 #endif
 }

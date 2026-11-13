@@ -7,6 +7,10 @@
 **Settings → Profile** shows the actual database and settings paths, schema/product versions, storage mode, and last error.
 Use these displayed paths when locating your profile; operating-system configuration can change the defaults.
 
+Fora.Deck retains XLibrary's technical application and organization names. The rebrand does not create
+a new profile folder, rename `xlibrary.db`, or change the `.xlprofile` format or credential-store identity.
+Do not rename profile directories just to match the new display name.
+
 | Mode | Storage |
 | --- | --- |
 | Installed | The operating system's per-user data folders. The catalog is normally `%LOCALAPPDATA%\XLibrary\xlibrary.db` on Windows or `${XDG_DATA_HOME:-~/.local/share}/XLibrary/xlibrary.db` on Linux. |
@@ -30,10 +34,10 @@ The local token remains local.
 ## Restoring a profile
 
 1. Choose **Settings → Profile → Restore profile…** and select the backup.
-2. Review the preview. XLibrary checks the format, schema, date, contents, and file fingerprint before replacement.
-3. Confirm restoration and restart XLibrary when prompted to apply all settings.
+2. Review the preview. Fora.Deck checks the format, schema, date, contents, and file fingerprint before replacement.
+3. Confirm restoration and restart Fora.Deck when prompted to apply all settings.
 
-Restoration replaces the current profile. XLibrary preserves its previous database, journals, settings, and a complete backup when readable.
+Restoration replaces the current profile. Fora.Deck preserves its previous database, journals, settings, and a complete backup when readable.
 An interrupted replacement rolls back at the next startup. Keep your own separate backups as well.
 
 Schema upgrades are sequential and transactional. Before migration, an existing database receives a timestamped

@@ -1,9 +1,14 @@
 # Architecture
 
-XLibrary is a C++23 desktop application built with Qt Widgets and SQLite. It has
+Fora.Deck is a C++23 desktop application built with Qt Widgets and SQLite. It has
 two primary application targets: `xlibrary_core` for the backend and `XLibrary` for the desktop
 application. The backend uses Qt Core, Gui and Concurrent; on Linux it also uses
 Qt DBus. It does not depend on widgets or headers in `desktop/`.
+
+The public product name is Fora.Deck and the author name is ForaSource. Startup sets
+`applicationDisplayName` separately from the retained technical `applicationName` and
+`organizationName` (`XLibrary`). Executables, CMake targets, profile paths, IPC, backup
+identifiers, translation contexts and plugin IID keep their existing names.
 
 ## Component ownership
 

@@ -1,7 +1,7 @@
 # Interface design
 
-XLibrary uses a quiet desktop interface with neutral graphite or soft light
-surfaces, slate accents and original application icons. This guide records the
+Fora.Deck uses a quiet desktop interface with neutral graphite or soft light
+surfaces, restrained coral accents and original application icons. This guide records the
 design direction and its current implementation boundaries. It is not a claim
 that every screen has passed visual acceptance on every desktop environment.
 
@@ -10,12 +10,14 @@ that every screen has passed visual acceptance on every desktop environment.
 The full library places navigation and tags on the left, search above the main
 list, and details for the selected application on the right. Related rows share
 a surface; spacing and thin dividers separate groups. Primary launch actions use
-tone and placement for emphasis. Status color belongs to a small indicator or
+coral and placement for emphasis. In the inspector, launch precedes tags and technical details;
+browser launch-profile controls stay next to it. Removal is separated from the other actions.
+Status color belongs to a small indicator or
 message, with text describing the state.
 
 When file search is enabled and selected, the main Files workspace replaces the application
 list with a file-only result list that fills the available height.
-The details pane keeps its width and shows “Nothing to display here :(” in file mode or when no application is selected,
+The details pane keeps its width and shows “Details will appear here.” in file mode or when no application is selected,
 so switching between applications and files does not move the search controls.
 Application-specific sections, including tags, remain available separately.
 Both search fields show the shared Files switch only while indexing mode is Basic or Full.
@@ -45,18 +47,41 @@ dialogs.
 | [`SearchOverlay`](../desktop/SearchOverlay.h) | Compact search surface, placement and reveal/height animation. |
 | [`PlatformIntegration`](../desktop/PlatformIntegration.h) | Platform appearance, composition and system animation preferences. |
 
-The current dark palette starts with base `#242528`, panels `#2A2B2E`, fields
-`#303135`, text `#EBEBED` and slate primary buttons `#68717C`. The light palette
-uses base `#F3F3F4`, panels `#EBECEE`, white fields and text `#22252A`. Selection,
-border and secondary-text colors are defined alongside these in
-[`appearance.cpp`](../desktop/appearance.cpp); that code is the source of truth.
-These colors are starting points for contrast, not a reason to duplicate theme
-constants in individual views.
+[`appearance.cpp`](../desktop/appearance.cpp) owns the shared palette and styles;
+that code is the source of truth. The current values include:
 
-The application requests Segoe UI with Qt's sans-serif fallback and applies a
-shared scaled font size. Use `appearance::scaled` for dimensions affected by the
-text-scale preference. Preserve original application icon colors and use the
-existing vector icon system for XLibrary controls.
+| Role | Dark | Light |
+| --- | --- | --- |
+| Shell and side panes | `#181A1D` | `#F5F6F8` |
+| Main work surface and dialogs | `#202328` | `#FFFFFF` |
+| Fields and secondary surfaces | `#2A2E34` | `#EDF0F4` |
+| Neutral hover | `#2D323A` | `#E5EAF0` |
+| Selection | `#392B29` | `#FBE8E2` |
+| Decorative separators | `#343A43` | `#DEE3E9` |
+| Field borders | `#778191` | `#7A8595` |
+| Main text | `#F2F3F5` | `#20242B` |
+| Secondary text | `#AEB5BF` | `#56606D` |
+| Small accent text and focus | `#F16647` | `#B63F2B` |
+
+Primary buttons use coral `#F16647` with dark `#181A1D` text and icons;
+hover uses `#FF795C`, press uses `#E45E40`, and unavailable controls use neutral colors.
+Selection is flat, with a separate two-pixel keyboard focus border. Borders reserve
+space so receiving focus does not move the control. Green, amber and red describe
+status alongside text, rather than identifying ordinary navigation sections.
+
+The application loads local Inter Regular/Medium/SemiBold (400/500/600), including
+Cyrillic, from embedded resources. If loading fails, Qt's sans-serif fallback is used.
+The base text is 14 logical pixels, captions 12, page headings 24 and group headings 16.
+Application rows retain their 52-pixel base height. Use `appearance::scaled` for dimensions
+affected by the text-scale preference; larger fonts and stored pane widths must remain usable.
+Preserve original application icon colors and use the existing 24×24 vector icon system,
+with rounded 1.75-pixel strokes, for Fora.Deck controls.
+
+The product mark is a geometric D with a displaced panel; the wordmark keeps `Fora` and
+`Deck` in the same color and weight, with a coral dot. Ordinary titles and accessible
+names use the exact text `Fora.Deck`. [Brand assets](../assets/README.md) document the
+vector originals, raster exports and unchanged technical filenames. The public author
+name is ForaSource; this does not rename the executable, profile, IPC or plugin identifiers.
 
 ## Interaction and feedback
 
@@ -68,7 +93,8 @@ existing vector icon system for XLibrary controls.
   selection must not leave unrelated details visible.
 - Use the common `NotificationBanner` for new in-window notifications. Its
   default duration is seven seconds, with a text action when needed, a close
-  control and a time bar. Longer intervals need a specific reason.
+  control and a time bar. Its surface is quiet, with an information icon, accent link
+  and thin coral countdown. Longer intervals need a specific reason.
 - Reserve dialogs for confirmation, input and details. Field errors should stay
   near the field and remain understandable without relying on color alone.
 - Keep motion brief and tied to a state change. Both the application animation

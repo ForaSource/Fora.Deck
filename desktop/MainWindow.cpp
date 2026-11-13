@@ -129,7 +129,7 @@ MainWindow::MainWindow(DesktopService &service)
         refresh_actions();
         update_layout();
     });
-    setWindowTitle("XLibrary");
+    setWindowTitle(QGuiApplication::applicationDisplayName());
     setWindowIcon(appearance::logo());
     const auto available = screen()->availableGeometry().size() - QSize(32, 64);
     setMinimumSize(QSize(960, 640).boundedTo(available));
@@ -153,13 +153,13 @@ MainWindow::MainWindow(DesktopService &service)
     appearance::apply(service.settings, registry.style_sheet());
     setCentralWidget(registry.create("shell", context, this));
     auto *tray_menu = new QMenu(this);
-    auto *show_action = tray_menu->addAction(QCoreApplication::translate("XLibrary", "Open XLibrary"));
+    auto *show_action = tray_menu->addAction(QCoreApplication::translate("XLibrary", "Open Fora.Deck"));
     connect(show_action, &QAction::triggered, this, &MainWindow::show_library);
     tray_menu->addAction(context.actions.value("settings"));
     tray_menu->addSeparator();
     tray_menu->addAction(context.actions.value("quit"));
     tray.setIcon(windowIcon());
-    tray.setToolTip("XLibrary");
+    tray.setToolTip(QGuiApplication::applicationDisplayName());
     tray.setContextMenu(tray_menu);
     if (QSystemTrayIcon::isSystemTrayAvailable())
         tray.show();
@@ -379,6 +379,11 @@ void MainWindow::apply_settings() {
         if (const auto icon_name = action->property("appearance_icon").toString(); !icon_name.isEmpty())
             action->setIcon(appearance::icon(icon_name));
     for (auto *control : findChildren<QAbstractButton *>()) {
+        const auto icon_name = control->property("appearance_icon").toString();
+        if (!icon_name.isEmpty())
+            control->setIcon(appearance::icon(icon_name, control->property("primary").toBool()
+                                                             ? QColor("#181A1D")
+                                                             : control->palette().color(QPalette::PlaceholderText)));
         control->setIconSize(QSize(appearance::scaled(service.settings, 20), appearance::scaled(service.settings, 20)));
         if (control->property("icon_only").toBool())
             control->setFixedWidth(appearance::scaled(service.settings, 44));
@@ -542,7 +547,7 @@ void MainWindow::show_welcome() {
     auto *dialog = new QDialog(this);
     dialog->setObjectName("welcome");
     dialog->setAttribute(Qt::WA_DeleteOnClose);
-    dialog->setWindowTitle(QCoreApplication::translate("XLibrary", "Welcome to XLibrary"));
+    dialog->setWindowTitle(QCoreApplication::translate("XLibrary", "Welcome to Fora.Deck"));
     prepare_dialog(dialog, context, {700, 640}, {480, 400});
     auto *root = new QVBoxLayout(dialog);
     root->setContentsMargins(28, 28, 28, 28);
@@ -551,6 +556,7 @@ void MainWindow::show_welcome() {
     const auto logo_size = appearance::scaled(service.settings, 64);
     logo->setPixmap(appearance::logo().pixmap(logo_size, logo_size));
     root->addWidget(logo, 0, Qt::AlignHCenter);
+    root->addWidget(label(QGuiApplication::applicationDisplayName(), "heading"), 0, Qt::AlignHCenter);
     root->addWidget(label(QCoreApplication::translate("XLibrary", "Your applications. One home."), "heading"));
     root->addWidget(label(
         QCoreApplication::translate("XLibrary", "Choose how to start. You can return to this screen in Settings."),
@@ -564,8 +570,7 @@ void MainWindow::show_welcome() {
         card->setProperty("card", true);
         auto *layout = new QVBoxLayout(card);
         layout->setContentsMargins(16, 12, 16, 12);
-        auto *control = button(title);
-        control->setIcon(appearance::icon(icon));
+        auto *control = button(title, nullptr, icon);
         layout->addWidget(control);
         layout->addWidget(label(description, "muted"));
         cards->addWidget(card);
@@ -575,7 +580,7 @@ void MainWindow::show_welcome() {
         });
     };
     choice(QCoreApplication::translate("XLibrary", "Find my applications"),
-           QCoreApplication::translate("XLibrary", "Review installed applications and choose what to keep."), "search",
+           QCoreApplication::translate("XLibrary", "Review installed applications and choose what to keep."), "scan",
            [this] { service.discover(); });
     choice(QCoreApplication::translate("XLibrary", "Add an application manually"),
            QCoreApplication::translate("XLibrary", "Choose a file and customize its name, tags and launch options."),
@@ -614,7 +619,7 @@ void MainWindow::show_tutorial() {
     auto *dialog = new QDialog(parent ? parent : this);
     dialog->setObjectName("tutorial");
     dialog->setAttribute(Qt::WA_DeleteOnClose);
-    dialog->setWindowTitle(QCoreApplication::translate("XLibrary", "A quick tour of XLibrary"));
+    dialog->setWindowTitle(QCoreApplication::translate("XLibrary", "A quick tour of Fora.Deck"));
     prepare_dialog(dialog, context, {640, 500}, {420, 340});
     auto *root = new QVBoxLayout(dialog);
     root->setContentsMargins(28, 24, 28, 24);
@@ -640,7 +645,7 @@ void MainWindow::show_tutorial() {
              "Create a scenario, choose applications and set a delay before each launch. Review problems before "
              "starting and follow each step's status. Stop leaves already opened applications running."),
          QCoreApplication::translate("XLibrary", "Waiting → Delay → Launching → Success")},
-        {"keyboard", QCoreApplication::translate("XLibrary", "Keep XLibrary close"),
+        {"keyboard", QCoreApplication::translate("XLibrary", "Keep Fora.Deck close"),
          QCoreApplication::translate("XLibrary",
                                      "Settings → Keyboard shortcuts shows your current bindings for the library, quick "
                                      "search and individual applications or scenarios. Settings also contains local "
@@ -652,8 +657,12 @@ void MainWindow::show_tutorial() {
         layout->setContentsMargins(0, 0, 0, 0);
         layout->setSpacing(20);
         auto *icon = new QLabel;
-        const auto size = appearance::scaled(service.settings, 48);
-        icon->setPixmap(appearance::icon(topic[0], palette().color(QPalette::WindowText)).pixmap(size, size));
+        const auto refresh_icon = [this, icon, icon_name = topic[0]] {
+            const auto size = appearance::scaled(service.settings, 48);
+            icon->setPixmap(appearance::icon(icon_name, palette().color(QPalette::WindowText)).pixmap(size, size));
+        };
+        connect(&service, &DesktopService::appearance_changed, icon, refresh_icon);
+        refresh_icon();
         layout->addWidget(icon);
         layout->addWidget(label(topic[1], "heading"));
         layout->addWidget(label(topic[2], "muted"));

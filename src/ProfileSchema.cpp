@@ -351,7 +351,7 @@ void xlibrary::migrate_profile(sqlite3 *const connection, const std::filesystem:
     if (recorded < 0 || recorded > profile_schema_version)
         throw std::runtime_error("Profile schema " + std::to_string(recorded) + " is newer than supported schema " +
                                  std::to_string(profile_schema_version) +
-                                 "; update XLibrary. The profile was not changed.");
+                                 "; update Fora.Deck. The profile was not changed.");
     auto version = recorded == 0 ? infer_legacy_version(connection) : recorded;
     if (version != 0)
         validate_columns(connection, version);

@@ -104,7 +104,7 @@ bool desktop_platform::installed_for_updates() {
 
 bool desktop_platform::start_update_installer(const QString &path, QString &error) {
     if (!installed_for_updates()) {
-        error = QCoreApplication::translate("XLibrary", "This copy of XLibrary was not installed by the installer.");
+        error = QCoreApplication::translate("XLibrary", "This copy of Fora.Deck was not installed by the installer.");
         return false;
     }
     const auto native_path = QDir::toNativeSeparators(path).toStdWString();
@@ -255,7 +255,7 @@ bool GlobalHotkey::set_sequence(const QKeySequence &value, QString &error) {
     if (modifiers & Qt::MetaModifier)
         flags |= MOD_WIN;
     if (next_id > 0xbfff) {
-        error = QCoreApplication::translate("XLibrary", "Restart XLibrary before changing the shortcut again.");
+        error = QCoreApplication::translate("XLibrary", "Restart Fora.Deck before changing the shortcut again.");
         return false;
     }
     const auto new_id = next_id++;

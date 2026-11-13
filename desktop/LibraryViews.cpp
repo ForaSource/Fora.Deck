@@ -774,7 +774,7 @@ QWidget *library(const ui_context &context, QWidget *const parent) {
     auto *profile = new QPushButton(QCoreApplication::translate("XLibrary", "Open profile folder"));
     auto *restore = new QPushButton(QCoreApplication::translate("XLibrary", "Restore database backup…"));
     auto *restore_profile = new QPushButton(QCoreApplication::translate("XLibrary", "Restore complete profile…"));
-    auto *restart = new QPushButton(QCoreApplication::translate("XLibrary", "Restart XLibrary"));
+    auto *restart = new QPushButton(QCoreApplication::translate("XLibrary", "Restart Fora.Deck"));
     recovery_layout->addWidget(retry);
     recovery_layout->addWidget(profile);
     recovery_layout->addWidget(restore);
@@ -1300,16 +1300,17 @@ QWidget *scenarios(const ui_context &context, QWidget *const parent) {
     QObject::connect(service, &DesktopService::catalog_changed, widget, rebuild_steps);
     QObject::connect(list, &QListWidget::currentRowChanged, widget, [=] { rebuild_steps(); });
     auto *tools = new QHBoxLayout;
-    auto *run = button(QCoreApplication::translate("XLibrary", "Run scenario"), "primary");
-    auto *edit = button(QCoreApplication::translate("XLibrary", "Edit"));
-    auto *remove = button(QCoreApplication::translate("XLibrary", "Remove"));
-    auto *stop = button(QCoreApplication::translate("XLibrary", "Stop"));
+    auto *run = button(QCoreApplication::translate("XLibrary", "Run scenario"), "primary", "play");
+    auto *edit = button(QCoreApplication::translate("XLibrary", "Edit"), nullptr, "edit");
+    auto *remove = button(QCoreApplication::translate("XLibrary", "Remove"), "danger", "trash");
+    auto *stop = button(QCoreApplication::translate("XLibrary", "Stop"), nullptr, "stop");
+    remove->setProperty("quiet", true);
     auto *issues = new QPlainTextEdit;
     issues->setReadOnly(true);
     issues->setAccessibleName(QCoreApplication::translate("XLibrary", "Scenario issues"));
     issues->setMinimumHeight(appearance::scaled(*context.settings, 60));
     issues->setMaximumHeight(appearance::scaled(*context.settings, 150));
-    auto *recheck = button(QCoreApplication::translate("XLibrary", "Check again"));
+    auto *recheck = button(QCoreApplication::translate("XLibrary", "Check again"), nullptr, "refresh");
     root->addWidget(issues);
     const auto check_selected = [=] {
         const auto id = list->currentItem() ? list->currentItem()->data(Qt::UserRole).toLongLong() : 0;
@@ -1354,7 +1355,7 @@ QWidget *scenarios(const ui_context &context, QWidget *const parent) {
                 record.name + QCoreApplication::translate("XLibrary", "\nApplications: %1").arg(record.steps.size()),
                 list);
             item->setData(Qt::UserRole, record.id);
-            item->setSizeHint({100, 64});
+            item->setSizeHint({100, appearance::scaled(service->settings, 64)});
             if (record.id == selected)
                 list->setCurrentItem(item);
         }
@@ -1393,6 +1394,7 @@ QWidget *scenarios(const ui_context &context, QWidget *const parent) {
     });
     QObject::connect(stop, &QPushButton::clicked, service, &DesktopService::cancel_scenario);
     QObject::connect(service, &DesktopService::catalog_changed, widget, rebuild);
+    QObject::connect(service, &DesktopService::appearance_changed, widget, rebuild, Qt::QueuedConnection);
     QObject::connect(service, &DesktopService::scenario_changed, widget, [=](const QString &text) {
         status->setText(text);
         run->setEnabled(list->count() > 0 && !service->is_scenario_active());

@@ -54,7 +54,7 @@ Escape or the global shortcut dismisses quick search. The button on the right op
 
 Change or clear bindings in **Settings → Keyboard shortcuts**. Both Enter keys are supported; text editing keys keep their usual meaning
 inside text fields. Escape clears library search and cannot be reassigned. Duplicate bindings are rejected when saving.
-Built-in global shortcuts require XLibrary to be running; Wayland starts with unassigned global bindings.
+Built-in global shortcuts require Fora.Deck to be running; Wayland starts with unassigned global bindings.
 
 Application and scenario editors also accept a global hotkey. Their assignments appear in the corresponding keyboard settings tabs.
 The editor shows a persistent-ID command for use with a system shortcut: `XLibrary --launch-id ID` or `XLibrary --scenario-id ID`.
@@ -66,7 +66,7 @@ File search is **Off** by default. Enable it in **Settings → File search** to 
 the search field in the main window and quick search. The switch selects either applications (off) or files (on);
 the two result types are never mixed. Both windows share the selection, starting with applications.
 Selecting files opens the main **Files** workspace instead of the application list.
-The details pane keeps its width and shows “Nothing to display here :(” in file mode or when no application is selected.
+The details pane keeps its width and shows “Details will appear here.” in file mode or when no application is selected.
 Favorites, running applications, tags, scenarios and My files remain available as separate sections.
 Opening one of these sections returns search to applications. Disabling file search hides the switch and shows applications.
 An empty query prompts for a filename. The file workspace uses the full available height.
@@ -130,7 +130,7 @@ replacing the placeholder with its filename. The AppImage includes Qt but still 
 the public baseline is Debian 13, Qt 6.8.2, and glibc 2.41. Mark it executable with `chmod +x <package>.AppImage`, then run it.
 See [profile storage](profile.md#storage-modes) before moving or replacing an AppImage.
 
-On Wayland, configure a binding in XLibrary to request permission through the GlobalShortcuts portal,
+On Wayland, configure a binding in Fora.Deck to request permission through the GlobalShortcuts portal,
 or add a system shortcut running `XLibrary --overlay`. Use the full executable or AppImage path when it is not on PATH.
 `XLibrary` opens the full library; both commands also address an already running instance using the same profile.
 

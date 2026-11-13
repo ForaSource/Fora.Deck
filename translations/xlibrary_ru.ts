@@ -40,8 +40,8 @@
         <translation>Не удалось открыть файл.</translation>
     </message>
     <message>
-        <source>Restart XLibrary before changing the shortcut again.</source>
-        <translation>Перезапустите XLibrary перед следующим изменением сочетания клавиш.</translation>
+        <source>Restart Fora.Deck before changing the shortcut again.</source>
+        <translation>Перезапустите Fora.Deck перед следующим изменением сочетания клавиш.</translation>
     </message>
     <message>
         <source>The saved GitHub token was not found. Save a new token or delete it from the update settings.</source>
@@ -124,28 +124,28 @@
         <translation>Не удалось создать временный профиль для проверки запуска.</translation>
     </message>
     <message>
-        <source>Could not create the XLibrary settings folder.</source>
-        <translation>Не удалось создать папку настроек XLibrary.</translation>
+        <source>Could not create the Fora.Deck settings folder.</source>
+        <translation>Не удалось создать папку настроек Fora.Deck.</translation>
     </message>
     <message>
-        <source>Could not write the XLibrary profile lock file. Check access permissions.</source>
-        <translation>Не удалось записать файл блокировки профиля XLibrary. Проверьте права доступа.</translation>
+        <source>Could not write the Fora.Deck profile lock file. Check access permissions.</source>
+        <translation>Не удалось записать файл блокировки профиля Fora.Deck. Проверьте права доступа.</translation>
     </message>
     <message>
-        <source>Another instance of XLibrary is starting or not responding.</source>
-        <translation>Другой экземпляр XLibrary уже запускается или не отвечает.</translation>
+        <source>Another instance of Fora.Deck is starting or not responding.</source>
+        <translation>Другой экземпляр Fora.Deck уже запускается или не отвечает.</translation>
     </message>
     <message>
-        <source>Could not open the XLibrary local channel.</source>
-        <translation>Не удалось открыть локальный канал XLibrary.</translation>
+        <source>Could not open the Fora.Deck local channel.</source>
+        <translation>Не удалось открыть локальный канал Fora.Deck.</translation>
     </message>
     <message>
-        <source>Cannot write XLibrary settings. Choose a writable folder.</source>
-        <translation>Нет прав на запись настроек XLibrary. Выберите доступную для записи папку.</translation>
+        <source>Cannot write Fora.Deck settings. Choose a writable folder.</source>
+        <translation>Нет прав на запись настроек Fora.Deck. Выберите доступную для записи папку.</translation>
     </message>
     <message>
-        <source>XLibrary error</source>
-        <translation>Ошибка XLibrary</translation>
+        <source>Fora.Deck error</source>
+        <translation>Ошибка Fora.Deck</translation>
     </message>
     <message>
         <source>Invalid application name or path.</source>
@@ -858,8 +858,8 @@ Applications: %1</source>
         <translation>Используйте одно сочетание клавиш.</translation>
     </message>
     <message>
-        <source>Wayland manages global shortcuts. Assign XLibrary in the system keyboard settings.</source>
-        <translation>Wayland управляет глобальными сочетаниями. Назначьте запуск XLibrary в настройках клавиатуры системы.</translation>
+        <source>Wayland manages global shortcuts. Assign Fora.Deck in the system keyboard settings.</source>
+        <translation>Wayland управляет глобальными сочетаниями. Назначьте запуск Fora.Deck в настройках клавиатуры системы.</translation>
     </message>
     <message>
         <source>Use a letter, digit, F1–F24, or Space.</source>
@@ -894,8 +894,8 @@ Applications: %1</source>
         <translation>Сочетание занято оконным менеджером или другим приложением.</translation>
     </message>
     <message>
-        <source>The global shortcut requires an X11-enabled build. Assign XLibrary using system settings.</source>
-        <translation>Глобальное сочетание требует сборку с поддержкой X11. Назначьте запуск XLibrary средствами системы.</translation>
+        <source>The global shortcut requires an X11-enabled build. Assign Fora.Deck using system settings.</source>
+        <translation>Глобальное сочетание требует сборку с поддержкой X11. Назначьте запуск Fora.Deck средствами системы.</translation>
     </message>
     <message>
         <source>The /proc filesystem is unavailable: process state is unknown.</source>
@@ -962,8 +962,8 @@ Applications: %1</source>
         <translation>Закрыть уведомление</translation>
     </message>
     <message>
-        <source>Open XLibrary</source>
-        <translation>Открыть XLibrary</translation>
+        <source>Open Fora.Deck</source>
+        <translation>Открыть Fora.Deck</translation>
     </message>
     <message>
         <source>Launch</source>
@@ -1134,8 +1134,8 @@ Applications: %1</source>
         <translation>Открыть настройки</translation>
     </message>
     <message>
-        <source>On Wayland, assign a desktop shortcut to the XLibrary command. It opens the running library. The built-in global shortcut is available on X11.</source>
-        <translation>В Wayland назначьте сочетание в настройках рабочего стола для команды XLibrary. Она открывает уже запущенную библиотеку. Встроенное глобальное сочетание доступно в X11.</translation>
+        <source>On Wayland, assign a desktop shortcut to the Fora.Deck command. It opens the running library. The built-in global shortcut is available on X11.</source>
+        <translation>В Wayland назначьте сочетание в настройках рабочего стола для команды Fora.Deck. Она открывает уже запущенную библиотеку. Встроенное глобальное сочетание доступно в X11.</translation>
     </message>
     <message>
         <source>An empty field disables the shortcut. Application actions use the selected library entry. Text editing keys keep their usual behavior in text fields. ↑↓ selects a row. Escape clears the search and is reserved.</source>
@@ -1182,8 +1182,8 @@ Applications: %1</source>
         <translation>Импорт библиотеки</translation>
     </message>
     <message>
-        <source>XLibrary catalog (*.json)</source>
-        <translation>Библиотека XLibrary (*.json)</translation>
+        <source>Fora.Deck catalog (*.json)</source>
+        <translation>Библиотека Fora.Deck (*.json)</translation>
     </message>
     <message>
         <source>Export library</source>
@@ -1210,12 +1210,12 @@ Applications: %1</source>
         <translation>Модули интерфейса</translation>
     </message>
     <message>
-        <source>Native plugins can change interface areas and appearance. Enable only trusted modules; they run inside XLibrary. Changes take effect after restart.</source>
-        <translation>Нативные плагины могут менять области интерфейса и оформление. Включайте только доверенные модули; они выполняются внутри XLibrary. Изменения применяются после перезапуска.</translation>
+        <source>Native plugins can change interface areas and appearance. Enable only trusted modules; they run inside Fora.Deck. Changes take effect after restart.</source>
+        <translation>Нативные плагины могут менять области интерфейса и оформление. Включайте только доверенные модули; они выполняются внутри Fora.Deck. Изменения применяются после перезапуска.</translation>
     </message>
     <message>
-        <source>No modules installed. Folder: plugins next to the XLibrary executable.</source>
-        <translation>Модули не установлены. Каталог: plugins рядом с исполняемым файлом XLibrary.</translation>
+        <source>No modules installed. Folder: plugins next to the Fora.Deck executable.</source>
+        <translation>Модули не установлены. Каталог: plugins рядом с исполняемым файлом Fora.Deck.</translation>
     </message>
     <message>
         <source>About</source>
@@ -1250,20 +1250,20 @@ Applications: %1</source>
         <translation>Технологии и лицензии</translation>
     </message>
     <message>
-        <source>Qt %1 · C++23 · SQLite · QtKeychain
-XLibrary — MIT
+        <source>Qt %1 · C++23 · SQLite · QtKeychain · Inter
+Fora.Deck — MIT; Inter — OFL 1.1
 Third-party licenses are included with the application.</source>
-        <translation>Qt %1 · C++23 · SQLite · QtKeychain
-XLibrary — MIT
-Лицензии сторонних компонентов входят в комплект программы.</translation>
+        <translation>Qt %1 · C++23 · SQLite · QtKeychain · Inter
+Fora.Deck — MIT; Inter — OFL 1.1
+Лицензии сторонних компонентов включены в поставку приложения.</translation>
     </message>
     <message>
-        <source>XLibrary settings</source>
-        <translation>Настройки XLibrary</translation>
+        <source>Fora.Deck settings</source>
+        <translation>Настройки Fora.Deck</translation>
     </message>
     <message>
-        <source>XLibrary appearance, behavior, and features</source>
-        <translation>Оформление, поведение и возможности XLibrary</translation>
+        <source>Fora.Deck appearance, behavior, and features</source>
+        <translation>Оформление, поведение и возможности Fora.Deck</translation>
     </message>
     <message>
         <source>General</source>
@@ -1358,12 +1358,12 @@ XLibrary — MIT
         <translation>Сочетание занято Windows или другим приложением.</translation>
     </message>
     <message>
-        <source>Invalid XLibrary AppImage launch paths.</source>
-        <translation>Некорректные пути запуска XLibrary AppImage.</translation>
+        <source>Invalid Fora.Deck AppImage launch paths.</source>
+        <translation>Некорректные пути запуска Fora.Deck AppImage.</translation>
     </message>
     <message>
-        <source>Invalid XLibrary AppImage file path.</source>
-        <translation>Некорректный путь к файлу XLibrary AppImage.</translation>
+        <source>Invalid Fora.Deck AppImage file path.</source>
+        <translation>Некорректный путь к файлу Fora.Deck AppImage.</translation>
     </message>
     <message>
         <source>Interface language</source>
@@ -1374,8 +1374,8 @@ XLibrary — MIT
         <translation>Язык системы</translation>
     </message>
     <message>
-        <source>Language changes take effect after restarting XLibrary.</source>
-        <translation>Изменение языка применяется после перезапуска XLibrary.</translation>
+        <source>Language changes take effect after restarting Fora.Deck.</source>
+        <translation>Изменение языка применяется после перезапуска Fora.Deck.</translation>
     </message>
     <message>
         <source>Check for updates</source>
@@ -1430,16 +1430,16 @@ XLibrary — MIT
         <translation>Перейти к обновлению</translation>
     </message>
     <message>
-        <source>XLibrary update</source>
-        <translation>Обновление XLibrary</translation>
+        <source>Fora.Deck update</source>
+        <translation>Обновление Fora.Deck</translation>
     </message>
     <message>
         <source>A new version is available: %1 (current: %2). Update now?
 
-XLibrary will download and verify the installer, then close. Complete the update in the installation wizard. Your library and settings will be kept. Save any unsaved edits before continuing.</source>
+Fora.Deck will download and verify the installer, then close. Complete the update in the installation wizard. Your library and settings will be kept. Save any unsaved edits before continuing.</source>
         <translation>Доступна новая версия: %1 (текущая: %2). Хотите обновиться сейчас?
 
-XLibrary скачает и проверит установщик, затем закроется. Завершите обновление в мастере установки. Библиотека и настройки сохранятся. Перед продолжением сохраните несохранённые изменения.</translation>
+Fora.Deck скачает и проверит установщик, затем закроется. Завершите обновление в мастере установки. Библиотека и настройки сохранятся. Перед продолжением сохраните несохранённые изменения.</translation>
     </message>
     <message>
         <source>Update now</source>
@@ -1514,8 +1514,8 @@ Automatic installation is unavailable for this copy or release. Follow the relea
         <translation>Автоматическое обновление этой установки больше недоступно. Откройте выпуск на GitHub.</translation>
     </message>
     <message>
-        <source>This copy of XLibrary was not installed by the installer.</source>
-        <translation>Эта копия XLibrary не была установлена установщиком.</translation>
+        <source>This copy of Fora.Deck was not installed by the installer.</source>
+        <translation>Эта копия Fora.Deck не была установлена установщиком.</translation>
     </message>
     <message>
         <source>Could not start the installer (Windows error %1).</source>
@@ -1686,8 +1686,8 @@ Automatic installation is unavailable for this copy or release. Follow the relea
         <translation>Профиль восстановлен, но настройки автозапуска обновить не удалось.</translation>
     </message>
     <message>
-        <source>Profile restored. Restart XLibrary to apply all settings. Previous profile: %1</source>
-        <translation>Профиль восстановлен. Перезапустите XLibrary, чтобы применить все настройки. Прежний профиль: %1</translation>
+        <source>Profile restored. Restart Fora.Deck to apply all settings. Previous profile: %1</source>
+        <translation>Профиль восстановлен. Перезапустите Fora.Deck, чтобы применить все настройки. Прежний профиль: %1</translation>
     </message>
     <message>
         <source>The profile is being restored or requires a restart.</source>
@@ -1752,8 +1752,8 @@ Technical reason: %3</source>
         <translation>Не удалось сохранить настройки перед восстановлением профиля.</translation>
     </message>
     <message>
-        <source>The profile was restored but could not be opened. Restart XLibrary.</source>
-        <translation>Профиль восстановлен, но открыть его не удалось. Перезапустите XLibrary.</translation>
+        <source>The profile was restored but could not be opened. Restart Fora.Deck.</source>
+        <translation>Профиль восстановлен, но открыть его не удалось. Перезапустите Fora.Deck.</translation>
     </message>
     <message>
         <source>Could not save the diagnostic report.</source>
@@ -1768,8 +1768,8 @@ Technical reason: %3</source>
         <translation>Восстановлено путей приложений: %1.</translation>
     </message>
     <message>
-        <source>Could not restart XLibrary. Close and open it manually.</source>
-        <translation>Не удалось перезапустить XLibrary. Закройте приложение и откройте его снова.</translation>
+        <source>Could not restart Fora.Deck. Close and open it manually.</source>
+        <translation>Не удалось перезапустить Fora.Deck. Закройте приложение и откройте его снова.</translation>
     </message>
     <message>
         <source>Restore database backup…</source>
@@ -1780,8 +1780,8 @@ Technical reason: %3</source>
         <translation>Восстановить весь профиль…</translation>
     </message>
     <message>
-        <source>Restart XLibrary</source>
-        <translation>Перезапустить XLibrary</translation>
+        <source>Restart Fora.Deck</source>
+        <translation>Перезапустить Fora.Deck</translation>
     </message>
     <message>
         <source>Replace only the database with this SQLite backup? Settings are not restored. The current database files will be preserved.</source>
@@ -1800,8 +1800,8 @@ Technical reason: %3</source>
         <translation>Дата создания: %1</translation>
     </message>
     <message>
-        <source>XLibrary version: %1</source>
-        <translation>Версия XLibrary: %1</translation>
+        <source>Fora.Deck version: %1</source>
+        <translation>Версия Fora.Deck: %1</translation>
     </message>
     <message>
         <source>Database schema: %1</source>
@@ -1928,8 +1928,8 @@ Technical reason: %3</source>
         <translation>Выберите резервную копию профиля</translation>
     </message>
     <message>
-        <source>XLibrary profile (*.xlprofile)</source>
-        <translation>Профиль XLibrary (*.xlprofile)</translation>
+        <source>Fora.Deck profile (*.xlprofile)</source>
+        <translation>Профиль Fora.Deck (*.xlprofile)</translation>
     </message>
     <message>
         <source>Restore complete profile</source>
@@ -1944,8 +1944,8 @@ Technical reason: %3</source>
         <translation>Содержимое резервной копии профиля</translation>
     </message>
     <message>
-        <source>Restore replaces the current library and settings. The current profile is preserved for recovery. Restart XLibrary afterward to apply the restored settings. Applications will not be launched.</source>
-        <translation>Восстановление заменит текущую библиотеку и настройки. Текущий профиль будет сохранён для возможного возврата. После восстановления перезапустите XLibrary, чтобы применить настройки. Приложения автоматически не запустятся.</translation>
+        <source>Restore replaces the current library and settings. The current profile is preserved for recovery. Restart Fora.Deck afterward to apply the restored settings. Applications will not be launched.</source>
+        <translation>Восстановление заменит текущую библиотеку и настройки. Текущий профиль будет сохранён для возможного возврата. После восстановления перезапустите Fora.Deck, чтобы применить настройки. Приложения автоматически не запустятся.</translation>
     </message>
     <message>
         <source>Restore profile</source>
@@ -2000,8 +2000,8 @@ Technical reason: %3</source>
         <translation>Восстановить пути после переноса папки…</translation>
     </message>
     <message>
-        <source>The profile was restored. Restart XLibrary to apply its settings before making further changes.</source>
-        <translation>Профиль восстановлен. Перед дальнейшими изменениями перезапустите XLibrary, чтобы применить настройки.</translation>
+        <source>The profile was restored. Restart Fora.Deck to apply its settings before making further changes.</source>
+        <translation>Профиль восстановлен. Перед дальнейшими изменениями перезапустите Fora.Deck, чтобы применить настройки.</translation>
     </message>
     <message>
         <source>Back up complete profile</source>
@@ -2792,8 +2792,8 @@ Technical reason: %3</source>
         <translation>Портал GlobalShortcuts не зарегистрировал сочетание. Используйте системные настройки клавиатуры: KDE: Клавиатура → Комбинации клавиш; GNOME: Клавиатура → Пользовательские комбинации; Xfce: Клавиатура → Комбинации клавиш приложений. Команда: XLibrary --overlay (быстрый поиск) или XLibrary (библиотека). Для приложений и сценариев используйте команду из их редактора.</translation>
     </message>
     <message>
-        <source>XLibrary shortcut</source>
-        <translation>Горячая клавиша XLibrary</translation>
+        <source>Fora.Deck shortcut</source>
+        <translation>Горячая клавиша Fora.Deck</translation>
     </message>
     <message>
         <source>Use Ctrl, Alt, or Super with a letter, digit, F1–F24, or Space.</source>
@@ -2880,8 +2880,8 @@ Technical reason: %3</source>
         <translation>Начать с пустой библиотеки</translation>
     </message>
     <message>
-        <source>Welcome to XLibrary</source>
-        <translation>Добро пожаловать в XLibrary</translation>
+        <source>Welcome to Fora.Deck</source>
+        <translation>Добро пожаловать в Fora.Deck</translation>
     </message>
     <message>
         <source>Your applications. One home.</source>
@@ -2912,8 +2912,8 @@ Technical reason: %3</source>
         <translation>Файл настроек</translation>
     </message>
     <message>
-        <source>Your library, tags, scenarios and settings are stored on this computer. XLibrary does not upload your catalog. Update checks contact GitHub; your saved access token is kept in the system credential store.</source>
-        <translation>Библиотека, теги, сценарии и настройки хранятся на этом компьютере. XLibrary не загружает каталог в сеть. Проверка обновлений обращается к GitHub; сохранённый токен доступа хранится в системном хранилище учётных данных.</translation>
+        <source>Your library, tags, scenarios and settings are stored on this computer. Fora.Deck does not upload your catalog. Update checks contact GitHub; your saved access token is kept in the system credential store.</source>
+        <translation>Библиотека, теги, сценарии и настройки хранятся на этом компьютере. Fora.Deck не загружает каталог в сеть. Проверка обновлений обращается к GitHub; сохранённый токен доступа хранится в системном хранилище учётных данных.</translation>
     </message>
     <message>
         <source>Delay</source>
@@ -2968,7 +2968,7 @@ Technical reason: %3</source>
         <translation>Создавайте теги в боковом меню или редакторе приложения. Тег содержит до 64 символов без пробелов, запятых и #. Выделите несколько приложений с Ctrl или Shift для изменения тегов сразу у всех. Удаление тега сохраняет приложения.</translation>
     </message>
     <message>
-        <source>Open Settings → Keyboard shortcuts to see or change the current bindings. Clear a binding to disable it. Assign application and scenario shortcuts in their editors. A shortcut already used by XLibrary or another application may be refused. On Wayland, system permission or a desktop shortcut may be required.</source>
+        <source>Open Settings → Keyboard shortcuts to see or change the current bindings. Clear a binding to disable it. Assign application and scenario shortcuts in their editors. A shortcut already used by Fora.Deck or another application may be refused. On Wayland, system permission or a desktop shortcut may be required.</source>
         <translation>Откройте «Настройки → Горячие клавиши» для просмотра и изменения сочетаний. Очистите поле, чтобы отключить сочетание. Клавиши для приложений и сценариев назначаются в их редакторах. Занятое сочетание может быть отклонено. На Wayland может потребоваться системное разрешение или настройка сочетания в среде рабочего стола.</translation>
     </message>
     <message>
@@ -2992,13 +2992,13 @@ Technical reason: %3</source>
         <translation>Версия и сведения об окружении скопированы.</translation>
     </message>
     <message>
-        <source>XLibrary %1
+        <source>Fora.Deck %1
 OS: %2
 Architecture: %3
 Qt: %4
 Session: %5
 Mode: %6</source>
-        <translation>XLibrary %1
+        <translation>Fora.Deck %1
 ОС: %2
 Архитектура: %3
 Qt: %4
@@ -3022,16 +3022,16 @@ Qt: %4
         <translation>Сбросить настройки…</translation>
     </message>
     <message>
-        <source>Restore default interface, shortcuts, sources and behavior settings? Applications, tags, scenarios, history and saved credentials will be kept. XLibrary will need a restart.</source>
-        <translation>Восстановить стандартные настройки интерфейса, сочетаний клавиш, источников и поведения? Приложения, теги, сценарии, история и сохранённые учётные данные останутся. Потребуется перезапуск XLibrary.</translation>
+        <source>Restore default interface, shortcuts, sources and behavior settings? Applications, tags, scenarios, history and saved credentials will be kept. Fora.Deck will need a restart.</source>
+        <translation>Восстановить стандартные настройки интерфейса, сочетаний клавиш, источников и поведения? Приложения, теги, сценарии, история и сохранённые учётные данные останутся. Потребуется перезапуск Fora.Deck.</translation>
     </message>
     <message>
-        <source>Settings reset. Restart XLibrary to apply the defaults. Your catalog was kept.</source>
-        <translation>Настройки сброшены. Перезапустите XLibrary для применения значений по умолчанию. Каталог сохранён.</translation>
+        <source>Settings reset. Restart Fora.Deck to apply the defaults. Your catalog was kept.</source>
+        <translation>Настройки сброшены. Перезапустите Fora.Deck для применения значений по умолчанию. Каталог сохранён.</translation>
     </message>
     <message>
-        <source>Settings were reset. Restart XLibrary now?</source>
-        <translation>Настройки сброшены. Перезапустить XLibrary сейчас?</translation>
+        <source>Settings were reset. Restart Fora.Deck now?</source>
+        <translation>Настройки сброшены. Перезапустить Fora.Deck сейчас?</translation>
     </message>
     <message>
         <source>Author: %1</source>
@@ -3046,8 +3046,8 @@ Qt: %4
         <translation>Включить анимации интерфейса</translation>
     </message>
     <message>
-        <source>A quick tour of XLibrary</source>
-        <translation>Короткое обучение XLibrary</translation>
+        <source>A quick tour of Fora.Deck</source>
+        <translation>Короткое обучение Fora.Deck</translation>
     </message>
     <message>
         <source>Add → Edit → Tags → Favorites</source>
@@ -3074,8 +3074,8 @@ Qt: %4
         <translation>Готово</translation>
     </message>
     <message>
-        <source>Keep XLibrary close</source>
-        <translation>Держите XLibrary под рукой</translation>
+        <source>Keep Fora.Deck close</source>
+        <translation>Держите Fora.Deck под рукой</translation>
     </message>
     <message>
         <source>Make the library yours</source>
@@ -3280,6 +3280,10 @@ Qt: %4
     <message>
         <source>File index is up to date</source>
         <translation>Файловый индекс актуален</translation>
+    </message>
+    <message>
+        <source>By ForaSource</source>
+        <translation>Автор: ForaSource</translation>
     </message>
 </context>
 </TS>

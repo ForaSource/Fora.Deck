@@ -192,10 +192,18 @@ inline QLabel *label(const QString &text, const char *const property = nullptr) 
         result->setProperty(property, true);
     return result;
 }
-inline QPushButton *button(const QString &text, const char *const property = nullptr) {
+inline QPushButton *button(const QString &text, const char *const property = nullptr, const QString &icon_name = {}) {
     auto *result = new QPushButton(text);
     if (property)
         result->setProperty(property, true);
+    if (!icon_name.isEmpty()) {
+        result->setProperty("appearance_icon", icon_name);
+        result->setIcon(appearance::icon(icon_name, result->property("primary").toBool()
+                                                        ? QColor("#181A1D")
+                                                        : result->palette().color(QPalette::PlaceholderText)));
+        const auto size = qRound(qMax(14, result->font().pixelSize()) * 20 / 14.0);
+        result->setIconSize({size, size});
+    }
     return result;
 }
 inline QPushButton *action_button(QAction *const action, const bool quiet = false, const QString &text = {}) {

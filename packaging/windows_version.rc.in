@@ -12,13 +12,13 @@ BEGIN
     BEGIN
         BLOCK "040904b0"
         BEGIN
-            VALUE "CompanyName", "lappland-open"
-            VALUE "FileDescription", "XLibrary application library"
+            VALUE "CompanyName", "ForaSource"
+            VALUE "FileDescription", "Fora.Deck application library"
             VALUE "FileVersion", "@XLIBRARY_RELEASE_VERSION@"
             VALUE "InternalName", "XLibrary"
-            VALUE "LegalCopyright", "Copyright (c) 2026 lappland-open"
+            VALUE "LegalCopyright", "Copyright (c) 2026 ForaSource"
             VALUE "OriginalFilename", "XLibrary.exe"
-            VALUE "ProductName", "XLibrary"
+            VALUE "ProductName", "Fora.Deck"
             VALUE "ProductVersion", "@XLIBRARY_RELEASE_VERSION@"
         END
     END

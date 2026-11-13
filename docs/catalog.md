@@ -13,7 +13,7 @@ JSON/file previews also show sources, arguments, and working directories; choose
 Cancelling imports nothing. Search and select/clear controls affect visible results, retaining hidden selections.
 Rejected files have a reason.
 
-At normal startup, XLibrary checks selected discovery sources in the background. The **New applications** window offers new configurations;
+At normal startup, Fora.Deck checks selected discovery sources in the background. The **New applications** window offers new configurations;
 existing ones retain their names, tags, favorites, history, and launch options. Their discovered locations and sources can be refreshed.
 Startup checks do not show manual scan progress or scan-result notifications; actual catalog changes produce a brief count notification.
 The `--check-startup` maintenance command uses a temporary profile and does not scan the computer.

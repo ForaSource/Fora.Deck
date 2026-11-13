@@ -106,6 +106,6 @@ cmake --build --preset linux-clang-debug --parallel 4
 
 Analysis runs while compiling own sources and excludes dependencies/generated sources. Release builds use O2 and IPO/LTO when supported; leave `XLIBRARY_NATIVE_CPU=OFF` for distributed binaries.
 
-English is the base language. `translations/xlibrary_ru.ts` and `translations/qt_widgets_ru.ts` are compiled by `lrelease` and embedded; runtime does not need separate XLibrary translation files. Use `QCoreApplication::translate` with context `XLibrary` for application messages and update the Russian catalog.
+English is the base language. `translations/xlibrary_ru.ts` and `translations/qt_widgets_ru.ts` are compiled by `lrelease` and embedded; runtime does not need separate Fora.Deck translation files. Use `QCoreApplication::translate` with context `XLibrary` for application messages and update the Russian catalog.
 
 For existing automated commands, startup checks and manual verification, see [testing](testing.md).

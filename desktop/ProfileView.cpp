@@ -21,10 +21,11 @@ using namespace ui_helpers;
 
 QString manifest_summary(const profile_manifest &manifest) {
     const auto created = QDateTime::fromString(manifest.created_utc, Qt::ISODateWithMs);
-    QStringList lines{QCoreApplication::translate("XLibrary", "Created: %1")
-                          .arg(created.isValid() ? created.toLocalTime().toString(Qt::TextDate) : manifest.created_utc),
-                      QCoreApplication::translate("XLibrary", "XLibrary version: %1").arg(manifest.application_version),
-                      QCoreApplication::translate("XLibrary", "Database schema: %1").arg(manifest.schema_version)};
+    QStringList lines{
+        QCoreApplication::translate("XLibrary", "Created: %1")
+            .arg(created.isValid() ? created.toLocalTime().toString(Qt::TextDate) : manifest.created_utc),
+        QCoreApplication::translate("XLibrary", "Fora.Deck version: %1").arg(manifest.application_version),
+        QCoreApplication::translate("XLibrary", "Database schema: %1").arg(manifest.schema_version)};
     lines.append(QCoreApplication::translate("XLibrary", "Backup format: %1").arg(manifest.format_version));
     const QList<QPair<QString, QString>> entities{
         {"applications", QCoreApplication::translate("XLibrary", "Applications: %1")},
@@ -180,7 +181,7 @@ void select_profile_restore(const ui_context &context, QWidget *const parent) {
     auto *service = static_cast<DesktopService *>(context.service);
     const auto path =
         QFileDialog::getOpenFileName(parent, QCoreApplication::translate("XLibrary", "Select a profile backup"), {},
-                                     QCoreApplication::translate("XLibrary", "XLibrary profile (*.xlprofile)"));
+                                     QCoreApplication::translate("XLibrary", "Fora.Deck profile (*.xlprofile)"));
     if (path.isEmpty())
         return;
     auto *dialog = new QDialog(parent);
@@ -198,7 +199,7 @@ void select_profile_restore(const ui_context &context, QWidget *const parent) {
     layout->addWidget(summary, 1);
     layout->addWidget(label(QCoreApplication::translate(
         "XLibrary", "Restore replaces the current library and settings. The current profile is preserved for recovery. "
-                    "Restart XLibrary afterward to apply the restored settings. Applications will not be launched.")));
+                    "Restart Fora.Deck afterward to apply the restored settings. Applications will not be launched.")));
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Cancel);
     buttons->button(QDialogButtonBox::Cancel)->setText(QCoreApplication::translate("XLibrary", "Cancel"));
     auto *restore =
@@ -271,7 +272,8 @@ QWidget *profile_view(const ui_context &context, QWidget *const parent) {
     diagnostics->setMinimumHeight(220);
     diagnostics->setAccessibleName(QCoreApplication::translate("XLibrary", "Current profile diagnostics"));
     layout->addWidget(diagnostics);
-    auto *export_button = button(QCoreApplication::translate("XLibrary", "Export safe diagnostics…"));
+    auto *export_button =
+        button(QCoreApplication::translate("XLibrary", "Export safe diagnostics…"), nullptr, "export");
     layout->addWidget(export_button);
     layout->addWidget(
         label(QCoreApplication::translate(
@@ -286,8 +288,8 @@ QWidget *profile_view(const ui_context &context, QWidget *const parent) {
                   "A profile backup includes applications, all tags, scenarios, history, and settings. It contains "
                   "private paths and arguments. Native module files and system-stored tokens are not included."),
               "muted"));
-    auto *backup = button(QCoreApplication::translate("XLibrary", "Back up profile…"));
-    auto *restore = button(QCoreApplication::translate("XLibrary", "Restore profile…"));
+    auto *backup = button(QCoreApplication::translate("XLibrary", "Back up profile…"), nullptr, "export");
+    auto *restore = button(QCoreApplication::translate("XLibrary", "Restore profile…"), nullptr, "import");
     layout->addWidget(backup);
     layout->addWidget(restore);
     layout->addWidget(label(QCoreApplication::translate("XLibrary", "Recover application paths"), "subheading"));
@@ -302,10 +304,10 @@ QWidget *profile_view(const ui_context &context, QWidget *const parent) {
     auto *restart_hint =
         label(QCoreApplication::translate(
                   "XLibrary",
-                  "The profile was restored. Restart XLibrary to apply its settings before making further changes."),
+                  "The profile was restored. Restart Fora.Deck to apply its settings before making further changes."),
               "muted");
     layout->addWidget(restart_hint);
-    auto *restart = button(QCoreApplication::translate("XLibrary", "Restart XLibrary"), "primary");
+    auto *restart = button(QCoreApplication::translate("XLibrary", "Restart Fora.Deck"), "primary");
     layout->addWidget(restart);
     layout->addStretch();
     const auto update = [=] {
@@ -330,7 +332,7 @@ QWidget *profile_view(const ui_context &context, QWidget *const parent) {
     QObject::connect(backup, &QPushButton::clicked, widget, [=] {
         QFileDialog dialog(widget, QCoreApplication::translate("XLibrary", "Back up complete profile"));
         dialog.setAcceptMode(QFileDialog::AcceptSave);
-        dialog.setNameFilter(QCoreApplication::translate("XLibrary", "XLibrary profile (*.xlprofile)"));
+        dialog.setNameFilter(QCoreApplication::translate("XLibrary", "Fora.Deck profile (*.xlprofile)"));
         dialog.setDefaultSuffix("xlprofile");
         dialog.selectFile("xlibrary-" + QDateTime::currentDateTimeUtc().toString("yyyy-MM-dd") + ".xlprofile");
         if (dialog.exec() != QDialog::Accepted || dialog.selectedFiles().isEmpty())

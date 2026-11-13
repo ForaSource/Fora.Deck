@@ -899,9 +899,9 @@ bool Application::set_autostart(const bool enabled, QString &error) {
         error = QCoreApplication::translate("XLibrary", "Could not open the autostart file: ") + file.errorString();
         return false;
     }
-    const auto content = enabled ? "[Desktop Entry]\nType=Application\nName=XLibrary\nExec=" + exec_quote(executable) +
+    const auto content = enabled ? "[Desktop Entry]\nType=Application\nName=Fora.Deck\nExec=" + exec_quote(executable) +
                                        " --background\nTerminal=false\n"
-                                 : QString("[Desktop Entry]\nType=Application\nName=XLibrary\nHidden=true\n");
+                                 : QString("[Desktop Entry]\nType=Application\nName=Fora.Deck\nHidden=true\n");
     const auto bytes = content.toUtf8();
     if (file.write(bytes) != bytes.size() || !file.commit()) {
         error = QCoreApplication::translate("XLibrary", "Could not save XDG autostart: ") + file.errorString();

@@ -83,7 +83,7 @@ Use a disposable profile and a small folder of documents, images, unsupported ex
    old results must not overwrite the new query or scope. Check Basic depth limits and recursive standard/additional folders.
    Confirm Full is marked not recommended. The Files switch must appear in both search surfaces only in Basic and Full.
    Toggle it with a query and a pending file request: off shows only applications, on shows only files, and both windows stay synchronized.
-   In file mode, the main workspace hides application rows and keeps the details pane with “Nothing to display here :(”.
+   In file mode, the main workspace hides application rows and keeps the details pane with “Details will appear here.”.
    Check the same placeholder with an empty application list; switching modes must not move the Files switch.
    Disable indexing while files are selected:
    both switches must disappear and application search must return. Re-enable indexing and check the switch again.
@@ -99,8 +99,11 @@ Use a disposable profile and a small folder of documents, images, unsupported ex
 Use [the update guide](updates.md) for channels, installer eligibility and expected behavior. Check both manual requests and the normal startup notification; `--check-startup` skips networking.
 
 1. Verify current/newer local versions never offer a downgrade. Stable excludes GitHub prereleases; Preview includes them. Version ordering follows SemVer, not publication dates. Change channels during a request and confirm the previous channel's installer cannot be used.
-2. On an older installed Windows copy, check version confirmation, cancellation, retry, progress and closing settings during the request. Cancel/failure should leave XLibrary open and remove the partial download.
-3. Accept a valid update: the ordinary interactive Inno Setup wizard should use the prior installation directory and XLibrary should exit normally. Confirm completed installation, preserved profile and new version startup.
+2. On an older installed Windows copy, check version confirmation, cancellation, retry, progress and closing settings during the request. Cancel/failure should leave Fora.Deck open and remove the partial download.
+3. Accept a valid update: the ordinary interactive Inno Setup wizard should use the prior installation directory and Fora.Deck should exit normally. Confirm completed installation, preserved profile and new version startup.
+   When upgrading an XLibrary installation, check that its standard Start Menu and desktop shortcuts are
+   replaced by Fora.Deck shortcuts without duplicates. Repeat with desktop-shortcut creation unchecked:
+   an already existing desktop shortcut should keep working under the new name.
 4. For portable, Linux, or a release without an eligible installer/digest, verify the confirmed action opens the specific release page.
 5. Check offline operation, timeout, API limit, malformed metadata, size/hash mismatch and failure to start the installer. Errors must be visible and retry remain available.
 6. Repeat checks without a token inside 60 seconds, then with a token inside 5 seconds. Results, errors and cancellations retain the interval across settings close/reopen; reading the cache must not extend it. After expiration, a new request should run. Token/channel changes must not reuse an unrelated cached result.
