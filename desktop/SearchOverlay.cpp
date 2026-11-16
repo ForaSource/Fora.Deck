@@ -234,7 +234,11 @@ void SearchOverlay::paintEvent(QPaintEvent *) {
         painter.drawRoundedRect(surface.adjusted(-spread, -spread / 2.0, spread, spread), radius + spread,
                                 radius + spread);
     }
-    painter.setBrush(palette().base());
+    // The transparent widget stylesheet also clears its Base palette role.
+    // Paint from the application palette so only the rounded margins stay transparent.
+    auto surface_color = QApplication::palette().color(QPalette::Base);
+    surface_color.setAlpha(255);
+    painter.setBrush(surface_color);
     painter.setPen(QPen(palette().color(QPalette::Mid), 1));
     painter.drawRoundedRect(surface, radius, radius);
     if (results->isVisible() && progress == 1) {

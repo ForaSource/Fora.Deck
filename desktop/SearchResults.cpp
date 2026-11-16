@@ -105,9 +105,11 @@ public:
 namespace {
 class SearchDelegate : public QStyledItemDelegate {
     DesktopService &service;
+    bool compact;
 
 public:
-    SearchDelegate(DesktopService &service, QObject *const parent) : QStyledItemDelegate(parent), service(service) {}
+    SearchDelegate(DesktopService &service, const bool compact, QObject *const parent)
+        : QStyledItemDelegate(parent), service(service), compact(compact) {}
     QSize sizeHint(const QStyleOptionViewItem &, const QModelIndex &) const override {
         return {0, appearance::scaled(service.settings, 60)};
     }
@@ -150,9 +152,24 @@ public:
         painter->setFont(option.font);
         painter->setPen(option.palette.color(entry.type == search_entry::kind::message ? QPalette::PlaceholderText
                                                                                        : QPalette::Text));
-        const auto text_rect = area.adjusted(icon_size + 28, 0, -14, 0);
+        auto text_rect = area.adjusted(icon_size + 28, 0, -14, 0);
+        if (compact && index.row() < 10 && entry.type != search_entry::kind::message) {
+            const auto shortcut = QKeySequence(Qt::ALT | (index.row() == 9 ? Qt::Key_0 : Qt::Key_1 + index.row()))
+                                      .toString(QKeySequence::NativeText);
+            auto shortcut_font = option.font;
+            shortcut_font.setPixelSize(appearance::scaled(service.settings, 12));
+            const int shortcut_width = QFontMetrics(shortcut_font).horizontalAdvance(shortcut);
+            const QRect shortcut_rect(text_rect.right() - shortcut_width + 1, text_rect.top(),
+                                      shortcut_width, text_rect.height());
+            painter->setFont(shortcut_font);
+            painter->setPen(option.palette.color(QPalette::PlaceholderText));
+            painter->drawText(shortcut_rect, Qt::AlignRight | Qt::AlignVCenter, shortcut);
+            text_rect.setRight(shortcut_rect.left() - appearance::scaled(service.settings, 16));
+            painter->setFont(option.font);
+            painter->setPen(option.palette.color(QPalette::Text));
+        }
         const auto path = QDir::toNativeSeparators(entry.path);
-        if (!path.isEmpty() && path != entry.title) {
+        if (!compact && !path.isEmpty() && path != entry.title) {
             const auto title_rect = text_rect.adjusted(0, 0, 0, -text_rect.height() / 2);
             painter->drawText(title_rect, Qt::AlignBottom | Qt::AlignLeft,
                               option.fontMetrics.elidedText(entry.title, Qt::ElideRight, title_rect.width()));
@@ -198,7 +215,7 @@ SearchResults::SearchResults(DesktopService &service, QLineEdit &input, const bo
             return;
         this->service.files->update_metadata(entry.path, this->service.files->tags_for(entry.path), favorite);
     };
-    setItemDelegate(new SearchDelegate(service, this));
+    setItemDelegate(new SearchDelegate(service, compact, this));
     setRootIsDecorated(false);
     setUniformRowHeights(true);
     setAllColumnsShowFocus(true);
@@ -331,7 +348,8 @@ void SearchResults::replace_entries(QVector<search_entry> entries) {
                 break;
             }
     setCurrentIndex(results->index(selected, 0));
-    const auto rows = qMin(results->rowCount(), 5);
+    const int visible_rows = compact ? qBound(3, service.settings.value("search/overlay_rows", 5).toInt(), 10) : 5;
+    const auto rows = qMin(results->rowCount(), visible_rows);
     if (!compact && files_enabled) {
         setMinimumHeight(0);
         setMaximumHeight(QWIDGETSIZE_MAX);
@@ -376,7 +394,7 @@ void SearchResults::update_applications() {
             QString::localeAwareCompare(service.model.search_name(left.first), service.model.search_name(right.first));
         return comparison == 0 ? service.model.at(left.first).id < service.model.at(right.first).id : comparison < 0;
     };
-    // Keep only the five best matches in O(n), rather than sorting an entire second catalog on each key.
+    // Retain every match so results beyond the visible rows remain scrollable.
     for (int row = 0; row < service.model.rowCount(); ++row) {
         const auto &record = service.model.at(row);
         if (!compact && ((service.section() == "favorites" && !record.favorite) ||
@@ -389,14 +407,9 @@ void SearchResults::update_applications() {
         const auto rank = query.rank(service.model.search_data(row));
         if (rank < 0)
             continue;
-        const QPair<int, int> candidate{row, rank};
-        auto position = std::lower_bound(best.begin(), best.end(), candidate, better);
-        if (position != best.end() || best.size() < 5) {
-            best.insert(position, candidate);
-            if (best.size() > 5)
-                best.removeLast();
-        }
+        best.append({row, rank});
     }
+    std::sort(best.begin(), best.end(), better);
     QVector<search_entry> entries;
     for (const auto &candidate : best) {
         if (!SearchQuery::accepts_rank(candidate.second, best.front().second))
@@ -729,6 +742,19 @@ bool SearchResults::eventFilter(QObject *const object, QEvent *const event) {
         (compact || special || (files_enabled && results->rowCount() > 0))) {
         if (event->type() == QEvent::ShortcutOverride || event->type() == QEvent::KeyPress) {
             auto *key = static_cast<QKeyEvent *>(event);
+            if (compact && (key->modifiers() & ~Qt::KeypadModifier) == Qt::AltModifier &&
+                key->key() >= Qt::Key_0 && key->key() <= Qt::Key_9) {
+                const int row = key->key() == Qt::Key_0 ? 9 : key->key() - Qt::Key_1;
+                if (row < results->rowCount() && results->entries[row].type != search_entry::kind::message) {
+                    if (event->type() == QEvent::KeyPress && !key->isAutoRepeat()) {
+                        setCurrentIndex(results->index(row, 0));
+                        scrollTo(currentIndex());
+                        activate_current();
+                    }
+                    event->accept();
+                    return true;
+                }
+            }
             const bool plain = !(key->modifiers() & ~Qt::KeypadModifier);
             const bool actions_key =
                 (compact || files_enabled) && ((plain && key->key() == Qt::Key_Tab) ||

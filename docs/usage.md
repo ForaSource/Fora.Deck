@@ -47,7 +47,11 @@ an unknown exclusion hides nothing. If an app is missing from results, clear the
 
 ## Quick search and keyboard shortcuts
 
-The compact launcher shows up to five matching applications. Use ↑/↓ and Enter to select and launch.
+Choose 3–10 visible results in **Settings → Appearance → Visible results in quick search** (default: 5).
+The compact launcher keeps matching applications available beyond these visible rows; scroll with the mouse wheel
+or use ↑/↓ to reach them, and Enter to launch. The panel height is limited by the available screen space.
+Quick-search rows show the name and a shortcut on the right: Alt+1–Alt+9 opens the first nine results,
+and Alt+0 opens the tenth. Paths are available in tooltips and result actions.
 Tab or Shift+F10 opens the selected result's actions; use ↑/↓ and Enter inside that menu, and Escape to return.
 Actions include browser profiles, new instances, window switching, folder/path operations, favorites, editing, and removal where applicable.
 Windows executable entries also offer an explicit administrator launch.

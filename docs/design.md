@@ -46,8 +46,10 @@ Native window buttons and window-management behavior are retained. Native frames
 windows open, native handles change or the palette changes.
 
 The compact launcher has a search field, a button to open the full library and
-the results relevant to the query. Its height follows its contents. Application
-search shows up to five application results; file/path and calculator results
+the results relevant to the query on an opaque theme-colored surface. Its height follows its contents and the
+available screen space. Settings selects 3–10 visible results (default: 5); additional matching applications
+remain accessible by scrolling or keyboard navigation. Compact rows omit paths and show right-aligned
+Alt+1–Alt+9 / Alt+0 hints for the first ten actionable results. File/path and calculator results
 use the shared search presentation. In application mode, an empty query can show favorite or previously
 launched applications; file mode prompts for a filename. Opening the library carries the query into the full window.
 

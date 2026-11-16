@@ -1102,6 +1102,14 @@ Applications: %1</source>
         <translation>Размер текста</translation>
     </message>
     <message>
+        <source>Visible results in quick search</source>
+        <translation>Количество видимых результатов быстрого поиска</translation>
+    </message>
+    <message>
+        <source>Scroll to see more results. The height is limited by the screen size.</source>
+        <translation>Прокрутите список, чтобы увидеть остальные результаты. Высота ограничена размером экрана.</translation>
+    </message>
+    <message>
         <source>Short, smooth transitions follow available system animation settings.</source>
         <translation>Короткие плавные переходы учитывают доступные системные настройки анимации.</translation>
     </message>

@@ -131,6 +131,12 @@ QWidget *appearance_page(const ui_context &context, QWidget *) {
 #endif
     choices(widget, settings, "appearance/text_scale", QCoreApplication::translate("XLibrary", "Text size"),
             {{"100%", 100}, {"125%", 125}, {"150%", 150}, {"200%", 200}}, 100);
+    choices(widget, settings, "search/overlay_rows",
+            QCoreApplication::translate("XLibrary", "Visible results in quick search"),
+            {{"3", 3}, {"4", 4}, {"5", 5}, {"6", 6}, {"7", 7}, {"8", 8}, {"9", 9}, {"10", 10}}, 5);
+    widget->layout()->addWidget(label(
+        QCoreApplication::translate("XLibrary", "Scroll to see more results. The height is limited by the screen size."),
+        "muted"));
     checkbox(widget, settings, "appearance/animations",
              QCoreApplication::translate("XLibrary", "Enable interface animations"), true);
     widget->layout()->addWidget(
