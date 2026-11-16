@@ -32,14 +32,15 @@ using namespace ui_helpers;
 QWidget *shell(const ui_context &context, QWidget *const parent) {
     auto *service = static_cast<DesktopService *>(context.service);
     auto *widget = new QFrame(parent);
+    widget->setObjectName("shell");
     auto *root = new QHBoxLayout(widget);
-    root->setContentsMargins(8, 6, 8, 8);
+    root->setContentsMargins(16, 8, 16, 16);
     root->setSpacing(0);
     auto *navigation = context.registry->create("navigation", context, widget);
-    auto *center = new QFrame;
+    auto *center = new QFrame(widget);
     center->setObjectName("library_workspace");
     auto *body = new QVBoxLayout(center);
-    body->setContentsMargins(20, 16, 20, 16);
+    body->setContentsMargins(16, 16, 16, 12);
     body->setSpacing(0);
     auto *search_bar = context.registry->create("search_bar", context, center);
     body->addWidget(search_bar);
@@ -48,16 +49,9 @@ QWidget *shell(const ui_context &context, QWidget *const parent) {
     pages->addWidget(context.registry->create("library", context, pages));
     pages->addWidget(context.registry->create("scenarios", context, pages));
     pages->addWidget(context.registry->create("my_files", context, pages));
+    pages->addWidget(context.registry->create("file_workspace", context, pages));
     auto *transition = new PageTransition(pages);
     body->addWidget(transition, 1);
-    const auto update_mode = [=] {
-        const auto active = service->file_search_active();
-        transition->setVisible(!active);
-        body->setStretch(0, active ? 1 : 0);
-    };
-    QObject::connect(service->files, &FileManager::configuration_changed, widget, update_mode);
-    QObject::connect(service, &DesktopService::navigation_changed, widget, update_mode);
-    update_mode();
     auto *notice = new NotificationBanner(*context.settings, 20);
     QObject::connect(service, &DesktopService::appearance_changed, notice, &NotificationBanner::refresh_appearance);
     body->addWidget(notice);
@@ -104,13 +98,13 @@ QWidget *shell(const ui_context &context, QWidget *const parent) {
                             widget, [service] { return !service->profile_busy() && !service->restart_required(); });
     root->addWidget(splitter);
     QObject::connect(service, &DesktopService::navigation_changed, widget,
-                     [=, section = service->section(), tag = service->tag()]() mutable {
-                         if (section == service->section() && tag == service->tag())
+                     [=] {
+                         const auto section = service->section();
+                         const int next = service->file_search_active() ? 3 : section == "scenarios" ? 1 : section == "files" ? 2 : 0;
+                         if (next == pages->currentIndex())
                              return;
-                         section = service->section();
-                         tag = service->tag();
-                         pages->setCurrentIndex(section == "scenarios" ? 1 : section == "files" ? 2 : 0);
-                         transition->start();
+                         const int direction = next == 3 ? 1 : pages->currentIndex() == 3 ? -1 : 0;
+                         transition->transition_to([=] { pages->setCurrentIndex(next); }, direction);
                      });
     return widget;
 }
@@ -178,6 +172,7 @@ MainWindow::MainWindow(DesktopService &service)
             search->setText(query);
     });
     connect(&service, &DesktopService::selection_changed, this, &MainWindow::refresh_actions);
+    connect(&service, &DesktopService::file_selection_changed, this, &MainWindow::refresh_actions);
     connect(&service, &DesktopService::catalog_changed, this, &MainWindow::refresh_actions);
     connect(&service, &DesktopService::profile_state_changed, this, &MainWindow::refresh_actions);
     connect(&service, &DesktopService::discovery_changed, this, &MainWindow::refresh_actions);
@@ -282,8 +277,12 @@ void MainWindow::create_actions() {
     add("open_folder", QCoreApplication::translate("XLibrary", "Open folder"), "folder",
         [this] { service.open_folder(service.selection()); });
     add("copy_path", QCoreApplication::translate("XLibrary", "Copy path"), "copy", [this] {
-        if (const auto *record = service.selected())
-            QApplication::clipboard()->setText(QDir::toNativeSeparators(Application::application_path(*record)));
+        if (const auto *record = service.selected()) {
+            const auto path = Application::application_path(*record);
+            const bool local_path = Application::file_target(*record) ||
+                                    (Application::target_kind(*record) == "steam" && !path.isEmpty());
+            QApplication::clipboard()->setText(local_path ? QDir::toNativeSeparators(path) : record->path);
+        }
     });
     add("copy_arguments", QCoreApplication::translate("XLibrary", "Copy arguments"), "copy", [this] {
         if (const auto *record = service.selected())
@@ -333,6 +332,19 @@ void MainWindow::refresh_actions() {
         context.actions.value(id)->setEnabled(profile_available && record != nullptr &&
                                               service.section() != "scenarios" && service.section() != "files" &&
                                               !service.file_search_active());
+    if (service.file_search_active() || service.section() == "files")
+        context.actions.value("details")->setEnabled(profile_available && !service.selected_file().isEmpty());
+    const bool folder_supported = record && (Application::file_target(*record) ||
+                                              !record->installation_directory.isEmpty());
+    auto *open_folder = context.actions.value("open_folder");
+    open_folder->setEnabled(open_folder->isEnabled() && folder_supported);
+    const bool local_path = record && (Application::file_target(*record) ||
+                                        (Application::target_kind(*record) == "steam" &&
+                                         !Application::application_path(*record).isEmpty()));
+    context.actions.value("copy_path")->setText(
+        !record || local_path ? QCoreApplication::translate("XLibrary", "Copy path")
+                              : QCoreApplication::translate("XLibrary", "Copy launch target"));
+    context.actions.value("launch")->setEnabled(context.actions.value("launch")->isEnabled() && record && record->available);
     auto *new_instance = context.actions.value("new_instance");
     const bool can_start = profile_available && record && record->available && record->new_instance_error.isEmpty();
     new_instance->setEnabled(can_start && service.section() != "scenarios" && service.section() != "files" &&
@@ -480,7 +492,7 @@ void MainWindow::update_layout() {
     if (centralWidget())
         for (auto *splitter : centralWidget()->findChildren<QSplitter *>("library_splitter"))
             if (auto *library = dynamic_cast<LibrarySplitter *>(splitter))
-                library->update_layout(service.section() != "scenarios" && service.section() != "files");
+                library->update_layout(service.section() != "scenarios");
 }
 
 void MainWindow::show_library() {

@@ -12,6 +12,15 @@ with English as the fallback. Appearance settings control the theme, text size, 
 
 ## Application search
 
+The library offers **List** and **Cards** views of the same filtered and sorted applications.
+Switching views keeps the selected applications. Use Ctrl/Shift for multiple selection;
+the footer then offers bulk editing, removal and clearing the selection.
+Right-click an application or use its actions menu for launch options and editing.
+**Library actions** contains availability refresh, discovery, the last scan report and undo removal.
+**Add application** opens the editor; its adjacent menu also offers discovery.
+Settings and quick help are at the bottom of navigation.
+On narrower windows the inspector is hidden; **Details** opens the selected application's dialog.
+
 Search by application name, executable filename, or aliases added in **Edit application**.
 Search handles case, repeated spaces, Unicode normalization, initials such as `vsc`, word prefixes,
 limited typo correction, and English/Russian keyboard layout mistakes: `пщщпду` can find `google`.
@@ -28,6 +37,10 @@ The selected sort mode breaks remaining ties in the library.
 | `#work #chat` | Apps with both tags. |
 | `#work -#games` | Apps tagged `work`, excluding those tagged `games`. |
 | `#dev code` | Apps tagged `dev` that also match “code”. |
+
+In **My tags**, click a tag to filter by it. Click a selected tag again to remove that filter;
+click another tag to switch to it. Hold **Ctrl** while clicking to add or remove individual tags.
+When several sidebar tags are selected, applications must have all of them.
 
 Tag conditions are exact and all must match. An unknown required tag gives no matches;
 an unknown exclusion hides nothing. If an app is missing from results, clear the query and check the selected section and sidebar tag.
@@ -62,19 +75,42 @@ Deleting an application or scenario removes its assignment. Complete profile bac
 
 ## File search and My files
 
-File search is **Off** by default. Enable it in **Settings → File search** to reveal the **Files** switch beside
-the search field in the main window and quick search. The switch selects either applications (off) or files (on);
+File search is **Off** by default. Enable it in **Settings → File search** to reveal the **Applications / Files** choice
+in the main window and quick search. Select **Applications** or **Files**;
 the two result types are never mixed. Both windows share the selection, starting with applications.
 Selecting files opens the main **Files** workspace instead of the application list.
-The details pane keeps its width and shows “Details will appear here.” in file mode or when no application is selected.
-Favorites, running applications, tags, scenarios and My files remain available as separate sections.
-Opening one of these sections returns search to applications. Disabling file search hides the switch and shows applications.
-An empty query prompts for a filename. The file workspace uses the full available height.
+Selecting a file in the list, cards or **My files** shows its type, size, modification date, tags and path in the details pane.
+**Opens with** identifies the system's default application, with its icon when available; an unresolved association is shown explicitly.
+Use **Open**, **Open folder** or **Copy path** in the pane. On narrower windows, **Details** opens the same information in a dialog.
+The pane keeps its width when switching between applications and files and prompts for a selection when empty.
+Favorites and sidebar tags filter the selected result type. Running applications, scenarios and My files return
+search to applications. Disabling file search hides this choice and shows applications.
+An empty file query shows indexed files. The main workspace shows
+up to 200 results with a count, sorting, list/cards views and file actions, using the same layout as applications.
+Switching between applications and files uses a brief fade and slide, respecting disabled interface/system animations.
+The file list, cards and quick search load icons in the background. Images show small previews when their format
+is supported by Qt or the Windows thumbnail provider. Other files use their associated application's icon on Windows
+(or its Shell file icon for packaged applications), and the system file-type icon on Linux. Unavailable icons/previews
+use the generic file symbol.
+
+The default **Recommended** file order groups extensions alphabetically (ignoring case), with the newest additions
+first inside each group. This also applies to quick search and to the presentation of matching search results.
+Choose **By extension** or **By date added** in the sort menu, or click the corresponding list header;
+name, recent opens, favorites and tag sorting remain available. An explicit saved sort choice is retained.
+The added date records first discovery in the index, or the first save to My files. Refreshing the index preserves it.
+For an older index, the last recorded scan date is used because its original discovery date was not stored.
+Unindexed files have no added date; rebuilding the index starts these dates again.
+
+Click a file's star or use its context menu to change its favorite status. **Edit tags** accepts comma-separated tags;
+`#tag` includes a tag and `-#tag` excludes it, including alongside filename masks and extension filters.
+File favorites and tags are saved in the profile and included in complete profile backups.
+**Save to My files** remains a separate action; removing a favorite does not remove a saved file.
 
 Search supports filenames, layout correction, typo suggestions, and extension filters such as `.pdf` or `report.pdf`.
 Filename masks use `*` for any number of characters and `?` for one: `*.pdf`, `report-??.txt`.
 Other mask characters are literal. Matching files show their folder to distinguish identical names.
-Saved files and frequently opened files receive priority within comparable search matches.
+Relevance selects the bounded set of matches before the chosen display order is applied. Favorites, saved files
+and opening history break ties in the default order; their dedicated sort modes can give them higher priority.
 
 In **Settings → File search**, select a mode and choose **Save**:
 
@@ -108,7 +144,7 @@ Enter arithmetic such as `2+3*4`, `sqrt(81)`, `√(16)`, `2^8`, `2**8`, or `(12+
 Enter copies the result. Operators include `+ - * / % ^`; powers associate to the right.
 Division by zero, non-real results, and incomplete expressions do not produce a number.
 
-With the **Files** switch on, both search surfaces accept absolute folder paths, `~/`, `%USERPROFILE%`, and `$HOME/`.
+With **Files** selected, both search surfaces accept absolute folder paths, `~/`, `%USERPROFILE%`, and `$HOME/`.
 Folder browsing requires an enabled file-search mode. Results show direct children, including hidden entries;
 a partial final filename filters that folder. Enter on a folder browses it; Enter on a file opens its system handler.
 Folder results include working files and folders; applications remain in application search.

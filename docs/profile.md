@@ -17,14 +17,14 @@ Do not rename profile directories just to match the new display name.
 | Portable folder | A `portable.flag` beside the executable selects its adjacent `data/` directory. Keep that directory during upgrades. |
 | AppImage | A normally launched AppImage uses `<AppImage filename>.data` beside the image. Keep the corresponding directory when replacing or renaming the image. |
 
-The file index is a separate, rebuildable `file-index.sqlite` cache. Saved file paths and usage history are durable profile data;
+The file index is a separate, rebuildable `file-index.sqlite` cache. Saved file paths, file favorites/tags and usage history are durable profile data;
 the index is not a copy of the documents themselves.
 
 ## Complete backups
 
 Choose **Settings → Profile → Back up profile…** to create a `.xlprofile` file.
 It includes application cards and launch configurations, aliases, all tags, scenarios, settings, hotkey assignments,
-saved filter records, saved file paths, discovery sources, and launch/file usage history.
+saved filter records, saved file paths and file favorites/tags, discovery sources, and launch/file usage history.
 This transfers more than the [JSON catalog format](catalog.md#json-import-and-export).
 
 Backups contain private paths and arguments. They retain saved paths rather than the documents at those paths;
@@ -55,7 +55,7 @@ Card IDs, tags, favorites, history, arguments, and scenario references are retai
 The profile page can export diagnostics for a bug report. The export omits catalog contents, arguments, settings values, tokens, and raw errors,
 but includes local profile paths. Inspect the file before sharing it if those paths are private.
 
-The confirmed preference reset in settings retains the catalog and saved file paths. Restart afterwards.
+The confirmed preference reset in settings retains the catalog, saved file paths and file favorites/tags. Restart afterwards.
 **Settings → Library → Clear usage history** separately clears application/file usage counts and recent launch history.
 
 If a native interface module prevents normal startup, use [safe mode](plugins.md#safe-mode) to disable it.

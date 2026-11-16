@@ -77,9 +77,12 @@ unused tags, saved filter records, saved file paths, and usage history.
 
 ## Bulk editing and removal
 
-Use Ctrl/Shift to select several library entries. The selection bar shows the count and opens bulk editing for tags and favorites.
+Use Ctrl/Shift to select several library entries in the list or cards. With two or more selected entries,
+the footer replaces keyboard hints with the count, bulk editing, removal and clearing the selection.
+Bulk editing changes tags and favorites.
 Mixed values stay unchanged until explicitly checked or unchecked.
 
 Removal confirms the entry count and deletes catalog entries only. **Undo removal** restores the last deletion in the current session,
-including metadata and scenario steps. Undo is also available from the notification banner.
+including metadata and scenario steps. Undo is available from **Library actions** after the notification disappears,
+and directly from the notification banner while it is visible.
 It refuses to overwrite conflicting new entries or linked scenarios that have changed since removal.

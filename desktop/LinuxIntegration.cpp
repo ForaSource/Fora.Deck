@@ -49,6 +49,7 @@ constexpr int x11_success = Success;
 #include <QFileIconProvider>
 #include <QFileInfo>
 #include <QIcon>
+#include <QMimeDatabase>
 #include <QLocale>
 #include <QProcess>
 #include <QProcessEnvironment>
@@ -691,6 +692,52 @@ bool desktop_platform::start_update_installer(const QString &, QString &error) {
     return false;
 }
 
+desktop_platform::file_association desktop_platform::default_file_application(const QString &path) {
+    const auto executable = QStandardPaths::findExecutable("xdg-mime");
+    if (executable.isEmpty())
+        return {};
+    QProcess process;
+    try {
+        process.setProcessEnvironment(Application::environment());
+    } catch (const std::exception &) {
+        return {};
+    }
+    process.start(executable, {"query", "default", QMimeDatabase{}.mimeTypeForFile(path).name()});
+    if (!process.waitForStarted(1000) || !process.waitForFinished(2000)) {
+        process.kill();
+        process.waitForFinished(1000);
+        return {};
+    }
+    if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0)
+        return {};
+    const auto desktop_id = QString::fromUtf8(process.readAllStandardOutput()).trimmed();
+    if (!desktop_id.endsWith(".desktop") || desktop_id.contains('/') || desktop_id.contains('\\'))
+        return {};
+    auto entry_path = QStandardPaths::locate(QStandardPaths::GenericDataLocation, "applications/" + desktop_id);
+    if (entry_path.isEmpty() && desktop_id.contains('-')) {
+        for (const auto &directory : QStandardPaths::standardLocations(QStandardPaths::GenericDataLocation)) {
+            const QDir applications(directory + "/applications");
+            QDirIterator entries(applications.absolutePath(), {"*.desktop"}, QDir::Files, QDirIterator::Subdirectories);
+            while (entries.hasNext()) {
+                const auto candidate = entries.next();
+                if (applications.relativeFilePath(candidate).replace('/', '-') == desktop_id) {
+                    entry_path = candidate;
+                    break;
+                }
+            }
+            if (!entry_path.isEmpty())
+                break;
+        }
+    }
+    if (entry_path.isEmpty())
+        return {};
+    try {
+        return {Application::resolve_application(entry_path).name, {}, Application::icon_name(entry_path)};
+    } catch (const std::exception &) {
+        return {};
+    }
+}
+
 QImage desktop_platform::application_icon(const QString &path) {
     QString icon_name;
     if (QFileInfo(path).suffix() == "desktop") {
@@ -709,8 +756,12 @@ QImage desktop_platform::application_icon(const QString &path) {
     QIcon icon;
     if (!icon_name.isEmpty() && !QFileInfo(icon_name).isAbsolute())
         icon = QIcon::fromTheme(icon_name);
-    if (icon.isNull())
-        icon = QIcon::fromTheme("application-x-executable", QFileIconProvider{}.icon(QFileInfo(path)));
+    if (icon.isNull()) {
+        const QFileInfo info(path);
+        icon = info.isExecutable() || info.suffix() == "desktop"
+                   ? QIcon::fromTheme("application-x-executable", QFileIconProvider{}.icon(info))
+                   : QFileIconProvider{}.icon(info);
+    }
     return icon.pixmap(64, 64).toImage();
 }
 

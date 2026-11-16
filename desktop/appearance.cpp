@@ -1,13 +1,54 @@
 #include <cmath>
+#include <QAbstractButton>
 #include <QApplication>
+#include <QFocusEvent>
 #include <QFontDatabase>
 #include <QPainter>
 #include <QPainterPath>
 #include <QPalette>
+#include <QStyle>
 #include <QStyleHints>
 
 #include "appearance.h"
 #include "WindowManager.h"
+
+namespace {
+class ButtonFocusFilter final : public QObject {
+public:
+    using QObject::QObject;
+
+protected:
+    bool eventFilter(QObject *const object, QEvent *const event) override {
+        auto *button = qobject_cast<QAbstractButton *>(object);
+        if (!button)
+            return QObject::eventFilter(object, event);
+        bool keyboard_focus = button->property("keyboard_focus").toBool();
+        if (event->type() == QEvent::FocusIn) {
+            const auto reason = static_cast<QFocusEvent *>(event)->reason();
+            if (reason != Qt::ActiveWindowFocusReason && reason != Qt::PopupFocusReason)
+                keyboard_focus = reason == Qt::TabFocusReason || reason == Qt::BacktabFocusReason ||
+                                 reason == Qt::ShortcutFocusReason;
+        } else if (event->type() == QEvent::FocusOut) {
+            const auto reason = static_cast<QFocusEvent *>(event)->reason();
+            if (reason != Qt::ActiveWindowFocusReason && reason != Qt::PopupFocusReason)
+                keyboard_focus = false;
+        } else if (event->type() == QEvent::MouseButtonPress) {
+            keyboard_focus = false;
+        } else if (event->type() == QEvent::KeyPress && button->hasFocus()) {
+            keyboard_focus = true;
+        } else {
+            return QObject::eventFilter(object, event);
+        }
+        if (keyboard_focus != button->property("keyboard_focus").toBool()) {
+            button->setProperty("keyboard_focus", keyboard_focus);
+            button->style()->unpolish(button);
+            button->style()->polish(button);
+            button->update();
+        }
+        return QObject::eventFilter(object, event);
+    }
+};
+}
 
 QIcon appearance::icon(const QString &name, const QColor &requested_color) {
     const auto color = requested_color.isValid() ? requested_color : qApp->palette().color(QPalette::PlaceholderText);
@@ -34,10 +75,20 @@ QIcon appearance::icon(const QString &name, const QColor &requested_color) {
     } else if (name == "file") {
         painter.drawPolyline(QPolygonF{QPointF(14, 3), QPointF(14, 9), QPointF(20, 9)});
         painter.drawPolygon(QPolygonF{QPointF(4, 3), QPointF(14, 3), QPointF(20, 9), QPointF(20, 21), QPointF(4, 21)});
-    } else if (name == "library") {
+    } else if (name == "library" || name == "grid" || name == "cards") {
         for (int x : {4, 14})
             for (int y : {4, 14})
                 painter.drawRoundedRect(QRectF(x, y, 6, 6), 1, 1);
+    } else if (name == "list") {
+        for (int y : {6, 12, 18}) {
+            painter.drawPoint(QPointF(4, y));
+            painter.drawLine(QPointF(9, y), QPointF(21, y));
+        }
+    } else if (name == "running") {
+        painter.drawRoundedRect(QRectF(3, 3, 13, 12), 2, 2);
+        painter.drawRoundedRect(QRectF(8, 9, 13, 12), 2, 2);
+        painter.setBrush(color);
+        painter.drawEllipse(QPointF(18, 18), 1, 1);
     } else if (name == "favorite" || name == "favorite_filled") {
         if (name == "favorite_filled")
             painter.setBrush(color);
@@ -56,9 +107,16 @@ QIcon appearance::icon(const QString &name, const QColor &requested_color) {
     } else if (name == "play") {
         painter.drawPolygon(QPolygonF{QPointF(8, 4), QPointF(20, 12), QPointF(8, 20)});
     } else if (name == "scenarios") {
-        painter.drawPolygon(QPolygonF{QPointF(3, 8), QPointF(12, 3), QPointF(21, 8), QPointF(12, 13)});
-        painter.drawPolyline(QPolygonF{QPointF(3, 13), QPointF(12, 18), QPointF(21, 13)});
-        painter.drawPolyline(QPolygonF{QPointF(3, 17), QPointF(12, 22), QPointF(21, 17)});
+        painter.drawLine(QPointF(6, 6), QPointF(6, 18));
+        for (int y : {5, 12, 19}) {
+            painter.setBrush(qApp->palette().base());
+            painter.drawEllipse(QPointF(6, y), 2, 2);
+            painter.drawLine(QPointF(12, y), QPointF(21, y));
+        }
+    } else if (name == "saved_file") {
+        painter.drawPolygon(QPolygonF{QPointF(4, 3), QPointF(14, 3), QPointF(20, 9), QPointF(20, 21), QPointF(4, 21)});
+        painter.drawPolyline(QPolygonF{QPointF(14, 3), QPointF(14, 9), QPointF(20, 9)});
+        painter.drawPolygon(QPolygonF{QPointF(8, 11), QPointF(14, 11), QPointF(14, 18), QPointF(11, 16), QPointF(8, 18)});
     } else if (name == "folder") {
         QPainterPath path;
         path.moveTo(3, 7);
@@ -221,6 +279,11 @@ QIcon appearance::icon(const QString &name, const QColor &requested_color) {
     } else if (name == "app") {
         painter.drawRoundedRect(QRectF(3, 4, 18, 16), 2, 2);
         painter.drawLine(QPointF(3, 8), QPointF(21, 8));
+    } else if (name == "details") {
+        painter.drawRoundedRect(QRectF(3, 4, 18, 16), 2, 2);
+        painter.drawLine(QPointF(14, 4), QPointF(14, 20));
+        painter.drawLine(QPointF(17, 9), QPointF(18, 9));
+        painter.drawLine(QPointF(17, 13), QPointF(18, 13));
     } else if (name == "info") {
         painter.drawEllipse(QRectF(3, 3, 18, 18));
         painter.drawPoint(QPointF(12, 8));
@@ -253,22 +316,37 @@ int appearance::scaled(const QSettings &settings, const int size) {
 
 void appearance::paint_selection(QPainter &painter, const QRectF &rect, const QPalette &palette, const qreal radius,
                                  const bool focused) {
+    painter.setPen(Qt::NoPen);
     painter.setBrush(palette.color(QPalette::Highlight));
-    painter.setPen(QPen(palette.color(focused ? QPalette::Link : QPalette::Midlight), focused ? 2 : 1));
     painter.drawRoundedRect(rect, radius, radius);
+    const qreal marker_width = qMax(3.0, rect.height() / 18.0);
+    const qreal marker_height = qMax(0.0, qMin(rect.height() - 8, rect.height() * 0.5));
+    painter.setBrush(palette.color(QPalette::Link));
+    painter.drawRoundedRect(QRectF(rect.left(), rect.center().y() - marker_height / 2,
+                                  marker_width, marker_height), marker_width / 2, marker_width / 2);
+    if (focused) {
+        painter.setBrush(Qt::NoBrush);
+        painter.setPen(QPen(palette.color(QPalette::Link), 2));
+        painter.drawRoundedRect(rect.adjusted(1, 1, -1, -1), radius, radius);
+    }
 }
 
 void appearance::apply(const QSettings &settings, const QString &additional_style) {
+    [[maybe_unused]] static auto *const focus_filter = [] {
+        auto *result = new ButtonFocusFilter(qApp);
+        qApp->installEventFilter(result);
+        return result;
+    }();
     qApp->setProperty("xlibrary_disable_animations", !settings.value("appearance/animations", true).toBool());
     const bool dark = is_dark(settings);
-    const QColor base(dark ? "#202328" : "#FFFFFF");
-    const QColor panel(dark ? "#181A1D" : "#F5F6F8");
-    const QColor field(dark ? "#2A2E34" : "#EDF0F4");
-    const QColor text(dark ? "#F2F3F5" : "#20242B");
-    const QColor secondary(dark ? "#AEB5BF" : "#56606D");
-    const QColor border(dark ? "#343A43" : "#DEE3E9");
-    const QColor selection(dark ? "#392B29" : "#FBE8E2");
-    const QColor selection_top(dark ? "#2D323A" : "#E5EAF0");
+    const QColor base(dark ? "#22262D" : "#FFFFFF");
+    const QColor panel(dark ? "#191B20" : "#F4F5F7");
+    const QColor field(dark ? "#2C323B" : "#E9EDF2");
+    const QColor text(dark ? "#F2F4F7" : "#1E242C");
+    const QColor secondary(dark ? "#AEB7C4" : "#566170");
+    const QColor border(dark ? "#353D48" : "#DCE2E9");
+    const QColor selection(dark ? "#3B2B28" : "#FBE8E2");
+    const QColor selection_top(dark ? "#2B313A" : "#E7EBF0");
     const QColor selection_border(dark ? "#F16647" : "#B63F2B");
     QPalette palette;
     palette.setColor(QPalette::Window, panel);
@@ -279,7 +357,7 @@ void appearance::apply(const QSettings &settings, const QString &additional_styl
     palette.setColor(QPalette::Button, field);
     palette.setColor(QPalette::ButtonText, text);
     palette.setColor(QPalette::Mid, border);
-    palette.setColor(QPalette::Dark, QColor(dark ? "#778191" : "#7A8595"));
+    palette.setColor(QPalette::Dark, QColor(dark ? "#768190" : "#7A8595"));
     palette.setColor(QPalette::Link, selection_border);
     palette.setColor(QPalette::Highlight, selection);
     palette.setColor(QPalette::Light, selection_top);
@@ -305,9 +383,13 @@ void appearance::apply(const QSettings &settings, const QString &additional_styl
         QMainWindow { background: %3; }
         QDialog { background: %2; }
         QFrame#shell, QSplitter#library_splitter { background: %3; border: none; }
-        QFrame#library_workspace { background: %2; border: 1px solid %6; border-radius: 12px; }
+        QFrame#library_workspace { background: %2; border: none; border-radius: 12px; }
         QFrame[panel="true"], QWidget[panel="true"] { background: %3; }
-        QFrame#navigation, QScrollArea#details { background: %3; border: none; }
+        QFrame#navigation { background: %3; border: none; }
+        QWidget#settings_categories { background: %3; border-radius: 12px; }
+        QScrollArea#settings_navigation, QScrollArea#settings_navigation > QWidget { background: transparent; border: none; }
+        QScrollArea#details { background: @inspector@; border: none; border-radius: 12px; }
+        QScrollArea#details > QWidget, QScrollArea#details > QWidget > QWidget { background: transparent; border: none; }
         QLabel[muted="true"] { color: %4; }
         QLabel[status_kind="running"] { color: @success@; }
         QLabel[status_kind="warning"] { color: @warning@; }
@@ -316,7 +398,7 @@ void appearance::apply(const QSettings &settings, const QString &additional_styl
         QLabel[application_title="true"] { font-size: %12px; font-weight: 600; }
         QLabel[brand="true"] { font-size: %13px; font-weight: 600; }
         QLabel[caption="true"] { color: %4; font-size: %14px; }
-        QPushButton, QToolButton { background: %5; border: 2px solid %6; border-radius: 8px; padding: 6px 10px; min-height: %10px; }
+        QPushButton, QToolButton { background: %5; border: 2px solid transparent; border-radius: 8px; padding: 6px 10px; min-height: %10px; }
         QPushButton:hover, QToolButton:hover { background: %17; }
         QPushButton:pressed { background: %3; }
         QPushButton:checked, QToolButton:checked { background: %7; border-color: %16; }
@@ -326,23 +408,28 @@ void appearance::apply(const QSettings &settings, const QString &additional_styl
         QPushButton[primary="true"]:disabled { color: %4; background: %5; }
         QPushButton:disabled, QToolButton:disabled { color: %4; background: %3; }
         QPushButton[danger="true"] { color: %15; }
-        QPushButton[danger="true"]:hover { border-color: %15; }
         QPushButton[quiet="true"] { background: transparent; border-color: transparent; text-align: left; }
         QPushButton[quiet="true"]:hover { background: %17; }
         QPushButton[quiet="true"]:checked { background: %7; border-color: transparent; }
         QPushButton[navigation="true"] { background: transparent; border: 2px solid transparent; border-radius: 8px; padding: 8px 10px; min-height: @navigation_height@px; text-align: left; }
         QPushButton[navigation="true"]:hover { background: %17; }
         QPushButton[navigation="true"]:checked { background: %7; border-color: transparent; }
-        QPushButton[navigation="true"]:checked:focus, QPushButton[quiet="true"]:checked:focus { border-color: %16; }
+        QPushButton[navigation="true"][keyboard_focus="true"]:focus, QPushButton[quiet="true"][keyboard_focus="true"]:focus { border-color: %16; }
         QLineEdit, QComboBox, QSpinBox, QKeySequenceEdit { background: %5; border: 2px solid @input_border@; border-radius: 8px; padding: 6px 8px; min-height: %10px; selection-background-color: %7; selection-color: %1; }
-        QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QKeySequenceEdit:focus, QPushButton:focus, QToolButton:focus { border-color: %16; }
+        QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QKeySequenceEdit:focus, QPushButton[keyboard_focus="true"]:focus, QToolButton[keyboard_focus="true"]:focus { border-color: %16; }
+        QWidget[segmented="true"] { background: %5; border-radius: 8px; }
+        QPushButton[segment="true"] { background: transparent; border: 2px solid transparent; padding: 3px 10px; min-height: %10px; }
+        QPushButton[segment="true"]:checked { background: %7; color: %1; border-color: %16; font-weight: 600; }
+        QPushButton[segment="true"]:hover { background: %17; }
+        QPushButton[segment="true"]:checked:hover { background: %7; }
+        QPushButton[segment="true"][keyboard_focus="true"]:focus { border-color: %16; }
         QLineEdit[invalid="true"] { border-color: %15; }
         QLineEdit#search_input { min-height: @launch_height@px; }
         QLineEdit QToolButton { background: transparent; border: none; border-radius: 0; padding: 0; min-height: 0; }
         QComboBox::drop-down { border: none; width: 24px; }
         QTabBar#shortcut_tabs::tab { background: transparent; color: %4; border: 1px solid transparent; border-radius: 8px; padding: 8px 12px; margin-right: 8px; min-height: %10px; }
         QTabBar#shortcut_tabs::tab:last { margin-right: 0; }
-        QTabBar#shortcut_tabs::tab:hover { background: %5; border-color: %6; }
+        QTabBar#shortcut_tabs::tab:hover { background: %5; }
         QTabBar#shortcut_tabs::tab:selected { color: %1; background: %7; border-color: %16; }
         QTabBar#shortcut_tabs::scroller { width: 2em; }
         QTabBar#shortcut_tabs QToolButton { padding: 0; min-width: 0; min-height: 0; border-radius: 6px; }
@@ -373,9 +460,9 @@ void appearance::apply(const QSettings &settings, const QString &additional_styl
         QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal { background: transparent; }
         QScrollBar::up-arrow, QScrollBar::down-arrow, QScrollBar::left-arrow, QScrollBar::right-arrow { image: none; background: transparent; border: none; width: 0; height: 0; }
         QAbstractScrollArea::corner { background: transparent; border: none; }
-        QMenu { background: %2; border: 1px solid %6; border-radius: 12px; padding: 6px; }
+        QMenu { background: %2; border: 1px solid transparent; border-radius: 12px; padding: 6px; }
         QMenu::item { padding: 8px 24px 8px 12px; border: 1px solid transparent; border-radius: 10px; }
-        QMenu::item:selected { background: %7; border-color: %16; }
+        QMenu::item:selected { background: %7; }
         QMenu::separator { height: 1px; background: %6; margin: 4px 8px; }
         QCheckBox { spacing: 8px; padding: 4px 0px; border: 2px solid transparent; border-radius: 8px; }
         QCheckBox:focus { border-color: %16; }
@@ -384,16 +471,16 @@ void appearance::apply(const QSettings &settings, const QString &additional_styl
         QCheckBox::indicator:focus { border-color: %16; }
         QCheckBox::indicator:disabled { border-color: %6; background: %5; }
         QLabel[error="true"] { color: %15; }
-        QFrame[card="true"] { background: %3; border: 1px solid %6; border-radius: 12px; }
+        QFrame[card="true"] { background: @inspector@; border: 1px solid %6; border-radius: 12px; }
         QFrame[card="true"] QLabel { background: transparent; border: none; }
         QFrame#settings_surface { background: %2; }
         QToolTip { background: %3; color: %1; border: 1px solid %6; padding: 6px; }
         QStatusBar { background: %2; color: %4; }
         QFrame#notification { background: %5; border: 1px solid %6; border-radius: 12px; }
         QToolButton#notification_dismiss { background: transparent; border: 1px solid transparent; border-radius: 7px; padding: 0; min-height: 0; }
-        QToolButton#notification_dismiss:hover { background: %7; border-color: %6; }
+        QToolButton#notification_dismiss:hover { background: %7; }
         QToolButton#notification_dismiss:pressed { background: %3; }
-        QToolButton#notification_dismiss:focus { border-color: %16; }
+        QToolButton#notification_dismiss[keyboard_focus="true"]:focus { border-color: %16; }
         QProgressBar#notification_progress { background: %3; border: none; border-radius: 2px; }
         QProgressBar#notification_progress::chunk { background: #F16647; border-radius: 2px; }
         QFrame#discovery_panel { background: %3; border: 1px solid %6; border-radius: 12px; }
@@ -402,9 +489,9 @@ void appearance::apply(const QSettings &settings, const QString &additional_styl
         QProgressBar#discovery_bar::chunk { background: #F16647; border-radius: 4px; }
         QSplitter::handle { background: %3; }
         QSplitter::handle:hover, QSplitter::handle:pressed { background: %16; }
-        QSplitter#library_splitter::handle { background: transparent; border: none; margin: 14px 2px; border-radius: 1px; }
-        QSplitter#library_splitter::handle:hover { background: %16; }
-        QSplitter#library_splitter::handle:pressed { background: %4; }
+        QSplitter#library_splitter::handle,
+        QSplitter#library_splitter::handle:hover,
+        QSplitter#library_splitter::handle:pressed { background: transparent; border: none; margin: 0; }
         QGroupBox { border: none; margin-top: 24px; font-weight: 600; }
         QGroupBox::title { subcontrol-origin: margin; }
     )";
@@ -415,6 +502,7 @@ void appearance::apply(const QSettings &settings, const QString &additional_styl
                       QString::number(scaled(settings, 12)), dark ? "#ED9398" : "#B73548", selection_border.name(),
                       selection_top.name(), dark ? "#555960" : "#B3BAC4", dark ? "#7B8491" : "#8994A3");
     style.replace("@font_family@", font.family());
+    style.replace("@inspector@", dark ? "#242930" : "#F7F8FA");
     style.replace("@input_border@", palette.color(QPalette::Dark).name());
     style.replace("@success@", dark ? "#7CCDA6" : "#237A55");
     style.replace("@warning@", dark ? "#E7BD6A" : "#8A5D00");

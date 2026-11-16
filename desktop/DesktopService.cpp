@@ -38,6 +38,13 @@ DesktopService::DesktopService(QObject *const parent, const QString &profile_pat
         settings.setValue("onboarding/completed", true);
     files = new FileManager(QFileInfo(settings.fileName()).absolutePath(), settings.value("files/saved").toStringList(),
                             this);
+    files->restore_metadata(settings.value("files/metadata").toMap());
+    connect(files, &FileManager::metadata_changed, this, [this] {
+        settings.setValue("files/metadata", files->metadata_values());
+        settings.sync();
+        if (settings.status() != QSettings::NoError)
+            notify(QCoreApplication::translate("XLibrary", "Could not save the settings file."));
+    });
     connect(files, &FileManager::error, this, &DesktopService::notify);
     connect(files, &FileManager::busy_changed, this, &DesktopService::profile_state_changed);
     connect(files, &FileManager::configuration_changed, this, [this] {
@@ -194,15 +201,25 @@ DesktopService::DesktopService(QObject *const parent, const QString &profile_pat
     connect(worker, &Manager::tag_renamed, this, [this](const QString &old_name, const QString &new_name) {
         if (old_name.isEmpty())
             return;
+        files->rename_tag(old_name, new_name);
         filter.set_query(search_query::rewrite_tag(filter.text(), old_name, new_name));
-        if (tag_name_key(current_tag) == tag_name_key(old_name))
-            navigate(current_section, new_name);
+        auto renamed_tags = current_tags;
+        for (auto &tag : renamed_tags)
+            if (tag_name_key(tag) == tag_name_key(old_name))
+                tag = new_name;
+        if (renamed_tags != current_tags)
+            navigate_tags(current_section, renamed_tags);
     });
     connect(worker, &Manager::loaded, this, [this](const catalog_snapshot &value) {
         snapshot = value;
         clear_stale_scenario_run();
-        if (!current_tag.isEmpty() && !snapshot.tags.contains(current_tag))
-            navigate(current_section);
+        auto remaining_tags = current_tags;
+        const auto file_tags = files->tag_names();
+        remaining_tags.removeIf([&](const QString &tag) {
+            return !has_tag(snapshot.tags, tag) && (!searching_files() || !has_tag(file_tags, tag));
+        });
+        if (remaining_tags != current_tags)
+            navigate_tags(current_section, remaining_tags);
         model.replace(value.applications);
         invalidate_scenario_checks();
         if (!model.find(selected_id))
@@ -459,13 +476,35 @@ void DesktopService::select(const qint64 id) {
     }
 }
 
+void DesktopService::select_file(const QString &path) {
+    if (selected_file_path == path)
+        return;
+    selected_file_path = path;
+    emit file_selection_changed();
+}
+
 void DesktopService::navigate(const QString &section, const QString &tag) {
+    navigate_tags(section, tag.isEmpty() ? QStringList{} : QStringList{tag});
+}
+
+void DesktopService::navigate_tags(const QString &section, const QStringList &tags) {
+    selected_file_path.clear();
     current_section = section;
-    current_tag = tag;
-    if (section != "library" || !tag.isEmpty())
+    current_tags = tags;
+    current_tags.removeDuplicates();
+    if (section != "library" && section != "favorites")
         files_selected = false;
-    filter.set_section(section, tag);
+    filter.set_tag_section(section, current_tags);
     emit navigation_changed();
+}
+
+QString DesktopService::saved_filter_query() const {
+    auto query = filter.text();
+    // Saved filters store one sidebar tag; preserve the others as exact query conditions.
+    for (qsizetype index = 1; index < current_tags.size(); ++index)
+        query += (query.isEmpty() || query.back().isSpace() ? QString{} : QStringLiteral(" ")) +
+                 '#' + current_tags[index];
+    return query;
 }
 
 void DesktopService::set_searching_files(const bool selected) {
@@ -473,6 +512,7 @@ void DesktopService::set_searching_files(const bool selected) {
     if (files_selected == enabled)
         return;
     files_selected = enabled;
+    selected_file_path.clear();
     if (enabled)
         navigate("library");
     else
@@ -1254,6 +1294,8 @@ bool DesktopService::reset_settings() {
     settings.setValue("onboarding/completed", true);
     if (previous.contains("files/saved"))
         settings.setValue("files/saved", previous.value("files/saved"));
+    if (previous.contains("files/metadata"))
+        settings.setValue("files/metadata", previous.value("files/metadata"));
     settings.sync();
     if (settings.status() != QSettings::NoError) {
         settings.clear();

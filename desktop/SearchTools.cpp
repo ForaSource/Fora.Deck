@@ -1,11 +1,9 @@
-#include <QAbstractButton>
+#include <QButtonGroup>
 #include <QComboBox>
 #include <QDialogButtonBox>
 #include <QLineEdit>
-#include <QPainter>
 #include <QRegularExpression>
 #include <QSignalBlocker>
-#include <QVariantAnimation>
 
 #include "DesktopService.h"
 #include "PlatformIntegration.h"
@@ -131,7 +129,7 @@ QWidget *search_tools(DesktopService &service, QLineEdit &input, QWidget *const 
         filters->addItem(QCoreApplication::translate("XLibrary", "Saved filters"), qint64(0));
         for (const auto &record : service.catalog().filters) {
             filters->addItem(record.name, record.id);
-            if (record.query == service.filter.text() && record.section == service.section() &&
+            if (record.query == service.saved_filter_query() && record.section == service.section() &&
                 record.tag == service.tag() && record.sort_mode == service.filter.sort_mode_value() &&
                 record.sort_order == service.filter.sortOrder())
                 filters->setCurrentIndex(filters->count() - 1);
@@ -142,8 +140,8 @@ QWidget *search_tools(DesktopService &service, QLineEdit &input, QWidget *const 
                       : service.section() == "running" ? QCoreApplication::translate("XLibrary", "Running applications")
                       : service.section() == "scenarios" ? QCoreApplication::translate("XLibrary", "Scenarios")
                                                          : QCoreApplication::translate("XLibrary", "Library"));
-        if (!service.tag().isEmpty())
-            active.append('#' + service.tag());
+        for (const auto &tag : service.tags())
+            active.append('#' + tag);
         if (!input.text().trimmed().isEmpty())
             active.append(input.text().simplified());
         const QStringList sorts{QCoreApplication::translate("XLibrary", "By name"),
@@ -214,7 +212,7 @@ QWidget *search_tools(DesktopService &service, QLineEdit &input, QWidget *const 
         edit_filter(service, input, widget,
                     {0,
                      {},
-                     input.text(),
+                     service.saved_filter_query(),
                      service.section(),
                      service.tag(),
                      service.filter.sort_mode_value(),
@@ -239,83 +237,37 @@ QWidget *search_tools(DesktopService &service, QLineEdit &input, QWidget *const 
     return widget;
 }
 
-namespace {
-class FileSearchSwitch : public QAbstractButton {
-    QVariantAnimation motion;
-    qreal progress;
-
-public:
-    FileSearchSwitch(const bool enabled, QWidget *parent)
-        : QAbstractButton(parent), motion(this), progress(enabled ? 1 : 0) {
-        setObjectName("file_search_switch");
-        setText(QCoreApplication::translate("XLibrary", "Files"));
-        setAccessibleName(QCoreApplication::translate("XLibrary", "Search working files"));
-        setToolTip(accessibleName());
-        setCheckable(true);
-        setChecked(enabled);
-        setCursor(Qt::PointingHandCursor);
-        setFocusPolicy(Qt::StrongFocus);
-        setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
-        motion.setDuration(170);
-        motion.setEasingCurve(QEasingCurve::OutCubic);
-        connect(&motion, &QVariantAnimation::valueChanged, this, [this](const QVariant &value) {
-            progress = value.toReal();
-            update();
-        });
-        connect(this, &QAbstractButton::toggled, this, [this](bool checked) {
-            motion.stop();
-            if (!desktop_platform::animations_enabled() || !isVisible()) {
-                progress = checked ? 1 : 0;
-                update();
-                return;
-            }
-            motion.setStartValue(progress);
-            motion.setEndValue(checked ? 1.0 : 0.0);
-            motion.start();
-        });
-    }
-    QSize sizeHint() const override {
-        const auto scale = qMax(14, font().pixelSize()) / 14.0;
-        return {fontMetrics().horizontalAdvance(text()) + qRound(66 * scale),
-                qMax(qRound(34 * scale), fontMetrics().height() + qRound(14 * scale))};
-    }
-    void paintEvent(QPaintEvent *) override {
-        QPainter painter(this);
-        painter.setRenderHint(QPainter::Antialiasing);
-        const auto scale = qMax(14, font().pixelSize()) / 14.0;
-        const auto foreground = palette().color(isEnabled() ? QPalette::Active : QPalette::Disabled, QPalette::Text);
-        painter.setPen(foreground);
-        painter.drawText(rect().adjusted(qRound(8 * scale), 0, -qRound(50 * scale), 0),
-                         Qt::AlignVCenter | Qt::AlignLeft, text());
-        const QRectF track(width() - 44 * scale, (height() - 22 * scale) / 2.0, 38 * scale, 22 * scale);
-        auto base = palette().color(QPalette::Mid);
-        const auto accent = palette().color(isEnabled() ? QPalette::Link : QPalette::Mid);
-        base.setRedF(base.redF() * (1 - progress) + accent.redF() * progress);
-        base.setGreenF(base.greenF() * (1 - progress) + accent.greenF() * progress);
-        base.setBlueF(base.blueF() * (1 - progress) + accent.blueF() * progress);
-        painter.setPen(Qt::NoPen);
-        painter.setBrush(base);
-        painter.drawRoundedRect(track, 11 * scale, 11 * scale);
-        painter.setBrush(Qt::white);
-        painter.drawEllipse(
-            QRectF(track.left() + (3 + progress * 16) * scale, track.top() + 3 * scale, 16 * scale, 16 * scale));
-        if (hasFocus()) {
-            painter.setBrush(Qt::NoBrush);
-            painter.setPen(QPen(accent, 2));
-            painter.drawRoundedRect(QRectF(rect()).adjusted(1, 1, -1, -1), 8, 8);
-        }
-    }
-};
-}
-QAbstractButton *file_search_switch(DesktopService &service, QWidget *parent) {
-    auto *button = new FileSearchSwitch(service.searching_files(), parent);
-    const auto refresh = [button, &service] {
-        button->setVisible(service.files->is_enabled());
-        button->setChecked(service.searching_files());
+QWidget *file_search_switch(DesktopService &service, QWidget *parent) {
+    auto *segments = new QFrame(parent);
+    segments->setObjectName("file_search_switch");
+    segments->setProperty("segmented", true);
+    auto *layout = new QHBoxLayout(segments);
+    layout->setContentsMargins(3, 3, 3, 3);
+    layout->setSpacing(2);
+    auto *group = new QButtonGroup(segments);
+    const auto make_segment = [=](const QString &text, const QString &name) {
+        auto *control = new QPushButton(text, segments);
+        control->setObjectName(name);
+        control->setAccessibleName(text);
+        control->setToolTip(text);
+        control->setProperty("segment", true);
+        control->setCheckable(true);
+        control->setCursor(Qt::PointingHandCursor);
+        group->addButton(control);
+        layout->addWidget(control);
+        return control;
     };
-    QObject::connect(button, &QAbstractButton::clicked, &service, &DesktopService::set_searching_files);
-    QObject::connect(service.files, &FileManager::configuration_changed, button, refresh);
-    QObject::connect(&service, &DesktopService::navigation_changed, button, refresh);
+    auto *applications = make_segment(QCoreApplication::translate("XLibrary", "Applications"), "search_applications");
+    auto *files = make_segment(QCoreApplication::translate("XLibrary", "Files"), "search_files");
+    const auto refresh = [=, &service] {
+        segments->setVisible(service.files->is_enabled());
+        applications->setChecked(!service.searching_files());
+        files->setChecked(service.searching_files());
+    };
+    QObject::connect(applications, &QPushButton::clicked, &service, [&service] { service.set_searching_files(false); });
+    QObject::connect(files, &QPushButton::clicked, &service, [&service] { service.set_searching_files(true); });
+    QObject::connect(service.files, &FileManager::configuration_changed, segments, refresh);
+    QObject::connect(&service, &DesktopService::navigation_changed, segments, refresh);
     refresh();
-    return button;
+    return segments;
 }

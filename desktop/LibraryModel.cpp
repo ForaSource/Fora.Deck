@@ -1,7 +1,10 @@
+#include <algorithm>
 #include <QApplication>
 #include <QDir>
 #include <QFileInfo>
 #include <QFutureWatcher>
+#include <QImageReader>
+#include <QMimeDatabase>
 #include <QtConcurrent/QtConcurrentRun>
 #include <QTimer>
 
@@ -18,6 +21,23 @@ QString icon_cache_key(const app_record &record) {
     if (const auto path = Application::process_path(record); QFileInfo(path).isAbsolute())
         return "file:" + path;
     return "kind:" + Application::target_kind(record);
+}
+
+QImage file_thumbnail(const QString &path) {
+    if (!QMimeDatabase{}.mimeTypeForFile(path, QMimeDatabase::MatchExtension).name().startsWith("image/"))
+        return {};
+    QImageReader reader(path);
+    reader.setAutoTransform(true);
+    const QSize target(128, 128);
+    const auto size = reader.size();
+    if (!size.isValid())
+        return {};
+    if (size.width() > target.width() || size.height() > target.height())
+        reader.setScaledSize(size.scaled(target, Qt::KeepAspectRatio));
+    auto image = reader.read();
+    if (image.width() > target.width() || image.height() > target.height())
+        image = image.scaled(target, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+    return image;
 }
 }
 
@@ -47,9 +67,44 @@ QIcon LibraryModel::fallback_icon(const QString &kind) const {
     const auto icon = kind == "steam"        ? QIcon::fromTheme("steam", appearance::icon("library"))
                       : kind == "system_uri" ? QIcon::fromTheme("preferences-system", appearance::icon("settings"))
                       : kind == "aumid" || kind == "executable" || kind == "desktop" ? appearance::icon("app")
+                      : kind == "file" ? appearance::icon("file")
                                                                                      : appearance::icon("external");
     fallback_icons.insert(cache_key, icon);
     return icon;
+}
+
+QIcon LibraryModel::file_icon(const QString &path, const qint64 modified, const qint64 size) const {
+    const auto normalized = normalized_path(path);
+    // File metadata is collected by the query worker, never by the paint/data path.
+    const auto key = "document:" + QString::number(normalized.size()) + ':' + normalized + ':' +
+                     QString::number(modified) + ':' + QString::number(size);
+    if (const auto *icon = icons.object(key))
+        return icon->isNull() ? fallback_icon("file") : *icon;
+    app_record record;
+    record.path = path;
+    request_icon(record, key);
+    return fallback_icon("file");
+}
+
+void LibraryModel::retry_file_icons() {
+    for (const auto &key : icons.keys())
+        if (key.startsWith("document:") && icons.object(key)->isNull())
+            icons.remove(key);
+}
+
+void LibraryModel::store_icon(const QString &key, const QImage &image) {
+    pending_icons.remove(key);
+    // Cache failed reads without capturing a theme-dependent fallback icon.
+    icons.insert(key, new QIcon(image.isNull() ? QIcon{} : QIcon(QPixmap::fromImage(image))));
+    if (key.startsWith("document:")) {
+        // Application requests may have been deferred while document thumbnails filled the queue.
+        if (!records.isEmpty())
+            emit dataChanged(index(0, 0), index(rowCount() - 1, 0), {Qt::DecorationRole});
+    } else
+        for (int row = 0; row < records.size(); ++row)
+            if (icon_keys[row] == key)
+                emit dataChanged(index(row, 0), index(row, 0), {Qt::DecorationRole});
+    emit icon_ready();
 }
 
 void LibraryModel::request_icon(const app_record &record, const QString &key) const {
@@ -57,38 +112,42 @@ void LibraryModel::request_icon(const app_record &record, const QString &key) co
         return;
     }
     const auto image_file = key.startsWith("image:");
-    const auto path = image_file ? record.icon_path : key.mid(5);
+    const auto document_file = key.startsWith("document:");
+    const auto path = image_file ? record.icon_path : document_file ? record.path : key.mid(5);
     pending_icons.insert(key);
     auto *self = const_cast<LibraryModel *>(this);
 #ifdef Q_OS_LINUX
     // System icon engines use QPixmap and must run on the GUI thread.
-    if (!image_file) {
+    if (!image_file && !document_file) {
         QTimer::singleShot(0, self, [self, key, path] {
             const auto image = desktop_platform::application_icon(path);
-            self->pending_icons.remove(key);
-            // Cache failed reads without capturing a theme-dependent fallback icon.
-            self->icons.insert(key, new QIcon(image.isNull() ? QIcon{} : QIcon(QPixmap::fromImage(image))));
-            for (int row = 0; row < self->records.size(); ++row) {
-                if (self->icon_keys[row] == key)
-                    emit self->dataChanged(self->index(row, 0), self->index(row, 0), {Qt::DecorationRole});
-            }
+            self->store_icon(key, image);
         });
         return;
     }
 #endif
     auto *watcher = new QFutureWatcher<QImage>(self);
-    connect(watcher, &QFutureWatcher<QImage>::finished, self, [self, watcher, key] {
-        const auto image = watcher->result();
-        self->pending_icons.remove(key);
-        self->icons.insert(key, new QIcon(image.isNull() ? QIcon{} : QIcon(QPixmap::fromImage(image))));
+    connect(watcher, &QFutureWatcher<QImage>::finished, self, [self, watcher, key, path, document_file] {
+        auto image = watcher->result();
+#ifdef Q_OS_LINUX
+        if (document_file && image.isNull())
+            image = desktop_platform::application_icon(path);
+#else
+        Q_UNUSED(path)
+        Q_UNUSED(document_file)
+#endif
+        self->store_icon(key, image);
         watcher->deleteLater();
-        for (int row = 0; row < self->records.size(); ++row) {
-            if (self->icon_keys[row] == key) {
-                emit self->dataChanged(self->index(row, 0), self->index(row, 0), {Qt::DecorationRole});
-            }
-        }
     });
-    watcher->setFuture(QtConcurrent::run(&self->icon_pool, [path, image_file] {
+    watcher->setFuture(QtConcurrent::run(&self->icon_pool, [path, image_file, document_file] {
+        if (document_file) {
+            auto image = file_thumbnail(path);
+#ifdef Q_OS_WIN
+            if (image.isNull())
+                image = desktop_platform::application_icon(path);
+#endif
+            return image;
+        }
         return image_file ? QImage(path) : desktop_platform::application_icon(path);
     }));
 }
@@ -280,7 +339,8 @@ int LibraryFilter::query_rank(const int row) const {
         for (int index = 0; index < model->rowCount(); ++index) {
             const auto &record = model->at(index);
             if ((section == "favorites" && !record.favorite) || (section == "running" && !record.running) ||
-                (!selected_tag.isEmpty() && !has_tag(record.tags, selected_tag)))
+                !std::all_of(selected_tags.cbegin(), selected_tags.cend(),
+                             [&](const QString &tag) { return has_tag(record.tags, tag); }))
                 continue;
             const auto rank = query.rank(model->search_data(index));
             query_ranks[index] = rank;
@@ -295,11 +355,15 @@ int LibraryFilter::query_rank(const int row) const {
 }
 
 void LibraryFilter::set_section(const QString &value, const QString &tag) {
+    set_tag_section(value, tag.isEmpty() ? QStringList{} : QStringList{tag});
+}
+
+void LibraryFilter::set_tag_section(const QString &value, const QStringList &tags) {
 #if QT_VERSION >= QT_VERSION_CHECK(6, 10, 0)
     beginFilterChange();
 #endif
     section = value;
-    selected_tag = tag;
+    selected_tags = tags;
     query_ranks.clear();
 #if QT_VERSION >= QT_VERSION_CHECK(6, 10, 0)
     endFilterChange(Direction::Rows);
@@ -336,7 +400,8 @@ bool LibraryFilter::filterAcceptsRow(const int row, const QModelIndex &parent) c
         return false;
     if (section == "running" && !record.running)
         return false;
-    if (!selected_tag.isEmpty() && !has_tag(record.tags, selected_tag))
+    if (!std::all_of(selected_tags.cbegin(), selected_tags.cend(),
+                     [&](const QString &tag) { return has_tag(record.tags, tag); }))
         return false;
     return query_rank(row) >= 0;
 }

@@ -117,7 +117,9 @@ public:
 class TransitionOverlay : public QWidget {
 public:
     QPixmap snapshot;
+    QPixmap previous_snapshot;
     qreal opacity = 1.0;
+    int direction = 0;
 
     explicit TransitionOverlay(QWidget *const parent) : QWidget(parent) {
         setAttribute(Qt::WA_TransparentForMouseEvents);
@@ -128,9 +130,14 @@ protected:
     void paintEvent(QPaintEvent *) override {
         QPainter painter(this);
         // An opaque background preserves the surface color during transitions.
-        painter.fillRect(rect(), palette().window());
+        painter.fillRect(rect(), palette().base());
+        const int distance = qRound(width() * 0.025) * direction;
+        if (!previous_snapshot.isNull()) {
+            painter.setOpacity(1.0);
+            painter.drawPixmap(rect().translated(qRound(-distance * opacity), 0), previous_snapshot);
+        }
         painter.setOpacity(opacity);
-        painter.drawPixmap(rect(), snapshot);
+        painter.drawPixmap(rect().translated(qRound(distance * (1.0 - opacity)), 0), snapshot);
     }
 };
 
@@ -145,6 +152,7 @@ protected:
         animation->stop();
         overlay->hide();
         overlay->snapshot = QPixmap{};
+        overlay->previous_snapshot = QPixmap{};
         QWidget::resizeEvent(event);
     }
 
@@ -152,6 +160,7 @@ public:
     explicit PageTransition(QWidget *const contents)
         : contents(contents), overlay(new TransitionOverlay(this)), animation(new QVariantAnimation(this)) {
         setAutoFillBackground(true);
+        setBackgroundRole(QPalette::Base);
         auto *layout = new QVBoxLayout(this);
         layout->setContentsMargins(0, 0, 0, 0);
         layout->addWidget(contents);
@@ -166,16 +175,46 @@ public:
         connect(animation, &QVariantAnimation::finished, this, [this] {
             overlay->hide();
             overlay->snapshot = QPixmap{};
+            overlay->previous_snapshot = QPixmap{};
         });
+    }
+
+    void transition_to(const std::function<void()> &change, const int direction = 0) {
+        const bool animate = isVisible() && desktop_platform::animations_enabled();
+        // Include an in-flight transition so rapid reversals start from the displayed frame.
+        const auto previous = animate ? grab() : QPixmap{};
+        animation->stop();
+        overlay->hide();
+        overlay->snapshot = QPixmap{};
+        overlay->previous_snapshot = QPixmap{};
+        change();
+        layout()->activate();
+        if (!animate)
+            return;
+        overlay->previous_snapshot = previous;
+        // Capture the opaque surface; grabbing transparent contents forces their Window background.
+        overlay->snapshot = grab();
+        overlay->direction = direction;
+        overlay->setGeometry(rect());
+        overlay->opacity = 0.0;
+        animation->setDuration(220);
+        animation->setStartValue(0.0);
+        overlay->show();
+        overlay->raise();
+        animation->start();
     }
 
     void start() {
         animation->stop();
         overlay->hide();
         overlay->snapshot = QPixmap{};
+        overlay->previous_snapshot = QPixmap{};
         if (!contents->isVisible() || !desktop_platform::animations_enabled())
             return;
-        overlay->snapshot = contents->grab();
+        overlay->snapshot = grab();
+        overlay->direction = 0;
+        animation->setDuration(140);
+        animation->setStartValue(0.88);
         overlay->setGeometry(rect());
         overlay->opacity = animation->startValue().toReal();
         overlay->show();
@@ -212,8 +251,10 @@ inline QPushButton *action_button(QAction *const action, const bool quiet = fals
     result->setEnabled(action->isEnabled());
     result->setToolTip(action->toolTip());
     result->setProperty("icon_only", !text.isNull() && text.isEmpty());
-    if (result->property("icon_only").toBool())
+    if (result->property("icon_only").toBool()) {
         result->setFixedWidth(qRound(qMax(14, result->font().pixelSize()) * 44 / 14.0));
+        result->setAccessibleName(action->text());
+    }
     result->setIconSize(QSize(qRound(qMax(14, result->font().pixelSize()) * 20 / 14.0),
                               qRound(qMax(14, result->font().pixelSize()) * 20 / 14.0)));
     QObject::connect(result, &QPushButton::clicked, action, &QAction::trigger);
@@ -224,6 +265,8 @@ inline QPushButton *action_button(QAction *const action, const bool quiet = fals
                             ? appearance::icon(action->property("appearance_icon").toString(), QColor("#181A1D"))
                             : action->icon());
         result->setToolTip(action->toolTip());
+        if (result->property("icon_only").toBool())
+            result->setAccessibleName(action->text());
     });
     return result;
 }

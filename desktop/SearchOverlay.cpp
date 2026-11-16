@@ -6,6 +6,7 @@
 #include <QHBoxLayout>
 #include <QHideEvent>
 #include <QLineEdit>
+#include <QLabel>
 #include <QPainter>
 #include <QPainterPath>
 #include <QScreen>
@@ -31,7 +32,7 @@ SearchOverlay::SearchOverlay(DesktopService &service, QWidget *const parent)
               Qt::Window |
 #endif
                   Qt::FramelessWindowHint),
-      service(service), contents(new QWidget(this)), input(new QLineEdit), open_button(new QToolButton),
+      service(service), contents(new QWidget(this)), input(new QLineEdit), shortcut_hint(new QLabel), open_button(new QToolButton),
       results(new SearchResults(service, *input, true)), notice(new NotificationBanner(service.settings, 0, 7000)),
       opacity(new QGraphicsOpacityEffect(contents)), reveal(new QVariantAnimation(this)),
       height_animation(new QVariantAnimation(this)), activation_check(new QTimer(this)) {
@@ -65,11 +66,14 @@ SearchOverlay::SearchOverlay(DesktopService &service, QWidget *const parent)
     open_button->setAccessibleName(QCoreApplication::translate("XLibrary", "Open Fora.Deck"));
     open_button->setToolTip(open_button->accessibleName());
     open_button->setCursor(Qt::PointingHandCursor);
-    row->addWidget(file_search_switch(service, contents));
     row->addWidget(open_button);
     layout->addLayout(row);
+    layout->addWidget(file_search_switch(service, contents), 0, Qt::AlignLeft);
     layout->addWidget(results);
     layout->addWidget(notice);
+    shortcut_hint->setProperty("caption", true);
+    shortcut_hint->setWordWrap(true);
+    layout->addWidget(shortcut_hint);
     contents->installEventFilter(this);
     connect(&service, &DesktopService::message, notice, [this](const QString &message) {
         if (isVisible()) {
@@ -124,10 +128,15 @@ SearchOverlay::SearchOverlay(DesktopService &service, QWidget *const parent)
 
 void SearchOverlay::refresh_appearance() {
     notice->refresh_appearance();
+    const auto shortcut = QKeySequence::fromString(
+        service.settings.value("shortcuts/overlay", desktop_platform::default_overlay_shortcut()).toString(),
+        QKeySequence::PortableText).toString(QKeySequence::NativeText);
+    shortcut_hint->setText(QCoreApplication::translate("XLibrary", "↑↓ Select · Enter Open · Esc Close · %1 Quick search")
+                               .arg(shortcut));
     input->findChild<QAction *>("overlay_search_icon")->setIcon(appearance::icon("search"));
     open_button->setIcon(appearance::icon("library"));
     inset = appearance::scaled(service.settings, 16);
-    header_height = appearance::scaled(service.settings, 40);
+    header_height = appearance::scaled(service.settings, 52);
     input->setFixedHeight(header_height);
     open_button->setFixedSize(appearance::scaled(service.settings, 40), appearance::scaled(service.settings, 40));
     open_button->setIconSize(QSize(appearance::scaled(service.settings, 20), appearance::scaled(service.settings, 20)));
@@ -142,9 +151,9 @@ void SearchOverlay::refresh_appearance() {
             "QLineEdit#overlay_search_input { background: transparent; border: 2px solid transparent; padding: 0 6px; "
             "min-height: %1px; max-height: %1px; font-size: %3px; }"
             "QLineEdit#overlay_search_input:focus { border-color: %2; }"
-            "QListView#search_results { background: transparent; border: none; }"
+            "QAbstractItemView#search_results { background: transparent; border: none; }"
             "QToolButton { border: 2px solid transparent; border-radius: 8px; background: transparent; }"
-            "QToolButton:focus { border-color: %2; }"
+            "QToolButton[keyboard_focus=\"true\"]:focus { border-color: %2; }"
             "QToolButton:hover { background: rgba(135,140,150,35); }")
             .arg(header_height - 4)
             .arg(palette().color(QPalette::Link).name())
@@ -156,10 +165,16 @@ void SearchOverlay::update_height() {
     // Resolve stylesheet constraints before measuring, including on the first show.
     contents->ensurePolished();
     contents->layout()->activate();
+    const auto available = screen()->availableGeometry();
+    const int natural_results_height = results->property("preferred_height").toInt();
+    if (!results->isHidden() && natural_results_height > 0) {
+        const int overhead = contents->layout()->sizeHint().height() - results->height();
+        results->setFixedHeight(qMin(natural_results_height, qMax(0, available.height() - inset * 2 - overhead)));
+        contents->layout()->activate();
+    }
     const int content_height = contents->layout()->sizeHint().height();
     // The painted surface starts 8 px below the window; keep both inner insets equal.
     const qreal target = content_height + (inset - 8) * 2;
-    const auto available = screen()->availableGeometry();
     const int desired_height = qMin(qRound(target) + 16, available.height());
     const bool animate =
         isVisible() && desktop_platform::animations_enabled() && progress >= 1 && surface_height != target;
@@ -177,11 +192,10 @@ void SearchOverlay::update_height() {
 }
 
 void SearchOverlay::update_surface() {
-    // Children keep their final size. A mask reveals them without ever stretching glyphs.
-    const qreal center_y = inset + header_height / 2.0;
-    const qreal surface_width = 8 + (width() - 16 - 8) * progress;
-    const qreal animated_height = 8 + (surface_height - 8) * progress;
-    const QRectF surface((width() - surface_width) / 2, center_y * (1 - progress) + 8 * progress - 4 * (1 - progress),
+    // Children keep their final size while the existing reveal fades the surface.
+    const qreal surface_width = width() - 16;
+    const qreal animated_height = surface_height;
+    const QRectF surface((width() - surface_width) / 2, 8 - 4 * (1 - progress),
                          surface_width, animated_height);
     // Without an X11 compositor, alpha pixels outside the panel are displayed as black.
     // A native window shape removes those pixels; composited desktops keep the soft shadow.
@@ -207,10 +221,10 @@ void SearchOverlay::update_surface() {
 void SearchOverlay::paintEvent(QPaintEvent *) {
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
-    const qreal center_y = inset + header_height / 2.0;
-    const qreal surface_width = 8 + (width() - 24) * progress;
-    const qreal animated_height = 8 + (surface_height - 8) * progress;
-    const QRectF surface((width() - surface_width) / 2, (center_y - 4) * (1 - progress) + 8 * progress, surface_width,
+    painter.setOpacity(progress);
+    const qreal surface_width = width() - 16;
+    const qreal animated_height = surface_height;
+    const QRectF surface((width() - surface_width) / 2, 8 - 4 * (1 - progress), surface_width,
                          animated_height);
     const auto radius = qMin(12.0, animated_height / 2);
     const bool dark = appearance::is_dark(service.settings);

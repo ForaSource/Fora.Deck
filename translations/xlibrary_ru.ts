@@ -3285,5 +3285,141 @@ Qt: %4
         <source>By ForaSource</source>
         <translation>Автор: ForaSource</translation>
     </message>
+    <message>
+        <source>↑↓ Select · Enter Open · Esc Close · %1 Quick search</source>
+        <translation>↑↓ Выбор · Enter Открыть · Esc Закрыть · %1 Быстрый поиск</translation>
+    </message>
+    <message>
+        <source>Path</source>
+        <translation>Путь</translation>
+    </message>
+    <message>
+        <source>Open</source>
+        <translation>Открыть</translation>
+    </message>
+    <message>
+        <source>More add options</source>
+        <translation>Другие способы добавления</translation>
+    </message>
+    <message>
+        <source>List</source>
+        <translation>Список</translation>
+    </message>
+    <message>
+        <source>Cards</source>
+        <translation>Карточки</translation>
+    </message>
+    <message>
+        <source>Library view</source>
+        <translation>Вид библиотеки</translation>
+    </message>
+    <message>
+        <source>Library actions</source>
+        <translation>Действия библиотеки</translation>
+    </message>
+    <message>
+        <source>More actions</source>
+        <translation>Другие действия</translation>
+    </message>
+    <message>
+        <source>Select a scenario</source>
+        <translation>Выберите сценарий</translation>
+    </message>
+    <message>
+        <source>Delay: %1 s</source>
+        <translation>Задержка: %1 с</translation>
+    </message>
+    <message>
+        <source>Copy launch target</source>
+        <translation>Копировать цель запуска</translation>
+    </message>
+    <message>
+        <source>File</source>
+        <translation>Файл</translation>
+    </message>
+    <message>
+        <source>Folder</source>
+        <translation>Папка</translation>
+    </message>
+    <message>
+        <source>Recommended</source>
+        <translation>Рекомендуемые</translation>
+    </message>
+    <message>
+        <source>Recently opened</source>
+        <translation>Недавно открытые</translation>
+    </message>
+    <message>
+        <source>File sort order</source>
+        <translation>Сортировка файлов</translation>
+    </message>
+    <message>
+        <source>File actions</source>
+        <translation>Действия с файлами</translation>
+    </message>
+    <message>
+        <source>Refresh index</source>
+        <translation>Обновить индекс</translation>
+    </message>
+    <message>
+        <source>↑↓  Select     Enter  Open     Shift+F10  Actions</source>
+        <translation>↑↓  Выбор     Enter  Открыть     Shift+F10  Действия</translation>
+    </message>
+    <message>
+        <source> from all applications and files? Saved filters will also stop using this tag.</source>
+        <translation> из всех приложений и файлов? Сохранённые фильтры также перестанут использовать этот тег.</translation>
+    </message>
+    <message>
+        <source>Extension</source>
+        <translation>Расширение</translation>
+    </message>
+    <message>
+        <source>Date added</source>
+        <translation>Дата добавления</translation>
+    </message>
+    <message>
+        <source>By extension</source>
+        <translation>По расширению</translation>
+    </message>
+    <message>
+        <source>By date added</source>
+        <translation>По дате добавления</translation>
+    </message>
+    <message>
+        <source>File type</source>
+        <translation>Тип файла</translation>
+    </message>
+    <message>
+        <source>Size</source>
+        <translation>Размер</translation>
+    </message>
+    <message>
+        <source>Modified</source>
+        <translation>Дата изменения</translation>
+    </message>
+    <message>
+        <source>File path</source>
+        <translation>Путь к файлу</translation>
+    </message>
+    <message>
+        <source>Opens with</source>
+        <translation>Открывается в</translation>
+    </message>
+    <message>
+        <source>Default application not found</source>
+        <translation>Приложение по умолчанию не найдено</translation>
+    </message>
+    <message>
+        <source>Detecting application…</source>
+        <translation>Определение приложения…</translation>
+    </message>
+    <message>
+        <source>Select a file</source>
+        <translation>Выберите файл</translation>
+    </message>
+    <message>
+        <source>File details</source>
+        <translation>Сведения о файле</translation>
+    </message>
 </context>
 </TS>

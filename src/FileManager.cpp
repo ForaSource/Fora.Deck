@@ -75,8 +75,16 @@ const QSet<QString> &extensions() {
     }();
     return allowed;
 }
+QPair<QString, QString> split_file_query(const QString &text) {
+    QStringList filename_terms;
+    QStringList tag_terms;
+    for (const auto &term : text.simplified().split(' ', Qt::SkipEmptyParts))
+        (term.startsWith('#') || term.startsWith("-#") ? tag_terms : filename_terms).append(term);
+    return {filename_terms.join(' '), tag_terms.join(' ')};
+}
 QString file_query_text(const QString &text, QString &extension) {
-    auto query_text = text.simplified();
+    const auto parts = split_file_query(text);
+    auto query_text = parts.first;
     const auto token = query_text.section(' ', -1).toLower();
     const auto alternate = search_query::switch_layout(token).toLower();
     for (auto candidate : {token, alternate}) {
@@ -96,7 +104,7 @@ QString file_query_text(const QString &text, QString &extension) {
             break;
         }
     }
-    return query_text.trimmed();
+    return (query_text.trimmed() + ' ' + parts.second).trimmed();
 }
 bool contains_path(const QString &root, const QString &path) {
     return root == path || path.startsWith(root.endsWith('/') ? root : root + '/');
@@ -178,10 +186,22 @@ FileManager::FileManager(const QString &directory, const QStringList &saved_path
         xlibrary::sqlite_execute(
             db.get(), "PRAGMA journal_mode=WAL;"
                       "CREATE TABLE IF NOT EXISTS files(path TEXT PRIMARY KEY,name TEXT NOT "
-                      "NULL,scope TEXT NOT NULL,seen INTEGER NOT NULL);"
+                      "NULL,scope TEXT NOT NULL,seen INTEGER NOT NULL,added INTEGER NOT NULL DEFAULT 0);"
                       "CREATE TABLE IF NOT EXISTS saved(path TEXT PRIMARY KEY);"
                       "CREATE INDEX IF NOT EXISTS files_scope ON files(scope);"
                       "CREATE TABLE IF NOT EXISTS scan_state(scope TEXT PRIMARY KEY,completed INTEGER NOT NULL);");
+        bool has_added = false;
+        {
+            xlibrary::SqliteStatement columns(db.get(), "PRAGMA table_info(files)");
+            while (columns.next())
+                has_added |= columns.qtext(1) == "added";
+        }
+        if (!has_added) {
+            // Older indexes retained only their last scan time, the earliest available approximation.
+            xlibrary::sqlite_execute(db.get(), "BEGIN IMMEDIATE;"
+                                              "ALTER TABLE files ADD COLUMN added INTEGER NOT NULL DEFAULT 0;"
+                                              "UPDATE files SET added=seen; COMMIT");
+        }
         xlibrary::sqlite_execute(db.get(), "BEGIN; DELETE FROM saved;");
         for (const auto &path : saved_paths) {
             if (!QFileInfo(path).isAbsolute())
@@ -379,12 +399,14 @@ void FileManager::start_scan() {
                     xlibrary::sqlite_execute(db.get(), "BEGIN");
                     for (const auto &entry : batch) {
                         xlibrary::SqliteStatement insert(
-                            db.get(), "INSERT INTO files VALUES(?,?,?,?) ON CONFLICT(path) "
-                                      "DO UPDATE SET name=excluded.name,scope=excluded.scope,seen=excluded.seen");
+                            db.get(), "INSERT INTO files(path,name,scope,seen,added) VALUES(?,?,?,?,?) ON CONFLICT(path) "
+                                      "DO UPDATE SET name=excluded.name,scope=excluded.scope,seen=excluded.seen,"
+                                      "added=CASE WHEN files.added=0 THEN excluded.added ELSE files.added END");
                         insert.bind(1, entry.first);
                         insert.bind(2, entry.second);
                         insert.bind(3, scope);
                         insert.bind(4, seen);
+                        insert.bind(5, seen);
                         insert.next();
                     }
                     xlibrary::sqlite_execute(db.get(), "COMMIT");
@@ -483,7 +505,8 @@ void FileManager::start_scan() {
 void FileManager::search(const QString &text, const quint64 request, QObject *receiver,
                          std::function<void(quint64, QVector<file_match>)> completed,
                          std::shared_ptr<std::atomic<quint64>> field_generation,
-                         const QHash<QString, usage_record> &usage) {
+                         const QHash<QString, usage_record> &usage, const QStringList &tags,
+                         const bool favorites_only, const int limit, const int sort_mode) {
     auto *watcher = new QFutureWatcher<QVector<file_match>>(receiver);
     connect(watcher, &QFutureWatcher<QVector<file_match>>::finished, receiver,
             [watcher, request, completed = std::move(completed)] {
@@ -495,16 +518,18 @@ void FileManager::search(const QString &text, const quint64 request, QObject *re
     watcher->setFuture(QtConcurrent::run(&query_pool, [path = database_path, scope = scope, text, usage, enabled,
                                                        exclusions = excluded_paths, cache = search_cache,
                                                        generation = query_generation, expected, field_generation,
-                                                       request] {
+                                                       request, metadata = metadata, tags, favorites_only,
+                                                       limit = qBound(1, limit, 200), sort_mode] {
         QVector<file_match> matches;
         const auto cancelled = [&] { return generation->load() != expected || field_generation->load() != request; };
-        if (!enabled || text.trimmed().isEmpty() || cancelled())
+        if (!enabled || cancelled())
             return matches;
         try {
             auto db = open_index(path);
-            const auto pattern = search_query::file_pattern(text.trimmed());
+            const auto parts = split_file_query(text);
+            const auto pattern = search_query::file_pattern(parts.first);
             QString extension;
-            const auto query_text = pattern ? text.trimmed() : file_query_text(text, extension);
+            const auto query_text = pattern ? parts.second : file_query_text(text, extension);
             const SearchQuery query(query_text);
             const bool has_query = !query_text.isEmpty();
             QStringList preferred{QStandardPaths::writableLocation(QStandardPaths::DesktopLocation),
@@ -512,9 +537,25 @@ void FileManager::search(const QString &text, const quint64 request, QObject *re
             for (auto &root : preferred)
                 if (!root.isEmpty())
                     root = identity(root);
-            const auto better = [](const file_match &a, const file_match &b) {
-                if (a.rank != b.rank)
+            const auto ordered = [sort_mode](const file_match &a, const file_match &b, const bool rank_results) {
+                if (rank_results && a.rank != b.rank)
                     return a.rank < b.rank;
+                if (const auto comparison = compare_file_order(a.extension, a.added, b.extension, b.added, sort_mode))
+                    return comparison < 0;
+                if (sort_mode == 1) {
+                    const auto comparison = QString::compare(a.name, b.name, Qt::CaseInsensitive);
+                    if (comparison != 0)
+                        return comparison < 0;
+                }
+                if (sort_mode == 2 && a.last_used != b.last_used)
+                    return a.last_used > b.last_used;
+                if (a.favorite != b.favorite)
+                    return a.favorite;
+                if (sort_mode == 4) {
+                    const auto comparison = QString::compare(a.tags.join(','), b.tags.join(','), Qt::CaseInsensitive);
+                    if (comparison != 0)
+                        return comparison < 0;
+                }
                 if (a.saved != b.saved)
                     return a.saved;
                 if (a.use_count != b.use_count)
@@ -527,6 +568,7 @@ void FileManager::search(const QString &text, const quint64 request, QObject *re
                     return a.depth < b.depth;
                 return a.path < b.path;
             };
+            const auto better = [&](const file_match &a, const file_match &b) { return ordered(a, b, true); };
             // Direct queries never pay for edit distance across the full disk index.
             // Only a query with no direct matches needs the abbreviation/typo pass.
             QSet<QString> inspected;
@@ -534,13 +576,13 @@ void FileManager::search(const QString &text, const quint64 request, QObject *re
                 if (suggestions && (!matches.isEmpty() || pattern || !has_query))
                     break;
                 for (;;) {
-                    const auto capacity = 30 - matches.size();
+                    const auto capacity = limit - matches.size();
                     QVector<file_match> candidates;
                     xlibrary::SqliteStatement rows(
                         db.get(),
-                        "SELECT f.path,f.name,EXISTS(SELECT 1 FROM saved s WHERE s.path=f.path) "
+                        "SELECT f.path,f.name,EXISTS(SELECT 1 FROM saved s WHERE s.path=f.path),f.added "
                         "FROM files f WHERE f.scope=? OR EXISTS(SELECT 1 FROM saved s WHERE s.path=f.path) "
-                        "UNION ALL SELECT s.path,'',1 FROM saved s WHERE NOT EXISTS(SELECT 1 FROM files f WHERE "
+                        "UNION ALL SELECT s.path,'',1,0 FROM saved s WHERE NOT EXISTS(SELECT 1 FROM files f WHERE "
                         "f.path=s.path)");
                     rows.bind(1, scope);
                     while (rows.next()) {
@@ -551,6 +593,12 @@ void FileManager::search(const QString &text, const quint64 request, QObject *re
                             continue;
                         const auto stored_name = rows.qtext(1);
                         const auto name = stored_name.isEmpty() ? QFileInfo(file_path).fileName() : stored_name;
+                        const auto properties = metadata.value(file_path).toMap();
+                        const auto file_tags = properties.value("tags").toStringList();
+                        const bool favorite = properties.value("favorite").toBool();
+                        if ((favorites_only && !favorite) ||
+                            !std::all_of(tags.cbegin(), tags.cend(), [&](const auto &tag) { return has_tag(file_tags, tag); }))
+                            continue;
                         if (!extension.isEmpty() &&
                             QFileInfo(name).suffix().compare(extension, Qt::CaseInsensitive) != 0)
                             continue;
@@ -558,6 +606,7 @@ void FileManager::search(const QString &text, const quint64 request, QObject *re
                         if (pattern) {
                             if (!pattern->match(name.normalized(QString::NormalizationForm_C)).hasMatch())
                                 continue;
+                            rank = query.rank({}, {}, file_tags);
                         } else if (has_query) {
                             auto *prepared = cache->object(name);
                             std::optional<SearchQuery::SearchableData> uncached;
@@ -572,13 +621,19 @@ void FileManager::search(const QString &text, const quint64 request, QObject *re
                                     prepared = &*uncached;
                                 }
                             }
-                            rank = query.rank(*prepared, suggestions);
+                            rank = file_tags.isEmpty()
+                                       ? query.rank(*prepared, suggestions)
+                                       : query.rank(SearchQuery::prepare(name, {}, file_tags), suggestions);
                         }
                         if (rank < 0)
                             continue;
                         const auto history = usage.value(file_path);
                         file_match match{file_path,        name, rank, rows.number(2) != 0, true, history.count,
                                          history.last_used};
+                        match.tags = file_tags;
+                        match.favorite = favorite;
+                        match.extension = QFileInfo(name).suffix().toCaseFolded();
+                        match.added = rows.number(3);
                         match.depth = static_cast<int>(file_path.count('/'));
                         for (int location = 0; location < preferred.size(); ++location)
                             if (!preferred[location].isEmpty() && file_path.startsWith(preferred[location] + '/')) {
@@ -593,6 +648,8 @@ void FileManager::search(const QString &text, const quint64 request, QObject *re
                             const QFileInfo info(file_path);
                             if (!info.isFile() || !info.isReadable())
                                 continue;
+                            match.modified = info.lastModified().toMSecsSinceEpoch();
+                            match.size = info.size();
                             candidates.insert(position, std::move(match));
                             if (candidates.size() > capacity)
                                 candidates.removeLast();
@@ -607,7 +664,7 @@ void FileManager::search(const QString &text, const quint64 request, QObject *re
                             matches.append(entry);
                     }
                     // Refill after rejected candidates without reading every matching file's contents.
-                    if (matches.size() == 30 || candidates.size() < capacity)
+                    if (matches.size() == limit || candidates.size() < capacity)
                         break;
                 }
                 std::sort(matches.begin(), matches.end(), better);
@@ -616,25 +673,71 @@ void FileManager::search(const QString &text, const quint64 request, QObject *re
                 const auto best = matches.first().rank;
                 matches.removeIf([best](const auto &entry) { return !SearchQuery::accepts_rank(entry.rank, best); });
             }
+            // Matching chooses the bounded relevant subset; presentation groups extensions across match ranks.
+            if (sort_mode == 0 || sort_mode == 5 || sort_mode == 6)
+                std::sort(matches.begin(), matches.end(), [&](const auto &a, const auto &b) { return ordered(a, b, false); });
         } catch (const std::exception &) { /* Index status exposes persistent storage failures. */
         }
         return cancelled() ? QVector<file_match>{} : matches;
     }));
 }
+int FileManager::compare_file_order(const QString &left_extension, const qint64 left_added,
+                                    const QString &right_extension, const qint64 right_added, const int sort_mode) {
+    if (sort_mode == 0 || sort_mode == 5)
+        if (const auto comparison = QString::compare(left_extension, right_extension, Qt::CaseInsensitive))
+            return comparison;
+    if ((sort_mode == 0 || sort_mode == 5 || sort_mode == 6) && left_added != right_added)
+        return left_added > right_added ? -1 : 1;
+    return 0;
+}
+
+void FileManager::directory_dates(const QString &request, QObject *const receiver,
+                                 std::function<void(QHash<QString, qint64>)> completed) {
+    auto *watcher = new QFutureWatcher<QHash<QString, qint64>>(receiver);
+    connect(watcher, &QFutureWatcher<QHash<QString, qint64>>::finished, receiver,
+            [watcher, completed = std::move(completed)] {
+                completed(watcher->result());
+                watcher->deleteLater();
+            });
+    watcher->setFuture(QtConcurrent::run(&query_pool, [database = database_path, request] {
+        QHash<QString, qint64> result;
+        const QFileInfo target(request);
+        auto root = identity(target.isDir() ? target.absoluteFilePath() : target.absolutePath());
+        if (!root.endsWith('/'))
+            root += '/';
+        auto pattern = root;
+        pattern.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
+        pattern += '%';
+        try {
+            auto db = open_index(database);
+            xlibrary::SqliteStatement rows(db.get(), "SELECT path,added FROM files WHERE path LIKE ? ESCAPE '\\' "
+                                                   "AND instr(substr(path,?),'/')=0");
+            rows.bind(1, pattern);
+            rows.bind(2, root.size() + 1);
+            while (rows.next())
+                result.insert(rows.qtext(0), rows.number(1));
+        } catch (const std::exception &) {
+        }
+        return result;
+    }));
+}
+
 QVector<file_match> FileManager::filter_matches(const QString &text, QVector<file_match> matches) {
     if (text.trimmed().isEmpty())
-        return {};
-    const auto pattern = search_query::file_pattern(text.trimmed());
+        return matches;
+    const auto parts = split_file_query(text);
+    const auto pattern = search_query::file_pattern(parts.first);
     QString extension;
-    const auto query_text = pattern ? text.trimmed() : file_query_text(text, extension);
+    const auto query_text = pattern ? parts.second : file_query_text(text, extension);
     const SearchQuery query(query_text);
     for (auto &match : matches) {
         if (!extension.isEmpty() && QFileInfo(match.name).suffix().compare(extension, Qt::CaseInsensitive) != 0)
             match.rank = -1;
         else if (pattern)
-            match.rank = pattern->match(match.name.normalized(QString::NormalizationForm_C)).hasMatch() ? 0 : -1;
+            match.rank = pattern->match(match.name.normalized(QString::NormalizationForm_C)).hasMatch()
+                             ? query.rank({}, {}, match.tags) : -1;
         else
-            match.rank = query.rank(match.name, {}, {});
+            match.rank = query.rank(match.name, {}, match.tags);
     }
     matches.removeIf([](const auto &match) { return match.rank < 0; });
     if (!matches.isEmpty()) {
@@ -644,6 +747,67 @@ QVector<file_match> FileManager::filter_matches(const QString &text, QVector<fil
         matches.removeIf([best](const auto &match) { return !SearchQuery::accepts_rank(match.rank, best); });
     }
     return matches;
+}
+
+void FileManager::restore_metadata(const QVariantMap &values) {
+    metadata.clear();
+    for (auto it = values.cbegin(); it != values.cend(); ++it) {
+        if (!QFileInfo(it.key()).isAbsolute())
+            continue;
+        const auto properties = it.value().toMap();
+        QStringList tags;
+        for (const auto &tag : properties.value("tags").toStringList())
+            if (valid_tag_name(tag) && !has_tag(tags, tag) && tags.size() < catalog_limits::tags_per_application)
+                tags.append(tag);
+        metadata.insert(identity(it.key()), QVariantMap{{"tags", tags}, {"favorite", properties.value("favorite").toBool()}});
+    }
+}
+
+QStringList FileManager::tags_for(const QString &path) const {
+    return metadata.value(identity(path)).toMap().value("tags").toStringList();
+}
+
+bool FileManager::is_favorite(const QString &path) const {
+    return metadata.value(identity(path)).toMap().value("favorite").toBool();
+}
+
+QStringList FileManager::tag_names() const {
+    QStringList result;
+    for (const auto &value : metadata)
+        for (const auto &tag : value.toMap().value("tags").toStringList())
+            if (!has_tag(result, tag))
+                result.append(tag);
+    result.sort(Qt::CaseInsensitive);
+    return result;
+}
+
+void FileManager::rename_tag(const QString &old_name, const QString &new_name) {
+    for (auto &value : metadata) {
+        auto properties = value.toMap();
+        auto tags = properties.value("tags").toStringList();
+        if (!has_tag(tags, old_name))
+            continue;
+        tags.removeIf([&](const auto &tag) { return tag_name_key(tag) == tag_name_key(old_name); });
+        if (!new_name.isEmpty() && !has_tag(tags, new_name))
+            tags.append(new_name);
+        properties.insert("tags", tags);
+        value = properties;
+    }
+    emit metadata_changed();
+    emit changed();
+}
+
+void FileManager::update_metadata(const QString &path, const QStringList &tags, const bool favorite) {
+    if (!QFileInfo(path).isAbsolute() || tags.size() > catalog_limits::tags_per_application ||
+        std::any_of(tags.cbegin(), tags.cend(), [](const auto &tag) { return !valid_tag_name(tag); }))
+        return;
+    const auto key = identity(path);
+    if (tags.isEmpty() && !favorite)
+        metadata.remove(key);
+    else
+        metadata.insert(key, QVariantMap{{"tags", tags}, {"favorite", favorite}});
+    emit metadata_changed();
+    emit changed();
 }
 
 void FileManager::saved_files(QObject *receiver, std::function<void(QVector<file_match>)> completed) {
@@ -693,14 +857,28 @@ void FileManager::set_saved(const QString &path, const bool saved) {
                             {}};
                 }
                 auto db = open_index(database);
+                xlibrary::sqlite_execute(db.get(), "BEGIN IMMEDIATE");
                 xlibrary::SqliteStatement statement(db.get(), saved ? "INSERT OR IGNORE INTO saved VALUES(?)"
                                                                     : "DELETE FROM saved WHERE path=?");
                 statement.bind(1, path);
                 statement.next();
+                if (saved) {
+                    const auto now = QDateTime::currentMSecsSinceEpoch();
+                    xlibrary::SqliteStatement remember(db.get(), "INSERT OR IGNORE INTO files(path,name,scope,seen,added) "
+                                                               "VALUES(?,?,?,?,?)");
+                    remember.bind(1, path);
+                    remember.bind(2, QFileInfo(path).fileName());
+                    // A saved-only file must not claim membership in the current indexed scope.
+                    remember.bind(3, "");
+                    remember.bind(4, now);
+                    remember.bind(5, now);
+                    remember.next();
+                }
                 QStringList paths;
                 xlibrary::SqliteStatement rows(db.get(), "SELECT path FROM saved ORDER BY path");
                 while (rows.next())
                     paths.append(rows.qtext(0));
+                xlibrary::sqlite_execute(db.get(), "COMMIT");
                 return {{}, paths};
             } catch (const std::exception &e) {
                 return {QString::fromUtf8(e.what()), {}};

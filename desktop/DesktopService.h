@@ -102,8 +102,9 @@ private:
     bool restart_pending = false;
     QString library_file;
     qint64 selected_id = 0;
+    QString selected_file_path;
     QString current_section = "library";
-    QString current_tag;
+    QStringList current_tags;
     bool files_selected = false;
     catalog_snapshot snapshot;
     quint64 begin_operation(const QString &operation);
@@ -168,6 +169,8 @@ public:
     void check_scenario(qint64 id, bool force = false);
     qint64 selection() const { return selected_id; }
     const app_record *selected() const { return model.find(selected_id); }
+    const QString &selected_file() const { return selected_file_path; }
+    void select_file(const QString &path);
     const catalog_snapshot &catalog() const { return snapshot; }
     const QVector<qint64> &selections() const { return selected_ids; }
     void select_applications(const QVector<qint64> &ids);
@@ -191,9 +194,12 @@ public:
     bool searching_files() const { return files->is_enabled() && files_selected; }
     void set_searching_files(bool selected);
     bool file_search_active() const {
-        return searching_files() && current_section == "library" && current_tag.isEmpty();
+        return searching_files() && (current_section == "library" || current_section == "favorites");
     }
-    QString tag() const { return current_tag; }
+    QString tag() const { return current_tags.value(0); }
+    const QStringList &tags() const { return current_tags; }
+    QString saved_filter_query() const;
+    void navigate_tags(const QString &section, const QStringList &tags);
     Q_INVOKABLE void select(qint64 id);
     Q_INVOKABLE void navigate(const QString &section, const QString &tag = {});
     Q_INVOKABLE quint64 save_application(app_record record);
@@ -234,6 +240,7 @@ signals:
     void target_shortcuts_changed();
     void launch_profiles_changed(const QString &path);
     void selection_changed();
+    void file_selection_changed();
     void selections_changed();
     void undo_removal_changed();
     void catalog_preview_ready();

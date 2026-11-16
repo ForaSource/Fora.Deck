@@ -976,11 +976,14 @@ QDialog *settings_dialog(const ui_context &context, QWidget *const parent) {
         auto *page_layout = new QHBoxLayout(holder);
         page_layout->setContentsMargins(0, 0, 0, 0);
         auto *contents = context.registry->create(section.second, context, holder);
+        contents->setMaximumWidth(appearance::scaled(*context.settings, 760));
         page_layout->addWidget(contents, 1);
+        page_layout->addStretch();
         pages->addWidget(scroll(holder));
     }
     navigation_layout->addStretch();
     auto *navigation_scroll = scroll(navigation);
+    navigation_scroll->setObjectName("settings_navigation");
     navigation_scroll->setMinimumWidth(appearance::scaled(*context.settings, 184));
     navigation_scroll->setMaximumWidth(appearance::scaled(*context.settings, 220));
     auto *transition = new PageTransition(pages);

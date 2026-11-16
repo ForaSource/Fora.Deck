@@ -231,7 +231,7 @@ target_compile_definitions(XLibrary PRIVATE XLIBRARY_VERSION="${XLIBRARY_RELEASE
 target_link_libraries(XLibrary PRIVATE xlibrary_core Qt6::Widgets Qt6::Concurrent Qt6::Network qt6keychain)
 
 if(WIN32)
-    target_link_libraries(XLibrary PRIVATE ole32 uuid dwmapi)
+    target_link_libraries(XLibrary PRIVATE ole32 uuid dwmapi shlwapi)
     configure_file(packaging/windows_version.rc.in windows_version.rc @ONLY)
     target_sources(XLibrary PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/windows_version.rc")
     if(MINGW)

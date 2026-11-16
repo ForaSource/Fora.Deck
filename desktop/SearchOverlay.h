@@ -6,6 +6,7 @@
 class DesktopService;
 class QGraphicsOpacityEffect;
 class QLineEdit;
+class QLabel;
 class QToolButton;
 class QTimer;
 class QVariantAnimation;
@@ -17,6 +18,7 @@ class SearchOverlay : public QWidget {
     DesktopService &service;
     QWidget *contents;
     QLineEdit *input;
+    QLabel *shortcut_hint;
     QToolButton *open_button;
     SearchResults *results;
     NotificationBanner *notice;

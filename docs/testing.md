@@ -81,12 +81,23 @@ Use a disposable profile and a small folder of documents, images, unsupported ex
    excluded files must stay absent, and an empty query must not show indexed files.
 3. Switch file search Off during scanning, then back to Basic or Full. Off must stop indexing; enabled modes must resume it. Change the query and folder scope while work is pending;
    old results must not overwrite the new query or scope. Check Basic depth limits and recursive standard/additional folders.
-   Confirm Full is marked not recommended. The Files switch must appear in both search surfaces only in Basic and Full.
-   Toggle it with a query and a pending file request: off shows only applications, on shows only files, and both windows stay synchronized.
-   In file mode, the main workspace hides application rows and keeps the details pane with “Details will appear here.”.
-   Check the same placeholder with an empty application list; switching modes must not move the Files switch.
+   Confirm Full is marked not recommended. The Applications / Files choice must appear in both search surfaces only in Basic and Full.
+   Change it with a query and a pending file request: Applications shows only applications, Files shows only files, and both windows stay synchronized.
+   With an empty file query, check indexed results, favorites and recent usage. Check list/cards views, the result count,
+   sorting, tag editing, `#tag`/`-#tag` with names, extensions and masks, and sidebar tags/favorites without leaving file mode.
+   Restart a disposable profile and verify file tags/favorites persist independently of My files. Check both switch directions,
+   rapid reversal, resizing, disabled animations and a pending search; file actions must never target the selected application.
+   Check associated-application icons and portrait/landscape image previews in the list, cards and quick search, including
+   EXIF rotation, transparency, unsupported/corrupt images, Unicode paths and files removed while loading. Scroll through
+   more than 32 uncached entries and switch modes during loading; icons must keep updating without moving selection.
+   Check default extension groups (case-insensitive alphabetical order) and newest-added-first order inside each group,
+   both with and without a query and in quick search. Check extension/date columns, their headers and the sort menu.
+   Refresh an old index twice: migration must retain its files and added dates must remain unchanged by the second scan.
+   Check equal dates, unknown dates, saved files outside the current scan scope, and changing paths while date lookup is pending.
+   In file mode, the main workspace hides application rows and keeps the details pane with a neutral placeholder.
+   Check the placeholder with an empty application list; switching modes must not move the mode choice.
    Disable indexing while files are selected:
-   both switches must disappear and application search must return. Re-enable indexing and check the switch again.
+   both mode controls must disappear and application search must return. Re-enable indexing and check the choice again.
    Search during scanning and keep a query open: progress and application discovery must not move its results.
    Restart after a completed scan: the cached index must be searchable without another scan before six hours; manual refresh must bypass the interval.
 4. Save a result to My files, restart, and check persistence. Removing it from My files must keep the disk file.
