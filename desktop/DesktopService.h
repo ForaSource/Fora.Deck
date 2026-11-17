@@ -224,6 +224,8 @@ public:
     Q_INVOKABLE void export_catalog(const QString &path);
     Q_INVOKABLE void import_catalog(const QString &path);
     Q_INVOKABLE void launch(qint64 id, bool new_instance = false, bool scenario = false);
+    void terminate_application(qint64 id);
+    void sync_process_monitoring();
     quint64 request_launch(qint64 id, bool new_instance = false, bool scenario = false);
     quint64 request_launch_mode(qint64 id, Application::launch_mode mode, bool scenario = false,
                                 const QString &profile = {});

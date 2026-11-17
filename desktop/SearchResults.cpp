@@ -689,6 +689,10 @@ void SearchResults::show_actions() {
     if (record.running && Application::file_target(record))
         launch_action(QCoreApplication::translate("XLibrary", "Switch to running window"),
                       Application::launch_mode::activate);
+    if (record.running)
+        connect(menu->addAction(appearance::icon("stop"), QCoreApplication::translate("XLibrary", "Terminate")),
+                &QAction::triggered, this,
+                [this, id] { confirm_application_termination(service, id, window()); });
     const auto profiles = service.launch_profiles(record);
     if (!profiles.isEmpty()) {
         auto *profile_menu = menu->addMenu(QCoreApplication::translate("XLibrary", "Browser profile"));

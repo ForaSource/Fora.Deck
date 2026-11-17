@@ -79,6 +79,7 @@ DesktopService::DesktopService(QObject *const parent, const QString &profile_pat
         launch_failures.removeIf([this](auto entry) { return !model.find(entry.key()); });
     });
     connect(this, &DesktopService::appearance_changed, this, &DesktopService::sync_target_hotkeys);
+    connect(this, &DesktopService::appearance_changed, this, &DesktopService::sync_process_monitoring);
     connect(this, &DesktopService::operation_changed, this, [this](const operation_result &result) {
         if (!pending_shortcut_request || result.id != pending_shortcut_request ||
             result.state == operation_state::loading)
@@ -115,6 +116,7 @@ DesktopService::DesktopService(QObject *const parent, const QString &profile_pat
     connect(this, &DesktopService::catalog_changed, this, &DesktopService::warm_launch_profiles);
     discovery_pool.setMaxThreadCount(1);
     discovery_pool.setExpiryTimeout(5000);
+    sync_process_monitoring();
     worker->moveToThread(&worker_thread);
     connect(worker, &Manager::volumes_observed, this, [this](const QStringList &roots) {
         if (!profile_busy() && !restart_pending)
@@ -645,6 +647,22 @@ quint64 DesktopService::request_launch_mode(const qint64 id, const Application::
             worker.launch_record(id, mode, generation, token, desktop_platform::launch_application, profile);
         },
         operation_error_source::platform);
+}
+
+void DesktopService::sync_process_monitoring() {
+    const bool memory = settings.value("monitoring/memory", true).toBool();
+    const bool cpu = settings.value("monitoring/cpu", true).toBool();
+    model.set_process_display(memory, cpu);
+    QMetaObject::invokeMethod(worker, [worker = worker, memory, cpu] {
+        worker->set_process_monitoring(memory, cpu);
+    }, Qt::AutoConnection);
+}
+
+void DesktopService::terminate_application(const qint64 id) {
+    const auto *record = model.find(id);
+    if (!is_ready() || profile_busy() || restart_pending || !record || !record->running)
+        return;
+    enqueue("terminate", [id](Manager &worker) { worker.terminate_application(id); }, operation_error_source::platform);
 }
 
 void DesktopService::open_folder(const qint64 id) {

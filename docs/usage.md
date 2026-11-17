@@ -45,6 +45,25 @@ When several sidebar tags are selected, applications must have all of them.
 Tag conditions are exact and all must match. An unknown required tag gives no matches;
 an unknown exclusion hides nothing. If an app is missing from results, clear the query and check the selected section and sidebar tag.
 
+## Running applications
+
+The **Running applications** section lists monitored catalog entries. Running entries show current CPU and RAM
+usage in the list, cards and details. Values refresh about every 2.5 seconds. CPU is a percentage of total logical
+processor capacity measured between samples; the first reading needs two samples. RAM is the sum of resident
+memory (Windows working sets or Linux RSS) of matching processes; shared pages can be counted more than once.
+An em dash means a measurement is unavailable. Monitoring covers processes matched by the existing application
+identity, rather than every descendant or helper executable.
+
+**Settings → General → Running applications** has independent **Show memory usage** and **Show CPU usage**
+switches, both enabled by default. Save settings to apply them without restarting; disabling a metric also stops
+collecting it. Process detection continues so the running section and window switching still work.
+
+Use **Terminate** in details, quick search or the application's context menu to force terminate its currently matching
+processes. A confirmation warns about unsaved work. All matching instances are affected, including those opened
+outside Fora.Deck; entries sharing the same executable can refer to the same processes. The catalog entry is kept.
+Access failures appear in the notification banner. Fora.Deck refuses to terminate itself through this action.
+On Linux, safe termination requires kernel support for `pidfd_open` and `pidfd_send_signal` (Linux 5.3+).
+
 ## Quick search and keyboard shortcuts
 
 Choose 3–10 visible results in **Settings → Appearance → Visible results in quick search** (default: 5).

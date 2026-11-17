@@ -4,6 +4,46 @@
 <context>
     <name>XLibrary</name>
     <message>
+        <source>Show memory usage</source>
+        <translation>Показывать потребление памяти</translation>
+    </message>
+    <message>
+        <source>Show CPU usage</source>
+        <translation>Показывать загрузку CPU</translation>
+    </message>
+    <message>
+        <source>CPU: %1</source>
+        <translation>CPU: %1</translation>
+    </message>
+    <message>
+        <source>RAM: %1</source>
+        <translation>ОЗУ: %1</translation>
+    </message>
+    <message>
+        <source>CPU is a percentage of total processor capacity. RAM is the sum of resident memory of matching processes.</source>
+        <translation>CPU — доля общей мощности процессора. ОЗУ — сумма резидентной памяти соответствующих приложению процессов.</translation>
+    </message>
+    <message>
+        <source>Terminate</source>
+        <translation>Завершить</translation>
+    </message>
+    <message>
+        <source>Terminate application</source>
+        <translation>Завершить приложение</translation>
+    </message>
+    <message>
+        <source>Force terminate all processes of %1? Unsaved work may be lost.</source>
+        <translation>Принудительно завершить все процессы приложения «%1»? Несохранённые данные могут быть потеряны.</translation>
+    </message>
+    <message>
+        <source>PID %1: %2</source>
+        <translation>PID %1: %2</translation>
+    </message>
+    <message>
+        <source>Fora.Deck cannot terminate itself here.</source>
+        <translation>Fora.Deck не может завершить собственный процесс этим действием.</translation>
+    </message>
+    <message>
         <source>Library health</source>
         <translation>Состояние библиотеки</translation>
     </message>

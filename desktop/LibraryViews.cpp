@@ -184,7 +184,7 @@ class ApplicationList : public QTreeView {
         setColumnHidden(1, width < unit * 34);
         setColumnHidden(2, width < unit * 22);
         header()->resizeSection(1, qBound(unit * 7, width / 4, unit * 15));
-        header()->resizeSection(2, qBound(unit * 8, width / 5, unit * 11));
+        header()->resizeSection(2, qBound(unit * 11, width / 4, unit * 14));
     }
 
 protected:
@@ -363,8 +363,11 @@ public:
                 status_rect.adjust(scaled_size(option, 20), 0, 0, 0);
             }
             painter->setPen(option.palette.color(QPalette::PlaceholderText));
+            const auto usage = index.data(LibraryModel::process_usage_role).toString();
             painter->drawText(status_rect, Qt::AlignVCenter,
-                              option.fontMetrics.elidedText(index.siblingAtColumn(parent()->property("file_workspace").toBool() ? 4 : 2).data().toString(), Qt::ElideRight, status_rect.width()));
+                              option.fontMetrics.elidedText(usage.isEmpty()
+                                  ? index.siblingAtColumn(parent()->property("file_workspace").toBool() ? 4 : 2).data().toString()
+                                  : usage, Qt::ElideRight, status_rect.width()));
             painter->restore();
             return;
         }
@@ -443,6 +446,17 @@ public:
             small.setPixelSize(scaled_size(option, 12));
             painter->setFont(small);
             painter->setPen(option.palette.color(QPalette::PlaceholderText));
+            const auto usage = index.data(LibraryModel::process_usage_role).toString();
+            if (!usage.isEmpty()) {
+                const auto height = QFontMetrics(small).height();
+                painter->drawText(QRect(text_rect.left(), rect.center().y() - height, text_rect.width(), height),
+                                  Qt::AlignVCenter, index.data().toString());
+                painter->drawText(QRect(text_rect.left(), rect.center().y(), text_rect.width(), height),
+                                  Qt::AlignVCenter,
+                                  QFontMetrics(small).elidedText(usage, Qt::ElideRight, text_rect.width()));
+                painter->restore();
+                return;
+            }
             painter->drawText(
                 text_rect, Qt::AlignVCenter,
                 QFontMetrics(small).elidedText(index.data().toString(), Qt::ElideRight, text_rect.width()));
@@ -1523,6 +1537,16 @@ QWidget *details(const ui_context &context, QWidget *const parent) {
     auto *launch = action_button(context.actions.value("launch"));
     launch->setProperty("primary", true);
     root->addWidget(launch);
+    auto *terminate = action_button(context.actions.value("terminate"));
+    terminate->setProperty("danger", true);
+    root->addWidget(terminate);
+    auto *process_usage = label({}, "muted");
+    process_usage->setObjectName("application_process_usage");
+    process_usage->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+    process_usage->setMinimumWidth(0);
+    process_usage->setToolTip(QCoreApplication::translate(
+        "XLibrary", "CPU is a percentage of total processor capacity. RAM is the sum of resident memory of matching processes."));
+    root->addWidget(process_usage);
     root->addSpacing(8);
     auto *tag_header = new QHBoxLayout;
     tag_header->addWidget(label(QCoreApplication::translate("XLibrary", "Tags"), "muted"), 1);
@@ -1766,6 +1790,9 @@ QWidget *details(const ui_context &context, QWidget *const parent) {
             file_folder->setEnabled(enabled);
         }
         name->setText(record ? record->name : QCoreApplication::translate("XLibrary", "Select an application"));
+        terminate->setVisible(record && record->running);
+        process_usage->setText(record ? service->model.process_usage(*record) : QString{});
+        process_usage->setVisible(!process_usage->text().isEmpty());
         status->setText(record ? record->running     ? QCoreApplication::translate("XLibrary", "● Running")
                                  : record->available ? QCoreApplication::translate("XLibrary", "Not running")
                                  : record->volume_unavailable
@@ -1861,7 +1888,7 @@ QWidget *details(const ui_context &context, QWidget *const parent) {
 
 QWidget *application_menu(const ui_context &context, QWidget *const parent) {
     auto *menu = new QMenu(parent);
-    for (const auto &id : {"launch", "new_instance", "open_folder", "copy_path", "copy_arguments", "favorite",
+    for (const auto &id : {"launch", "new_instance", "terminate", "open_folder", "copy_path", "copy_arguments", "favorite",
                            "edit_application", "bulk_edit", "undo_removal"})
         menu->addAction(context.actions.value(id));
     auto *service = static_cast<DesktopService *>(context.service);

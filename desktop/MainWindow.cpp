@@ -225,6 +225,9 @@ void MainWindow::create_actions() {
         if (service.selection())
             service.launch(service.selection(), true);
     });
+    add("terminate", QCoreApplication::translate("XLibrary", "Terminate"), "stop", [this] {
+        confirm_application_termination(service, service.selection(), this);
+    });
     add("focus_search", QCoreApplication::translate("XLibrary", "Search"), "search", [] {});
     add("settings", QCoreApplication::translate("XLibrary", "Settings"), "settings", [this] {
         if (!isVisible())
@@ -329,13 +332,17 @@ void MainWindow::create_actions() {
 void MainWindow::refresh_actions() {
     const auto *record = service.selected();
     const bool profile_available = !service.profile_busy() && !service.restart_required();
-    for (const auto &id : {"launch", "new_instance", "edit_application", "remove_application", "favorite",
+    for (const auto &id : {"launch", "new_instance", "terminate", "edit_application", "remove_application", "favorite",
                            "open_folder", "copy_path", "copy_arguments", "details"})
         context.actions.value(id)->setEnabled(profile_available && record != nullptr &&
                                               service.section() != "scenarios" && service.section() != "files" &&
                                               !service.file_search_active());
     if (service.file_search_active() || service.section() == "files")
         context.actions.value("details")->setEnabled(profile_available && !service.selected_file().isEmpty());
+    auto *terminate = context.actions.value("terminate");
+    terminate->setVisible(record && record->running && service.section() != "scenarios" &&
+                          service.section() != "files" && !service.file_search_active());
+    terminate->setEnabled(terminate->isEnabled() && record && record->running);
     const bool folder_supported = record && (Application::file_target(*record) ||
                                               !record->installation_directory.isEmpty());
     auto *open_folder = context.actions.value("open_folder");

@@ -29,6 +29,10 @@ class Manager : public QObject {
     static constexpr qint64 availability_interval_ms = 10000;
     static constexpr qsizetype availability_watch_limit = 128;
     std::shared_ptr<std::atomic<quint64>> request_sequence = std::make_shared<std::atomic<quint64>>(0);
+    bool monitor_memory = true;
+    bool monitor_cpu = true;
+    Heartbeat::process_snapshot previous_processes;
+    QElapsedTimer process_age;
 
 public:
     Manager(const QString &database_path, std::shared_ptr<std::atomic<quint64>> request_sequence)
@@ -54,6 +58,8 @@ public:
     void restore(quint64 id, const QString &path);
     void refresh();
     void poll(bool force = false);
+    void set_process_monitoring(bool memory, bool cpu);
+    void terminate_application(qint64 id);
 
 signals:
     void loaded(const catalog_snapshot &catalog);

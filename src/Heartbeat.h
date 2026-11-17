@@ -22,6 +22,15 @@ private:
     std::jthread worker;
 
 public:
+    struct process_sample {
+        quint32 pid = 0;
+        quint64 start_time = 0;
+        double cpu_seconds = -1;
+        qint64 memory_bytes = -1;
+    };
+    using process_snapshot = QHash<QString, QVector<process_sample>>;
+    static process_snapshot sample_processes(const QVector<app_record> &applications, bool memory, bool cpu);
+    static void terminate_application(const app_record &application);
     static QSet<QString> running_paths(const QVector<app_record> &applications);
     Heartbeat(std::uint32_t process_id, const std::filesystem::path &executable_path);
     Heartbeat(const Heartbeat &) = delete;

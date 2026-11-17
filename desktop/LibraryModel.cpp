@@ -5,6 +5,7 @@
 #include <QFutureWatcher>
 #include <QImageReader>
 #include <QMimeDatabase>
+#include <QLocale>
 #include <QtConcurrent/QtConcurrentRun>
 #include <QTimer>
 
@@ -168,7 +169,8 @@ QVariant LibraryModel::data(const QModelIndex &index, const int requested_role) 
                : record.volume_unavailable ? QCoreApplication::translate("XLibrary", "Drive unavailable")
                                            : QCoreApplication::translate("XLibrary", "Unavailable");
     case Qt::ToolTipRole:
-        return record.name + '\n' + QDir::toNativeSeparators(Application::application_path(record));
+        return record.name + '\n' + QDir::toNativeSeparators(Application::application_path(record)) +
+               (process_usage(record).isEmpty() ? QString{} : '\n' + process_usage(record));
     case Qt::DecorationRole:
         if (index.column() == 0) {
             if (const auto *icon = icons.object(icon_keys[index.row()]))
@@ -189,6 +191,8 @@ QVariant LibraryModel::data(const QModelIndex &index, const int requested_role) 
         return record.favorite;
     case available_role:
         return record.available;
+    case process_usage_role:
+        return process_usage(record);
     default:
         return {};
     }
@@ -258,7 +262,32 @@ QHash<int, QByteArray> LibraryModel::roleNames() const {
     roles.insert(running_role, "running");
     roles.insert(favorite_role, "favorite");
     roles.insert(available_role, "available");
+    roles.insert(process_usage_role, "process_usage");
     return roles;
+}
+
+QString LibraryModel::process_usage(const app_record &record) const {
+    if (!record.running)
+        return {};
+    QStringList values;
+    if (show_cpu)
+        values.append(QCoreApplication::translate("XLibrary", "CPU: %1")
+                          .arg(record.cpu_percent < 0 ? QString::fromUtf8("—")
+                                                      : QLocale{}.toString(record.cpu_percent, 'f', 1) + '%'));
+    if (show_memory)
+        values.append(QCoreApplication::translate("XLibrary", "RAM: %1")
+                          .arg(record.memory_bytes < 0 ? QString::fromUtf8("—")
+                                                       : QLocale{}.formattedDataSize(record.memory_bytes, 1)));
+    return values.join(QString::fromUtf8(" · "));
+}
+
+void LibraryModel::set_process_display(const bool memory, const bool cpu) {
+    if (show_memory == memory && show_cpu == cpu)
+        return;
+    show_memory = memory;
+    show_cpu = cpu;
+    if (!records.isEmpty())
+        emit dataChanged(index(0, 0), index(rowCount() - 1, 2), {process_usage_role, Qt::ToolTipRole});
 }
 
 void LibraryModel::update_state(const QVector<app_record> &applications) {
@@ -271,9 +300,12 @@ void LibraryModel::update_state(const QVector<app_record> &applications) {
         auto &record = records[row];
         const auto *state = states.value(record.id);
         if (state && (record.running != state->running || record.available != state->available ||
+                      record.cpu_percent != state->cpu_percent || record.memory_bytes != state->memory_bytes ||
                       record.volume_unavailable != state->volume_unavailable ||
                       record.new_instance_error != state->new_instance_error)) {
             record.running = state->running;
+            record.cpu_percent = state->cpu_percent;
+            record.memory_bytes = state->memory_bytes;
             record.available = state->available;
             record.volume_unavailable = state->volume_unavailable;
             record.new_instance_error = state->new_instance_error;
@@ -285,7 +317,7 @@ void LibraryModel::update_state(const QVector<app_record> &applications) {
     // Let the proxy update ordering once, after the entire state snapshot has been applied.
     if (first_changed >= 0)
         emit dataChanged(index(first_changed, 0), index(last_changed, 2),
-                         {Qt::DisplayRole, running_role, available_role, record_role});
+                         {Qt::DisplayRole, running_role, available_role, record_role, process_usage_role, Qt::ToolTipRole});
 }
 
 const app_record *LibraryModel::find(const qint64 id) const {

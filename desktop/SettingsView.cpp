@@ -90,6 +90,11 @@ QWidget *general(const ui_context &context, QWidget *) {
             {{QCoreApplication::translate("XLibrary", "Show the library"), "show"},
              {QCoreApplication::translate("XLibrary", "Start in the tray"), "tray"}},
             "show");
+    widget->layout()->addWidget(label(QCoreApplication::translate("XLibrary", "Running applications"), "subheading"));
+    checkbox(widget, settings, "monitoring/memory",
+             QCoreApplication::translate("XLibrary", "Show memory usage"), true);
+    checkbox(widget, settings, "monitoring/cpu",
+             QCoreApplication::translate("XLibrary", "Show CPU usage"), true);
     auto *reset = button(QCoreApplication::translate("XLibrary", "Reset settings…"), "danger");
     widget->layout()->addWidget(reset);
     QObject::connect(reset, &QPushButton::clicked, widget, [=] {

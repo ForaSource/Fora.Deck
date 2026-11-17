@@ -1,6 +1,11 @@
 #include <memory>
 #include <stdexcept>
 #include <utility>
+#include <cerrno>
+#include <csignal>
+#include <sys/syscall.h>
+#include <unistd.h>
+#include <QScopeGuard>
 
 #include "Application.h"
 #include "LaunchArguments.h"
@@ -632,14 +637,50 @@ QString exec_quote(QString value) {
     return desktop_escape('"' + value + '"');
 }
 
+Heartbeat::process_sample read_process_sample(const quint32 pid, const bool memory, const bool cpu) {
+    Heartbeat::process_sample sample;
+    sample.pid = pid;
+    QFile stat_file("/proc/" + QString::number(pid) + "/stat");
+    if (!stat_file.open(QIODevice::ReadOnly))
+        return sample;
+    const auto stat = stat_file.read(8192);
+    // comm may itself contain spaces and parentheses; fields start after its final ')'.
+    const auto end = stat.lastIndexOf(')');
+    if (end < 0)
+        return sample;
+    const auto fields = stat.mid(end + 1).simplified().split(' ');
+    if (fields.size() < 22)
+        return sample;
+    bool valid = false;
+    sample.start_time = fields[19].toULongLong(&valid);
+    if (!valid)
+        sample.start_time = 0;
+    if (cpu) {
+        bool user_valid = false, kernel_valid = false;
+        const auto user = fields[11].toULongLong(&user_valid);
+        const auto kernel = fields[12].toULongLong(&kernel_valid);
+        const auto ticks = sysconf(_SC_CLK_TCK);
+        if (user_valid && kernel_valid && ticks > 0)
+            sample.cpu_seconds = (double(user) + double(kernel)) / double(ticks);
+    }
+    if (memory) {
+        const auto pages = fields[21].toLongLong(&valid);
+        const auto page_size = sysconf(_SC_PAGESIZE);
+        if (valid && pages >= 0 && page_size > 0 && pages <= std::numeric_limits<qint64>::max() / page_size)
+            sample.memory_bytes = pages * page_size;
+    }
+    return sample;
 }
 
-QSet<QString> Heartbeat::running_paths(const QVector<app_record> &applications) {
+}
+
+Heartbeat::process_snapshot Heartbeat::sample_processes(const QVector<app_record> &applications,
+                                                       const bool memory, const bool cpu) {
     if (!QFileInfo("/proc/self/exe").exists())
         throw std::runtime_error(
             QCoreApplication::translate("XLibrary", "The /proc filesystem is unavailable: process state is unknown.")
                 .toStdString());
-    QSet<QString> result;
+    process_snapshot result;
     QHash<QByteArray, QString> steam_paths;
     QVector<QPair<QString, process_identity>> identities;
     for (const auto &application : applications) {
@@ -660,10 +701,12 @@ QSet<QString> Heartbeat::running_paths(const QVector<app_record> &applications) 
     const QDir proc("/proc");
     for (const auto &name : proc.entryList(QDir::Dirs | QDir::NoDotAndDotDot)) {
         bool numeric = false;
-        name.toUInt(&numeric);
-        if (!numeric)
+        const auto pid = name.toUInt(&numeric);
+        if (!numeric || !pid)
             continue;
         const auto directory = proc.filePath(name);
+        const auto sample = read_process_sample(pid, memory, cpu);
+        QSet<QString> matched_paths;
         // Proton's /proc/exe can name a Wine host; Steam identifies the game in its environment.
         if (!steam_paths.isEmpty()) {
             QFile environment_file(directory + "/environ");
@@ -672,19 +715,70 @@ QSet<QString> Heartbeat::running_paths(const QVector<app_record> &applications) 
                 const auto entries = environment.split('\0');
                 for (qsizetype index = 0; index + 1 < entries.size(); ++index)
                     if (const auto found = steam_paths.constFind(entries[index]); found != steam_paths.cend())
-                        result.insert(*found);
+                        matched_paths.insert(*found);
             }
         }
         const auto executable = process_executable(directory);
-        if (executable.isEmpty())
-            continue;
-        const auto arguments = process_arguments(directory);
-        for (const auto &[path, identity] : identities) {
-            if (!result.contains(path) && matches_process(identity, directory, executable, arguments))
-                result.insert(path);
+        if (!executable.isEmpty()) {
+            const auto arguments = process_arguments(directory);
+            for (const auto &[path, identity] : identities) {
+                if (!matched_paths.contains(path) && matches_process(identity, directory, executable, arguments))
+                    matched_paths.insert(path);
+            }
         }
+        // Reject a PID that was recycled while identity and measurements were read.
+        if (matched_paths.isEmpty() || !sample.start_time ||
+            read_process_sample(pid, false, false).start_time != sample.start_time)
+            continue;
+        for (const auto &path : matched_paths)
+            result[normalized_path(path)].append(sample);
     }
     return result;
+}
+
+void Heartbeat::terminate_application(const app_record &application) {
+    const auto processes = sample_processes({application}, false, false);
+    QStringList errors;
+    for (auto it = processes.cbegin(); it != processes.cend(); ++it) {
+        QVector<QPair<long, process_sample>> descriptors;
+        const auto close_descriptors = qScopeGuard([&] {
+            for (const auto &entry : descriptors)
+                close(static_cast<int>(entry.first));
+        });
+        for (const auto &sample : it.value()) {
+            if (sample.pid == static_cast<quint32>(getpid())) {
+                errors.append(QCoreApplication::translate("XLibrary", "Fora.Deck cannot terminate itself here."));
+                continue;
+            }
+            const auto fail = [&](const int error) {
+                errors.append(QCoreApplication::translate("XLibrary", "PID %1: %2")
+                                  .arg(sample.pid).arg(QString::fromStdString(std::generic_category().message(error))));
+            };
+            // pidfds keep the signal attached to this process even if its PID is reused.
+            const auto descriptor = syscall(SYS_pidfd_open, sample.pid, 0);
+            if (descriptor < 0) {
+                if (errno != ESRCH)
+                    fail(errno);
+                continue;
+            }
+            descriptors.append({descriptor, sample});
+        }
+        if (descriptors.isEmpty())
+            continue;
+        const auto verified = sample_processes({application}, false, false);
+        QHash<quint32, quint64> start_times;
+        for (const auto &sample : verified.value(it.key()))
+            start_times.insert(sample.pid, sample.start_time);
+        for (const auto &[descriptor, sample] : descriptors) {
+            if (start_times.value(sample.pid) != sample.start_time)
+                continue;
+            if (syscall(SYS_pidfd_send_signal, descriptor, SIGKILL, nullptr, 0) < 0 && errno != ESRCH)
+                errors.append(QCoreApplication::translate("XLibrary", "PID %1: %2")
+                                  .arg(sample.pid).arg(QString::fromStdString(std::generic_category().message(errno))));
+        }
+    }
+    if (!errors.isEmpty())
+        throw std::runtime_error(errors.join('\n').toStdString());
 }
 
 QString Application::new_instance_error(const app_record &record) {

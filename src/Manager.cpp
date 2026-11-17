@@ -7,6 +7,8 @@
 #include <QLoggingCategory>
 #include <QSaveFile>
 #include <QScopeGuard>
+#include <QThread>
+#include <limits>
 #include <stdexcept>
 
 #include "LaunchArguments.h"
@@ -160,6 +162,27 @@ void Manager::refresh() {
     poll(true);
 }
 
+void Manager::set_process_monitoring(const bool memory, const bool cpu) {
+    if (monitor_memory == memory && monitor_cpu == cpu)
+        return;
+    monitor_memory = memory;
+    monitor_cpu = cpu;
+    previous_processes.clear();
+    process_age.invalidate();
+    if (store)
+        poll(true);
+}
+
+void Manager::terminate_application(const qint64 id) {
+    const auto found = std::ranges::find_if(std::as_const(catalog.applications),
+                                          [id](const auto &record) { return record.id == id; });
+    if (found == catalog.applications.cend())
+        return;
+    // Publish any partial termination even when another process denied access.
+    const auto refresh_state = qScopeGuard([this] { poll(true); });
+    Heartbeat::terminate_application(*found);
+}
+
 void Manager::poll(const bool force) {
     const bool measured = poll_log().isDebugEnabled();
     QElapsedTimer elapsed;
@@ -192,6 +215,7 @@ void Manager::poll(const bool force) {
     };
     bool capabilities_changed = false;
     auto paths = last_running;
+    Heartbeat::process_snapshot processes;
     try {
         if (check_availability) {
             for (auto &record : catalog.applications) {
@@ -285,12 +309,22 @@ void Manager::poll(const bool force) {
             availability_invalidated = false;
             availability_age.restart();
         }
-        paths = Heartbeat::running_paths(catalog.applications);
+        processes = Heartbeat::sample_processes(catalog.applications, monitor_memory, monitor_cpu);
+        paths.clear();
+        for (auto it = processes.cbegin(); it != processes.cend(); ++it)
+            paths.insert(it.key());
         if (monitor_state == operation_state::error)
             emit result({monitor_request_id, "monitor", operation_state::ready, {}});
         monitor_state = operation_state::ready;
     } catch (const std::exception &error) {
         availability_invalidated = true;
+        previous_processes.clear();
+        process_age.invalidate();
+        for (auto &record : catalog.applications) {
+            record.cpu_percent = -1;
+            record.memory_bytes = -1;
+        }
+        emit state_changed(catalog.applications);
         if (monitor_state != operation_state::error) {
             monitor_request_id = ++*request_sequence;
             emit result({monitor_request_id, "monitor", operation_state::error,
@@ -299,13 +333,50 @@ void Manager::poll(const bool force) {
         monitor_state = operation_state::error;
         return;
     }
-    for (auto &record : catalog.applications)
-        record.running = paths.contains(normalized_path(Application::process_path(record)));
+    const auto seconds = process_age.isValid() ? double(process_age.nsecsElapsed()) / 1000000000.0 : 0.0;
+    process_age.start();
+    const auto processors = qMax(1, QThread::idealThreadCount());
+    bool measurements_changed = false;
+    QHash<QString, QPair<double, qint64>> measurements;
+    for (auto it = processes.cbegin(); it != processes.cend(); ++it) {
+        QHash<quint32, Heartbeat::process_sample> previous;
+        for (const auto &sample : previous_processes.value(it.key()))
+            previous.insert(sample.pid, sample);
+        bool cpu_valid = monitor_cpu && seconds > 0;
+        bool memory_valid = monitor_memory;
+        double cpu_seconds = 0;
+        qint64 memory_bytes = 0;
+        for (const auto &sample : it.value()) {
+            const auto old = previous.constFind(sample.pid);
+            if (sample.cpu_seconds < 0 || !sample.start_time || old == previous.cend() ||
+                sample.start_time != old->start_time || old->cpu_seconds < 0 ||
+                sample.cpu_seconds < old->cpu_seconds)
+                cpu_valid = false;
+            else
+                cpu_seconds += sample.cpu_seconds - old->cpu_seconds;
+            if (sample.memory_bytes < 0 || sample.memory_bytes > std::numeric_limits<qint64>::max() - memory_bytes)
+                memory_valid = false;
+            else
+                memory_bytes += sample.memory_bytes;
+        }
+        measurements.insert(it.key(), {cpu_valid ? qBound(0.0, 100.0 * cpu_seconds / seconds / processors, 100.0) : -1,
+                                      memory_valid ? memory_bytes : -1});
+    }
+    for (auto &record : catalog.applications) {
+        const auto path = normalized_path(Application::process_path(record));
+        record.running = paths.contains(path);
+        const auto values = measurements.value(path, {-1, -1});
+        measurements_changed = measurements_changed || record.cpu_percent != values.first ||
+                               record.memory_bytes != values.second;
+        record.cpu_percent = values.first;
+        record.memory_bytes = values.second;
+    }
+    previous_processes = monitor_cpu ? std::move(processes) : Heartbeat::process_snapshot{};
     if (known_volume_roots != previous_roots)
         emit volumes_observed(known_volume_roots);
     if (locations_changed)
         emit locations_observed(verified_locations);
-    if (force || capabilities_changed || paths != last_running || unavailable != last_unavailable ||
+    if (force || capabilities_changed || measurements_changed || paths != last_running || unavailable != last_unavailable ||
         missing_volumes != last_missing_volumes) {
         last_running = paths;
         last_unavailable = unavailable;

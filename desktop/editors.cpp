@@ -23,6 +23,18 @@
 #include "localization.h"
 #include "UiHelpers.h"
 
+void confirm_application_termination(DesktopService &service, const qint64 id, QWidget *const parent) {
+    const auto *record = service.model.find(id);
+    if (!record || !record->running)
+        return;
+    const auto name = record->name;
+    if (ui_helpers::confirm(parent, QCoreApplication::translate("XLibrary", "Terminate application"),
+                            QCoreApplication::translate(
+                                "XLibrary", "Force terminate all processes of %1? Unsaved work may be lost.")
+                                .arg(name), QCoreApplication::translate("XLibrary", "Terminate")))
+        service.terminate_application(id);
+}
+
 namespace {
 using namespace ui_helpers;
 

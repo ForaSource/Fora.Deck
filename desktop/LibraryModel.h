@@ -28,12 +28,15 @@ private:
     mutable QCache<QString, QIcon> icons{256};
     mutable QSet<QString> pending_icons;
     QThreadPool icon_pool;
+    bool show_memory = true;
+    bool show_cpu = true;
     QIcon fallback_icon(const QString &kind) const;
     void request_icon(const app_record &record, const QString &key) const;
     void store_icon(const QString &key, const QImage &image);
 
 public:
-    enum role { id_role = Qt::UserRole + 1, record_role, tags_role, running_role, favorite_role, available_role };
+    enum role { id_role = Qt::UserRole + 1, record_role, tags_role, running_role, favorite_role, available_role,
+                process_usage_role };
     explicit LibraryModel(QObject *parent = nullptr);
     ~LibraryModel() override;
     int rowCount(const QModelIndex &parent = {}) const override;
@@ -43,6 +46,8 @@ public:
     QHash<int, QByteArray> roleNames() const override;
     void replace(QVector<app_record> applications);
     void update_state(const QVector<app_record> &applications);
+    void set_process_display(bool memory, bool cpu);
+    QString process_usage(const app_record &record) const;
     QIcon file_icon(const QString &path, qint64 modified, qint64 size) const;
     void retry_file_icons();
     int row_for_id(qint64 id) const { return rows_by_id.value(id, -1); }

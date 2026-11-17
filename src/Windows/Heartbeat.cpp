@@ -1,5 +1,6 @@
 #include <windows.h>
 #include <tlhelp32.h>
+#include <psapi.h>
 
 #include <iterator>
 #include <stdexcept>
@@ -9,6 +10,7 @@
 
 #include "Application.h"
 #include "Heartbeat.h"
+#include "PathHelpers.h"
 
 namespace {
 using unique_handle = std::unique_ptr<void, decltype(&CloseHandle)>;
@@ -139,14 +141,17 @@ QString xlibrary::windows_process_path(const quint32 process_id) {
                                                                        : QString{};
 }
 
-QSet<QString> Heartbeat::running_paths(const QVector<app_record> &applications) {
+Heartbeat::process_snapshot Heartbeat::sample_processes(const QVector<app_record> &applications,
+                                                       const bool memory, const bool cpu) {
     QSet<QString> names;
-    QSet<QString> paths;
+    QSet<QString> expected_paths;
+    process_snapshot paths;
     for (const auto &application : applications) {
         const auto path = Application::process_path(application);
         if (path.isEmpty())
             continue;
         names.insert(QFileInfo(path).fileName().toCaseFolded());
+        expected_paths.insert(normalized_path(path));
     }
     if (names.isEmpty()) {
         return paths;
@@ -162,12 +167,81 @@ QSet<QString> Heartbeat::running_paths(const QVector<app_record> &applications) 
     if (Process32FirstW(snapshot.get(), &entry)) {
         do {
             if (names.contains(QString::fromWCharArray(entry.szExeFile).toCaseFolded())) {
-                const auto path = xlibrary::windows_process_path(entry.th32ProcessID);
-                if (!path.isEmpty()) {
-                    paths.insert(QDir::fromNativeSeparators(path).toCaseFolded());
+                const unique_handle process(OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE,
+                                                        FALSE, entry.th32ProcessID), &CloseHandle);
+                if (!process)
+                    continue;
+                wchar_t path_buffer[32768]{};
+                DWORD length = static_cast<DWORD>(std::size(path_buffer));
+                if (!QueryFullProcessImageNameW(process.get(), 0, path_buffer, &length) ||
+                    WaitForSingleObject(process.get(), 0) != WAIT_TIMEOUT)
+                    continue;
+                const auto path = normalized_path(QString::fromWCharArray(path_buffer, length));
+                if (!expected_paths.contains(path))
+                    continue;
+                process_sample sample;
+                sample.pid = entry.th32ProcessID;
+                FILETIME created{}, exited{}, kernel{}, user{};
+                if (GetProcessTimes(process.get(), &created, &exited, &kernel, &user)) {
+                    const auto ticks = [](const FILETIME &time) {
+                        return (quint64(time.dwHighDateTime) << 32) | time.dwLowDateTime;
+                    };
+                    sample.start_time = ticks(created);
+                    if (cpu)
+                        sample.cpu_seconds = (double(ticks(kernel)) + double(ticks(user))) / 10000000.0;
                 }
+                if (memory) {
+                    PROCESS_MEMORY_COUNTERS counters{};
+                    counters.cb = sizeof(counters);
+                    if (K32GetProcessMemoryInfo(process.get(), &counters, sizeof(counters)))
+                        sample.memory_bytes = static_cast<qint64>(counters.WorkingSetSize);
+                }
+                paths[path].append(sample);
             }
         } while (Process32NextW(snapshot.get(), &entry));
     }
     return paths;
+}
+
+void Heartbeat::terminate_application(const app_record &application) {
+    const auto processes = sample_processes({application}, false, false);
+    QStringList errors;
+    for (auto it = processes.cbegin(); it != processes.cend(); ++it) {
+        for (const auto &sample : it.value()) {
+            const auto fail = [&](const DWORD error) {
+                errors.append(QCoreApplication::translate("XLibrary", "PID %1: %2")
+                                  .arg(sample.pid).arg(QString::fromStdString(
+                                      std::system_category().message(static_cast<int>(error)))));
+            };
+            if (sample.pid == GetCurrentProcessId()) {
+                errors.append(QCoreApplication::translate("XLibrary", "Fora.Deck cannot terminate itself here."));
+                continue;
+            }
+            const unique_handle process(OpenProcess(PROCESS_TERMINATE | PROCESS_QUERY_LIMITED_INFORMATION |
+                                                       SYNCHRONIZE, FALSE, sample.pid), &CloseHandle);
+            if (!process) {
+                const auto error = GetLastError();
+                if (error != ERROR_INVALID_PARAMETER)
+                    fail(error);
+                continue;
+            }
+            if (WaitForSingleObject(process.get(), 0) == WAIT_OBJECT_0)
+                continue;
+            FILETIME created{}, exited{}, kernel{}, user{};
+            if (!GetProcessTimes(process.get(), &created, &exited, &kernel, &user)) {
+                fail(GetLastError());
+                continue;
+            }
+            const auto start_time = (quint64(created.dwHighDateTime) << 32) | created.dwLowDateTime;
+            if (!sample.start_time || start_time != sample.start_time)
+                continue;
+            const auto [alive, error] = check_process_handle(process.get(), QDir::toNativeSeparators(it.key()).toStdWString());
+            if (error)
+                fail(error);
+            else if (alive && !TerminateProcess(process.get(), 1))
+                fail(GetLastError());
+        }
+    }
+    if (!errors.isEmpty())
+        throw std::runtime_error(errors.join('\n').toStdString());
 }

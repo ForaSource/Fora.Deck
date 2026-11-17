@@ -55,6 +55,9 @@ struct app_record {
     bool available = true;
     bool volume_unavailable = false;
     bool running = false;
+    // Transient process measurements; negative values mean unavailable or disabled.
+    double cpu_percent = -1;
+    qint64 memory_bytes = -1;
     QString new_instance_error;
     QString discovery_source;
     QStringList discovery_sources;
