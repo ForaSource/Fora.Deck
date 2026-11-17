@@ -495,6 +495,8 @@ QWidget *file_settings(const ui_context &context, QWidget *) {
     widget->layout()->addWidget(diagnostics);
     QObject::connect(service->files, &FileManager::status_changed, diagnostics,
                      [=] { diagnostics->setPlainText(service->files->diagnostics_text()); });
+    widget->layout()->addWidget(label(QCoreApplication::translate("XLibrary",
+        "Unavailable sources are checked about every 30 seconds. Returning sources refresh separately from the regular index refresh."), "muted"));
     auto *scan = button(QCoreApplication::translate("XLibrary", "Refresh file index"));
     scan->setEnabled(service->files->is_enabled());
     widget->layout()->addWidget(scan);

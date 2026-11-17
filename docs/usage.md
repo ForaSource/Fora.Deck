@@ -133,6 +133,11 @@ six hours later; restarting the application does not reset that age. Changing sc
 The diagnostics below the status show each source's last attempt, last complete scan and unavailable folders
 (up to 200 paths displayed per source). These records survive restart. A partial or interrupted scan does not
 advance the last complete scan time; a refresh warning means an empty result is not proof that a file is absent.
+While file search is enabled, a background check runs about every 30 seconds when no scan is active.
+When an unavailable source returns on the recorded local volume, only that source is scanned; newly mounted
+local drives are scanned to the depth selected by Basic/Full mode. Other sources and their timestamps are retained.
+This recovery can run before the regular six-hour refresh. It does not monitor every file change.
+An unrelated volume at the same mount path remains unavailable until a manual refresh explicitly indexes it.
 Indexing and querying use separate background workers: the rest of the application and searches remain available.
 Index progress does not replace the visible results; discovered files appear on the next query.
 

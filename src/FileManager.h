@@ -62,6 +62,8 @@ class FileManager : public QObject {
         std::make_shared<QCache<QString, SearchQuery::SearchableData>>(20000);
     QTimer refresh;
     QTimer progress_timer;
+    QTimer source_poll;
+    bool checking_sources = false;
     std::shared_ptr<std::atomic<quint64>> scan_generation = std::make_shared<std::atomic<quint64>>(0);
     std::shared_ptr<std::atomic<quint64>> query_generation = std::make_shared<std::atomic<quint64>>(0);
     std::shared_ptr<std::atomic<quint64>> indexed = std::make_shared<std::atomic<quint64>>(0);
@@ -72,7 +74,8 @@ class FileManager : public QObject {
     qint64 last_refresh = 0;
     QVector<file_index_source> source_states;
     void load_source_states();
-    void start_scan();
+    void start_scan(const QStringList &only_roots = {});
+    void check_sources();
     void schedule_refresh();
 
 public:

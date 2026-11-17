@@ -4,6 +4,10 @@
 <context>
     <name>XLibrary</name>
     <message>
+        <source>Unavailable sources are checked about every 30 seconds. Returning sources refresh separately from the regular index refresh.</source>
+        <translation>Доступность источников проверяется примерно каждые 30 секунд. Вернувшиеся источники обновляются отдельно от планового обновления индекса.</translation>
+    </message>
+    <message>
         <source>File index diagnostics</source>
         <translation>Диагностика файлового индекса</translation>
     </message>

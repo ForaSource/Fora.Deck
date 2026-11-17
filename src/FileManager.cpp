@@ -185,6 +185,8 @@ FileManager::FileManager(const QString &directory, const QStringList &saved_path
     query_pool.setMaxThreadCount(1);
     refresh.setSingleShot(true);
     connect(&refresh, &QTimer::timeout, this, &FileManager::rescan);
+    source_poll.setInterval(30000);
+    connect(&source_poll, &QTimer::timeout, this, &FileManager::check_sources);
     progress_timer.setInterval(1000);
     connect(&progress_timer, &QTimer::timeout, this, [this] {
         state = QCoreApplication::translate("XLibrary", "Indexing files: %1").arg(indexed->load());
@@ -243,6 +245,7 @@ FileManager::~FileManager() {
 }
 void FileManager::shutdown() {
     refresh.stop();
+    source_poll.stop();
     progress_timer.stop();
     rescan_pending = false;
     ++*scan_generation;
@@ -338,6 +341,7 @@ void FileManager::configure(const file_search_mode selected_mode, const QStringL
                             "\n--exclusions--\n" + excluded_paths.join('\n');
     scope = QString::fromLatin1(QCryptographicHash::hash(scope_data.toUtf8(), QCryptographicHash::Sha256).toHex());
     refresh.stop();
+    source_poll.stop();
     last_refresh = 0;
     source_states.clear();
     if (is_enabled()) {
@@ -362,6 +366,10 @@ void FileManager::configure(const file_search_mode selected_mode, const QStringL
     }
     emit configuration_changed();
     emit changed();
+    if (is_enabled()) {
+        source_poll.start();
+        QTimer::singleShot(0, this, &FileManager::check_sources);
+    }
     if (rescan_pending && !scanning)
         start_scan();
     else if (is_enabled() && !scanning) {
@@ -379,11 +387,81 @@ void FileManager::schedule_refresh() {
                                        : refresh_interval_ms));
 }
 void FileManager::rescan() {
-    if (scanning || !is_enabled())
+    if (!is_enabled())
         return;
+    if (scanning) {
+        rescan_pending = true;
+        return;
+    }
     start_scan();
 }
-void FileManager::start_scan() {
+
+void FileManager::check_sources() {
+    if (!is_enabled() || scanning || checking_sources || source_states.isEmpty())
+        return;
+    checking_sources = true;
+    struct probe_result {
+        QVector<file_index_source> sources;
+        QStringList returned;
+        QString error;
+    };
+    const auto expected = scan_generation->load();
+    auto *watcher = new QFutureWatcher<probe_result>(this);
+    connect(watcher, &QFutureWatcher<probe_result>::finished, this, [this, watcher, expected] {
+        const auto result = watcher->result();
+        watcher->deleteLater();
+        checking_sources = false;
+        if (expected != scan_generation->load() || !is_enabled())
+            return;
+        if (!result.error.isEmpty()) {
+            state = QCoreApplication::translate("XLibrary", "File index error: %1").arg(result.error);
+            emit status_changed();
+            return;
+        }
+        source_states = result.sources;
+        emit status_changed();
+        // A manual full scan or configuration change takes precedence over this probe.
+        if (!scanning && !result.returned.isEmpty())
+            start_scan(result.returned);
+    });
+    watcher->setFuture(QtConcurrent::run(&scan_pool,
+        [path = database_path, scope = scope, sources = source_states,
+         exclusions = excluded_paths, generation = scan_generation, expected]() mutable -> probe_result {
+            probe_result result;
+            try {
+                auto db = open_index(path);
+                for (auto &source : sources) {
+                    if (generation->load() != expected)
+                        return result;
+                    const auto volume = volume_identity(source.root);
+                    const bool available = volume.size() == 2 && traversable_directory(QFileInfo(source.root)) &&
+                        QFileInfo(source.root).isReadable() &&
+                        (source.volume_root.isEmpty() ||
+                         volume == QStringList{source.volume_root, source.volume_device});
+                    if (available && source.state == "unavailable")
+                        result.returned.append(source.root);
+                    else if (!available)
+                        source.state = "unavailable";
+                    xlibrary::SqliteStatement update(db.get(), "UPDATE index_sources SET state=? WHERE scope=? AND root=?");
+                    update.bind(1, source.state);
+                    update.bind(2, scope);
+                    update.bind(3, source.root);
+                    update.next();
+                }
+                // Newly mounted local volumes are also part of Basic/Full scope.
+                for (const auto &root : volume_roots())
+                    if (!excluded_path(exclusions, root) &&
+                        std::none_of(sources.cbegin(), sources.cend(), [&](const auto &source) { return source.root == root; }))
+                        result.returned.append(root);
+                result.sources = std::move(sources);
+            } catch (const std::exception &error) {
+                result.error = QString::fromUtf8(error.what());
+            }
+            return result;
+        }));
+}
+
+void FileManager::start_scan(const QStringList &only_roots) {
     refresh.stop();
     rescan_pending = false;
     scanning = true;
@@ -394,14 +472,14 @@ void FileManager::start_scan() {
     using scan_result = QPair<QString, qint64>;
     const auto expected = scan_generation->load();
     auto *watcher = new QFutureWatcher<scan_result>(this);
-    connect(watcher, &QFutureWatcher<scan_result>::finished, this, [this, watcher, expected] {
+    connect(watcher, &QFutureWatcher<scan_result>::finished, this, [this, watcher, expected, partial = !only_roots.isEmpty()] {
         const auto result = watcher->result();
         watcher->deleteLater();
         scanning = false;
         progress_timer.stop();
         if (expected == scan_generation->load()) {
             state = result.first;
-            if (result.second)
+            if (result.second && !partial)
                 last_refresh = result.second;
             try {
                 load_source_states();
@@ -423,7 +501,7 @@ void FileManager::start_scan() {
     watcher->setFuture(QtConcurrent::run(
         &scan_pool,
         [path = database_path, scope = scope, requested_roots, selected_mode, exclusions, generation = scan_generation,
-         expected, count = indexed]() -> scan_result {
+         expected, count = indexed, only_roots]() -> scan_result {
             const auto roots = volume_roots();
             QStringList blocked_mounts;
             for (const auto &volume : QStorageInfo::mountedVolumes())
@@ -471,7 +549,7 @@ void FileManager::start_scan() {
                     if (!source_roots.contains(previous_sources.qtext(0)))
                         source_roots.insert(previous_sources.qtext(0), static_cast<int>(previous_sources.number(1)));
                 for (auto it = source_roots.begin(); it != source_roots.end();) {
-                    if (excluded_path(exclusions, it.key()))
+                    if (excluded_path(exclusions, it.key()) || (!only_roots.isEmpty() && !only_roots.contains(it.key())))
                         it = source_roots.erase(it);
                     else
                         ++it;
@@ -613,7 +691,7 @@ void FileManager::start_scan() {
                         const QStringList previous_volume{stale.qtext(2), stale.qtext(3)};
                         if (completed_directories.contains(parent) && !current_volumes.contains(parent))
                             current_volumes.insert(parent, volume_identity(parent));
-                        if (stale.qtext(1) != scope ||
+                        if ((only_roots.isEmpty() && stale.qtext(1) != scope) ||
                             (!previous_volume[0].isEmpty() && completed_directories.value(parent) == previous_volume &&
                              current_volumes.value(parent) == previous_volume))
                             obsolete.append(file_path);
@@ -628,7 +706,6 @@ void FileManager::start_scan() {
                 forget.bind(1, scope);
                 forget.next();
                 const auto completed = QDateTime::currentMSecsSinceEpoch();
-                bool all_complete = true;
                 for (auto it = source_roots.cbegin(); it != source_roots.cend(); ++it) {
                     QJsonArray issues;
                     QStringList paths;
@@ -642,7 +719,6 @@ void FileManager::start_scan() {
                     const bool available = volume.size() == 2 && completed_directories.contains(it.key()) &&
                                            completed_directories.value(it.key()) == volume;
                     const bool complete = available && paths.isEmpty();
-                    all_complete &= complete;
                     xlibrary::SqliteStatement finish_source(db.get(), "UPDATE index_sources SET "
                         "volume_root=CASE WHEN ? THEN ? ELSE volume_root END,"
                         "volume_device=CASE WHEN ? THEN ? ELSE volume_device END,"
@@ -659,10 +735,15 @@ void FileManager::start_scan() {
                     finish_source.bind(10, it.key());
                     finish_source.next();
                 }
+                xlibrary::SqliteStatement source_health(db.get(), "SELECT MIN(completed),SUM(state<>'complete') "
+                    "FROM index_sources WHERE scope=?");
+                source_health.bind(1, scope);
+                source_health.next();
+                const auto full_completed = source_health.number(1) == 0 ? source_health.number(0) : 0;
                 xlibrary::SqliteStatement remember(db.get(), "INSERT INTO scan_state VALUES(?,?) ON CONFLICT(scope) "
                                                              "DO UPDATE SET completed=excluded.completed");
                 remember.bind(1, scope);
-                remember.bind(2, all_complete ? completed : 0);
+                remember.bind(2, full_completed);
                 remember.next();
                 if (cancelled()) {
                     xlibrary::sqlite_execute(db.get(), "ROLLBACK");
