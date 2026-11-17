@@ -510,7 +510,26 @@ void MainWindow::show_overlay() {
     overlay->show_search();
 }
 
+void MainWindow::offer_brand_transition() {
+    if (!isVisible() || !service.is_ready() || service.profile_busy() || service.restart_required() ||
+        QCoreApplication::arguments().contains("--check-startup") ||
+        service.settings.value("onboarding/fora_deck_announced", false).toBool())
+        return;
+    const bool existing_profile = service.settings.value("onboarding/completed", false).toBool() ||
+                                  !service.catalog().applications.isEmpty();
+    service.settings.setValue("onboarding/fora_deck_announced", true);
+    if (existing_profile)
+        service.notify(QCoreApplication::translate(
+            "XLibrary", "XLibrary is now Fora.Deck. Your library and settings have been preserved."));
+}
+
+void MainWindow::showEvent(QShowEvent *event) {
+    QMainWindow::showEvent(event);
+    QTimer::singleShot(0, this, &MainWindow::offer_brand_transition);
+}
+
 void MainWindow::start() {
+    connect(&service, &DesktopService::catalog_changed, this, &MainWindow::offer_brand_transition);
     const auto offer_welcome = [this] {
         if (welcome_offered || !service.is_ready() || service.profile_busy() || service.restart_required() ||
             QCoreApplication::arguments().contains("--check-startup"))

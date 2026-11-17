@@ -10,6 +10,8 @@ Use these displayed paths when locating your profile; operating-system configura
 Fora.Deck retains XLibrary's technical application and organization names. The rebrand does not create
 a new profile folder, rename `xlibrary.db`, or change the `.xlprofile` format or credential-store identity.
 Do not rename profile directories just to match the new display name.
+Existing profiles receive a one-time notice when the main window is shown: XLibrary is now Fora.Deck,
+and the library and settings have been preserved. Background startup leaves the notice for the next visible window.
 
 | Mode | Storage |
 | --- | --- |

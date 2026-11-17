@@ -27,6 +27,7 @@ private:
     bool welcome_offered = false;
     void show_welcome();
     void show_tutorial();
+    void offer_brand_transition();
     void create_actions();
     void refresh_actions();
     void apply_settings();
@@ -34,6 +35,7 @@ private:
     void update_layout();
 
 protected:
+    void showEvent(QShowEvent *event) override;
     void closeEvent(QCloseEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;
     void dragEnterEvent(QDragEnterEvent *event) override;

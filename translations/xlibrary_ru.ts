@@ -4,6 +4,10 @@
 <context>
     <name>XLibrary</name>
     <message>
+        <source>XLibrary is now Fora.Deck. Your library and settings have been preserved.</source>
+        <translation>XLibrary теперь Fora.Deck. Ваша библиотека и настройки сохранены.</translation>
+    </message>
+    <message>
         <source>Search applications and files, calculate or enter a path</source>
         <translation>Поиск приложений и файлов, вычисление или ввод пути</translation>
     </message>
