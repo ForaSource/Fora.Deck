@@ -140,6 +140,11 @@ virtual/network filesystems are skipped. Search is by filename; document content
 Right-click a result, or use Shift+F10, to open it, open its folder, copy its path, or **Save to My files**.
 The **My files** section retains saved paths after restart, independently of the index's folder scope.
 Removing a saved entry keeps the file on disk. Unavailable saved files are marked accordingly.
+Indexed matches from unavailable sources are also retained and marked **Source or file unavailable**;
+they cannot be opened until a subsequent query finds them available again. A scan only removes missing
+cached files after completely reading their parent directory on the recorded local volume. Unreadable
+or disconnected locations retain their cached matches. Changing indexing scope still removes ordinary
+cached entries outside that scope; saved paths are retained.
 Use **Settings → Library → Clear usage history** to clear application and file usage counts and recent launch history.
 
 ## Calculator and folder browsing

@@ -39,6 +39,7 @@ struct search_entry {
     qint64 size = -1;
     QString extension{};
     qint64 added = 0;
+    bool available = true;
 };
 
 namespace search_results {

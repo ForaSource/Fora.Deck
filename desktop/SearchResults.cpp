@@ -64,21 +64,25 @@ public:
                                        : QString::fromUtf8("—");
             if (index.column() == 4)
                 return QDir::toNativeSeparators(QFileInfo(entry.path).absolutePath());
-            return entry.title;
+            return entry.available ? entry.title : entry.title + " · " +
+                QCoreApplication::translate("XLibrary", "Source or file unavailable");
         }
         if (role == LibraryModel::tags_role)
             return entry.tags;
         if (role == LibraryModel::favorite_role)
             return entry.favorite;
         if (role == LibraryModel::available_role)
-            return entry.type != search_entry::kind::message;
+            return entry.available && entry.type != search_entry::kind::message;
         if (role == Qt::DecorationRole && index.column() == 0) {
+            if (!entry.available)
+                return appearance::icon("file");
             if (entry.type == search_entry::kind::file || entry.type == search_entry::kind::working_file)
                 return library.file_icon(entry.path, entry.modified, entry.size);
             return appearance::icon(entry.type == search_entry::kind::directory ? "folder" : "file");
         }
         if (role == Qt::ToolTipRole)
-            return entry.path.isEmpty() ? entry.title : QDir::toNativeSeparators(entry.path);
+            return (entry.path.isEmpty() ? entry.title : QDir::toNativeSeparators(entry.path)) +
+                (entry.available ? QString{} : '\n' + QCoreApplication::translate("XLibrary", "Source or file unavailable"));
         return {};
     }
     Qt::ItemFlags flags(const QModelIndex &index) const override {
@@ -172,7 +176,7 @@ public:
         if (!compact && !path.isEmpty() && path != entry.title) {
             const auto title_rect = text_rect.adjusted(0, 0, 0, -text_rect.height() / 2);
             painter->drawText(title_rect, Qt::AlignBottom | Qt::AlignLeft,
-                              option.fontMetrics.elidedText(entry.title, Qt::ElideRight, title_rect.width()));
+                              option.fontMetrics.elidedText(index.data().toString(), Qt::ElideRight, title_rect.width()));
             auto detail_font = option.font;
             detail_font.setPixelSize(appearance::scaled(service.settings, 12));
             painter->setFont(detail_font);
@@ -182,7 +186,7 @@ public:
                               QFontMetrics(detail_font).elidedText(path, Qt::ElideMiddle, path_rect.width()));
         } else {
             painter->drawText(text_rect, Qt::AlignVCenter | Qt::AlignLeft,
-                              option.fontMetrics.elidedText(entry.title, Qt::ElideRight, text_rect.width()));
+                              option.fontMetrics.elidedText(index.data().toString(), Qt::ElideRight, text_rect.width()));
         }
         painter->restore();
     }
@@ -527,6 +531,7 @@ void SearchResults::update_entries() {
         entries.last().size = match.size;
         entries.last().extension = match.extension;
         entries.last().added = match.added;
+        entries.last().available = match.available;
     }
     replace_entries(std::move(entries));
 }
@@ -569,7 +574,7 @@ void SearchResults::activate_current() {
     } else if (entry.type == search_entry::kind::application) {
         pending_launch = service.request_launch(entry.application_id);
     } else if ((entry.type == search_entry::kind::file || entry.type == search_entry::kind::working_file)) {
-        if (entry.type == search_entry::kind::working_file && !FileManager::accepts_file(entry.path)) {
+        if (!entry.available || (entry.type == search_entry::kind::working_file && !FileManager::accepts_file(entry.path))) {
             service.notify(QCoreApplication::translate("XLibrary", "The file is unavailable or its type is excluded."));
             update_query();
             return;
@@ -594,9 +599,11 @@ void SearchResults::show_actions() {
             action_menu->close();
         auto *menu = new QMenu(this);
         action_menu = menu;
-        connect(menu->addAction(QCoreApplication::translate("XLibrary", "Open")), &QAction::triggered, this,
+        auto *open = menu->addAction(QCoreApplication::translate("XLibrary", "Open"));
+        open->setEnabled(entry.available);
+        connect(open, &QAction::triggered, this,
                 [this, entry] {
-                    if (entry.type == search_entry::kind::working_file && !FileManager::accepts_file(entry.path)) {
+                    if (!entry.available || (entry.type == search_entry::kind::working_file && !FileManager::accepts_file(entry.path))) {
                         service.notify(QCoreApplication::translate("XLibrary",
                                                                    "The file is unavailable or its type is excluded."));
                         return;

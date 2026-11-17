@@ -19,6 +19,7 @@
 #include <QtConcurrent/QtConcurrentRun>
 
 #include "FileManager.h"
+#include "PathHelpers.h"
 #include "SearchQuery.h"
 #include "SqliteHelpers.h"
 #ifdef Q_OS_WIN
@@ -123,6 +124,12 @@ bool traversable_directory(const QFileInfo &info) {
 #endif
     return true;
 }
+QStringList volume_identity(const QString &path) {
+    const QStorageInfo volume(path);
+    if (!volume.isValid() || !volume.isReady() || !local_volume(volume))
+        return {};
+    return {identity(volume.rootPath()), QString::fromLatin1(volume.device().toHex())};
+}
 }
 
 bool FileManager::accepts_file(const QString &path) {
@@ -201,6 +208,15 @@ FileManager::FileManager(const QString &directory, const QStringList &saved_path
             xlibrary::sqlite_execute(db.get(), "BEGIN IMMEDIATE;"
                                               "ALTER TABLE files ADD COLUMN added INTEGER NOT NULL DEFAULT 0;"
                                               "UPDATE files SET added=seen; COMMIT");
+        }
+        for (const auto *column : {"volume_root", "volume_device"}) {
+            bool present = false;
+            xlibrary::SqliteStatement columns(db.get(), "PRAGMA table_info(files)");
+            while (columns.next())
+                present |= columns.qtext(1) == QLatin1String(column);
+            if (!present)
+                xlibrary::sqlite_execute(db.get(), (QStringLiteral("ALTER TABLE files ADD COLUMN ") + column +
+                                                    " TEXT NOT NULL DEFAULT ''").toUtf8().constData());
         }
         xlibrary::sqlite_execute(db.get(), "BEGIN; DELETE FROM saved;");
         for (const auto &path : saved_paths) {
@@ -364,6 +380,7 @@ void FileManager::start_scan() {
                 const auto seen = QDateTime::currentMSecsSinceEpoch();
                 std::deque<QPair<QString, int>> pending;
                 QHash<QString, int> visited;
+                QHash<QString, QStringList> completed_directories;
                 quint64 skipped = 0;
                 QStringList recursive_roots = requested_roots;
                 if (selected_mode == file_search_mode::basic)
@@ -390,7 +407,8 @@ void FileManager::start_scan() {
                 if (selected_mode == file_search_mode::basic)
                     for (const auto &root : roots)
                         add_root(root, 1);
-                QVector<QPair<QString, QString>> batch;
+                struct indexed_file { QString path, name, volume_root, volume_device; };
+                QVector<indexed_file> batch;
                 QElapsedTimer batch_age;
                 batch_age.start();
                 const auto flush = [&] {
@@ -399,14 +417,17 @@ void FileManager::start_scan() {
                     xlibrary::sqlite_execute(db.get(), "BEGIN");
                     for (const auto &entry : batch) {
                         xlibrary::SqliteStatement insert(
-                            db.get(), "INSERT INTO files(path,name,scope,seen,added) VALUES(?,?,?,?,?) ON CONFLICT(path) "
+                            db.get(), "INSERT INTO files(path,name,scope,seen,added,volume_root,volume_device) VALUES(?,?,?,?,?,?,?) ON CONFLICT(path) "
                                       "DO UPDATE SET name=excluded.name,scope=excluded.scope,seen=excluded.seen,"
+                                      "volume_root=excluded.volume_root,volume_device=excluded.volume_device,"
                                       "added=CASE WHEN files.added=0 THEN excluded.added ELSE files.added END");
-                        insert.bind(1, entry.first);
-                        insert.bind(2, entry.second);
+                        insert.bind(1, entry.path);
+                        insert.bind(2, entry.name);
                         insert.bind(3, scope);
                         insert.bind(4, seen);
                         insert.bind(5, seen);
+                        insert.bind(6, entry.volume_root);
+                        insert.bind(7, entry.volume_device);
                         insert.next();
                     }
                     xlibrary::sqlite_execute(db.get(), "COMMIT");
@@ -449,11 +470,12 @@ void FileManager::start_scan() {
                         ++skipped;
                         continue;
                     }
-                    QDirIterator entries(directory,
-                                         QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden | QDir::System);
-                    while (entries.hasNext() && !cancelled()) {
-                        entries.next();
-                        const auto info = entries.fileInfo();
+                    const auto directory_volume = volume_identity(directory);
+                    std::error_code enumeration_error;
+                    std::filesystem::directory_iterator entries(filesystem_path(directory), enumeration_error);
+                    const std::filesystem::directory_iterator end;
+                    for (; !enumeration_error && entries != end && !cancelled(); entries.increment(enumeration_error)) {
+                        const QFileInfo info(path_text(entries->path()));
                         if (excluded_path(exclusions, info.absoluteFilePath()))
                             continue;
                         if (info.isDir()) {
@@ -461,21 +483,49 @@ void FileManager::start_scan() {
                                 pending.emplace_back(info.absoluteFilePath(),
                                                      remaining_depth < 0 ? -1 : remaining_depth - 1);
                         } else if (accepts_file(info.absoluteFilePath())) {
-                            batch.append({identity(info.absoluteFilePath()), info.fileName()});
+                            if (directory_volume.size() != 2)
+                                continue;
+                            batch.append({identity(info.absoluteFilePath()), info.fileName(),
+                                          directory_volume[0], directory_volume[1]});
                             if (batch.size() >= 256 || batch_age.elapsed() > 100)
                                 flush();
                         }
                     }
+                    if (!enumeration_error && directory_volume.size() == 2 &&
+                        volume_identity(directory) == directory_volume)
+                        completed_directories.insert(identity(directory), directory_volume);
+                    else
+                        ++skipped;
                 }
                 flush();
                 if (cancelled())
                     return {QCoreApplication::translate("XLibrary", "File indexing cancelled"), 0};
                 xlibrary::sqlite_execute(db.get(), "BEGIN IMMEDIATE");
-                xlibrary::SqliteStatement prune(db.get(), "DELETE FROM files WHERE (scope<>? OR seen<>?) AND NOT "
-                                                          "EXISTS(SELECT 1 FROM saved s WHERE s.path=files.path)");
-                prune.bind(1, scope);
-                prune.bind(2, seen);
-                prune.next();
+                // Only a complete enumeration on the original volume proves that a cached file disappeared.
+                QStringList obsolete;
+                QHash<QString, QStringList> current_volumes;
+                {
+                    xlibrary::SqliteStatement stale(db.get(), "SELECT path,scope,volume_root,volume_device FROM files "
+                        "WHERE (scope<>? OR seen<>?) AND NOT EXISTS(SELECT 1 FROM saved s WHERE s.path=files.path)");
+                    stale.bind(1, scope);
+                    stale.bind(2, seen);
+                    while (stale.next() && !cancelled()) {
+                        const auto file_path = stale.qtext(0);
+                        const auto parent = identity(QFileInfo(file_path).absolutePath());
+                        const QStringList previous_volume{stale.qtext(2), stale.qtext(3)};
+                        if (completed_directories.contains(parent) && !current_volumes.contains(parent))
+                            current_volumes.insert(parent, volume_identity(parent));
+                        if (stale.qtext(1) != scope ||
+                            (!previous_volume[0].isEmpty() && completed_directories.value(parent) == previous_volume &&
+                             current_volumes.value(parent) == previous_volume))
+                            obsolete.append(file_path);
+                    }
+                }
+                for (const auto &file_path : obsolete) {
+                    xlibrary::SqliteStatement prune(db.get(), "DELETE FROM files WHERE path=?");
+                    prune.bind(1, file_path);
+                    prune.next();
+                }
                 xlibrary::SqliteStatement forget(db.get(), "DELETE FROM scan_state WHERE scope<>?");
                 forget.bind(1, scope);
                 forget.next();
@@ -580,9 +630,9 @@ void FileManager::search(const QString &text, const quint64 request, QObject *re
                     QVector<file_match> candidates;
                     xlibrary::SqliteStatement rows(
                         db.get(),
-                        "SELECT f.path,f.name,EXISTS(SELECT 1 FROM saved s WHERE s.path=f.path),f.added "
+                        "SELECT f.path,f.name,EXISTS(SELECT 1 FROM saved s WHERE s.path=f.path),f.added,f.volume_root,f.volume_device "
                         "FROM files f WHERE f.scope=? OR EXISTS(SELECT 1 FROM saved s WHERE s.path=f.path) "
-                        "UNION ALL SELECT s.path,'',1,0 FROM saved s WHERE NOT EXISTS(SELECT 1 FROM files f WHERE "
+                        "UNION ALL SELECT s.path,'',1,0,'','' FROM saved s WHERE NOT EXISTS(SELECT 1 FROM files f WHERE "
                         "f.path=s.path)");
                     rows.bind(1, scope);
                     while (rows.next()) {
@@ -646,8 +696,8 @@ void FileManager::search(const QString &text, const quint64 request, QObject *re
                         if (position != candidates.end() || candidates.size() < capacity) {
                             // Content checks belong to indexing and the final bounded subset, not every competitive row.
                             const QFileInfo info(file_path);
-                            if (!info.isFile() || !info.isReadable())
-                                continue;
+                            match.available = info.isFile() && info.isReadable() &&
+                                (rows.qtext(4).isEmpty() || volume_identity(file_path) == QStringList{rows.qtext(4), rows.qtext(5)});
                             match.modified = info.lastModified().toMSecsSinceEpoch();
                             match.size = info.size();
                             candidates.insert(position, std::move(match));
@@ -659,8 +709,8 @@ void FileManager::search(const QString &text, const quint64 request, QObject *re
                         if (cancelled())
                             return QVector<file_match>{};
                         inspected.insert(entry.path);
-                        if (accepts_file(entry.path) &&
-                            !excluded_path(exclusions, QFileInfo(entry.path).canonicalFilePath()))
+                        if (!entry.available || (accepts_file(entry.path) &&
+                            !excluded_path(exclusions, QFileInfo(entry.path).canonicalFilePath())))
                             matches.append(entry);
                     }
                     // Refill after rejected candidates without reading every matching file's contents.

@@ -4,6 +4,10 @@
 <context>
     <name>XLibrary</name>
     <message>
+        <source>Source or file unavailable</source>
+        <translation>Источник или файл недоступен</translation>
+    </message>
+    <message>
         <source>Reason for removal</source>
         <translation>Причина удаления</translation>
     </message>
