@@ -94,6 +94,7 @@ private:
     quint64 library_request_id = 0;
     operation_error opening_error;
     operation_error last_failure;
+    QHash<qint64, QString> launch_failures;
     operation_state profile_status = operation_state::ready;
     quint64 profile_request_id = 0;
     quint64 update_request_id = 0;
@@ -129,6 +130,8 @@ public:
     ~DesktopService() override;
     operation_state library_state() const { return library_status; }
     const operation_error &last_error() const { return last_failure; }
+    const QHash<qint64, QString> &launch_errors() const { return launch_failures; }
+    const QVector<app_record> &removal_candidates() const { return missing_records; }
     bool is_ready() const { return library_status == operation_state::ready; }
     bool is_opening() const { return library_status == operation_state::loading; }
     QString library_error() const { return opening_error.user_message; }

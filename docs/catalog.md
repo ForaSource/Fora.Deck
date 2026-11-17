@@ -39,6 +39,13 @@ Availability refreshes can mark an entry unavailable without deleting it. For mo
 
 ## Duplicates and scan reports
 
+Open **Library actions → Library health** (also available in **Settings → Library**) for a current overview
+of unavailable applications, entries on unavailable drives, pending removal candidates and launch failures
+recorded during this session. A successful launch clears that application's failure. The dialog also shows
+the last operation error in this session, per-source file index diagnostics and the last discovery report.
+Use **Refresh availability**, **Locate application…**, **Recover moved folder…** or **Refresh file index**
+from the overview. Missing files are retained unless the separate removal checks confirm an uninstall.
+
 Open **Last scan details** in the library or **Settings → Library** to read or copy the most recent report.
 It separates additions, duplicates, skipped entries, and errors.
 

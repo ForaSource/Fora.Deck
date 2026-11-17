@@ -4,6 +4,30 @@
 <context>
     <name>XLibrary</name>
     <message>
+        <source>Library health</source>
+        <translation>Состояние библиотеки</translation>
+    </message>
+    <message>
+        <source>Problem</source>
+        <translation>Проблема</translation>
+    </message>
+    <message>
+        <source>Launch failed this session: %1</source>
+        <translation>Ошибка запуска в этом сеансе: %1</translation>
+    </message>
+    <message>
+        <source>Unavailable applications: %1; on unavailable drives: %2; removal candidates: %3; launch failures: %4.</source>
+        <translation>Недоступных приложений: %1; на недоступных дисках: %2; кандидатов на удаление: %3; ошибок запуска: %4.</translation>
+    </message>
+    <message>
+        <source>No operation errors recorded this session.</source>
+        <translation>В этом сеансе ошибки операций не зафиксированы.</translation>
+    </message>
+    <message>
+        <source>Last operation error this session: %1</source>
+        <translation>Последняя ошибка операции в этом сеансе: %1</translation>
+    </message>
+    <message>
         <source>Unavailable sources are checked about every 30 seconds. Returning sources refresh separately from the regular index refresh.</source>
         <translation>Доступность источников проверяется примерно каждые 30 секунд. Вернувшиеся источники обновляются отдельно от планового обновления индекса.</translation>
     </message>

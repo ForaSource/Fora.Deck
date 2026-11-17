@@ -298,6 +298,8 @@ void MainWindow::create_actions() {
         context.actions.value(id)->setAutoRepeat(false);
     add("refresh_availability", QCoreApplication::translate("XLibrary", "Refresh availability"), "refresh",
         [this] { service.refresh_availability(); });
+    add("library_health", QCoreApplication::translate("XLibrary", "Library health"), "info",
+        [this] { show_library_health(context); });
     add("discover", QCoreApplication::translate("XLibrary", "Find installed applications"), "scan", [this] {
         if (service.is_discovering())
             service.cancel_discovery();

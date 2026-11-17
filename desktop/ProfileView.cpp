@@ -11,6 +11,7 @@
 #include <QPlainTextEdit>
 #include <QSignalBlocker>
 #include <QTableWidget>
+#include <QTabWidget>
 
 #include "DesktopService.h"
 #include "ProfileView.h"
@@ -351,4 +352,140 @@ QWidget *profile_view(const ui_context &context, QWidget *const parent) {
     QObject::connect(restart, &QPushButton::clicked, service, &DesktopService::restart_application);
     update();
     return widget;
+}
+
+void show_library_health(const ui_context &context) {
+    using namespace ui_helpers;
+    auto *service = static_cast<DesktopService *>(context.service);
+    if (auto *existing = context.window->findChild<QDialog *>("library_health", Qt::FindDirectChildrenOnly)) {
+        existing->show();
+        existing->raise();
+        existing->activateWindow();
+        return;
+    }
+    auto *dialog = new QDialog(context.window);
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->setWindowTitle(QCoreApplication::translate("XLibrary", "Library health"));
+    dialog->setObjectName("library_health");
+    prepare_dialog(dialog, context, {920, 640}, {640, 420});
+    auto *layout = new QVBoxLayout(dialog);
+    auto *summary = label({});
+    auto *last_error = label({}, "muted");
+    layout->addWidget(summary);
+    layout->addWidget(last_error);
+    auto *tabs = new QTabWidget;
+    auto *table = new QTableWidget(0, 3);
+    table->setObjectName("library_health_applications");
+    table->setHorizontalHeaderLabels({QCoreApplication::translate("XLibrary", "Name"),
+        QCoreApplication::translate("XLibrary", "Problem"), QCoreApplication::translate("XLibrary", "Target")});
+    table->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    table->setSelectionBehavior(QAbstractItemView::SelectRows);
+    table->setSelectionMode(QAbstractItemView::SingleSelection);
+    table->verticalHeader()->hide();
+    table->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+    auto *files = new QPlainTextEdit;
+    files->setReadOnly(true);
+    files->setAccessibleName(QCoreApplication::translate("XLibrary", "File index diagnostics"));
+    auto *report = new QPlainTextEdit;
+    report->setReadOnly(true);
+    tabs->addTab(table, QCoreApplication::translate("XLibrary", "Applications"));
+    tabs->addTab(files, QCoreApplication::translate("XLibrary", "File index diagnostics"));
+    tabs->addTab(report, QCoreApplication::translate("XLibrary", "Scan report"));
+    layout->addWidget(tabs, 1);
+    auto *actions = new QHBoxLayout;
+    auto *availability = action_button(context.actions.value("refresh_availability"));
+    auto *locate = button(QCoreApplication::translate("XLibrary", "Locate application…"));
+    auto *recover = button(QCoreApplication::translate("XLibrary", "Recover moved folder…"));
+    auto *refresh_files = button(QCoreApplication::translate("XLibrary", "Refresh file index"));
+    actions->addWidget(availability);
+    actions->addWidget(locate);
+    actions->addWidget(recover);
+    actions->addWidget(refresh_files);
+    layout->addLayout(actions);
+    auto *buttons = new QDialogButtonBox(QDialogButtonBox::Close);
+    layout->addWidget(buttons);
+    QObject::connect(buttons, &QDialogButtonBox::rejected, dialog, &QDialog::reject);
+    const auto selected_record = [=]() -> const app_record * {
+        const auto *item = table->item(table->currentRow(), 0);
+        return item ? service->model.find(item->data(Qt::UserRole).toLongLong()) : nullptr;
+    };
+    const auto update_actions = [=] {
+        const bool idle = service->is_ready() && !service->profile_busy() && !service->restart_required();
+        const auto *record = selected_record();
+        locate->setEnabled(idle && record && !record->available && Application::file_target(*record));
+        recover->setEnabled(idle && !service->is_discovering() && !service->is_scenario_active());
+        refresh_files->setEnabled(idle && service->files->is_enabled());
+    };
+    const auto update = [=] {
+        const auto *selected = selected_record();
+        const auto selected_id = selected ? selected->id : 0;
+        const QSignalBlocker blocker(table);
+        table->setRowCount(0);
+        qsizetype unavailable = 0;
+        qsizetype disconnected = 0;
+        qsizetype failed = 0;
+        QHash<qint64, QString> reasons;
+        for (const auto &candidate : service->removal_candidates())
+            reasons.insert(candidate.id, candidate.removal_reason);
+        for (const auto &record : service->catalog().applications) {
+            unavailable += !record.available;
+            disconnected += record.volume_unavailable;
+            failed += service->launch_errors().contains(record.id);
+            QStringList problems;
+            if (!record.available)
+                problems.append(record.volume_unavailable
+                    ? QCoreApplication::translate("XLibrary", "Drive disconnected or unavailable")
+                    : QCoreApplication::translate("XLibrary", "File unavailable; the entry is kept"));
+            if (reasons.contains(record.id))
+                problems.append(reasons.value(record.id));
+            if (service->launch_errors().contains(record.id))
+                problems.append(QCoreApplication::translate("XLibrary", "Launch failed this session: %1")
+                    .arg(service->launch_errors().value(record.id)));
+            if (problems.isEmpty())
+                continue;
+            const auto row = table->rowCount();
+            table->insertRow(row);
+            const QStringList values{record.name, problems.join('\n'),
+                                     QDir::toNativeSeparators(Application::application_path(record))};
+            for (int column = 0; column < 3; ++column) {
+                auto *item = new QTableWidgetItem(values[column]);
+                item->setToolTip(values[column]);
+                item->setData(Qt::UserRole, record.id);
+                table->setItem(row, column, item);
+            }
+            if (record.id == selected_id)
+                table->setCurrentCell(row, 0);
+        }
+        table->resizeRowsToContents();
+        summary->setText(QCoreApplication::translate("XLibrary",
+            "Unavailable applications: %1; on unavailable drives: %2; removal candidates: %3; launch failures: %4.")
+            .arg(unavailable).arg(disconnected).arg(reasons.size()).arg(failed));
+        const auto error = service->last_error().user_message;
+        last_error->setText(error.isEmpty()
+            ? QCoreApplication::translate("XLibrary", "No operation errors recorded this session.")
+            : QCoreApplication::translate("XLibrary", "Last operation error this session: %1").arg(error));
+        files->setPlainText(service->files->diagnostics_text());
+        report->setPlainText(service->discovery_report());
+        update_actions();
+    };
+    QObject::connect(table, &QTableWidget::itemSelectionChanged, dialog, update_actions);
+    QObject::connect(locate, &QPushButton::clicked, dialog, [=] {
+        if (const auto *record = selected_record(); record && locate->isEnabled())
+            select_application_replacement(service, *record, dialog);
+    });
+    QObject::connect(recover, &QPushButton::clicked, dialog, [=] { select_root_recovery(context, dialog); });
+    QObject::connect(refresh_files, &QPushButton::clicked, service->files, &FileManager::rescan);
+    QObject::connect(service, &DesktopService::catalog_changed, dialog, update);
+    QObject::connect(service, &DesktopService::selection_changed, dialog, update);
+    QObject::connect(service, &DesktopService::catalog_preview_ready, dialog, update);
+    QObject::connect(service, &DesktopService::profile_state_changed, dialog, update);
+    QObject::connect(service, &DesktopService::discovery_changed, dialog, update);
+    QObject::connect(service, &DesktopService::operation_changed, dialog, [=] { update(); });
+    QObject::connect(service, &DesktopService::application_launch_finished, dialog, [=] { update(); });
+    QObject::connect(service, &DesktopService::scenario_steps_changed, dialog, update);
+    QObject::connect(service, &DesktopService::discovery_report_changed, dialog, update);
+    QObject::connect(service->files, &FileManager::status_changed, dialog,
+                     [=] { files->setPlainText(service->files->diagnostics_text()); });
+    update();
+    dialog->open();
 }

@@ -307,6 +307,7 @@ QWidget *hotkeys(const ui_context &context, QWidget *) {
 QWidget *library_settings(const ui_context &context, QWidget *) {
     auto *service = static_cast<DesktopService *>(context.service);
     auto *widget = page(QCoreApplication::translate("XLibrary", "Application sources"));
+    widget->layout()->addWidget(action_button(context.actions.value("library_health")));
 #ifdef Q_OS_WIN
     checkbox(widget, *context.settings, "sources/registry",
              QCoreApplication::translate("XLibrary", "Registered Windows applications"), true);

@@ -75,6 +75,9 @@ DesktopService::DesktopService(QObject *const parent, const QString &profile_pat
     qRegisterMetaType<profile_manifest>();
     qRegisterMetaType<QVector<path_relocation>>();
     connect(this, &DesktopService::catalog_changed, this, &DesktopService::sync_target_hotkeys);
+    connect(this, &DesktopService::catalog_changed, this, [this] {
+        launch_failures.removeIf([this](auto entry) { return !model.find(entry.key()); });
+    });
     connect(this, &DesktopService::appearance_changed, this, &DesktopService::sync_target_hotkeys);
     connect(this, &DesktopService::operation_changed, this, [this](const operation_result &result) {
         if (!pending_shortcut_request || result.id != pending_shortcut_request ||
@@ -244,6 +247,10 @@ DesktopService::DesktopService(QObject *const parent, const QString &profile_pat
     connect(worker, &Manager::launched, this,
             [this](const qint64 id, const operation_result &result, const quint64 from_scenario) {
                 launching.remove(id);
+                if (result.state == operation_state::completed)
+                    launch_failures.remove(id);
+                else if (result.state == operation_state::error)
+                    launch_failures.insert(id, result.error.user_message);
                 if (!from_scenario)
                     emit application_launch_finished(id, result);
                 if (result.state == operation_state::completed && !from_scenario)

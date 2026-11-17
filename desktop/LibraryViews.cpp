@@ -1122,7 +1122,7 @@ QWidget *library(const ui_context &context, QWidget *const parent) {
     header->addWidget(presentation);
     auto *library_actions = button(QCoreApplication::translate("XLibrary", "Library actions"));
     auto *library_menu = new QMenu(library_actions);
-    for (const auto &id : {"refresh_availability", "discover", "undo_removal"})
+    for (const auto &id : {"library_health", "refresh_availability", "discover", "undo_removal"})
         library_menu->addAction(context.actions.value(id));
     auto *report = library_menu->addAction(QCoreApplication::translate("XLibrary", "Scan report"));
     QObject::connect(library_menu, &QMenu::aboutToShow, widget, [=] { report->setEnabled(!service->discovery_report().isEmpty()); });
