@@ -4,6 +4,42 @@
 <context>
     <name>XLibrary</name>
     <message>
+        <source>File index diagnostics</source>
+        <translation>Диагностика файлового индекса</translation>
+    </message>
+    <message>
+        <source>No completed source scan. Refresh required.</source>
+        <translation>Нет завершённого обхода источников. Требуется обновление.</translation>
+    </message>
+    <message>
+        <source>Never</source>
+        <translation>Никогда</translation>
+    </message>
+    <message>
+        <source>Source unavailable; cached results retained</source>
+        <translation>Источник недоступен; сохранённые результаты остаются в индексе</translation>
+    </message>
+    <message>
+        <source>Refresh required; search may be incomplete</source>
+        <translation>Требуется обновление; поиск может быть неполным</translation>
+    </message>
+    <message>
+        <source>Last scan complete</source>
+        <translation>Последний обход завершён полностью</translation>
+    </message>
+    <message>
+        <source>Last attempt: %1. Last complete scan: %2.</source>
+        <translation>Последняя попытка: %1. Последний полный обход: %2.</translation>
+    </message>
+    <message>
+        <source>Unavailable folders: %1</source>
+        <translation>Недоступных папок: %1</translation>
+    </message>
+    <message>
+        <source>Only the first 200 folders are shown.</source>
+        <translation>Показаны только первые 200 папок.</translation>
+    </message>
+    <message>
         <source>Source or file unavailable</source>
         <translation>Источник или файл недоступен</translation>
     </message>

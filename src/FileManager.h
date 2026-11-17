@@ -36,6 +36,17 @@ Q_DECLARE_METATYPE(QVector<file_match>)
 
 enum class file_search_mode { off, basic, full };
 
+struct file_index_source {
+    QString root;
+    int depth = -1;
+    QString volume_root;
+    QString volume_device;
+    qint64 attempted = 0;
+    qint64 completed = 0;
+    QString state;
+    QStringList unavailable_directories;
+};
+
 class FileManager : public QObject {
     Q_OBJECT
     QString database_path;
@@ -59,6 +70,8 @@ class FileManager : public QObject {
     bool rescan_pending = false;
     QString state;
     qint64 last_refresh = 0;
+    QVector<file_index_source> source_states;
+    void load_source_states();
     void start_scan();
     void schedule_refresh();
 
@@ -92,6 +105,8 @@ public:
     void rename_tag(const QString &old_name, const QString &new_name);
     bool is_saving() const { return pending_saves > 0; }
     QString status() const { return state; }
+    QString diagnostics_text() const;
+    const QVector<file_index_source> &sources() const { return source_states; }
     static bool accepts_file(const QString &path);
     static QStringList volume_roots();
 signals:

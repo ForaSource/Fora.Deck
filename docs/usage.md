@@ -130,6 +130,9 @@ In **Settings → File search**, select a mode and choose **Save**:
 The index stores paths and metadata locally and survives restart. A completed index refreshes automatically no sooner than
 six hours later; restarting the application does not reset that age. Changing scope builds the newly selected index.
 **Refresh file index** bypasses the interval manually. Apply settings before using it.
+The diagnostics below the status show each source's last attempt, last complete scan and unavailable folders
+(up to 200 paths displayed per source). These records survive restart. A partial or interrupted scan does not
+advance the last complete scan time; a refresh warning means an empty result is not proof that a file is absent.
 Indexing and querying use separate background workers: the rest of the application and searches remain available.
 Index progress does not replace the visible results; discovered files appear on the next query.
 

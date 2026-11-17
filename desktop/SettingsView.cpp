@@ -12,6 +12,7 @@
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMenu>
+#include <QPlainTextEdit>
 #include <QProgressBar>
 #include <QRegularExpressionValidator>
 #include <QStackedWidget>
@@ -486,6 +487,14 @@ QWidget *file_settings(const ui_context &context, QWidget *) {
     widget->layout()->addWidget(status);
     QObject::connect(service->files, &FileManager::status_changed, widget,
                      [=] { status->setText(service->files->status()); });
+    auto *diagnostics = new QPlainTextEdit(service->files->diagnostics_text());
+    diagnostics->setObjectName("file_index_diagnostics");
+    diagnostics->setReadOnly(true);
+    diagnostics->setAccessibleName(QCoreApplication::translate("XLibrary", "File index diagnostics"));
+    diagnostics->setMinimumHeight(appearance::scaled(*context.settings, 180));
+    widget->layout()->addWidget(diagnostics);
+    QObject::connect(service->files, &FileManager::status_changed, diagnostics,
+                     [=] { diagnostics->setPlainText(service->files->diagnostics_text()); });
     auto *scan = button(QCoreApplication::translate("XLibrary", "Refresh file index"));
     scan->setEnabled(service->files->is_enabled());
     widget->layout()->addWidget(scan);

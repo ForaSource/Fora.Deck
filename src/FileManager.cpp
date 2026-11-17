@@ -12,6 +12,10 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QFutureWatcher>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QLocale>
+#include <QMap>
 #include <QRegularExpression>
 #include <QSet>
 #include <QStandardPaths>
@@ -196,7 +200,10 @@ FileManager::FileManager(const QString &directory, const QStringList &saved_path
                       "NULL,scope TEXT NOT NULL,seen INTEGER NOT NULL,added INTEGER NOT NULL DEFAULT 0);"
                       "CREATE TABLE IF NOT EXISTS saved(path TEXT PRIMARY KEY);"
                       "CREATE INDEX IF NOT EXISTS files_scope ON files(scope);"
-                      "CREATE TABLE IF NOT EXISTS scan_state(scope TEXT PRIMARY KEY,completed INTEGER NOT NULL);");
+                      "CREATE TABLE IF NOT EXISTS scan_state(scope TEXT PRIMARY KEY,completed INTEGER NOT NULL);"
+                      "CREATE TABLE IF NOT EXISTS index_sources(scope TEXT NOT NULL,root TEXT NOT NULL,depth INTEGER NOT NULL,"
+                      "volume_root TEXT NOT NULL,volume_device TEXT NOT NULL,attempted INTEGER NOT NULL,"
+                      "completed INTEGER NOT NULL,state TEXT NOT NULL,issues TEXT NOT NULL,PRIMARY KEY(scope,root));");
         bool has_added = false;
         {
             xlibrary::SqliteStatement columns(db.get(), "PRAGMA table_info(files)");
@@ -260,6 +267,53 @@ file_search_mode FileManager::mode_from_setting(const QString &value) {
         return file_search_mode::full;
     return file_search_mode::off;
 }
+
+void FileManager::load_source_states() {
+    source_states.clear();
+    auto db = open_index(database_path);
+    xlibrary::SqliteStatement rows(db.get(), "SELECT root,depth,volume_root,volume_device,attempted,completed,state,issues "
+                                           "FROM index_sources WHERE scope=? ORDER BY root");
+    rows.bind(1, scope);
+    while (rows.next()) {
+        file_index_source source{rows.qtext(0), static_cast<int>(rows.number(1)), rows.qtext(2), rows.qtext(3),
+                                 rows.number(4), rows.number(5), rows.qtext(6), {}};
+        for (const auto &entry : QJsonDocument::fromJson(rows.qtext(7).toUtf8()).array())
+            source.unavailable_directories.append(entry.toString());
+        source_states.append(std::move(source));
+    }
+}
+
+QString FileManager::diagnostics_text() const {
+    QStringList lines{status()};
+    if (!is_enabled())
+        return lines.join('\n');
+    if (source_states.isEmpty())
+        lines.append(QCoreApplication::translate("XLibrary", "No completed source scan. Refresh required."));
+    const auto date = [](const qint64 value) {
+        return value ? QLocale{}.toString(QDateTime::fromMSecsSinceEpoch(value), QLocale::ShortFormat)
+                     : QCoreApplication::translate("XLibrary", "Never");
+    };
+    for (const auto &source : source_states) {
+        const bool stale = !source.completed || QDateTime::currentMSecsSinceEpoch() - source.completed >= refresh_interval_ms;
+        const auto description = source.state == "unavailable"
+            ? QCoreApplication::translate("XLibrary", "Source unavailable; cached results retained")
+            : source.state != "complete" || stale
+                ? QCoreApplication::translate("XLibrary", "Refresh required; search may be incomplete")
+                : QCoreApplication::translate("XLibrary", "Last scan complete");
+        lines.append('\n' + QDir::toNativeSeparators(source.root) + " — " + description);
+        lines.append(QCoreApplication::translate("XLibrary", "Last attempt: %1. Last complete scan: %2.")
+                         .arg(date(source.attempted), date(source.completed)));
+        if (!source.unavailable_directories.isEmpty()) {
+            lines.append(QCoreApplication::translate("XLibrary", "Unavailable folders: %1").arg(source.unavailable_directories.size()));
+            for (const auto &directory : source.unavailable_directories.mid(0, 200))
+                lines.append("  " + QDir::toNativeSeparators(directory));
+            if (source.unavailable_directories.size() > 200)
+                lines.append(QCoreApplication::translate("XLibrary", "Only the first 200 folders are shown."));
+        }
+    }
+    return lines.join('\n');
+}
+
 void FileManager::configure(const file_search_mode selected_mode, const QStringList &roots,
                             const QStringList &exclusions) {
     mode = selected_mode;
@@ -285,6 +339,7 @@ void FileManager::configure(const file_search_mode selected_mode, const QStringL
     scope = QString::fromLatin1(QCryptographicHash::hash(scope_data.toUtf8(), QCryptographicHash::Sha256).toHex());
     refresh.stop();
     last_refresh = 0;
+    source_states.clear();
     if (is_enabled()) {
         try {
             auto db = open_index(database_path);
@@ -292,11 +347,14 @@ void FileManager::configure(const file_search_mode selected_mode, const QStringL
             completed.bind(1, scope);
             if (completed.next())
                 last_refresh = completed.number(0);
+            load_source_states();
         } catch (const std::exception &e) {
             emit error(QString::fromUtf8(e.what()));
         }
     }
-    rescan_pending = is_enabled() && (scanning || !last_refresh ||
+    rescan_pending = is_enabled() && (scanning || !last_refresh || source_states.isEmpty() ||
+                                      std::any_of(source_states.cbegin(), source_states.cend(),
+                                                  [](const auto &source) { return source.state != "complete"; }) ||
                                       QDateTime::currentMSecsSinceEpoch() - last_refresh >= refresh_interval_ms);
     if (!is_enabled()) {
         state = QCoreApplication::translate("XLibrary", "File search is off");
@@ -345,6 +403,11 @@ void FileManager::start_scan() {
             state = result.first;
             if (result.second)
                 last_refresh = result.second;
+            try {
+                load_source_states();
+            } catch (const std::exception &error) {
+                state = QCoreApplication::translate("XLibrary", "File index error: %1").arg(QString::fromUtf8(error.what()));
+            }
             emit status_changed();
         }
         if (rescan_pending)
@@ -381,6 +444,7 @@ void FileManager::start_scan() {
                 std::deque<QPair<QString, int>> pending;
                 QHash<QString, int> visited;
                 QHash<QString, QStringList> completed_directories;
+                QSet<QString> unavailable_directories;
                 quint64 skipped = 0;
                 QStringList recursive_roots = requested_roots;
                 if (selected_mode == file_search_mode::basic)
@@ -393,20 +457,47 @@ void FileManager::start_scan() {
                 else
                     recursive_roots += roots;
                 recursive_roots.removeDuplicates();
+                QMap<QString, int> source_roots;
+                for (const auto &root : recursive_roots)
+                    source_roots.insert(identity(root), -1);
+                if (selected_mode == file_search_mode::basic)
+                    for (const auto &root : roots)
+                        if (!source_roots.contains(root))
+                            source_roots.insert(root, 1);
+                // Retain sources that disappeared from the mounted-volume inventory.
+                xlibrary::SqliteStatement previous_sources(db.get(), "SELECT root,depth FROM index_sources WHERE scope=?");
+                previous_sources.bind(1, scope);
+                while (previous_sources.next())
+                    if (!source_roots.contains(previous_sources.qtext(0)))
+                        source_roots.insert(previous_sources.qtext(0), static_cast<int>(previous_sources.number(1)));
+                for (auto it = source_roots.begin(); it != source_roots.end();) {
+                    if (excluded_path(exclusions, it.key()))
+                        it = source_roots.erase(it);
+                    else
+                        ++it;
+                }
+                for (auto it = source_roots.cbegin(); it != source_roots.cend(); ++it) {
+                    xlibrary::SqliteStatement begin_source(db.get(), "INSERT INTO index_sources VALUES(?,?,?,'','',?,0,'needs_refresh','[]') "
+                        "ON CONFLICT(scope,root) DO UPDATE SET state='needs_refresh',attempted=excluded.attempted");
+                    begin_source.bind(1, scope);
+                    begin_source.bind(2, it.key());
+                    begin_source.bind(3, it.value());
+                    begin_source.bind(4, seen);
+                    begin_source.next();
+                }
                 const auto add_root = [&](const QString &root, const int depth) {
                     const QFileInfo info(root);
                     const auto canonical = info.canonicalFilePath();
                     if (!canonical.isEmpty() && traversable_directory(info) && !excluded_path(exclusions, root) &&
                         !excluded_path(exclusions, canonical))
                         pending.emplace_back(canonical, depth);
-                    else
+                    else {
                         ++skipped;
+                        unavailable_directories.insert(identity(root));
+                    }
                 };
-                for (const auto &root : recursive_roots)
-                    add_root(root, -1);
-                if (selected_mode == file_search_mode::basic)
-                    for (const auto &root : roots)
-                        add_root(root, 1);
+                for (auto it = source_roots.cbegin(); it != source_roots.cend(); ++it)
+                    add_root(it.key(), it.value());
                 struct indexed_file { QString path, name, volume_root, volume_device; };
                 QVector<indexed_file> batch;
                 QElapsedTimer batch_age;
@@ -447,8 +538,11 @@ void FileManager::start_scan() {
                                 return root.size() > mount.size() && contains_path(mount, root) &&
                                        contains_path(root, directory_path);
                             });
-                        }))
+                        })) {
+                        unavailable_directories.insert(directory_path);
+                        ++skipped;
                         continue;
+                    }
                     if (batch_age.elapsed() > 100)
                         flush();
                     auto key = identity(directory);
@@ -456,6 +550,7 @@ void FileManager::start_scan() {
                     struct stat metadata {};
                     if (::stat(QFile::encodeName(directory).constData(), &metadata) != 0) {
                         ++skipped;
+                        unavailable_directories.insert(directory_path);
                         continue;
                     }
                     key = QString::number(metadata.st_dev) + ':' + QString::number(metadata.st_ino);
@@ -468,6 +563,7 @@ void FileManager::start_scan() {
                     visited.insert(key, remaining_depth);
                     if (!QFileInfo(directory).isReadable()) {
                         ++skipped;
+                        unavailable_directories.insert(directory_path);
                         continue;
                     }
                     const auto directory_volume = volume_identity(directory);
@@ -494,8 +590,10 @@ void FileManager::start_scan() {
                     if (!enumeration_error && directory_volume.size() == 2 &&
                         volume_identity(directory) == directory_volume)
                         completed_directories.insert(identity(directory), directory_volume);
-                    else
+                    else {
                         ++skipped;
+                        unavailable_directories.insert(directory_path);
+                    }
                 }
                 flush();
                 if (cancelled())
@@ -530,10 +628,41 @@ void FileManager::start_scan() {
                 forget.bind(1, scope);
                 forget.next();
                 const auto completed = QDateTime::currentMSecsSinceEpoch();
+                bool all_complete = true;
+                for (auto it = source_roots.cbegin(); it != source_roots.cend(); ++it) {
+                    QJsonArray issues;
+                    QStringList paths;
+                    for (const auto &directory : unavailable_directories)
+                        if (contains_path(it.key(), directory))
+                            paths.append(directory);
+                    paths.sort();
+                    for (const auto &directory : paths)
+                        issues.append(directory);
+                    const auto volume = volume_identity(it.key());
+                    const bool available = volume.size() == 2 && completed_directories.contains(it.key()) &&
+                                           completed_directories.value(it.key()) == volume;
+                    const bool complete = available && paths.isEmpty();
+                    all_complete &= complete;
+                    xlibrary::SqliteStatement finish_source(db.get(), "UPDATE index_sources SET "
+                        "volume_root=CASE WHEN ? THEN ? ELSE volume_root END,"
+                        "volume_device=CASE WHEN ? THEN ? ELSE volume_device END,"
+                        "completed=CASE WHEN ? THEN ? ELSE completed END,state=?,issues=? WHERE scope=? AND root=?");
+                    finish_source.bind(1, available);
+                    finish_source.bind(2, volume.value(0));
+                    finish_source.bind(3, available);
+                    finish_source.bind(4, volume.value(1));
+                    finish_source.bind(5, complete);
+                    finish_source.bind(6, completed);
+                    finish_source.bind(7, !available ? "unavailable" : complete ? "complete" : "needs_refresh");
+                    finish_source.bind(8, QString::fromUtf8(QJsonDocument(issues).toJson(QJsonDocument::Compact)));
+                    finish_source.bind(9, scope);
+                    finish_source.bind(10, it.key());
+                    finish_source.next();
+                }
                 xlibrary::SqliteStatement remember(db.get(), "INSERT INTO scan_state VALUES(?,?) ON CONFLICT(scope) "
                                                              "DO UPDATE SET completed=excluded.completed");
                 remember.bind(1, scope);
-                remember.bind(2, completed);
+                remember.bind(2, all_complete ? completed : 0);
                 remember.next();
                 if (cancelled()) {
                     xlibrary::sqlite_execute(db.get(), "ROLLBACK");
