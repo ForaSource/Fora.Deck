@@ -26,6 +26,8 @@ Use **Settings → Library → Reset discovery exclusions** to make excluded ent
 
 **Ask before removing uninstalled applications from the library** is enabled by default in **Settings → Library**.
 Review the names and paths, remove checked entries, or choose **Keep all**. Disabling the option removes confirmed missing entries automatically.
+Each removal candidate shows the specific missing file, or the missing Steam manifest and installation folder /
+Linux desktop entry and executable. The reason comes from the same verified-drive checks used to select candidates.
 
 Removal requires evidence from the same local volume where a target was previously available and a fresh check before deletion.
 Unavailable or changed volumes, unobserved paths, access errors, broken links, and uncertain shell targets are kept for manual review.

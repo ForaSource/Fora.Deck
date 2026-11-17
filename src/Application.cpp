@@ -179,10 +179,15 @@ bool Application::target_available(const app_record &record) {
 
 bool Application::definitely_removed(const app_record &record, const QStringList &known_volume_roots,
                                      const QVariantMap &verified_locations) {
+    return !removal_reason(record, known_volume_roots, verified_locations).isEmpty();
+}
+
+QString Application::removal_reason(const app_record &record, const QStringList &known_volume_roots,
+                                    const QVariantMap &verified_locations) {
     // Shell activation failures and a missing desktop shortcut alone do not prove an uninstall.
     const auto kind = target_kind(record);
     if (kind != "executable" && kind != "steam" && kind != "desktop")
-        return false;
+        return {};
     const auto absent_on_local_volume = [&](const QString &text) {
         if (!QFileInfo(text).isAbsolute())
             return false;
@@ -245,12 +250,22 @@ bool Application::definitely_removed(const app_record &record, const QStringList
     };
     if (kind == "steam") {
         const auto source = record.discovery_source;
-        return QFileInfo(source).fileName() == "appmanifest_" + record.path + ".acf" &&
-               absent_on_local_volume(source) && absent_on_local_volume(record.installation_directory);
+        if (QFileInfo(source).fileName() == "appmanifest_" + record.path + ".acf" &&
+            absent_on_local_volume(source) && absent_on_local_volume(record.installation_directory))
+            return QCoreApplication::translate("XLibrary", "Steam manifest and installation folder are missing on the verified local drive: %1; %2")
+                .arg(QDir::toNativeSeparators(source), QDir::toNativeSeparators(record.installation_directory));
+        return {};
     }
-    if (kind == "desktop")
-        return absent_on_local_volume(record.path) && absent_on_local_volume(record.executable_path);
-    return absent_on_local_volume(record.path);
+    if (kind == "desktop") {
+        if (absent_on_local_volume(record.path) && absent_on_local_volume(record.executable_path))
+            return QCoreApplication::translate("XLibrary", "Desktop entry and executable are missing on the verified local drive: %1; %2")
+                .arg(QDir::toNativeSeparators(record.path), QDir::toNativeSeparators(record.executable_path));
+        return {};
+    }
+    if (absent_on_local_volume(record.path))
+        return QCoreApplication::translate("XLibrary", "Application file is missing on the verified local drive: %1")
+            .arg(QDir::toNativeSeparators(record.path));
+    return {};
 }
 
 namespace {

@@ -61,7 +61,8 @@ void show_catalog_review(const ui_context &context) {
     auto *table = new QTableWidget(static_cast<int>(records.size()), 5);
     table->setObjectName("catalog_review_table");
     table->setHorizontalHeaderLabels(
-        {QCoreApplication::translate("XLibrary", "Name"), QCoreApplication::translate("XLibrary", "Source"),
+        {QCoreApplication::translate("XLibrary", "Name"),
+         removal ? QCoreApplication::translate("XLibrary", "Reason for removal") : QCoreApplication::translate("XLibrary", "Source"),
          QCoreApplication::translate("XLibrary", "Target"), QCoreApplication::translate("XLibrary", "Launch arguments"),
          QCoreApplication::translate("XLibrary", "Working directory")});
     table->setEditTriggers(QAbstractItemView::NoEditTriggers);
@@ -72,11 +73,15 @@ void show_catalog_review(const ui_context &context) {
     table->setColumnWidth(0, appearance::scaled(*context.settings, 220));
     table->setColumnWidth(1, appearance::scaled(*context.settings, 160));
     table->setColumnWidth(2, appearance::scaled(*context.settings, 250));
-    if (scan) {
+    if (scan || removal) {
         table->setColumnHidden(1, true);
         table->setColumnHidden(3, true);
         table->setColumnHidden(4, true);
         table->horizontalHeader()->setSectionResizeMode(2, QHeaderView::Stretch);
+    }
+    if (removal) {
+        table->setColumnHidden(1, false);
+        table->setColumnWidth(1, appearance::scaled(*context.settings, 300));
     }
     QSet<QString> known;
     for (const auto &record : service->catalog().applications)
@@ -88,11 +93,11 @@ void show_catalog_review(const ui_context &context) {
         auto *name = new QTableWidgetItem(record.name);
         name->setFlags(name->flags() | Qt::ItemIsUserCheckable);
         name->setCheckState(Qt::Checked);
-        if (duplicate)
+        if (duplicate && !removal)
             name->setToolTip(
                 QCoreApplication::translate("XLibrary", "This launch configuration is already in the library."));
         table->setItem(row, 0, name);
-        const QStringList values{record.discovery_source.isEmpty()
+        const QStringList values{removal ? record.removal_reason : record.discovery_source.isEmpty()
                                      ? QCoreApplication::translate("XLibrary", "JSON catalog")
                                      : record.discovery_source,
                                  QDir::toNativeSeparators(Application::application_path(record)), record.arguments,

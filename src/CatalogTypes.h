@@ -60,6 +60,8 @@ struct app_record {
     QStringList discovery_sources;
     qint64 last_launch = 0;
     qint64 launch_count = 0;
+    // Transient inventory evidence; never persisted as application metadata.
+    QString removal_reason;
 };
 
 struct usage_record {

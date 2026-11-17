@@ -39,6 +39,8 @@ public:
     static bool target_available(const app_record &record);
     static bool definitely_removed(const app_record &record, const QStringList &known_volume_roots,
                                    const QVariantMap &verified_locations);
+    static QString removal_reason(const app_record &record, const QStringList &known_volume_roots,
+                                  const QVariantMap &verified_locations);
     static bool requires_fresh_launch(const app_record &record);
     static QString configured_arguments(const app_record &record);
     static bool valid_launch_profile_id(const QString &profile);

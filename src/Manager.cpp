@@ -791,9 +791,12 @@ void Manager::review_inventory(const QVector<app_record> &records, const QVector
             throw DiscoveryCancelled();
         if (complete && monitor_state == operation_state::ready &&
             !last_running.contains(normalized_path(Application::process_path(record))) &&
-            !found.contains(Application::launch_key(record)) &&
-            Application::definitely_removed(record, known_volume_roots, verified_locations))
-            removed.append(record);
+            !found.contains(Application::launch_key(record))) {
+            auto candidate = record;
+            candidate.removal_reason = Application::removal_reason(record, known_volume_roots, verified_locations);
+            if (!candidate.removal_reason.isEmpty())
+                removed.append(std::move(candidate));
+        }
     }
     defer_result = true;
     emit inventory_ready(request_id, records, removed, issues);

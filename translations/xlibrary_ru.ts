@@ -4,6 +4,22 @@
 <context>
     <name>XLibrary</name>
     <message>
+        <source>Reason for removal</source>
+        <translation>Причина удаления</translation>
+    </message>
+    <message>
+        <source>Steam manifest and installation folder are missing on the verified local drive: %1; %2</source>
+        <translation>На проверенном локальном диске отсутствуют манифест Steam и папка установки: %1; %2</translation>
+    </message>
+    <message>
+        <source>Desktop entry and executable are missing on the verified local drive: %1; %2</source>
+        <translation>На проверенном локальном диске отсутствуют desktop-файл и исполняемый файл: %1; %2</translation>
+    </message>
+    <message>
+        <source>Application file is missing on the verified local drive: %1</source>
+        <translation>На проверенном локальном диске отсутствует файл приложения: %1</translation>
+    </message>
+    <message>
         <source>XLibrary is now Fora.Deck. Your library and settings have been preserved.</source>
         <translation>XLibrary теперь Fora.Deck. Ваша библиотека и настройки сохранены.</translation>
     </message>
