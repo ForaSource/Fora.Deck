@@ -138,6 +138,9 @@ When an unavailable source returns on the recorded local volume, only that sourc
 local drives are scanned to the depth selected by Basic/Full mode. Other sources and their timestamps are retained.
 This recovery can run before the regular six-hour refresh. It does not monitor every file change.
 An unrelated volume at the same mount path remains unavailable until a manual refresh explicitly indexes it.
+On Linux, source identity uses the filesystem UUID and subvolume where exposed by the system.
+Without an exposed UUID, cached deletions are kept conservatively and source identity is limited to the current boot;
+use a manual refresh after reboot if the source is reported unavailable.
 Indexing and querying use separate background workers: the rest of the application and searches remain available.
 Index progress does not replace the visible results; discovered files appear on the next query.
 

@@ -1,5 +1,6 @@
 #ifndef _WIN32
 #include <sys/stat.h>
+#include <sys/vfs.h>
 #endif
 #include <algorithm>
 #include <deque>
@@ -132,7 +133,25 @@ QStringList volume_identity(const QString &path) {
     const QStorageInfo volume(path);
     if (!volume.isValid() || !volume.isReady() || !local_volume(volume))
         return {};
+#ifdef Q_OS_WIN
     return {identity(volume.rootPath()), QString::fromLatin1(volume.device().toHex())};
+#else
+    // Unix device names can be reused for another drive. Prefer the filesystem UUID and subvolume.
+    const auto device = QFileInfo(QString::fromUtf8(volume.device())).canonicalFilePath();
+    const auto subvolume = QString::fromLatin1(volume.subvolume().toHex());
+    if (!device.isEmpty())
+        for (const auto &entry : QDir("/dev/disk/by-uuid").entryInfoList(QDir::Files | QDir::System))
+            if (entry.canonicalFilePath() == device)
+                return {identity(volume.rootPath()), "uuid:" + entry.fileName() + ':' + subvolume};
+    // Filesystems without an exposed UUID remain usable, but never justify destructive cache pruning.
+    struct statfs filesystem {};
+    QFile boot_id("/proc/sys/kernel/random/boot_id");
+    if (::statfs(QFile::encodeName(path).constData(), &filesystem) != 0 || !boot_id.open(QIODevice::ReadOnly))
+        return {};
+    const auto filesystem_id = QByteArray(reinterpret_cast<const char *>(&filesystem.f_fsid), sizeof(filesystem.f_fsid)).toHex();
+    return {identity(volume.rootPath()), "session:" + QString::fromUtf8(boot_id.readAll().trimmed()) + ':' +
+        QString::fromLatin1(volume.device().toHex()) + ':' + QString::fromLatin1(filesystem_id) + ':' + subvolume};
+#endif
 }
 }
 
@@ -179,12 +198,16 @@ QStringList FileManager::volume_roots() {
     return roots;
 }
 
+bool FileManager::can_open(const QString &path, const QString &volume_root, const QString &volume_device) {
+    return (volume_root.isEmpty() || volume_identity(path) == QStringList{volume_root, volume_device}) && accepts_file(path);
+}
+
 FileManager::FileManager(const QString &directory, const QStringList &saved_paths, QObject *parent) : QObject(parent) {
     database_path = QDir(directory).filePath("file-index.sqlite");
     scan_pool.setMaxThreadCount(1);
     query_pool.setMaxThreadCount(1);
     refresh.setSingleShot(true);
-    connect(&refresh, &QTimer::timeout, this, &FileManager::rescan);
+    connect(&refresh, &QTimer::timeout, this, [this] { if (is_enabled() && !scanning) start_scan(); });
     source_poll.setInterval(30000);
     connect(&source_poll, &QTimer::timeout, this, &FileManager::check_sources);
     progress_timer.setInterval(1000);
@@ -248,6 +271,7 @@ void FileManager::shutdown() {
     source_poll.stop();
     progress_timer.stop();
     rescan_pending = false;
+    pending_volume_change = false;
     ++*scan_generation;
     ++*query_generation;
     scan_pool.clear();
@@ -320,6 +344,7 @@ QString FileManager::diagnostics_text() const {
 void FileManager::configure(const file_search_mode selected_mode, const QStringList &roots,
                             const QStringList &exclusions) {
     mode = selected_mode;
+    pending_volume_change = false;
     const auto normalized_paths = [](const QStringList &paths) {
         QStringList result;
         for (const auto &path : paths) {
@@ -391,13 +416,14 @@ void FileManager::rescan() {
         return;
     if (scanning) {
         rescan_pending = true;
+        pending_volume_change = true;
         return;
     }
-    start_scan();
+    start_scan({}, true);
 }
 
 void FileManager::check_sources() {
-    if (!is_enabled() || scanning || checking_sources || source_states.isEmpty())
+    if (!is_enabled() || scanning || checking_sources)
         return;
     checking_sources = true;
     struct probe_result {
@@ -461,7 +487,7 @@ void FileManager::check_sources() {
         }));
 }
 
-void FileManager::start_scan(const QStringList &only_roots) {
+void FileManager::start_scan(const QStringList &only_roots, const bool allow_volume_change) {
     refresh.stop();
     rescan_pending = false;
     scanning = true;
@@ -488,8 +514,11 @@ void FileManager::start_scan(const QStringList &only_roots) {
             }
             emit status_changed();
         }
-        if (rescan_pending)
-            start_scan();
+        if (rescan_pending) {
+            const auto allow_change = pending_volume_change;
+            pending_volume_change = false;
+            start_scan({}, allow_change);
+        }
         else if (expected == scan_generation->load() && !result.second && is_enabled())
             refresh.start(refresh_interval_ms);
         else
@@ -501,7 +530,7 @@ void FileManager::start_scan(const QStringList &only_roots) {
     watcher->setFuture(QtConcurrent::run(
         &scan_pool,
         [path = database_path, scope = scope, requested_roots, selected_mode, exclusions, generation = scan_generation,
-         expected, count = indexed, only_roots]() -> scan_result {
+         expected, count = indexed, only_roots, allow_volume_change]() -> scan_result {
             const auto roots = volume_roots();
             QStringList blocked_mounts;
             for (const auto &volume : QStorageInfo::mountedVolumes())
@@ -542,25 +571,88 @@ void FileManager::start_scan(const QStringList &only_roots) {
                     for (const auto &root : roots)
                         if (!source_roots.contains(root))
                             source_roots.insert(root, 1);
-                // Retain sources that disappeared from the mounted-volume inventory.
-                xlibrary::SqliteStatement previous_sources(db.get(), "SELECT root,depth FROM index_sources WHERE scope=?");
-                previous_sources.bind(1, scope);
-                while (previous_sources.next())
-                    if (!source_roots.contains(previous_sources.qtext(0)))
-                        source_roots.insert(previous_sources.qtext(0), static_cast<int>(previous_sources.number(1)));
+                QHash<QString, QStringList> known_volumes;
+                // A scope edit must not discard offline volumes that still belong to Basic/Full mode.
+                xlibrary::SqliteStatement previous_sources(db.get(),
+                    "SELECT root,depth,volume_root,volume_device,scope FROM index_sources ORDER BY attempted DESC");
+                while (previous_sources.next()) {
+                    const auto root = previous_sources.qtext(0);
+                    const QStringList volume{previous_sources.qtext(2), previous_sources.qtext(3)};
+                    if (!volume[0].isEmpty()) {
+                        if (!known_volumes.contains(root))
+                            known_volumes.insert(root, volume);
+                        if (!known_volumes.contains(volume[0]))
+                            known_volumes.insert(volume[0], volume);
+                        if (!source_roots.contains(volume[0]))
+                            source_roots.insert(volume[0], selected_mode == file_search_mode::basic ? 1 : -1);
+                    }
+                    if (previous_sources.qtext(4) == scope && !source_roots.contains(root))
+                        source_roots.insert(root, static_cast<int>(previous_sources.number(1)));
+                }
+                xlibrary::SqliteStatement cached_volumes(db.get(), "SELECT volume_root,volume_device FROM files "
+                    "WHERE volume_root<>'' GROUP BY volume_root,volume_device ORDER BY MAX(seen) DESC");
+                while (cached_volumes.next()) {
+                    const auto root = cached_volumes.qtext(0);
+                    if (!known_volumes.contains(root))
+                        known_volumes.insert(root, QStringList{root, cached_volumes.qtext(1)});
+                    if (!source_roots.contains(root))
+                        source_roots.insert(root, selected_mode == file_search_mode::basic ? 1 : -1);
+                }
                 for (auto it = source_roots.begin(); it != source_roots.end();) {
                     if (excluded_path(exclusions, it.key()) || (!only_roots.isEmpty() && !only_roots.contains(it.key())))
                         it = source_roots.erase(it);
                     else
                         ++it;
                 }
+                const auto in_scope = [&](const QString &file_path) {
+                    if (excluded_path(exclusions, file_path))
+                        return false;
+                    for (auto it = source_roots.cbegin(); it != source_roots.cend(); ++it) {
+                        if (!contains_path(it.key(), file_path))
+                            continue;
+                        const auto relative = file_path.mid(it.key().size() + (it.key().endsWith('/') ? 0 : 1));
+                        if (it.value() < 0 || relative.count('/') <= it.value())
+                            return true;
+                    }
+                    return false;
+                };
+                if (only_roots.isEmpty()) {
+                    QStringList retained;
+                    QStringList excluded;
+                    xlibrary::SqliteStatement old_files(db.get(), "SELECT path FROM files WHERE scope<>?");
+                    old_files.bind(1, scope);
+                    while (old_files.next() && !cancelled())
+                        (in_scope(old_files.qtext(0)) ? retained : excluded).append(old_files.qtext(0));
+                    xlibrary::sqlite_execute(db.get(), "BEGIN IMMEDIATE");
+                    for (const auto &file_path : retained) {
+                        xlibrary::SqliteStatement move(db.get(), "UPDATE files SET scope=? WHERE path=?");
+                        move.bind(1, scope);
+                        move.bind(2, file_path);
+                        move.next();
+                    }
+                    for (const auto &file_path : excluded) {
+                        xlibrary::SqliteStatement remove(db.get(), "DELETE FROM files WHERE path=? AND NOT EXISTS(SELECT 1 FROM saved WHERE saved.path=files.path)");
+                        remove.bind(1, file_path);
+                        remove.next();
+                    }
+                    xlibrary::sqlite_execute(db.get(), cancelled() ? "ROLLBACK" : "COMMIT");
+                    if (cancelled())
+                        return {QCoreApplication::translate("XLibrary", "File indexing cancelled"), 0};
+                }
+                QSet<QString> changed_volumes;
+                if (!allow_volume_change)
+                    for (auto it = known_volumes.cbegin(); it != known_volumes.cend(); ++it)
+                        if (volume_identity(it.key()) != it.value())
+                            changed_volumes.insert(it.key());
                 for (auto it = source_roots.cbegin(); it != source_roots.cend(); ++it) {
-                    xlibrary::SqliteStatement begin_source(db.get(), "INSERT INTO index_sources VALUES(?,?,?,'','',?,0,'needs_refresh','[]') "
+                    xlibrary::SqliteStatement begin_source(db.get(), "INSERT INTO index_sources VALUES(?,?,?,?,?,?,0,'needs_refresh','[]') "
                         "ON CONFLICT(scope,root) DO UPDATE SET state='needs_refresh',attempted=excluded.attempted");
                     begin_source.bind(1, scope);
                     begin_source.bind(2, it.key());
                     begin_source.bind(3, it.value());
-                    begin_source.bind(4, seen);
+                    begin_source.bind(4, known_volumes.value(it.key()).value(0));
+                    begin_source.bind(5, known_volumes.value(it.key()).value(1));
+                    begin_source.bind(6, seen);
                     begin_source.next();
                 }
                 const auto add_root = [&](const QString &root, const int depth) {
@@ -608,6 +700,13 @@ void FileManager::start_scan(const QStringList &only_roots) {
                     const auto [directory, remaining_depth] = std::move(pending.front());
                     pending.pop_front();
                     const auto directory_path = identity(directory);
+                    if (std::any_of(changed_volumes.cbegin(), changed_volumes.cend(), [&](const auto &root) {
+                            return contains_path(root, directory_path);
+                        })) {
+                        unavailable_directories.insert(directory_path);
+                        ++skipped;
+                        continue;
+                    }
                     if (std::any_of(blocked_mounts.cbegin(), blocked_mounts.cend(), [&](const auto &mount) {
                             if (!contains_path(mount, directory_path))
                                 return false;
@@ -617,8 +716,6 @@ void FileManager::start_scan(const QStringList &only_roots) {
                                        contains_path(root, directory_path);
                             });
                         })) {
-                        unavailable_directories.insert(directory_path);
-                        ++skipped;
                         continue;
                     }
                     if (batch_age.elapsed() > 100)
@@ -689,11 +786,20 @@ void FileManager::start_scan(const QStringList &only_roots) {
                         const auto file_path = stale.qtext(0);
                         const auto parent = identity(QFileInfo(file_path).absolutePath());
                         const QStringList previous_volume{stale.qtext(2), stale.qtext(3)};
+                        std::error_code absence_error;
+                        const auto file_status = std::filesystem::symlink_status(filesystem_path(file_path), absence_error);
+                        const bool absent = file_status.type() == std::filesystem::file_type::not_found &&
+                            (!absence_error || absence_error == std::errc::no_such_file_or_directory);
                         if (completed_directories.contains(parent) && !current_volumes.contains(parent))
                             current_volumes.insert(parent, volume_identity(parent));
-                        if ((only_roots.isEmpty() && stale.qtext(1) != scope) ||
-                            (!previous_volume[0].isEmpty() && completed_directories.value(parent) == previous_volume &&
-                             current_volumes.value(parent) == previous_volume))
+                        const bool stable_volume =
+#ifdef Q_OS_WIN
+                            !previous_volume[1].isEmpty();
+#else
+                            previous_volume[1].startsWith("uuid:");
+#endif
+                        if (absent && stable_volume && !previous_volume[0].isEmpty() && completed_directories.value(parent) == previous_volume &&
+                             current_volumes.value(parent) == previous_volume)
                             obsolete.append(file_path);
                     }
                 }
@@ -710,7 +816,9 @@ void FileManager::start_scan(const QStringList &only_roots) {
                     QJsonArray issues;
                     QStringList paths;
                     for (const auto &directory : unavailable_directories)
-                        if (contains_path(it.key(), directory))
+                        if (contains_path(it.key(), directory) && (it.value() < 0 ||
+                            directory.mid(it.key().size() + (it.key().endsWith('/') ? 0 : 1)).count('/') < it.value() ||
+                            directory == it.key()))
                             paths.append(directory);
                     paths.sort();
                     for (const auto &directory : paths)
@@ -894,6 +1002,8 @@ void FileManager::search(const QString &text, const quint64 request, QObject *re
                         match.favorite = favorite;
                         match.extension = QFileInfo(name).suffix().toCaseFolded();
                         match.added = rows.number(3);
+                        match.volume_root = rows.qtext(4);
+                        match.volume_device = rows.qtext(5);
                         match.depth = static_cast<int>(file_path.count('/'));
                         for (int location = 0; location < preferred.size(); ++location)
                             if (!preferred[location].isEmpty() && file_path.startsWith(preferred[location] + '/')) {

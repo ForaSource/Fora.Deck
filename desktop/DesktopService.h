@@ -103,6 +103,8 @@ private:
     QString library_file;
     qint64 selected_id = 0;
     QString selected_file_path;
+    QString selected_file_volume_root;
+    QString selected_file_volume_device;
     QString current_section = "library";
     QStringList current_tags;
     bool files_selected = false;
@@ -170,7 +172,10 @@ public:
     qint64 selection() const { return selected_id; }
     const app_record *selected() const { return model.find(selected_id); }
     const QString &selected_file() const { return selected_file_path; }
-    void select_file(const QString &path);
+    void select_file(const QString &path, const QString &volume_root = {}, const QString &volume_device = {});
+    bool selected_file_available() const {
+        return FileManager::can_open(selected_file_path, selected_file_volume_root, selected_file_volume_device);
+    }
     const catalog_snapshot &catalog() const { return snapshot; }
     const QVector<qint64> &selections() const { return selected_ids; }
     void select_applications(const QVector<qint64> &ids);

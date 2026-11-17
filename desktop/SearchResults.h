@@ -40,6 +40,8 @@ struct search_entry {
     QString extension{};
     qint64 added = 0;
     bool available = true;
+    QString volume_root{};
+    QString volume_device{};
 };
 
 namespace search_results {

@@ -476,10 +476,12 @@ void DesktopService::select(const qint64 id) {
     }
 }
 
-void DesktopService::select_file(const QString &path) {
-    if (selected_file_path == path)
+void DesktopService::select_file(const QString &path, const QString &volume_root, const QString &volume_device) {
+    if (selected_file_path == path && selected_file_volume_root == volume_root && selected_file_volume_device == volume_device)
         return;
     selected_file_path = path;
+    selected_file_volume_root = volume_root;
+    selected_file_volume_device = volume_device;
     emit file_selection_changed();
 }
 

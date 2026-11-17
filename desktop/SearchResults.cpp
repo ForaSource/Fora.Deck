@@ -211,7 +211,8 @@ SearchResults::SearchResults(DesktopService &service, QLineEdit &input, const bo
         const auto *entry = row >= 0 && row < results->entries.size() ? &results->entries[row] : nullptr;
         this->service.select_file(entry && (entry->type == search_entry::kind::file ||
                                             entry->type == search_entry::kind::working_file)
-                                      ? entry->path : QString{});
+                                      ? entry->path : QString{}, entry ? entry->volume_root : QString{},
+                                      entry ? entry->volume_device : QString{});
     });
     results->favorite_changed = [this](const search_entry &entry, const bool favorite) {
         if (!isEnabled() || this->service.profile_busy() || this->service.restart_required() ||
@@ -532,6 +533,8 @@ void SearchResults::update_entries() {
         entries.last().extension = match.extension;
         entries.last().added = match.added;
         entries.last().available = match.available;
+        entries.last().volume_root = match.volume_root;
+        entries.last().volume_device = match.volume_device;
     }
     replace_entries(std::move(entries));
 }
@@ -574,7 +577,8 @@ void SearchResults::activate_current() {
     } else if (entry.type == search_entry::kind::application) {
         pending_launch = service.request_launch(entry.application_id);
     } else if ((entry.type == search_entry::kind::file || entry.type == search_entry::kind::working_file)) {
-        if (!entry.available || (entry.type == search_entry::kind::working_file && !FileManager::accepts_file(entry.path))) {
+        if (!entry.available || (entry.type == search_entry::kind::working_file &&
+            !FileManager::can_open(entry.path, entry.volume_root, entry.volume_device))) {
             service.notify(QCoreApplication::translate("XLibrary", "The file is unavailable or its type is excluded."));
             update_query();
             return;
@@ -603,7 +607,8 @@ void SearchResults::show_actions() {
         open->setEnabled(entry.available);
         connect(open, &QAction::triggered, this,
                 [this, entry] {
-                    if (!entry.available || (entry.type == search_entry::kind::working_file && !FileManager::accepts_file(entry.path))) {
+                    if (!entry.available || (entry.type == search_entry::kind::working_file &&
+                        !FileManager::can_open(entry.path, entry.volume_root, entry.volume_device))) {
                         service.notify(QCoreApplication::translate("XLibrary",
                                                                    "The file is unavailable or its type is excluded."));
                         return;

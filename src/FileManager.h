@@ -31,6 +31,8 @@ struct file_match {
     qint64 size = -1;
     QString extension{};
     qint64 added = 0;
+    QString volume_root{};
+    QString volume_device{};
 };
 Q_DECLARE_METATYPE(QVector<file_match>)
 
@@ -70,11 +72,12 @@ class FileManager : public QObject {
     bool scanning = false;
     int pending_saves = 0;
     bool rescan_pending = false;
+    bool pending_volume_change = false;
     QString state;
     qint64 last_refresh = 0;
     QVector<file_index_source> source_states;
     void load_source_states();
-    void start_scan(const QStringList &only_roots = {});
+    void start_scan(const QStringList &only_roots = {}, bool allow_volume_change = false);
     void check_sources();
     void schedule_refresh();
 
@@ -111,6 +114,7 @@ public:
     QString diagnostics_text() const;
     const QVector<file_index_source> &sources() const { return source_states; }
     static bool accepts_file(const QString &path);
+    static bool can_open(const QString &path, const QString &volume_root = {}, const QString &volume_device = {});
     static QStringList volume_roots();
 signals:
     void changed();

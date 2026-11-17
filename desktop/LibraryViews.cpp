@@ -1701,7 +1701,7 @@ QWidget *details(const ui_context &context, QWidget *const parent) {
         const auto selected_path = service->selected_file();
         if (selected_path.isEmpty() || service->profile_busy() || service->restart_required())
             return;
-        if (!FileManager::accepts_file(selected_path) || !desktop_platform::open_url(QUrl::fromLocalFile(selected_path)))
+        if (!service->selected_file_available() || !desktop_platform::open_url(QUrl::fromLocalFile(selected_path)))
             service->notify(QCoreApplication::translate("XLibrary", "Could not open the file."));
         else
             service->record_file_use(selected_path);
@@ -1743,7 +1743,7 @@ QWidget *details(const ui_context &context, QWidget *const parent) {
         load_association();
         if (!selected_path.isEmpty()) {
             const QFileInfo info(selected_path);
-            const bool available = info.isFile();
+            const bool available = service->selected_file_available();
             const auto mime = QMimeDatabase{}.mimeTypeForFile(info, QMimeDatabase::MatchExtension);
             file_name->setText(info.fileName());
             file_status->setText(available ? info.suffix().toUpper() : QCoreApplication::translate("XLibrary", "Unavailable"));
