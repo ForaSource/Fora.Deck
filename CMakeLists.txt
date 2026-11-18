@@ -234,6 +234,8 @@ qt_add_resources(XLibrary application_images
         PREFIX "/"
         FILES assets/xlibrary.ico
         assets/checkbox-check.png
+        assets/checkbox-mixed.png
+        assets/combobox-chevron.png
         assets/fonts/inter-regular.ttf
         assets/fonts/inter-medium.ttf
         assets/fonts/inter-semibold.ttf

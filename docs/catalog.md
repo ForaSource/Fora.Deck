@@ -35,7 +35,10 @@ Windows additionally excludes removable and network drives from automatic remova
 Steam removal requires both manifest and installation folder to be missing; a missing Linux desktop entry also needs its recorded executable to be missing.
 Confirmed uninstall removal supports undo and does not prevent a later reinstall from being discovered.
 
-Availability refreshes can mark an entry unavailable without deleting it. For moved targets, use [path recovery](profile.md#moved-applications).
+**Automatically remove unavailable applications without icons** is a separate **Settings → Library** option, enabled by default.
+During startup and manual scans it removes unavailable catalog entries whose icon is missing, including stale Windows app entries.
+Running applications and entries marked **Drive unavailable** are kept. The removal supports undo and allows later rediscovery.
+Availability refreshes only update statuses. For moved targets, use [path recovery](profile.md#moved-applications).
 
 ## Duplicates and scan reports
 
@@ -44,7 +47,7 @@ of unavailable applications, entries on unavailable drives, pending removal cand
 recorded during this session. A successful launch clears that application's failure. The dialog also shows
 the last operation error in this session, per-source file index diagnostics and the last discovery report.
 Use **Refresh availability**, **Locate application…**, **Recover moved folder…** or **Refresh file index**
-from the overview. Missing files are retained unless the separate removal checks confirm an uninstall.
+from the overview. Automatic cleanup runs during application scans.
 
 Open **Last scan details** in the library or **Settings → Library** to read or copy the most recent report.
 It separates additions, duplicates, skipped entries, and errors.
@@ -87,9 +90,11 @@ unused tags, saved filter records, saved file paths, and usage history.
 ## Bulk editing and removal
 
 Use Ctrl/Shift to select several library entries in the list or cards. With two or more selected entries,
-the footer replaces keyboard hints with the count, bulk editing, removal and clearing the selection.
-Bulk editing changes tags and favorites.
-Mixed values stay unchanged until explicitly checked or unchecked.
+the footer shows the count and actions for tags, removal and clearing the selection.
+Open **Tags** from the footer or the application's context menu. Check tags to assign them, uncheck tags to remove them,
+or enter new tags separated by commas. A dash marks a tag assigned to only some of the selected applications.
+Leave the dash in place to keep those assignments. Choose **Save** to apply changes.
+Use the **Favorites** submenu to add or remove all selected applications from favorites.
 
 Removal confirms the entry count and deletes catalog entries only. **Undo removal** restores the last deletion in the current session,
 including metadata and scenario steps. Undo is available from **Library actions** after the notification disappears,

@@ -74,6 +74,17 @@ QIcon LibraryModel::fallback_icon(const QString &kind) const {
     return icon;
 }
 
+QIcon LibraryModel::application_icon(const app_record &record) const {
+    return application_icon(record, icon_cache_key(record), Application::target_kind(record));
+}
+
+QIcon LibraryModel::application_icon(const app_record &record, const QString &key, const QString &kind) const {
+    if (const auto *icon = icons.object(key))
+        return icon->isNull() ? fallback_icon(kind) : *icon;
+    request_icon(record, key);
+    return fallback_icon(kind);
+}
+
 QIcon LibraryModel::file_icon(const QString &path, const qint64 modified, const qint64 size) const {
     const auto normalized = normalized_path(path);
     // File metadata is collected by the query worker, never by the paint/data path.
@@ -121,7 +132,7 @@ void LibraryModel::request_icon(const app_record &record, const QString &key) co
     // System icon engines use QPixmap and must run on the GUI thread.
     if (!image_file && !document_file) {
         QTimer::singleShot(0, self, [self, key, path] {
-            const auto image = desktop_platform::application_icon(path);
+            const auto image = QFileInfo(path).isFile() ? desktop_platform::application_icon(path) : QImage{};
             self->store_icon(key, image);
         });
         return;
@@ -149,7 +160,9 @@ void LibraryModel::request_icon(const app_record &record, const QString &key) co
 #endif
             return image;
         }
-        return image_file ? QImage(path) : desktop_platform::application_icon(path);
+        if (image_file)
+            return QImage(path);
+        return QFileInfo(path).isFile() ? desktop_platform::application_icon(path) : QImage{};
     }));
 }
 
@@ -172,12 +185,8 @@ QVariant LibraryModel::data(const QModelIndex &index, const int requested_role) 
         return record.name + '\n' + QDir::toNativeSeparators(Application::application_path(record)) +
                (process_usage(record).isEmpty() ? QString{} : '\n' + process_usage(record));
     case Qt::DecorationRole:
-        if (index.column() == 0) {
-            if (const auto *icon = icons.object(icon_keys[index.row()]))
-                return icon->isNull() ? fallback_icon(icon_kinds[index.row()]) : *icon;
-            request_icon(record, icon_keys[index.row()]);
-            return fallback_icon(icon_kinds[index.row()]);
-        }
+        if (index.column() == 0)
+            return application_icon(record, icon_keys[index.row()], icon_kinds[index.row()]);
         return {};
     case id_role:
         return record.id;

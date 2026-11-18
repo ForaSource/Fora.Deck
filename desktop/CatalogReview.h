@@ -4,6 +4,6 @@
 #include "UiRegistry.h"
 
 void show_catalog_review(const ui_context &context);
-void show_bulk_editor(const ui_context &context);
+void show_application_tags(const ui_context &context);
 
 #endif

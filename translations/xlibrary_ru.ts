@@ -497,7 +497,39 @@
     </message>
     <message>
         <source>Application file or shortcut</source>
-        <translation type="vanished">Файл приложения или ярлык</translation>
+        <translation>Файл приложения или ярлык</translation>
+    </message>
+    <message>
+        <source>Choose file…</source>
+        <translation>Выбрать файл…</translation>
+    </message>
+    <message>
+        <source>Or paste a file path</source>
+        <translation>Или вставьте путь к файлу</translation>
+    </message>
+    <message>
+        <source>Paste the full path or use Choose file…</source>
+        <translation>Вставьте полный путь или нажмите «Выбрать файл…».</translation>
+    </message>
+    <message>
+        <source>Filled in from the file</source>
+        <translation>Подставится из файла</translation>
+    </message>
+    <message>
+        <source>More options</source>
+        <translation>Дополнительные параметры</translation>
+    </message>
+    <message>
+        <source>Launch settings</source>
+        <translation>Параметры запуска</translation>
+    </message>
+    <message>
+        <source>Launch type</source>
+        <translation>Тип запуска</translation>
+    </message>
+    <message>
+        <source>In the library</source>
+        <translation>В библиотеке</translation>
     </message>
     <message>
         <source>Name</source>
@@ -874,6 +906,14 @@
     <message>
         <source>No tags</source>
         <translation>Нет тегов</translation>
+    </message>
+    <message>
+        <source>No matching tags</source>
+        <translation>Подходящих тегов нет</translation>
+    </message>
+    <message>
+        <source>A dash means the tag is assigned to some selected applications.</source>
+        <translation>Черта означает, что тег назначен только части выбранных приложений.</translation>
     </message>
     <message>
         <source>Arguments: </source>
@@ -2884,6 +2924,18 @@ Technical reason: %3</source>
         <translation>Не удалось сохранить исключения обнаружения.</translation>
     </message>
     <message>
+        <source>Automatically remove unavailable applications without icons</source>
+        <translation>Автоматически удалять недоступные приложения без иконок</translation>
+    </message>
+    <message>
+        <source>Runs at startup and during application scans.</source>
+        <translation>Очистка выполняется при запуске и сканировании приложений.</translation>
+    </message>
+    <message>
+        <source>Removed unavailable applications without icons: %1.</source>
+        <translation>Удалено недоступных приложений без иконок: %1.</translation>
+    </message>
+    <message>
         <source>No new applications found.</source>
         <translation>Новых приложений не найдено.</translation>
     </message>
@@ -2984,8 +3036,8 @@ Technical reason: %3</source>
         <translation>Добавить приложение вручную</translation>
     </message>
     <message>
-        <source>Choose a file and customize its name, tags and launch options.</source>
-        <translation>Выберите файл, задайте название, теги и параметры запуска.</translation>
+        <source>Choose a file or shortcut to add it to your library.</source>
+        <translation>Выберите файл или ярлык, чтобы добавить его в библиотеку.</translation>
     </message>
     <message>
         <source>Choose how to start. You can return to this screen in Settings.</source>

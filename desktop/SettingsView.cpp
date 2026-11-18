@@ -338,6 +338,11 @@ QWidget *library_settings(const ui_context &context, QWidget *) {
                                           "When disabled, confirmed missing applications are removed automatically. "
                                           "Unavailable drives and uncertain targets are kept."),
               "muted"));
+    checkbox(widget, *context.settings, "sources/remove_unavailable_without_icons",
+             QCoreApplication::translate("XLibrary", "Automatically remove unavailable applications without icons"),
+             true);
+    widget->layout()->addWidget(
+        label(QCoreApplication::translate("XLibrary", "Runs at startup and during application scans."), "muted"));
     widget->layout()->addWidget(action_button(context.actions.value("discover")));
     auto *clear_exclusions = button(QCoreApplication::translate("XLibrary", "Reset discovery exclusions"));
     widget->layout()->addWidget(clear_exclusions);

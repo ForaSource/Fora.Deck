@@ -447,17 +447,6 @@ public:
             small.setPixelSize(scaled_size(option, 12));
             painter->setFont(small);
             painter->setPen(option.palette.color(QPalette::PlaceholderText));
-            const auto usage = index.data(LibraryModel::process_usage_role).toString();
-            if (!usage.isEmpty()) {
-                const auto height = QFontMetrics(small).height();
-                painter->drawText(QRect(text_rect.left(), rect.center().y() - height, text_rect.width(), height),
-                                  Qt::AlignVCenter, index.data().toString());
-                painter->drawText(QRect(text_rect.left(), rect.center().y(), text_rect.width(), height),
-                                  Qt::AlignVCenter,
-                                  QFontMetrics(small).elidedText(usage, Qt::ElideRight, text_rect.width()));
-                painter->restore();
-                return;
-            }
             painter->drawText(
                 text_rect, Qt::AlignVCenter,
                 QFontMetrics(small).elidedText(index.data().toString(), Qt::ElideRight, text_rect.width()));
@@ -1312,9 +1301,9 @@ QWidget *library(const ui_context &context, QWidget *const parent) {
     selection_tools->addWidget(selected_count, 1);
     auto *clear_selection = button(QCoreApplication::translate("XLibrary", "Clear selection"));
     selection_tools->addWidget(clear_selection);
-    auto *bulk_edit = action_button(context.actions.value("bulk_edit"));
+    auto *application_tags = action_button(context.actions.value("bulk_edit"));
     auto *bulk_remove = action_button(context.actions.value("remove_application"));
-    selection_tools->addWidget(bulk_edit);
+    selection_tools->addWidget(application_tags);
     selection_tools->addWidget(bulk_remove);
     root->addLayout(selection_tools);
     const auto synchronize_selection = [=] {
@@ -1337,7 +1326,7 @@ QWidget *library(const ui_context &context, QWidget *const parent) {
         clear_selection->setVisible(!ids.isEmpty());
         const bool multiple = ids.size() >= 2;
         selected_count->setVisible(multiple);
-        bulk_edit->setVisible(multiple);
+        application_tags->setVisible(multiple);
         bulk_remove->setVisible(multiple);
         shortcut_hint->setVisible(!multiple);
         details->setVisible(!multiple);
@@ -1893,10 +1882,23 @@ QWidget *details(const ui_context &context, QWidget *const parent) {
 
 QWidget *application_menu(const ui_context &context, QWidget *const parent) {
     auto *menu = new QMenu(parent);
-    for (const auto &id : {"launch", "new_instance", "terminate", "open_folder", "copy_path", "copy_arguments", "favorite",
-                           "edit_application", "bulk_edit", "undo_removal"})
+    for (const auto &id : {"launch", "new_instance", "terminate", "open_folder", "copy_path", "copy_arguments"})
         menu->addAction(context.actions.value(id));
     auto *service = static_cast<DesktopService *>(context.service);
+    const auto ids = service->selections();
+    if (ids.size() > 1) {
+        auto *favorites = menu->addMenu(appearance::icon("favorite"),
+                                        QCoreApplication::translate("XLibrary", "Favorites"));
+        favorites->setEnabled(context.actions.value("favorite")->isEnabled());
+        auto *add = favorites->addAction(QCoreApplication::translate("XLibrary", "Add to favorites"));
+        auto *remove = favorites->addAction(QCoreApplication::translate("XLibrary", "Remove from favorites"));
+        QObject::connect(add, &QAction::triggered, favorites, [=] { service->update_metadata(ids, {}, {}, 1); });
+        QObject::connect(remove, &QAction::triggered, favorites, [=] { service->update_metadata(ids, {}, {}, 0); });
+    } else {
+        menu->addAction(context.actions.value("favorite"));
+    }
+    for (const auto &id : {"edit_application", "bulk_edit", "undo_removal"})
+        menu->addAction(context.actions.value(id));
     if (const auto *record = service->selected()) {
         const auto profiles = service->launch_profiles(*record);
         if (!profiles.isEmpty()) {

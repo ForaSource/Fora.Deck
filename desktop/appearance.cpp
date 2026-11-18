@@ -61,6 +61,15 @@ QIcon appearance::icon(const QString &name, const QColor &requested_color) {
     if (name == "add") {
         painter.drawLine(QPointF(12, 5), QPointF(12, 19));
         painter.drawLine(QPointF(5, 12), QPointF(19, 12));
+    } else if (name == "add_app") {
+        painter.drawRoundedRect(QRectF(2.5, 3.5, 19, 17), 3, 3);
+        painter.drawLine(QPointF(3, 8.5), QPointF(21, 8.5));
+        painter.drawLine(QPointF(9, 14.5), QPointF(15, 14.5));
+        painter.drawLine(QPointF(12, 11.5), QPointF(12, 17.5));
+    } else if (name == "chevron_right") {
+        painter.drawPolyline(QPolygonF{QPointF(9, 6), QPointF(15, 12), QPointF(9, 18)});
+    } else if (name == "chevron_down") {
+        painter.drawPolyline(QPolygonF{QPointF(6, 9), QPointF(12, 15), QPointF(18, 9)});
     } else if (name == "lock" || name == "private") {
         painter.drawRoundedRect(QRectF(5, 10, 14, 11), 2, 2);
         painter.drawArc(QRectF(8, 3, 8, 13), 0, 180 * 16);
@@ -401,6 +410,7 @@ void appearance::apply(const QSettings &settings, const QString &additional_styl
         QLabel[heading="true"] { font-size: %8px; font-weight: 600; }
         QLabel[subheading="true"] { font-size: %9px; font-weight: 600; }
         QLabel[application_title="true"] { font-size: %12px; font-weight: 600; }
+        QLabel#application_icon_preview { background: %5; border: 1px solid %6; border-radius: 8px; }
         QLabel[brand="true"] { font-size: %13px; font-weight: 600; }
         QLabel[caption="true"] { color: %4; font-size: %14px; }
         QPushButton, QToolButton { background: %5; border: 2px solid transparent; border-radius: 8px; padding: 6px 10px; min-height: %10px; }
@@ -416,6 +426,9 @@ void appearance::apply(const QSettings &settings, const QString &additional_styl
         QPushButton[quiet="true"] { background: transparent; border-color: transparent; text-align: left; }
         QPushButton[quiet="true"]:hover { background: %17; }
         QPushButton[quiet="true"]:checked { background: %7; border-color: transparent; }
+        QPushButton[disclosure="true"] { padding: 4px 2px; }
+        QPushButton[disclosure="true"]:checked { background: transparent; }
+        QPushButton[disclosure="true"]:checked:hover { background: %17; }
         QPushButton[navigation="true"] { background: transparent; border: 2px solid transparent; border-radius: 8px; padding: 8px 10px; min-height: @navigation_height@px; text-align: left; }
         QPushButton[navigation="true"]:hover { background: %17; }
         QPushButton[navigation="true"]:checked { background: %7; border-color: transparent; }
@@ -432,6 +445,9 @@ void appearance::apply(const QSettings &settings, const QString &additional_styl
         QLineEdit#search_input { min-height: @launch_height@px; }
         QLineEdit QToolButton { background: transparent; border: none; border-radius: 0; padding: 0; min-height: 0; }
         QComboBox::drop-down { border: none; width: 24px; }
+        QDialog[fit_content="true"] QComboBox::down-arrow { image: url(:/assets/combobox-chevron.png); width: 0.8em; height: 0.55em; }
+        QDialog[fit_content="true"] QPlainTextEdit#application_aliases { background: %5; border: 2px solid @input_border@; border-radius: 8px; padding: 2px 4px; selection-background-color: %7; }
+        QDialog[fit_content="true"] QPlainTextEdit#application_aliases:focus { border-color: %16; }
         QTabWidget#workspaces_tabs::pane { border: 0; background: transparent; }
         QTabBar#shortcut_tabs::tab, QTabBar#workspace_report_tabs::tab { background: transparent; color: %4; border: 1px solid transparent; border-radius: 8px; padding: 8px 12px; margin-right: 8px; min-height: %10px; }
         QTabBar#shortcut_tabs::tab:last, QTabBar#workspace_report_tabs::tab:last { margin-right: 0; }
@@ -439,12 +455,22 @@ void appearance::apply(const QSettings &settings, const QString &additional_styl
         QTabBar#shortcut_tabs::tab:selected, QTabBar#workspace_report_tabs::tab:selected { color: %1; background: %7; border-color: %16; }
         QTabBar#shortcut_tabs::scroller, QTabBar#workspace_report_tabs::scroller { width: 2em; }
         QTabBar#shortcut_tabs QToolButton, QTabBar#workspace_report_tabs QToolButton { padding: 0; min-width: 0; min-height: 0; border-radius: 6px; }
+        QTabBar#application_options_tabs::tab { background: %5; color: %4; border: 1px solid transparent; border-radius: 8px; padding: 5px 10px; margin-right: 6px; min-height: %10px; }
+        QTabBar#application_options_tabs::tab:hover { color: %1; background: %17; }
+        QTabBar#application_options_tabs::tab:selected { color: %1; background: %7; border-color: %16; }
+        QTabBar#application_options_tabs::scroller { width: 2em; }
+        QTabBar#application_options_tabs QToolButton { padding: 0; min-width: 0; min-height: 0; border-radius: 6px; }
         QAbstractItemView { background: %2; border: none; outline: none; selection-background-color: %7; }
         QAbstractItemView::item { padding: 6px; border: 2px solid transparent; border-radius: 8px; }
         QAbstractItemView::item:hover { background: %17; }
         QAbstractItemView::item:selected { background: %7; color: %1; }
         QAbstractItemView::item:focus { border-color: %16; }
         QListWidget#tag_list { background: transparent; }
+        QListWidget[tag_selector="true"] { background: transparent; }
+        QListWidget[tag_selector="true"]::item { padding: 3px 4px; }
+        QListWidget[tag_selector="true"]::indicator { width: @indicator_size@px; height: @indicator_size@px; border: 1px solid @input_border@; border-radius: 3px; background: %5; }
+        QListWidget[tag_selector="true"]::indicator:checked { background: #F16647; border-color: #F16647; image: url(:/assets/checkbox-check.png); }
+        QListWidget[tag_selector="true"]::indicator:indeterminate { background: #F16647; border-color: #F16647; image: url(:/assets/checkbox-mixed.png); }
         QTreeView#application_list::item { padding: 0; background: transparent; border: none; }
         QTreeView#application_list::item:selected, QTreeView#application_list::item:hover { background: transparent; }
         QHeaderView::section { background: %2; color: %4; border: none; border-bottom: 1px solid %6; padding: 8px 12px; text-align: left; }

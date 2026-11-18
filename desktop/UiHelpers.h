@@ -316,22 +316,24 @@ inline void open_dialog(const QString &id, const ui_context &context) {
     }
     auto *widget = context.registry->create(id, context, context.window);
     if (auto *dialog = qobject_cast<QDialog *>(widget)) {
-        // This limit also applies to dialogs replaced by plugins.
-        const auto available = dialog->screen()->availableGeometry().size() - QSize(32, 64);
-        const auto size_key = "dialogs/" + id + "/size";
-        const auto saved = context.settings->value(size_key).toSize();
-        if (saved.isValid() && !saved.isEmpty())
-            dialog->resize(appearance::scaled(*context.settings, saved.width()),
-                           appearance::scaled(*context.settings, saved.height()));
-        dialog->setMinimumSize(dialog->minimumSize().boundedTo(available));
-        dialog->resize(dialog->size().boundedTo(available));
-        dialog->setSizeGripEnabled(true);
-        QObject::connect(dialog, &QDialog::finished, dialog, [dialog, settings = context.settings, size_key] {
-            if (settings->property("profile_locked").toBool())
-                return;
-            const auto scale = appearance::scaled(*settings, 100) / 100.0;
-            settings->setValue(size_key, QSize(qRound(dialog->width() / scale), qRound(dialog->height() / scale)));
-        });
+        if (!dialog->property("fit_content").toBool()) {
+            // This limit also applies to dialogs replaced by plugins.
+            const auto available = dialog->screen()->availableGeometry().size() - QSize(32, 64);
+            const auto size_key = "dialogs/" + id + "/size";
+            const auto saved = context.settings->value(size_key).toSize();
+            if (saved.isValid() && !saved.isEmpty())
+                dialog->resize(appearance::scaled(*context.settings, saved.width()),
+                               appearance::scaled(*context.settings, saved.height()));
+            dialog->setMinimumSize(dialog->minimumSize().boundedTo(available));
+            dialog->resize(dialog->size().boundedTo(available));
+            dialog->setSizeGripEnabled(true);
+            QObject::connect(dialog, &QDialog::finished, dialog, [dialog, settings = context.settings, size_key] {
+                if (settings->property("profile_locked").toBool())
+                    return;
+                const auto scale = appearance::scaled(*settings, 100) / 100.0;
+                settings->setValue(size_key, QSize(qRound(dialog->width() / scale), qRound(dialog->height() / scale)));
+            });
+        }
         dialog->setAttribute(Qt::WA_DeleteOnClose);
         dialog->setWindowModality(Qt::WindowModal);
         dialog->show();

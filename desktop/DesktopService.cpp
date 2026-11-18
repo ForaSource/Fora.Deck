@@ -1194,10 +1194,14 @@ void DesktopService::discover(const bool at_startup) {
                 watcher->deleteLater();
                 return;
             }
+            const bool remove_without_icons =
+                !is_scenario_active() && settings.value("sources/remove_unavailable_without_icons", true).toBool();
             enqueue(
                 "discover",
-                [records = std::move(result.first), issues = std::move(result.second), cancelled = discovery_cancelled](
-                    Manager &worker) { worker.review_inventory(records, issues, cancelled); },
+                [records = std::move(result.first), issues = std::move(result.second), cancelled = discovery_cancelled,
+                 remove_without_icons](Manager &worker) {
+                    worker.review_inventory(records, issues, cancelled, remove_without_icons);
+                },
                 operation_error_source::filesystem, discovery_request_id);
         } catch (const DiscoveryCancelled &) {
             const auto message = discovery_summary(

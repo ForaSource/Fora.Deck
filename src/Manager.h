@@ -121,7 +121,7 @@ public:
                  operation_error_source source);
     void preview_files(const QStringList &paths, const std::shared_ptr<discovery_control> &cancelled);
     void review_inventory(const QVector<app_record> &records, const QVector<discovery_issue> &issues,
-                          const std::shared_ptr<discovery_control> &cancelled);
+                          const std::shared_ptr<discovery_control> &cancelled, bool remove_without_icons = false);
     void remove_missing_applications(const QVector<app_record> &records,
                                      const std::shared_ptr<discovery_control> &cancelled);
     void apply_catalog_preview(const QVector<app_record> &applications, QVector<discovery_issue> issues,

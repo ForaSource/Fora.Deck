@@ -14,14 +14,18 @@ with English as the fallback. Appearance settings control the theme, text size, 
 
 The library offers **List** and **Cards** views of the same filtered and sorted applications.
 Switching views keeps the selected applications. Use Ctrl/Shift for multiple selection;
-the footer then offers bulk editing, removal and clearing the selection.
+the footer then offers tag assignment, removal and clearing the selection.
 Right-click an application or use its actions menu for launch options and editing.
 **Library actions** contains availability refresh, discovery, the last scan report and undo removal.
-**Add application** opens the editor; its adjacent menu also offers discovery.
+To add an application, choose **Add application → Choose file…**, select a file or shortcut, and click **Add**.
+Fora.Deck suggests a name that you can change. You can also paste a file path and click **Add**.
+Open **More options** for **Launch settings**, including launch arguments and a shortcut key, or choose a target such as a Steam game.
+Use **In the library** to set tags, favorites, or search aliases.
+The menu next to **Add application** offers discovery.
 Settings and quick help are at the bottom of navigation.
 On narrower windows the inspector is hidden; **Details** opens the selected application's dialog.
 
-Search by application name, executable filename, or aliases added in **Edit application**.
+Search by application name, executable filename, or aliases from **Edit application → More options → In the library**.
 Search handles case, repeated spaces, Unicode normalization, initials such as `vsc`, word prefixes,
 limited typo correction, and English/Russian keyboard layout mistakes: `пщщпду` can find `google`.
 
@@ -48,7 +52,7 @@ an unknown exclusion hides nothing. If an app is missing from results, clear the
 ## Running applications
 
 The **Running applications** section lists monitored catalog entries. Running entries show current CPU and RAM
-usage in the list, cards and details. Values refresh about every 2.5 seconds. CPU is a percentage of total logical
+usage in cards, details and tooltips. Values refresh about every 2.5 seconds. CPU is a percentage of total logical
 processor capacity measured between samples; the first reading needs two samples. RAM is the sum of resident
 memory (Windows working sets or Linux RSS) of matching processes; shared pages can be counted more than once.
 An em dash means a measurement is unavailable. Monitoring covers processes matched by the existing application
@@ -93,7 +97,8 @@ inside text fields. Escape clears library search and cannot be reassigned. Dupli
 Built-in global shortcuts require Fora.Deck to be running; Wayland starts with unassigned global bindings.
 
 Application and scenario editors also accept a global hotkey. Their assignments appear in the corresponding keyboard settings tabs.
-The editor shows a persistent-ID command for use with a system shortcut: `XLibrary --launch-id ID` or `XLibrary --scenario-id ID`.
+For a system shortcut, copy the persistent-ID command `XLibrary --launch-id ID` from **Edit application → More options →
+Launch settings** or use `XLibrary --scenario-id ID` from the scenario editor.
 Deleting an application or scenario removes its assignment. Complete profile backups retain assignments.
 
 ## File search and My files

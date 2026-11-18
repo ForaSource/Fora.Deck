@@ -297,8 +297,8 @@ void MainWindow::create_actions() {
         if (const auto *record = service.selected())
             QApplication::clipboard()->setText(record->arguments);
     });
-    add("bulk_edit", QCoreApplication::translate("XLibrary", "Edit selected applications"), "edit",
-        [this] { show_bulk_editor(context); });
+    add("bulk_edit", QCoreApplication::translate("XLibrary", "Tags"), "tag",
+        [this] { show_application_tags(context); });
     add("undo_removal", QCoreApplication::translate("XLibrary", "Undo removal"), "undo",
         [this] { service.undo_removal(); });
     connect(&service, &DesktopService::undo_removal_changed, this, &MainWindow::refresh_actions);
@@ -630,7 +630,7 @@ void MainWindow::show_welcome() {
            QCoreApplication::translate("XLibrary", "Review installed applications and choose what to keep."), "scan",
            [this] { service.discover(); });
     choice(QCoreApplication::translate("XLibrary", "Add an application manually"),
-           QCoreApplication::translate("XLibrary", "Choose a file and customize its name, tags and launch options."),
+           QCoreApplication::translate("XLibrary", "Choose a file or shortcut to add it to your library."),
            "add", [this] { context.actions.value("add_application")->trigger(); });
     choice(QCoreApplication::translate("XLibrary", "Restore my library"),
            QCoreApplication::translate("XLibrary", "Preview and restore a complete .xlprofile backup."), "folder",

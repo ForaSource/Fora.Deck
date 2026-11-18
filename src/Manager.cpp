@@ -2,6 +2,7 @@
 #include <cctype>
 #include <limits>
 #include <QElapsedTimer>
+#include <QImage>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -864,7 +865,7 @@ void Manager::preview_files(const QStringList &paths, const std::shared_ptr<disc
 }
 
 void Manager::review_inventory(const QVector<app_record> &records, const QVector<discovery_issue> &issues,
-                               const std::shared_ptr<discovery_control> &cancelled) {
+                               const std::shared_ptr<discovery_control> &cancelled, const bool remove_without_icons) {
     // Refresh locations and sources only for known configurations; additions still require selection.
     store->refresh_discovery_metadata(records, *cancelled);
     refresh();
@@ -872,22 +873,48 @@ void Manager::review_inventory(const QVector<app_record> &records, const QVector
     for (const auto &record : records)
         found.insert(Application::launch_key(record));
     QVector<app_record> removed;
+    QVector<qint64> automatically_removed;
+    QSet<QString> removed_configurations;
     const bool complete = std::ranges::none_of(
         issues, [](const discovery_issue &issue) { return issue.kind == discovery_issue_kind::error; });
-    for (const auto &record : store->read().applications) {
+    for (const auto &record : std::as_const(catalog.applications)) {
         if (cancelled->requested.load())
             throw DiscoveryCancelled();
-        if (complete && monitor_state == operation_state::ready &&
-            !last_running.contains(normalized_path(Application::process_path(record))) &&
-            !found.contains(Application::launch_key(record))) {
+        if (monitor_state != operation_state::ready || record.running)
+            continue;
+        const auto key = Application::launch_key(record);
+        if (remove_without_icons && !record.available && !record.volume_unavailable) {
+            const auto has_icon = QFileInfo(record.icon_path).isAbsolute()
+                                      ? !QImage(record.icon_path).isNull()
+                                      : QFileInfo(Application::process_path(record)).isFile();
+            if (!has_icon && !Application::target_available(record)) {
+                automatically_removed.append(record.id);
+                removed_configurations.insert(key);
+                continue;
+            }
+        }
+        if (complete && !found.contains(key)) {
             auto candidate = record;
             candidate.removal_reason = Application::removal_reason(record, known_volume_roots, verified_locations);
             if (!candidate.removal_reason.isEmpty())
                 removed.append(std::move(candidate));
         }
     }
+    auto preview = records;
+    if (!automatically_removed.isEmpty()) {
+        auto expected = discovery_phase::running;
+        if (!cancelled->phase.compare_exchange_strong(expected, discovery_phase::committing))
+            throw DiscoveryCancelled();
+        const auto resume_review = qScopeGuard([&] { cancelled->phase.store(discovery_phase::running); });
+        remove_applications(automatically_removed, false);
+        preview.removeIf([&](const app_record &record) {
+            return removed_configurations.contains(Application::launch_key(record));
+        });
+        emit notification(QCoreApplication::translate("XLibrary", "Removed unavailable applications without icons: %1.")
+                              .arg(automatically_removed.size()));
+    }
     defer_result = true;
-    emit inventory_ready(request_id, records, removed, issues);
+    emit inventory_ready(request_id, preview, removed, issues);
 }
 
 void Manager::remove_missing_applications(const QVector<app_record> &records,
