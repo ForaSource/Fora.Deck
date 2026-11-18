@@ -1,25 +1,24 @@
-#include "WorkspaceWindowBackend.h"
-
 #include <QCoreApplication>
 
+#include "WorkspaceWindowBackend.h"
+
 #ifdef XLIBRARY_HAVE_WORKSPACE_X11
-#include <QFile>
-#include <QFileInfo>
-#include <QMargins>
-#include <QThread>
-
-#include <algorithm>
-#include <array>
-#include <cstdlib>
-#include <limits>
-
-#include <limits.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <xcb/randr.h>
 #include <xcb/res.h>
 #include <xcb/xcb.h>
+
+#include <algorithm>
+#include <array>
+#include <cstdlib>
+#include <limits.h>
+#include <limits>
+#include <QFile>
+#include <QFileInfo>
+#include <QMargins>
+#include <QThread>
 #endif
 
 namespace {
@@ -48,11 +47,9 @@ QString wayland_limitation() {
 
 #ifdef XLIBRARY_HAVE_WORKSPACE_X11
 
-template <typename T>
-using x11_reply = std::unique_ptr<T, decltype(&std::free)>;
+template <typename T> using x11_reply = std::unique_ptr<T, decltype(&std::free)>;
 
-template <typename T>
-x11_reply<T> take_reply(T *reply) {
+template <typename T> x11_reply<T> take_reply(T *reply) {
     return x11_reply<T>(reply, &std::free);
 }
 
@@ -122,7 +119,7 @@ bool read_process(quint32 pid, workspace_window &window) {
     const auto proc = QByteArray("/proc/") + QByteArray::number(pid);
     const auto proc_exe = proc + "/exe";
 
-    struct stat proc_details{};
+    struct stat proc_details {};
     if (::stat(proc.constData(), &proc_details) != 0 || proc_details.st_uid != geteuid())
         return false;
     const auto birth = process_birth(proc);
@@ -141,8 +138,8 @@ bool read_process(quint32 pid, workspace_window &window) {
         return false;
 
     const auto executable_name = QFile::encodeName(executable);
-    struct stat process_file{};
-    struct stat local_file{};
+    struct stat process_file {};
+    struct stat local_file {};
     // The executable path may name a different file inside a mount namespace.
     if (::stat(proc_exe.constData(), &process_file) != 0 || ::stat(executable_name.constData(), &local_file) != 0 ||
         !S_ISREG(local_file.st_mode) || process_file.st_dev != local_file.st_dev ||
@@ -172,10 +169,12 @@ public:
                 desktop.limitation = wayland_limitation();
             } else if (connection && root != XCB_NONE && !has_local_pid) {
                 desktop.limitation = QCoreApplication::translate(
-                    "Workspaces", "The X11 server cannot verify window ownership. Workspaces can launch resources only.");
+                    "Workspaces",
+                    "The X11 server cannot verify window ownership. Workspaces can launch resources only.");
             } else {
                 desktop.limitation = QCoreApplication::translate(
-                    "Workspaces", "Window capture and placement require a local X11 session with a compatible window manager.");
+                    "Workspaces",
+                    "Window capture and placement require a local X11 session with a compatible window manager.");
             }
             return desktop;
         }
@@ -208,9 +207,8 @@ public:
         if (!frame.isValid() || !state || !supports_placement(*state))
             return false;
         const auto visible_monitors = monitors(state->windows);
-        if (std::ranges::none_of(visible_monitors, [&frame](const auto &monitor) {
-                return monitor.work_area.contains(frame);
-            }))
+        if (std::ranges::none_of(visible_monitors,
+                                 [&frame](const auto &monitor) { return monitor.work_area.contains(frame); }))
             return false;
         auto current = verified_window(window, *state);
         if (!current)
@@ -303,12 +301,14 @@ private:
 
     bool has_xwayland_outputs() const {
         const auto cookie = xcb_randr_get_screen_resources_current(connection.get(), root);
-        const auto resources = take_reply(xcb_randr_get_screen_resources_current_reply(connection.get(), cookie, nullptr));
+        const auto resources =
+            take_reply(xcb_randr_get_screen_resources_current_reply(connection.get(), cookie, nullptr));
         if (!resources)
             return false;
         const auto *outputs = xcb_randr_get_screen_resources_current_outputs(resources.get());
         for (int index = 0; index < xcb_randr_get_screen_resources_current_outputs_length(resources.get()); ++index) {
-            const auto output_cookie = xcb_randr_get_output_info(connection.get(), outputs[index], resources->config_timestamp);
+            const auto output_cookie =
+                xcb_randr_get_output_info(connection.get(), outputs[index], resources->config_timestamp);
             const auto output = take_reply(xcb_randr_get_output_info_reply(connection.get(), output_cookie, nullptr));
             if (!output)
                 continue;
@@ -346,8 +346,8 @@ private:
 
         constexpr QByteArrayView xwayland_extension("XWAYLAND");
         const auto extension = take_reply(xcb_query_extension_reply(
-            connection.get(), xcb_query_extension(connection.get(), xwayland_extension.size(), xwayland_extension.data()),
-            nullptr));
+            connection.get(),
+            xcb_query_extension(connection.get(), xwayland_extension.size(), xwayland_extension.data()), nullptr));
         const auto scale = property(root, atom("_XWAYLAND_GLOBAL_OUTPUT_SCALE", true), XCB_GET_PROPERTY_TYPE_ANY);
         if ((extension && extension->present) || (scale && scale->type != XCB_NONE)) {
             xwayland = true;
@@ -358,18 +358,19 @@ private:
         if (randr && randr->present) {
             const auto version = take_reply(xcb_randr_query_version_reply(
                 connection.get(), xcb_randr_query_version(connection.get(), 1, 5), nullptr));
-            has_randr_monitors = version && (version->major_version > 1 ||
-                                             (version->major_version == 1 && version->minor_version >= 5));
-            if (version && (version->major_version > 1 ||
-                            (version->major_version == 1 && version->minor_version >= 3)) && has_xwayland_outputs()) {
+            has_randr_monitors =
+                version && (version->major_version > 1 || (version->major_version == 1 && version->minor_version >= 5));
+            if (version &&
+                (version->major_version > 1 || (version->major_version == 1 && version->minor_version >= 3)) &&
+                has_xwayland_outputs()) {
                 xwayland = true;
                 return false;
             }
         }
         const auto *res = xcb_get_extension_data(connection.get(), &xcb_res_id);
         if (res && res->present) {
-            const auto version = take_reply(xcb_res_query_version_reply(
-                connection.get(), xcb_res_query_version(connection.get(), 1, 2), nullptr));
+            const auto version = take_reply(
+                xcb_res_query_version_reply(connection.get(), xcb_res_query_version(connection.get(), 1, 2), nullptr));
             has_local_pid =
                 version && (version->server_major > 1 || (version->server_major == 1 && version->server_minor >= 2));
         }
@@ -426,10 +427,9 @@ private:
 
     bool can_move(xcb_window_t id, bool maximized) const {
         const auto allowed = property32(id, atoms.allowed_actions, XCB_ATOM_ATOM);
-        return allowed.isEmpty() ||
-               (allowed.contains(atoms.action_move) && allowed.contains(atoms.action_resize) &&
-                (!maximized || (allowed.contains(atoms.action_maximize_horz) &&
-                                allowed.contains(atoms.action_maximize_vert))));
+        return allowed.isEmpty() || (allowed.contains(atoms.action_move) && allowed.contains(atoms.action_resize) &&
+                                     (!maximized || (allowed.contains(atoms.action_maximize_horz) &&
+                                                     allowed.contains(atoms.action_maximize_vert))));
     }
 
     quint32 local_pid(xcb_window_t id) const {
@@ -455,8 +455,8 @@ private:
             !property32(id, XCB_ATOM_WM_TRANSIENT_FOR, XCB_ATOM_WINDOW).isEmpty())
             return std::nullopt;
         const auto state = property32(id, atoms.state, XCB_ATOM_ATOM);
-        if (state.contains(atoms.hidden) || state.contains(atoms.fullscreen) ||
-            state.contains(atoms.skip_taskbar) || state.contains(atoms.skip_pager))
+        if (state.contains(atoms.hidden) || state.contains(atoms.fullscreen) || state.contains(atoms.skip_taskbar) ||
+            state.contains(atoms.skip_pager))
             return std::nullopt;
         const auto hints = property32(id, XCB_ATOM_WM_HINTS, XCB_ATOM_WM_HINTS);
         constexpr uint32_t input_hint = 1;
@@ -473,7 +473,7 @@ private:
             return std::nullopt;
         const auto title = property8(id, atoms.wm_name, atoms.utf8_string);
         result.window.title = title.isEmpty() ? QString::fromLatin1(property8(id, XCB_ATOM_WM_NAME, XCB_ATOM_STRING))
-                                             : QString::fromUtf8(title);
+                                              : QString::fromUtf8(title);
         result.window.title = result.window.title.left(512).trimmed();
         result.window.title.removeIf([](QChar character) { return character.category() == QChar::Other_Control; });
 
@@ -492,8 +492,8 @@ private:
             const int border = geometry->border_width;
             result.decorations = {border, border, border, border};
         }
-        result.window.frame = QRect(position->dst_x, position->dst_y, geometry->width, geometry->height)
-                                  .marginsAdded(result.decorations);
+        result.window.frame =
+            QRect(position->dst_x, position->dst_y, geometry->width, geometry->height).marginsAdded(result.decorations);
         result.maximized_horz = state.contains(atoms.maximized_horz);
         result.maximized_vert = state.contains(atoms.maximized_vert);
         result.window.maximized = result.maximized_horz && result.maximized_vert;
@@ -518,15 +518,15 @@ private:
         event.type = type;
         std::ranges::copy(data, event.data.data32);
         constexpr auto mask = XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT | XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY;
-        const auto cookie = xcb_send_event_checked(connection.get(), false, root, mask,
-                                                   reinterpret_cast<const char *>(&event));
+        const auto cookie =
+            xcb_send_event_checked(connection.get(), false, root, mask, reinterpret_cast<const char *>(&event));
         const auto error = take_reply(xcb_request_check(connection.get(), cookie));
         return !error && !xcb_connection_has_error(connection.get());
     }
 
     QString monitor_name(xcb_atom_t id) const {
-        const auto reply = take_reply(
-            xcb_get_atom_name_reply(connection.get(), xcb_get_atom_name(connection.get(), id), nullptr));
+        const auto reply =
+            take_reply(xcb_get_atom_name_reply(connection.get(), xcb_get_atom_name(connection.get(), id), nullptr));
         if (!reply)
             return {};
         auto name = QString::fromUtf8(xcb_get_atom_name_name(reply.get()), xcb_get_atom_name_name_length(reply.get()));
@@ -536,8 +536,8 @@ private:
     }
 
     QVector<workspace_monitor> monitors(const QVector<xcb_window_t> &windows) const {
-        const auto geometry = take_reply(
-            xcb_get_geometry_reply(connection.get(), xcb_get_geometry(connection.get(), root), nullptr));
+        const auto geometry =
+            take_reply(xcb_get_geometry_reply(connection.get(), xcb_get_geometry(connection.get(), root), nullptr));
         if (!geometry || !geometry->width || !geometry->height)
             return {};
         const QRect screen(0, 0, geometry->width, geometry->height);
@@ -579,8 +579,8 @@ private:
                 strut = property32(id, atoms.strut, XCB_ATOM_CARDINAL);
                 if (strut.size() != 4)
                     continue;
-                strut.append({0, uint32_t(screen.bottom()), 0, uint32_t(screen.bottom()),
-                              0, uint32_t(screen.right()), 0, uint32_t(screen.right())});
+                strut.append({0, uint32_t(screen.bottom()), 0, uint32_t(screen.bottom()), 0, uint32_t(screen.right()),
+                              0, uint32_t(screen.right())});
             }
             if (strut[0] <= uint32_t(screen.width()) && strut[1] <= uint32_t(screen.width()) &&
                 strut[2] <= uint32_t(screen.height()) && strut[3] <= uint32_t(screen.height())) {
@@ -642,7 +642,8 @@ std::unique_ptr<WorkspaceWindowBackend> make_workspace_window_backend(const QStr
     }
     if (qt_platform != QStringLiteral("xcb")) {
         return std::make_unique<LaunchOnlyWorkspaceBackend>(QCoreApplication::translate(
-            "Workspaces", "Window capture and placement are unavailable on this display. Workspaces can launch resources only."));
+            "Workspaces",
+            "Window capture and placement are unavailable on this display. Workspaces can launch resources only."));
     }
 #ifdef XLIBRARY_HAVE_WORKSPACE_X11
     return std::make_unique<X11WorkspaceBackend>();

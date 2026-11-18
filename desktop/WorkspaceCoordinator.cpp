@@ -141,6 +141,8 @@ WorkspaceCoordinator::Entry WorkspaceCoordinator::preflight(workspace_item item,
         else if (Application::target_kind(*found) == "executable" && !QFileInfo(found->path).isExecutable())
             entry.issue = QCoreApplication::translate("Workspaces", "Application lacks permission to execute.");
 #endif
+        if (entry.issue.isEmpty() && Application::target_kind(*found) == "desktop")
+            Application::resolve_application(found->path);
         if (entry.issue.isEmpty() && !entry.item.reuse_existing && Application::file_target(*found))
             entry.issue = Application::new_instance_error(*found);
         entry.app = *found;
@@ -174,11 +176,31 @@ quint64 WorkspaceCoordinator::prepare(workspace_record workspace, QVector<app_re
     }
     emit changed();
     background(
-        [backend = backend, items = std::move(workspace.items), applications = std::move(applications)] {
+        [backend = backend, token = run_token, id, items = std::move(workspace.items),
+         applications = std::move(applications)] {
+            auto desktop = backend->snapshot();
             QVector<Entry> entries;
-            for (const auto &item : items)
-                entries.append(preflight(item, applications));
-            return std::pair{backend->snapshot(), std::move(entries)};
+            QHash<QString, int> configurations;
+            for (const auto &item : items) {
+                if (token->load() != id)
+                    return std::pair{std::move(desktop), QVector<Entry>{}};
+                auto entry = preflight(item, applications);
+                if (desktop.can_capture && item.reuse_existing && entry.can_reuse && !entry.executable.isEmpty())
+                    configurations.insert(entry.executable, 0);
+                entries.append(std::move(entry));
+            }
+            if (!configurations.isEmpty()) {
+                for (const auto &app : applications) {
+                    if (token->load() != id)
+                        return std::pair{std::move(desktop), QVector<Entry>{}};
+                    auto found = configurations.find(workspace_executable(app));
+                    if (found != configurations.end())
+                        ++*found;
+                }
+                for (auto &entry : entries)
+                    entry.ambiguous_configuration = configurations.value(entry.executable) > 1;
+            }
+            return std::pair{std::move(desktop), std::move(entries)};
         },
         [this, id](const auto &result) {
             if (id != generation || phase != Phase::preflight)
@@ -191,11 +213,21 @@ quint64 WorkspaceCoordinator::prepare(workspace_record workspace, QVector<app_re
                 if (!entry.item.enabled)
                     continue;
                 QString reason = entry.issue;
-                if (reason.isEmpty() && entry.app && entry.item.reuse_existing && entry.can_reuse &&
-                    workspace_matching_windows(result.first, entry.executable).size() > 1)
-                    reason = QCoreApplication::translate(
-                        "Workspaces",
-                        "Several windows match. This resource will be skipped while the match is ambiguous.");
+                if (reason.isEmpty() && entry.app && entry.item.reuse_existing) {
+                    const auto matches = workspace_matching_windows(result.first, entry.executable).size();
+                    if (matches && entry.can_reuse && entry.ambiguous_configuration)
+                        reason = QCoreApplication::translate(
+                            "Workspaces", "The existing window matches several launch configurations. Turn off reuse "
+                                          "to request a fresh launch.");
+                    else if (entry.can_reuse && matches > 1)
+                        reason = QCoreApplication::translate(
+                            "Workspaces",
+                            "Several windows match. This resource will be skipped while the match is ambiguous.");
+                    else if (matches && !entry.can_reuse)
+                        reason = QCoreApplication::translate("Workspaces",
+                                                             "Existing windows cannot be reused with these launch "
+                                                             "options. A fresh launch will be requested.");
+                }
                 if (reason.isEmpty() && entry.item.placement) {
                     if (!capabilities.can_place)
                         reason = capabilities.limitation.isEmpty()
@@ -285,6 +317,13 @@ void WorkspaceCoordinator::resolve_app(workspace_desktop desktop) {
     const auto &entry = entries[index];
     previous_windows = workspace_matching_windows(desktop, entry.executable);
     const auto should_reuse = entry.item.reuse_existing && entry.can_reuse;
+    if (should_reuse && entry.ambiguous_configuration && !previous_windows.isEmpty()) {
+        complete_step(workspace_step_state::skipped,
+                      QCoreApplication::translate("Workspaces",
+                                                  "The existing window matches several launch configurations. Turn "
+                                                  "off reuse to request a fresh launch."));
+        return;
+    }
     if (should_reuse && previous_windows.size() > 1) {
         complete_step(workspace_step_state::skipped,
                       QCoreApplication::translate("Workspaces",

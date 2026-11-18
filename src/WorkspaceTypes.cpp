@@ -97,7 +97,9 @@ QVector<workspace_record> xlibrary::read_workspaces(sqlite3 *const connection) {
                 record.items.size() >= workspace_item_limit || items.number(2) < 0 || items.number(2) > 3 ||
                 (items.number(7) != 0 && items.number(7) != 1) || (items.number(8) != 0 && items.number(8) != 1) ||
                 (items.number(15) != 0 && items.number(15) != 1))
-                throw std::runtime_error("Profile contains an invalid workspace item");
+                throw std::runtime_error(
+                    QCoreApplication::translate("Workspaces", "Profile contains an invalid workspace item")
+                        .toStdString());
             workspace_item item{items.number(0),
                                 static_cast<workspace_item_kind>(items.number(2)),
                                 items.number(3),
@@ -115,7 +117,8 @@ QVector<workspace_record> xlibrary::read_workspaces(sqlite3 *const connection) {
         }
         if (record.id <= 0 || rows.qtext(2) != workspace_name_key(record.name) ||
             !workspace_record_issue(record).isEmpty())
-            throw std::runtime_error("Profile contains an invalid workspace");
+            throw std::runtime_error(
+                QCoreApplication::translate("Workspaces", "Profile contains an invalid workspace").toStdString());
         records.append(std::move(record));
     }
     return records;

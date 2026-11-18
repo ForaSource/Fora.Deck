@@ -84,6 +84,7 @@ private:
         QString executable;
         QString issue;
         bool can_reuse = false;
+        bool ambiguous_configuration = false;
     };
 
     std::shared_ptr<WorkspaceWindowBackend> backend;

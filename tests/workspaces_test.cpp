@@ -134,6 +134,23 @@ private slots:
         QCOMPARE(launches, 0);
     }
 
+    void conflicting_catalog_configurations_prevent_reuse() {
+        auto backend = std::make_unique<FakeBackend>(desktop_with_windows({window()}));
+        int launches = 0;
+        WorkspaceCoordinator runs(
+            std::move(backend), [&](const auto &, const auto &, bool, quint64, const auto &) { return ++launches; },
+            [](const auto &) { return false; });
+        auto configured = application();
+        configured.id++;
+        configured.arguments = "--custom";
+        const auto id = runs.prepare({1, "Work", {app_item()}}, {application(), configured});
+        QTRY_VERIFY(runs.awaiting_confirmation());
+        QVERIFY(runs.start(id));
+        QTRY_COMPARE(runs.outcome(), workspace_outcome::failed);
+        QCOMPARE(runs.report().front().state, workspace_step_state::skipped);
+        QCOMPARE(launches, 0);
+    }
+
     void cancel_ignores_late_acceptance() {
         quint64 launch_count = 0;
         WorkspaceCoordinator::launch_token old_token;
@@ -213,6 +230,37 @@ private slots:
         QCOMPARE(current[0].frame, window(1).frame);
         QCOMPARE(current[1].frame, unrelated.frame);
         QCOMPARE(current[2].frame, QRect(500, 0, 500, 800));
+    }
+
+    void uses_explicit_browser_profile_and_launches_on_wayland() {
+        QTemporaryDir temp;
+        auto browser = application();
+#ifdef Q_OS_WIN
+        browser.path = temp.filePath("chrome.exe");
+#else
+        browser.path = temp.filePath("chrome");
+#endif
+        QVERIFY(QFile::copy(application().path, browser.path));
+        browser.default_launch_profile = "private";
+        auto item = app_item();
+        item.launch_profile = "normal";
+        item.placement = workspace_placement{"primary", {0, 0, 0.5, 1}};
+        QString profile;
+        WorkspaceCoordinator runs(
+            std::make_unique<FakeBackend>(workspace_desktop{}),
+            [&](const auto &, const QString &selected, bool, quint64, const auto &) {
+                profile = selected;
+                return 9;
+            },
+            [](const auto &) { return false; });
+        const auto id = runs.prepare({1, "Browser", {item}}, {browser});
+        QTRY_VERIFY(runs.awaiting_confirmation());
+        QVERIFY(runs.start(id));
+        QTRY_COMPARE(profile, QString("normal"));
+        runs.launch_finished({9, "workspace_launch", operation_state::completed, {}});
+        QCOMPARE(runs.outcome(), workspace_outcome::partial);
+        QVERIFY(runs.report().front().opened);
+        QVERIFY(!runs.report().front().placement_attempted);
     }
 
     void typed_resource_open() {

@@ -200,6 +200,33 @@ private slots:
         const std::unique_ptr<sqlite3, decltype(&sqlite3_close_v2)> backup(raw, sqlite3_close_v2);
         QCOMPARE(xlibrary::read_schema_version(raw), 9);
     }
+    void workspace_migration_rolls_back_on_table_collision() {
+        QTemporaryDir temporary;
+        const auto path = temporary.filePath("v9.db");
+        {
+            Database previous(path);
+            xlibrary::sqlite_execute(previous.get_connection(), R"(
+                DROP TABLE workspace_window;
+                DROP TABLE workspace_item;
+                DROP TABLE workspace;
+                CREATE TABLE workspace_item(legacy_marker TEXT);
+                INSERT INTO workspace_item VALUES('original');
+                PRAGMA user_version=9;
+            )");
+        }
+        QVERIFY_THROWS_EXCEPTION(std::runtime_error, Database{path});
+        sqlite3 *raw = nullptr;
+        QCOMPARE(sqlite3_open_v2(path.toUtf8().constData(), &raw, SQLITE_OPEN_READONLY, nullptr), SQLITE_OK);
+        const std::unique_ptr<sqlite3, decltype(&sqlite3_close_v2)> connection(raw, sqlite3_close_v2);
+        QCOMPARE(xlibrary::read_schema_version(raw), 9);
+        xlibrary::SqliteStatement marker(raw, "SELECT legacy_marker FROM workspace_item;");
+        QVERIFY(marker.next());
+        QCOMPARE(marker.qtext(0), QString("original"));
+        xlibrary::SqliteStatement rolled_back(raw, "SELECT 1 FROM sqlite_master WHERE name='workspace';");
+        QVERIFY(!rolled_back.next());
+        QCOMPARE(QDir(temporary.path()).entryList({"v9.db.before-schema-v10.*.bak"}, QDir::Files).size(), 1);
+    }
+
     void workspace_persistence() {
         QTemporaryDir temporary;
         const auto path = temporary.filePath("profile.db");
@@ -234,6 +261,10 @@ private slots:
             QVERIFY_THROWS_EXCEPTION(std::exception, db.save_workspace({0, "Bad URL", {url}}));
         }
         ProfileBackup::create(archive, path, settings);
+        const auto manifest = ProfileBackup::inspect(archive);
+        QCOMPARE(manifest.counts.value("workspace"), 1);
+        QCOMPARE(manifest.counts.value("workspace_item"), 2);
+        QCOMPARE(manifest.counts.value("workspace_window"), 1);
         {
             Database db(path);
             QCOMPARE(db.read().workspaces.front(), stored);
@@ -245,7 +276,7 @@ private slots:
             db.remove_workspace(stored.id);
             QVERIFY(db.read().workspaces.isEmpty());
         }
-        ProfileBackup::restore(archive, path, settings, ProfileBackup::inspect(archive).fingerprint);
+        ProfileBackup::restore(archive, path, settings, manifest.fingerprint);
         QCOMPARE(Database(path).read().workspaces.front(), stored);
     }
     void reject_future_and_corrupt() {

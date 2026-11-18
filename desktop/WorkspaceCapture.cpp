@@ -8,14 +8,16 @@
 #include "WorkspaceCapture.h"
 
 namespace {
-QString canonical_executable(const QString &path) {
-    if (path.isEmpty())
-        return {};
-    auto canonical = QFileInfo(QDir::fromNativeSeparators(path)).canonicalFilePath();
+QString executable_key(QString canonical) {
+    canonical = QDir::fromNativeSeparators(canonical);
 #ifdef Q_OS_WIN
     canonical = canonical.toCaseFolded();
 #endif
     return canonical;
+}
+
+QString canonical_executable(const QString &path) {
+    return path.isEmpty() ? QString{} : executable_key(QFileInfo(path).canonicalFilePath());
 }
 
 const workspace_monitor *monitor_for_frame(const QRect &frame, const QVector<workspace_monitor> &monitors) {
@@ -74,7 +76,7 @@ QVector<workspace_window> workspace_matching_windows(const workspace_desktop &de
     if (desktop.can_capture && !executable.isEmpty())
         for (const auto &window : desktop.windows)
             if (window.handle && window.pid > 0 && window.process_birth && !window.minimized &&
-                canonical_executable(window.executable) == executable)
+                executable_key(window.executable) == executable)
                 matches.append(window);
     return matches;
 }
@@ -94,7 +96,7 @@ QVector<workspace_capture_candidate> workspace_capture(const workspace_desktop &
         const auto *monitor = monitor_for_frame(window.frame, desktop.monitors);
         if (monitor)
             row.monitor = monitor->id;
-        const auto matching_apps = by_executable.value(canonical_executable(window.executable));
+        const auto matching_apps = by_executable.value(executable_key(window.executable));
         if (!window.handle || window.pid <= 0 || !window.process_birth || window.minimized || matching_apps.isEmpty()) {
             row.issue = QCoreApplication::translate("Workspaces", "Unrecognized window");
         } else if (matching_apps.size() != 1 || !workspace_can_reuse(*matching_apps.front(), {})) {
