@@ -205,17 +205,22 @@ Stopping skips remaining steps and leaves already opened applications running.
 
 ## Workspaces
 
-Open **Workspaces** next to **Scenarios**. Choose **New workspace**, enter a name and add up to 32 library applications,
-files, folders or HTTP(S) links. Drag items or use **Move up** and **Move down** to set launch order. Clear an item's
-checkbox to keep it in the workspace and skip it during runs. A supported browser can use the application default,
-the configured invocation, a normal or private window, or a specific detected profile.
+Open **Workspaces** next to **Scenarios**. Choose **New workspace**, enter a name and use the resource buttons
+to add up to 32 library applications, files, folders or HTTP(S) links. Use **Application** to search the library.
+Drag items or use **Move up** and **Move down** to set launch order. Clear an item's checkbox to skip it during
+runs. Use **Launch and window options** to choose a supported browser profile or set a window position.
 
-On Windows or a compatible local X11 session, **Save current desktop** opens a preview. Select one window per library
-application, continue to the editor and review the layout before saving. An unresolved window can be represented
-manually by adding its intended library application. Window placement is expressed as percentages of each monitor's
-usable area. When a saved monitor is disconnected, Fora.Deck tries the primary monitor.
+On Windows or a compatible local X11 session, choose **Capture open windows**. Fora.Deck preselects one window per
+unambiguously matched library application. If several launch entries share that executable, choose the one to use.
+For windows without a match, **Add file to library** opens the application editor with the detected executable path.
+The saved application is selected in the workspace preview. **Choose application** selects an existing library entry
+without copying the position of the detected window.
 
-Select a saved workspace and choose **Run**. Review any preflight warnings and confirm. **Last run** shows each
+Select **Review workspace** to name the workspace and add other resources before saving. **Back to windows** keeps
+your selection. If no windows are selected, **Create manually** opens an empty editor. Window placement is saved
+relative to the monitor's usable area. When a saved monitor is disconnected, Fora.Deck tries the primary monitor.
+
+Select a saved workspace and choose **Run workspace**. Review any preflight warnings and confirm. **Last run** shows each
 resource's outcome, including a missing target, an accepted open request, a reused window or verified positioning.
 When multiple windows match the same launch configuration, Fora.Deck skips the item while reuse is enabled.
 Clear the reuse option to request a fresh launch. Browsers and some application launchers can still forward the

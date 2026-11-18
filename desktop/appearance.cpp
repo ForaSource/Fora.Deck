@@ -70,6 +70,8 @@ QIcon appearance::icon(const QString &name, const QColor &requested_color) {
         painter.drawPolyline(QPolygonF{QPointF(9, 6), QPointF(15, 12), QPointF(9, 18)});
     } else if (name == "chevron_down") {
         painter.drawPolyline(QPolygonF{QPointF(6, 9), QPointF(12, 15), QPointF(18, 9)});
+    } else if (name == "chevron_up") {
+        painter.drawPolyline(QPolygonF{QPointF(6, 15), QPointF(12, 9), QPointF(18, 15)});
     } else if (name == "lock" || name == "private") {
         painter.drawRoundedRect(QRectF(5, 10, 14, 11), 2, 2);
         painter.drawArc(QRectF(8, 3, 8, 13), 0, 180 * 16);
@@ -145,6 +147,10 @@ QIcon appearance::icon(const QString &name, const QColor &requested_color) {
     } else if (name == "copy") {
         painter.drawRoundedRect(QRectF(8, 8, 12, 13), 2, 2);
         painter.drawPolyline(QPolygonF{QPointF(5, 16), QPointF(3, 16), QPointF(3, 3), QPointF(15, 3), QPointF(15, 5)});
+    } else if (name == "save") {
+        painter.drawPolygon(QPolygonF{QPointF(3, 3), QPointF(17, 3), QPointF(21, 7), QPointF(21, 21), QPointF(3, 21)});
+        painter.drawPolyline(QPolygonF{QPointF(7, 21), QPointF(7, 13), QPointF(17, 13), QPointF(17, 21)});
+        painter.drawLine(QPointF(8, 7), QPointF(15, 7));
     } else if (name == "keyboard") {
         painter.drawRoundedRect(QRectF(2, 5, 20, 14), 3, 3);
         for (int y : {9, 12})

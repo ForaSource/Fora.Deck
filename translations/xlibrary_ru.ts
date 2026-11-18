@@ -3613,6 +3613,154 @@ Qt: %4
 <context>
     <name>Workspaces</name>
     <message>
+        <source>Add an application to the library first.</source>
+        <translation>Сначала добавьте приложение в библиотеку.</translation>
+    </message>
+    <message>
+        <source>Add application</source>
+        <translation>Добавить приложение</translation>
+    </message>
+    <message>
+        <source>Add file</source>
+        <translation>Добавить файл</translation>
+    </message>
+    <message>
+        <source>Add folder</source>
+        <translation>Добавить папку</translation>
+    </message>
+    <message>
+        <source>Add link</source>
+        <translation>Добавить ссылку</translation>
+    </message>
+    <message>
+        <source>Add to workspace</source>
+        <translation>Добавить в пространство</translation>
+    </message>
+    <message>
+        <source>Choosing a different library app adds it without the window position.</source>
+        <translation>При выборе другого приложения положение этого окна не переносится.</translation>
+    </message>
+    <message>
+        <source>Add file to library…</source>
+        <translation>Добавить файл в библиотеку…</translation>
+    </message>
+    <message>
+        <source>Back to windows</source>
+        <translation>Назад к окнам</translation>
+    </message>
+    <message>
+        <source>Capture open windows</source>
+        <translation>Выбрать открытые окна</translation>
+    </message>
+    <message>
+        <source>Check one window per application. Where prompted, choose a library launch option.</source>
+        <translation>Отметьте по одному окну на приложение. Если доступен список вариантов запуска, выберите нужный.</translation>
+    </message>
+    <message>
+        <source>Choose launch option…</source>
+        <translation>Выбрать способ запуска…</translation>
+    </message>
+    <message>
+        <source>Choose application…</source>
+        <translation>Выбрать приложение…</translation>
+    </message>
+    <message>
+        <source>Choose windows to save</source>
+        <translation>Какие окна сохранить</translation>
+    </message>
+    <message>
+        <source>Create manually</source>
+        <translation>Создать вручную</translation>
+    </message>
+    <message>
+        <source>Drag to reorder. Clear a checkbox to skip that resource.</source>
+        <translation>Перетащите строку, чтобы изменить порядок. Снимите галочку, чтобы пропустить ресурс при запуске.</translation>
+    </message>
+    <message>
+        <source>e.g. Design, Study, or Work</source>
+        <translation>Например, «Учёба» или «Работа»</translation>
+    </message>
+    <message>
+        <source>File or folder path</source>
+        <translation>Путь к файлу или папке</translation>
+    </message>
+    <message>
+        <source>Launch and window options</source>
+        <translation>Параметры запуска и окна</translation>
+    </message>
+    <message>
+        <source>Library application or status</source>
+        <translation>Приложение или состояние</translation>
+    </message>
+    <message>
+        <source>Library applications</source>
+        <translation>Приложения из библиотеки</translation>
+    </message>
+    <message>
+        <source>Link</source>
+        <translation>Ссылка</translation>
+    </message>
+    <message>
+        <source>No applications match your search.</source>
+        <translation>По вашему запросу ничего не найдено.</translation>
+    </message>
+    <message>
+        <source>No matching library entry</source>
+        <translation>Нет совпадения в библиотеке</translation>
+    </message>
+    <message>
+        <source>No workspaces yet</source>
+        <translation>Здесь будут ваши пространства</translation>
+    </message>
+    <message>
+        <source>Nothing to open yet</source>
+        <translation>Пока нет ресурсов</translation>
+    </message>
+    <message>
+        <source>Open a group of applications, files, folders and links together.</source>
+        <translation>Открывайте нужные приложения, файлы, папки и ссылки одним действием.</translation>
+    </message>
+    <message>
+        <source>Remove</source>
+        <translation>Убрать</translation>
+    </message>
+    <message>
+        <source>Review workspace</source>
+        <translation>Проверить пространство</translation>
+    </message>
+    <message>
+        <source>Search library applications…</source>
+        <translation>Поиск приложений в библиотеке…</translation>
+    </message>
+    <message>
+        <source>Start with an empty workspace or capture the windows already open.</source>
+        <translation>Создайте пространство с нуля или выберите окна, которые уже открыты.</translation>
+    </message>
+    <message>
+        <source>Use the buttons above to add your first resource.</source>
+        <translation>Выберите приложение, файл, папку или ссылку с помощью кнопок выше.</translation>
+    </message>
+    <message>
+        <source>Web address</source>
+        <translation>Адрес сайта</translation>
+    </message>
+    <message>
+        <source>Window identity could not be verified</source>
+        <translation>Не удалось определить владельца окна</translation>
+    </message>
+    <message>
+        <source>Window layout</source>
+        <translation>С раскладкой окна</translation>
+    </message>
+    <message>
+        <source>Applications selected: %1</source>
+        <translation>Выбрано приложений: %1</translation>
+    </message>
+    <message>
+        <source>You can still build a workspace manually.</source>
+        <translation>Вы можете создать пространство вручную.</translation>
+    </message>
+    <message>
         <source>Invalid resource details.</source>
         <translation>Недопустимые параметры ресурса.</translation>
     </message>

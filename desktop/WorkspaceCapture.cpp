@@ -93,22 +93,28 @@ QVector<workspace_capture_candidate> workspace_capture(const workspace_desktop &
     for (const auto &window : desktop.windows) {
         workspace_capture_candidate row;
         row.window = window;
-        const auto *monitor = monitor_for_frame(window.frame, desktop.monitors);
-        if (monitor)
-            row.monitor = monitor->id;
         const auto matching_apps = by_executable.value(executable_key(window.executable));
-        if (!window.handle || window.pid <= 0 || !window.process_birth || window.minimized || matching_apps.isEmpty()) {
-            row.issue = QCoreApplication::translate("Workspaces", "Unrecognized window");
-        } else if (matching_apps.size() != 1 || !workspace_can_reuse(*matching_apps.front(), {})) {
-            row.issue = QCoreApplication::translate("Workspaces", "Launch configuration could not be identified");
+        if (!window.handle || window.pid <= 0 || !window.process_birth || window.minimized ||
+            window.executable.isEmpty()) {
+            row.issue = QCoreApplication::translate("Workspaces", "Window identity could not be verified");
+            row.window.executable.clear();
         } else {
-            workspace_item item;
-            item.application_id = matching_apps.front()->id;
-            item.display_name = matching_apps.front()->name.left(256);
-            item.display_name.removeIf([](const QChar c) { return c.category() == QChar::Other_Control; });
             if (desktop.can_place)
-                item.placement = workspace_capture_placement(window, desktop.monitors);
-            row.item = std::move(item);
+                row.window_placement = workspace_capture_placement(window, desktop.monitors);
+            if (matching_apps.isEmpty())
+                row.issue = QCoreApplication::translate("Workspaces", "No matching library entry");
+            const bool automatic = matching_apps.size() == 1;
+            for (const auto *app : matching_apps) {
+                workspace_item item;
+                item.application_id = app->id;
+                item.display_name = app->name.left(256);
+                item.display_name.removeIf([](const QChar c) { return c.category() == QChar::Other_Control; });
+                item.placement = row.window_placement;
+                if (automatic)
+                    row.item = std::move(item);
+                else
+                    row.launch_options.append(std::move(item));
+            }
         }
         candidates.append(std::move(row));
     }

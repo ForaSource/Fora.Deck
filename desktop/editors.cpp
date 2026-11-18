@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <memory>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDialogButtonBox>
@@ -972,4 +973,15 @@ void edit_application(DesktopService &service, const qint64 id, QWidget *const p
     auto *dialog = application_editor(context, parent);
     dialog->setAttribute(Qt::WA_DeleteOnClose);
     dialog->open();
+}
+
+qint64 add_application_from_file(DesktopService &service, const QString &path, QWidget *const parent) {
+    ui_context context;
+    context.service = &service;
+    context.settings = &service.settings;
+    app_record record;
+    record.path = path;
+    context.parameters.insert("record", QVariant::fromValue(record));
+    const std::unique_ptr<QDialog> dialog(application_editor(context, parent));
+    return dialog->exec() == QDialog::Accepted ? dialog->property("saved_application_id").toLongLong() : 0;
 }

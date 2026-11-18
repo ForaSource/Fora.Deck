@@ -16,9 +16,13 @@ Updates preserve assigned item IDs and replace the ordered contents atomically.
 ## Capture and execution
 
 Windows and X11 backends enumerate eligible foreign windows asynchronously.
-Capture only associates a window with a catalog target when executable identity
-is strong and the configuration is unambiguous. Candidates without a match
-are available for review. Saving requires explicit selection and confirmation.
+Capture preselects a unique catalog match by verified executable path. If
+several library entries match the same executable, the preview requires an
+explicit choice. An unmatched window can open the application editor with
+its verified executable path or offer an existing library entry through the
+manual picker. Saving the detected file to the library selects it in the
+preview. A different manual target has no captured placement. Saving the
+workspace requires confirmation.
 
 Preflight prepares a report before the run starts. Invalid items can be skipped
 after reviewing the report. The coordinator runs one item at a time. It records

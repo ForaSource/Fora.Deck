@@ -6,7 +6,8 @@
 struct workspace_capture_candidate {
     workspace_window window;
     std::optional<workspace_item> item;
-    QString monitor;
+    QVector<workspace_item> launch_options;
+    std::optional<workspace_placement> window_placement;
     QString issue;
 };
 
