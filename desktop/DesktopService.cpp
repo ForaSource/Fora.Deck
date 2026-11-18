@@ -5,6 +5,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QFutureWatcher>
+#include <QGuiApplication>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -66,6 +67,27 @@ DesktopService::DesktopService(QObject *const parent, const QString &profile_pat
     updates.set_channel(settings.value("updates/channel", "stable").toString());
     connect(&updates, &UpdateChecker::channel_changed, this,
             [this] { settings.setValue("updates/channel", updates.channel()); });
+    workspaces = std::make_unique<WorkspaceCoordinator>(
+        make_workspace_window_backend(QGuiApplication::platformName()),
+        [this](const app_record &app, const QString &selected, const bool fresh, const quint64 generation,
+               const WorkspaceCoordinator::launch_token &token) {
+            if (!is_ready() || profile_busy() || restart_pending || launching.contains(app.id))
+                return quint64{0};
+            launching.insert(app.id);
+            const auto request = enqueue(
+                "workspace_launch",
+                [id = app.id, context = launch_context{launch_origin::workspace, generation, app.configuration_id},
+                 token, profile = selected,
+                 mode = fresh && Application::file_target(app) ? Application::launch_mode::new_instance
+                                                               : Application::launch_mode::launch](Manager &manager) {
+                    manager.launch_record(id, mode, context, token, desktop_platform::launch_application, profile);
+                },
+                operation_error_source::platform);
+            workspace_launches.insert(request, app.id);
+            return request;
+        },
+        desktop_platform::open_url);
+    qRegisterMetaType<launch_context>();
     qRegisterMetaType<QVector<app_record>>();
     qRegisterMetaType<QVector<discovery_issue>>();
     qRegisterMetaType<operation_state>();
@@ -246,36 +268,44 @@ DesktopService::DesktopService(QObject *const parent, const QString &profile_pat
             invalidate_scenario_checks();
         emit selection_changed();
     });
-    connect(worker, &Manager::launched, this,
-            [this](const qint64 id, const operation_result &result, const quint64 from_scenario) {
+    connect(
+        worker, &Manager::launched, this,
+        [this](const qint64 id, const operation_result &result, const launch_context context, const qint64 process_id) {
+            if (context.origin == launch_origin::workspace) {
                 launching.remove(id);
-                if (result.state == operation_state::completed)
-                    launch_failures.remove(id);
-                else if (result.state == operation_state::error)
-                    launch_failures.insert(id, result.error.user_message);
-                if (!from_scenario)
-                    emit application_launch_finished(id, result);
-                if (result.state == operation_state::completed && !from_scenario)
-                    emit launch_succeeded();
-                if (from_scenario && from_scenario == scenario_run_generation && step_index < step_states.size()) {
-                    step_states[step_index] = result.state == operation_state::completed   ? "success"
-                                              : result.state == operation_state::cancelled ? "skipped"
-                                                                                           : "error";
-                    step_errors[step_index] = result.error.user_message;
-                    clear_stale_scenario_run();
-                    emit scenario_steps_changed();
-                }
-                if (!from_scenario || !is_scenario_active() || from_scenario != scenario_generation->load())
-                    return;
-                if (result.state != operation_state::completed) {
-                    finish_scenario(result.state, result.error);
-                    emit scenario_changed(QCoreApplication::translate(
-                        "XLibrary", "The scenario stopped because an application could not be launched."));
-                    return;
-                }
-                ++step_index;
-                next_scenario_step();
-            });
+                workspace_launches.remove(result.id);
+                workspaces->launch_finished(result, process_id);
+                return;
+            }
+            const auto from_scenario = context.origin == launch_origin::scenario ? context.generation : 0;
+            launching.remove(id);
+            if (result.state == operation_state::completed)
+                launch_failures.remove(id);
+            else if (result.state == operation_state::error)
+                launch_failures.insert(id, result.error.user_message);
+            if (!from_scenario)
+                emit application_launch_finished(id, result);
+            if (result.state == operation_state::completed && !from_scenario)
+                emit launch_succeeded();
+            if (from_scenario && from_scenario == scenario_run_generation && step_index < step_states.size()) {
+                step_states[step_index] = result.state == operation_state::completed   ? "success"
+                                          : result.state == operation_state::cancelled ? "skipped"
+                                                                                       : "error";
+                step_errors[step_index] = result.error.user_message;
+                clear_stale_scenario_run();
+                emit scenario_steps_changed();
+            }
+            if (!from_scenario || !is_scenario_active() || from_scenario != scenario_generation->load())
+                return;
+            if (result.state != operation_state::completed) {
+                finish_scenario(result.state, result.error);
+                emit scenario_changed(QCoreApplication::translate(
+                    "XLibrary", "The scenario stopped because an application could not be launched."));
+                return;
+            }
+            ++step_index;
+            next_scenario_step();
+        });
     scenario_timer.setSingleShot(true);
     connect(&updates, &UpdateChecker::operation_changed, this, [this](const operation_result &result) {
         if (result.state == operation_state::loading) {
@@ -318,6 +348,7 @@ DesktopService::~DesktopService() {
             qWarning("Cannot flush saved file paths: %s", e.what());
         }
     }
+    workspaces.reset();
     ++*scenario_generation;
     auto expected = discovery_phase::running;
     discovery_cancelled->phase.compare_exchange_strong(expected, discovery_phase::cancelling);
@@ -432,9 +463,15 @@ void DesktopService::publish_result(const operation_result &result) {
         }
         emit discovery_changed();
     }
+    if (result.operation == "workspace_launch" && result.state != operation_state::loading) {
+        if (const auto id = workspace_launches.take(result.id))
+            launching.remove(id);
+        workspaces->launch_finished(result);
+    }
     emit operation_changed(result);
     // Ошибку запуска уже показывает отдельный результат launch; сценарий сохраняет её для своих подписчиков.
     if (result.state == operation_state::error && result.operation != "run_scenario" &&
+        result.operation != "workspace_launch" &&
         !(startup_scan && (result.id == discovery_request_id || result.operation == "remove_missing")) &&
         !result.error.user_message.isEmpty())
         emit message(result.error.user_message);
@@ -552,6 +589,10 @@ void DesktopService::remove_application(const qint64 id) {
 }
 
 void DesktopService::remove_applications(const QVector<qint64> &ids) {
+    if (workspaces->active() || workspaces->capturing()) {
+        notify(QCoreApplication::translate("Workspaces", "Finish the workspace operation first."));
+        return;
+    }
     if (ids.isEmpty())
         return;
     if (is_scenario_active()) {
@@ -562,6 +603,10 @@ void DesktopService::remove_applications(const QVector<qint64> &ids) {
 }
 
 void DesktopService::undo_removal() {
+    if (workspaces->active() || workspaces->capturing()) {
+        notify(QCoreApplication::translate("Workspaces", "Finish the workspace operation first."));
+        return;
+    }
     if (is_scenario_active()) {
         notify(QCoreApplication::translate("XLibrary", "Stop the scenario before restoring applications."));
         return;
@@ -602,6 +647,47 @@ quint64 DesktopService::save_tag(const QString &old_name, const QString &new_nam
 
 void DesktopService::remove_tag(const QString &name) {
     enqueue("remove_tag", [name](Manager &worker) { worker.remove_tag(name); });
+}
+
+quint64 DesktopService::capture_workspace() {
+    if (!is_ready() || profile_busy() || restart_pending || is_scenario_active())
+        return 0;
+    return workspaces->capture(snapshot.applications);
+}
+
+quint64 DesktopService::prepare_workspace(const qint64 id) {
+    if (!is_ready() || profile_busy() || restart_pending || is_scenario_active() || workspaces->active() ||
+        is_discovering()) {
+        notify(QCoreApplication::translate("Workspaces", "Finish the current operation before running a workspace."));
+        return 0;
+    }
+    const auto found = std::ranges::find(snapshot.workspaces, id, &workspace_record::id);
+    return found == snapshot.workspaces.cend() ? 0 : workspaces->prepare(*found, snapshot.applications);
+}
+
+quint64 DesktopService::export_workspace_diagnostics(const QString &path) {
+    if (path.isEmpty() || workspaces->outcome() == workspace_outcome::none)
+        return 0;
+    QJsonArray steps;
+    for (const auto &step : workspaces->report()) {
+        steps.append(QJsonObject{{"status", static_cast<int>(step.state)},
+                                 {"duration_ms", step.duration_ms},
+                                 {"opened", step.opened},
+                                 {"reused", step.reused},
+                                 {"placement_requested", step.placement_requested},
+                                 {"placement_attempted", step.placement_attempted},
+                                 {"placement_verified", step.placement_verified}});
+    }
+    const auto report = QJsonDocument(QJsonObject{{"format", 1},
+                                                  {"application_version", QCoreApplication::applicationVersion()},
+                                                  {"session", QGuiApplication::platformName()},
+                                                  {"duration_ms", workspaces->duration_ms()},
+                                                  {"outcome", static_cast<int>(workspaces->outcome())},
+                                                  {"steps", steps}})
+                            .toJson();
+    return enqueue(
+        "diagnostics", [path, report](Manager &manager) { manager.export_diagnostics(path, report); },
+        operation_error_source::filesystem);
 }
 
 quint64 DesktopService::save_workspace(workspace_record record) {
@@ -654,7 +740,8 @@ quint64 DesktopService::request_launch_mode(const qint64 id, const Application::
     return enqueue(
         "launch",
         [id, mode, generation, token = scenario_generation, profile](Manager &worker) {
-            worker.launch_record(id, mode, generation, token, desktop_platform::launch_application, profile);
+            const launch_context context{generation ? launch_origin::scenario : launch_origin::manual, generation};
+            worker.launch_record(id, mode, context, token, desktop_platform::launch_application, profile);
         },
         operation_error_source::platform);
 }
@@ -687,6 +774,10 @@ void DesktopService::open_folder(const qint64 id) {
 void DesktopService::run_scenario(const qint64 id) {
     if (!is_ready() || !id || profile_busy() || restart_pending)
         return;
+    if (workspaces->active()) {
+        notify(QCoreApplication::translate("Workspaces", "Stop the workspace before running a scenario."));
+        return;
+    }
     if (is_scenario_active()) {
         notify(QCoreApplication::translate("XLibrary", "A scenario is already running. Stop it first."));
         return;
@@ -1213,6 +1304,10 @@ QString DesktopService::diagnostics_text() const {
 }
 
 quint64 DesktopService::backup_profile(const QString &path) {
+    if (workspaces->active() || workspaces->capturing()) {
+        notify(QCoreApplication::translate("Workspaces", "Finish the workspace operation first."));
+        return 0;
+    }
     if (path.isEmpty() || profile_busy() || is_discovering() || is_scenario_active()) {
         notify(QCoreApplication::translate(
             "XLibrary", "Wait for the current profile operation or stop the scan and scenario first."));
@@ -1229,6 +1324,10 @@ quint64 DesktopService::backup_profile(const QString &path) {
 }
 
 quint64 DesktopService::preview_profile(const QString &path) {
+    if (workspaces->active() || workspaces->capturing()) {
+        notify(QCoreApplication::translate("Workspaces", "Finish the workspace operation first."));
+        return 0;
+    }
     if (path.isEmpty() || profile_busy())
         return 0;
     if (is_discovering() || is_scenario_active()) {
@@ -1242,6 +1341,10 @@ quint64 DesktopService::preview_profile(const QString &path) {
 }
 
 quint64 DesktopService::restore_profile(const QString &path, const QByteArray &fingerprint) {
+    if (workspaces->active() || workspaces->capturing()) {
+        notify(QCoreApplication::translate("Workspaces", "Finish the workspace operation first."));
+        return 0;
+    }
     if (path.isEmpty() || profile_busy() || is_opening() || is_discovering() || is_scenario_active() ||
         !launching.isEmpty() || GithubTokenStore::pending_changes(settings)) {
         notify(QCoreApplication::translate(
@@ -1283,6 +1386,10 @@ quint64 DesktopService::export_diagnostics(const QString &path) {
 }
 
 quint64 DesktopService::preview_paths(const QString &old_root, const QString &new_root) {
+    if (workspaces->active() || workspaces->capturing()) {
+        notify(QCoreApplication::translate("Workspaces", "Finish the workspace operation first."));
+        return 0;
+    }
     if (profile_busy() || restart_pending || is_discovering() || is_scenario_active() || !launching.isEmpty()) {
         notify(QCoreApplication::translate(
             "XLibrary", "Wait for the current profile operation or stop the scan and scenario first."));
@@ -1293,6 +1400,10 @@ quint64 DesktopService::preview_paths(const QString &old_root, const QString &ne
 }
 
 quint64 DesktopService::recover_paths(const QVector<path_relocation> &changes) {
+    if (workspaces->active() || workspaces->capturing()) {
+        notify(QCoreApplication::translate("Workspaces", "Finish the workspace operation first."));
+        return 0;
+    }
     if (profile_busy() || restart_pending || is_discovering() || is_scenario_active() || !launching.isEmpty()) {
         notify(QCoreApplication::translate(
             "XLibrary", "Wait for the current profile operation or stop the scan and scenario first."));
@@ -1302,6 +1413,10 @@ quint64 DesktopService::recover_paths(const QVector<path_relocation> &changes) {
 }
 
 bool DesktopService::reset_settings() {
+    if (workspaces->active() || workspaces->capturing()) {
+        notify(QCoreApplication::translate("Workspaces", "Finish the workspace operation first."));
+        return false;
+    }
     if (!is_ready() || profile_busy() || restart_pending || is_discovering() || is_scenario_active() ||
         !launching.isEmpty() || pending_shortcut_request || GithubTokenStore::pending_changes(settings) ||
         updates.is_busy()) {

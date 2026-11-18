@@ -237,7 +237,7 @@ QString Application::configured_arguments(const app_record &record) {
     return record.arguments;
 }
 
-void Application::launch_application(const app_record &record, const launch_mode mode) {
+qint64 Application::launch_application(const app_record &record, const launch_mode mode) {
     validate_launch_target(record);
     const xlibrary::ComScope com;
     const auto kind = target_kind(record);
@@ -272,7 +272,7 @@ void Application::launch_application(const app_record &record, const launch_mode
                     QCoreApplication::translate("XLibrary", "Application activation failed (Windows error %1).")
                         .arg(activated)
                         .toStdString());
-            return;
+            return process_id;
         }
         const auto target = (kind == "steam" ? "steam://run/" + record.path : record.path).toStdWString();
         SHELLEXECUTEINFOW info{};
@@ -286,7 +286,7 @@ void Application::launch_application(const app_record &record, const launch_mode
                 QCoreApplication::translate("XLibrary", "Target activation failed (Windows error %1).")
                     .arg(GetLastError())
                     .toStdString());
-        return;
+        return 0;
     }
     if (mode == launch_mode::elevated) {
         if (kind != "executable" || QFileInfo(record.path).suffix().compare("exe", Qt::CaseInsensitive) != 0 ||
@@ -311,11 +311,11 @@ void Application::launch_application(const app_record &record, const launch_mode
                 QCoreApplication::translate("XLibrary", "Elevated launch failed (Windows error %1).")
                     .arg(GetLastError())
                     .toStdString());
-        return;
+        return 0;
     }
     Application application(record.name.toStdString(), std::filesystem::path(record.path.toStdWString()));
     const auto directory = effective_working_directory(record.path, record.working_directory);
-    application.launch(record.arguments.toStdWString(), std::filesystem::path(directory.toStdWString()));
+    return application.launch(record.arguments.toStdWString(), std::filesystem::path(directory.toStdWString()));
 }
 
 app_record Application::resolve_application(const QString &path) {

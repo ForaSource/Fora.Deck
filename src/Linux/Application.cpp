@@ -801,7 +801,7 @@ QString Application::new_instance_error(const app_record &record) {
     return {};
 }
 
-void Application::launch_application(const app_record &record, const launch_mode mode) {
+qint64 Application::launch_application(const app_record &record, const launch_mode mode) {
     validate_launch_target(record);
     if (mode == launch_mode::elevated)
         throw std::invalid_argument(
@@ -822,7 +822,7 @@ void Application::launch_application(const app_record &record, const launch_mode
         process.setArguments({"steam://run/" + record.path});
         if (!process.startDetached())
             throw std::runtime_error(process.errorString().toStdString());
-        return;
+        return 0;
     }
     QStringList command;
     QString directory = record.working_directory;
@@ -831,7 +831,7 @@ void Application::launch_application(const app_record &record, const launch_mode
         validate_entry(entry);
         if (mode != launch_mode::new_instance && !requires_fresh_launch(record) && record.arguments.isEmpty() &&
             record.working_directory.isEmpty() && activate_dbus(entry))
-            return;
+            return 0;
         command = entry_command(entry);
         command.append(user_arguments(record.arguments));
         if (directory.isEmpty())
@@ -858,10 +858,12 @@ void Application::launch_application(const app_record &record, const launch_mode
     process.setArguments(command);
     if (!directory.isEmpty())
         process.setWorkingDirectory(directory);
-    if (!process.startDetached())
+    qint64 pid = 0;
+    if (!process.startDetached(&pid))
         throw std::runtime_error(QCoreApplication::translate("XLibrary", "Could not launch the application: %1")
                                      .arg(process.errorString())
                                      .toStdString());
+    return pid;
 }
 
 QString Application::configured_arguments(const app_record &record) {

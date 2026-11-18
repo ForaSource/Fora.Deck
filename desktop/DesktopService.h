@@ -16,6 +16,7 @@
 #include "PlatformIntegration.h"
 #include "ProfileBackup.h"
 #include "UpdateChecker.h"
+#include "WorkspaceCoordinator.h"
 
 class Manager;
 
@@ -38,6 +39,7 @@ private:
     void queue_launch_profiles(const app_record &record, bool priority);
     void next_launch_profiles();
     void warm_launch_profiles();
+    std::unique_ptr<WorkspaceCoordinator> workspaces;
     QTimer scenario_timer;
     QVector<scenario_step> pending_steps;
     QStringList step_states;
@@ -57,6 +59,7 @@ private:
     quint64 scenario_request_id = 0;
     std::shared_ptr<std::atomic<quint64>> scenario_generation = std::make_shared<std::atomic<quint64>>(0);
     QSet<qint64> launching;
+    QHash<quint64, qint64> workspace_launches;
     operation_state discovery_state = operation_state::ready;
     quint64 discovery_request_id = 0;
     QStringList pending_exclusions;
@@ -215,6 +218,10 @@ public:
     Q_INVOKABLE void remove_application(qint64 id);
     Q_INVOKABLE quint64 save_tag(const QString &old_name, const QString &new_name);
     Q_INVOKABLE void remove_tag(const QString &name);
+    WorkspaceCoordinator &workspace_runs() { return *workspaces; }
+    quint64 capture_workspace();
+    quint64 prepare_workspace(qint64 id);
+    quint64 export_workspace_diagnostics(const QString &path);
     quint64 save_workspace(workspace_record record);
     quint64 remove_workspace(qint64 id);
     Q_INVOKABLE quint64 save_scenario(scenario_record record);

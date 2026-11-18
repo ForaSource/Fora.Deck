@@ -42,3 +42,8 @@ if(XLIBRARY_BUILD_BENCHMARKS)
     add_executable(poll_benchmark poll_benchmark.cpp)
     target_link_libraries(poll_benchmark PRIVATE xlibrary_core)
 endif()
+
+xlibrary_add_test(workspaces_test workspaces_test.cpp
+    ../desktop/WorkspaceCapture.cpp ../desktop/WorkspaceCapture.h ../desktop/WorkspaceWindowBackend.h
+    ../desktop/WorkspaceCoordinator.cpp ../desktop/WorkspaceCoordinator.h)
+target_link_libraries(workspaces_test PRIVATE Qt6::Concurrent)

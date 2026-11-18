@@ -40,6 +40,16 @@ struct operation_error {
     operation_error_source source = operation_error_source::none;
 };
 
+enum class launch_origin { manual, scenario, workspace };
+
+struct launch_context {
+    launch_origin origin = launch_origin::manual;
+    quint64 generation = 0;
+    qint64 configuration_id = 0;
+};
+
+Q_DECLARE_METATYPE(launch_context)
+
 struct operation_result {
     quint64 id = 0;
     QString operation;

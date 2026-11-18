@@ -787,10 +787,10 @@ void desktop_platform::apply_backdrop(QWidget *, bool, bool) {
     // Qt draws a fully opaque version; Linux has no generally available DWM backdrop.
 }
 
-void desktop_platform::launch_application(const app_record &record, const launch_mode mode) {
+qint64 desktop_platform::launch_application(const app_record &record, const launch_mode mode) {
     if (mode == launch_mode::activate && WindowManager::activate_window(record))
-        return;
-    Application::launch_application(record, mode);
+        return 0;
+    return Application::launch_application(record, mode);
 }
 
 bool desktop_platform::set_autostart(const bool enabled, QString &error) {

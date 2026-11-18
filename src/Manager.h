@@ -81,7 +81,7 @@ signals:
     void workspace_saved(quint64 request_id, qint64 id);
     void scenario_saved(quint64 request_id, qint64 id);
     void tag_renamed(const QString &old_name, const QString &new_name);
-    void launched(qint64 id, const operation_result &result, quint64 scenario);
+    void launched(qint64 id, const operation_result &result, launch_context context, qint64 process_id = 0);
     void notification(const QString &message);
     void discovery_report_ready(const QString &report);
     void discovery_dismissed(const QStringList &targets);
@@ -113,9 +113,9 @@ public:
     void preview_profile(const QString &path);
     void preview_paths(const QString &old_root, const QString &new_root);
     void recover_paths(const QVector<path_relocation> &changes);
-    void launch_record(qint64 id, Application::launch_mode mode, quint64 generation,
+    void launch_record(qint64 id, Application::launch_mode mode, launch_context context,
                        const std::shared_ptr<std::atomic<quint64>> &token,
-                       const std::function<void(const app_record &, Application::launch_mode)> &launch_action,
+                       const std::function<qint64(const app_record &, Application::launch_mode)> &launch_action,
                        const QString &profile = {});
     void execute(quint64 id, const QString &operation, const std::function<void(Manager &)> &task,
                  operation_error_source source);
