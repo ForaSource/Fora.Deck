@@ -16,6 +16,16 @@
 #include "PlatformIntegration.h"
 
 namespace {
+enum class application_status { running, stopped, drive_unavailable, unavailable };
+
+application_status status_of(const app_record &record) {
+    if (record.running)
+        return application_status::running;
+    if (record.available)
+        return application_status::stopped;
+    return record.volume_unavailable ? application_status::drive_unavailable : application_status::unavailable;
+}
+
 QString icon_cache_key(const app_record &record) {
     if (!record.icon_path.isEmpty() && QFileInfo(record.icon_path).isAbsolute())
         return "image:" + Application::target_kind(record) + ':' + record.icon_path;
@@ -177,10 +187,17 @@ QVariant LibraryModel::data(const QModelIndex &index, const int requested_role) 
             return record.name;
         if (index.column() == 1)
             return record.tags.join(", ");
-        return record.running              ? QCoreApplication::translate("XLibrary", "Running")
-               : record.available          ? QCoreApplication::translate("XLibrary", "Not running")
-               : record.volume_unavailable ? QCoreApplication::translate("XLibrary", "Drive unavailable")
-                                           : QCoreApplication::translate("XLibrary", "Unavailable");
+        switch (status_of(record)) {
+        case application_status::running:
+            return QCoreApplication::translate("XLibrary", "Running");
+        case application_status::stopped:
+            return QCoreApplication::translate("XLibrary", "Not running");
+        case application_status::drive_unavailable:
+            return QCoreApplication::translate("XLibrary", "Drive unavailable");
+        case application_status::unavailable:
+            return QCoreApplication::translate("XLibrary", "Unavailable");
+        }
+        return {};
     case Qt::ToolTipRole:
         return record.name + '\n' + QDir::toNativeSeparators(Application::application_path(record)) +
                (process_usage(record).isEmpty() ? QString{} : '\n' + process_usage(record));
@@ -451,19 +468,23 @@ bool LibraryFilter::lessThan(const QModelIndex &left, const QModelIndex &right) 
     const auto *model = static_cast<const LibraryModel *>(sourceModel());
     const auto &a = model->at(left.row());
     const auto &b = model->at(right.row());
-    if (query.has_text()) {
+    const bool ranked_search = query.has_text();
+    const bool ascending = sortOrder() == Qt::AscendingOrder;
+    if (ranked_search) {
         const auto a_rank = query_rank(left.row());
         const auto b_rank = query_rank(right.row());
         if (a_rank != b_rank)
-            return sortOrder() == Qt::AscendingOrder ? a_rank < b_rank : a_rank > b_rank;
+            return ascending ? a_rank < b_rank : a_rank > b_rank;
     }
-    // The proxy reverses comparisons for descending order; keep favorites pinned within each relevance rank.
-    if (a.favorite != b.favorite)
-        return sortOrder() == Qt::AscendingOrder ? a.favorite : b.favorite;
-    if (a.launch_count != b.launch_count)
-        return sortOrder() == Qt::AscendingOrder ? a.launch_count > b.launch_count : a.launch_count < b.launch_count;
-    if (a.launch_count > 0 && a.last_launch != b.last_launch)
-        return sortOrder() == Qt::AscendingOrder ? a.last_launch > b.last_launch : a.last_launch < b.last_launch;
+    // The proxy reverses comparisons in descending order. Keep search ranking and favorites-first stable.
+    if ((ranked_search || sort_mode == 2) && a.favorite != b.favorite)
+        return ascending ? a.favorite : b.favorite;
+    if (ranked_search) {
+        if (a.launch_count != b.launch_count)
+            return ascending ? a.launch_count > b.launch_count : a.launch_count < b.launch_count;
+        if (a.launch_count > 0 && a.last_launch != b.last_launch)
+            return ascending ? a.last_launch > b.last_launch : a.last_launch < b.last_launch;
+    }
     if (sort_mode == 3) {
         const auto &a_tags = model->tag_names(left.row());
         const auto &b_tags = model->tag_names(right.row());
@@ -474,8 +495,8 @@ bool LibraryFilter::lessThan(const QModelIndex &left, const QModelIndex &right) 
             return comparison < 0;
     }
     if (sort_mode == 4) {
-        const auto a_status = a.running ? 0 : a.available ? 1 : 2;
-        const auto b_status = b.running ? 0 : b.available ? 1 : 2;
+        const auto a_status = status_of(a);
+        const auto b_status = status_of(b);
         if (a_status != b_status)
             return a_status < b_status;
     }
