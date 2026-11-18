@@ -68,6 +68,10 @@ find_package(Qt6 6.5 REQUIRED COMPONENTS LinguistTools)
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     find_package(Qt6 6.5 REQUIRED COMPONENTS DBus)
     find_package(X11)
+    find_package(PkgConfig QUIET)
+    if(PkgConfig_FOUND)
+        pkg_check_modules(workspace_x11 QUIET IMPORTED_TARGET xcb xcb-randr xcb-res)
+    endif()
 endif()
 
 include(cmake/qtkeychain.cmake)
@@ -180,6 +184,8 @@ qt_add_executable(XLibrary WIN32
         desktop/SearchResults.h desktop/SearchResults.cpp
         desktop/SearchOverlay.h desktop/SearchOverlay.cpp
         desktop/DesktopService.h desktop/DesktopService.cpp
+        desktop/WorkspaceWindowBackend.h
+        desktop/WorkspaceCapture.h desktop/WorkspaceCapture.cpp
         desktop/appearance.h desktop/appearance.cpp
         desktop/SelectionButton.h desktop/SelectionButton.cpp
         desktop/LibrarySplitter.h desktop/LibrarySplitter.cpp
@@ -201,7 +207,7 @@ qt_add_resources(XLibrary application_translations
         FILES ${xlibrary_qm_files}
 )
 if(WIN32)
-    target_sources(XLibrary PRIVATE desktop/WindowsIntegration.cpp assets/application_icon.rc)
+    target_sources(XLibrary PRIVATE desktop/WindowsIntegration.cpp desktop/WindowsWorkspaceBackend.cpp assets/application_icon.rc)
     target_include_directories(XLibrary PRIVATE "$<$<COMPILE_LANGUAGE:RC>:${CMAKE_CURRENT_SOURCE_DIR}>")
     set_source_files_properties(assets/application_icon.rc PROPERTIES
             OBJECT_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/assets/xlibrary.ico"
@@ -211,7 +217,11 @@ if(WIN32)
         set_property(SOURCE assets/application_icon.rc APPEND PROPERTY COMPILE_OPTIONS --use-temp-file)
     endif()
 else()
-    target_sources(XLibrary PRIVATE desktop/LinuxIntegration.cpp)
+    target_sources(XLibrary PRIVATE desktop/LinuxIntegration.cpp desktop/LinuxWorkspaceBackend.cpp)
+    if(workspace_x11_FOUND)
+        target_link_libraries(XLibrary PRIVATE PkgConfig::workspace_x11)
+        target_compile_definitions(XLibrary PRIVATE XLIBRARY_HAVE_WORKSPACE_X11=1)
+    endif()
     target_link_libraries(xlibrary_core PUBLIC Qt6::DBus)
     if(X11_FOUND)
         target_link_libraries(XLibrary PRIVATE X11::X11)

@@ -9,7 +9,7 @@ Run commands from the repository root. Use separate build directories for each Q
 | Language and build system | C++23 compiler, CMake 3.21+, Ninja for the supplied presets |
 | GUI | Qt 6.5+ Widgets, Concurrent, Network and LinguistTools (`lrelease`); Qt Quick/QML is not required |
 | Windows | Windows 10/11 x64, matching dynamic Qt and MSVC or MinGW toolchain |
-| Linux | Linux with `/proc`, Qt DBus, `pkg-config`, libsecret development files; Xlib development files enable X11 hotkeys/window activation |
+| Linux | Linux with `/proc`, Qt DBus, `pkg-config`, libsecret development files; Xlib enables X11 hotkeys and activation. XCB, RandR and XRes development files enable Workspaces window management |
 | Existing tests | Matching Qt Test; Linux also needs `dbus-run-session` |
 | Packaging | See [release requirements](releasing.md) |
 
@@ -66,7 +66,7 @@ A C++23-capable toolchain is required; GCC 13+ or Clang 17+ with a suitable stan
 ```sh
 sudo apt-get update
 sudo apt-get install build-essential clang cmake ninja-build qt6-base-dev \
-  qt6-wayland qt6-tools-dev qt6-l10n-tools libx11-dev libsecret-1-dev \
+  qt6-wayland qt6-tools-dev qt6-l10n-tools libx11-dev libxcb-randr0-dev libxcb-res0-dev libsecret-1-dev \
   pkg-config dbus-x11
 cmake --preset linux-debug
 cmake --build --preset linux-debug --parallel 4
