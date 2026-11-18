@@ -39,6 +39,9 @@ QString manifest_summary(const profile_manifest &manifest) {
         {"application_tags", QCoreApplication::translate("XLibrary", "Tag assignments: %1")},
         {"desktop_scenario", QCoreApplication::translate("XLibrary", "Scenarios: %1")},
         {"desktop_scenario_step", QCoreApplication::translate("XLibrary", "Scenario steps: %1")},
+        {"workspace", QCoreApplication::translate("Workspaces", "Workspaces (%1)")},
+        {"workspace_item", QCoreApplication::translate("Workspaces", "Workspace resources (%1)")},
+        {"workspace_window", QCoreApplication::translate("Workspaces", "Saved window placements (%1)")},
         {"discovery_source", QCoreApplication::translate("XLibrary", "Discovery sources: %1")},
         {"history", QCoreApplication::translate("XLibrary", "Launch history entries: %1")},
         {"settings", QCoreApplication::translate("XLibrary", "Settings: %1")}};

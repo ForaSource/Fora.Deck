@@ -187,6 +187,7 @@ qt_add_executable(XLibrary WIN32
         desktop/WorkspaceWindowBackend.h
         desktop/WorkspaceCapture.h desktop/WorkspaceCapture.cpp
         desktop/WorkspaceCoordinator.h desktop/WorkspaceCoordinator.cpp
+        desktop/WorkspacesView.h desktop/WorkspacesView.cpp
         desktop/appearance.h desktop/appearance.cpp
         desktop/SelectionButton.h desktop/SelectionButton.cpp
         desktop/LibrarySplitter.h desktop/LibrarySplitter.cpp

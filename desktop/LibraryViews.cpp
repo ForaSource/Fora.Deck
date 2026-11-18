@@ -10,14 +10,14 @@
 #include <QFutureWatcher>
 #include <QHeaderView>
 #include <QKeyEvent>
-#include <QLineEdit>
-#include <QListWidget>
-#include <QListView>
 #include <QLayoutItem>
-#include <QMouseEvent>
+#include <QLineEdit>
+#include <QListView>
+#include <QListWidget>
 #include <QMenu>
 #include <QMessageBox>
 #include <QMimeDatabase>
+#include <QMouseEvent>
 #include <QPainter>
 #include <QPlainTextEdit>
 #include <QProgressBar>
@@ -28,10 +28,10 @@
 #include <QStackedLayout>
 #include <QStyle>
 #include <QStyledItemDelegate>
+#include <QtConcurrent/QtConcurrentRun>
 #include <QTreeView>
 #include <QTreeWidget>
 #include <QUrl>
-#include <QtConcurrent/QtConcurrentRun>
 
 #include "appearance.h"
 #include "Application.h"
@@ -45,6 +45,7 @@
 #include "SearchTools.h"
 #include "SelectionButton.h"
 #include "UiHelpers.h"
+#include "WorkspacesView.h"
 
 namespace {
 using namespace ui_helpers;
@@ -521,11 +522,13 @@ QWidget *navigation(const ui_context &context, QWidget *const parent) {
     layout->addSpacing(16);
     auto *group = new QButtonGroup(widget);
     group->setExclusive(true);
-    const QList<QStringList> links{{"library", QCoreApplication::translate("XLibrary", "Library"), "library"},
-                                   {"favorites", QCoreApplication::translate("XLibrary", "Favorites"), "favorite"},
-                                   {"running", QCoreApplication::translate("XLibrary", "Running applications"), "running"},
-                                   {"scenarios", QCoreApplication::translate("XLibrary", "Scenarios"), "scenarios"},
-                                   {"files", QCoreApplication::translate("XLibrary", "My files"), "saved_file"}};
+    const QList<QStringList> links{
+        {"library", QCoreApplication::translate("XLibrary", "Library"), "library"},
+        {"favorites", QCoreApplication::translate("XLibrary", "Favorites"), "favorite"},
+        {"running", QCoreApplication::translate("XLibrary", "Running applications"), "running"},
+        {"scenarios", QCoreApplication::translate("XLibrary", "Scenarios"), "scenarios"},
+        {"workspaces", QCoreApplication::translate("Workspaces", "Workspaces"), "workspaces"},
+        {"files", QCoreApplication::translate("XLibrary", "My files"), "saved_file"}};
     for (const auto &link : links) {
         if (link[0] == "scenarios")
             layout->addSpacing(12);
@@ -793,6 +796,8 @@ QWidget *search_bar(const ui_context &context, QWidget *const parent) {
     });
     QObject::connect(timer, &QTimer::timeout, widget, [=] { service->filter.set_query(search->text()); });
     QObject::connect(context.actions.value("focus_search"), &QAction::triggered, search, [=] {
+        if (service->section() == "workspaces")
+            service->navigate("library");
         search->setFocus();
         search->selectAll();
     });
@@ -2263,5 +2268,6 @@ void register_library_views(UiRegistry &registry) {
         return dialog;
     });
     registry.add_default("scenarios", scenarios);
+    registry.add_default("workspaces", workspaces_view);
     registry.add_default("application_menu", application_menu);
 }

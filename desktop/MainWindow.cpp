@@ -50,6 +50,7 @@ QWidget *shell(const ui_context &context, QWidget *const parent) {
     pages->addWidget(context.registry->create("scenarios", context, pages));
     pages->addWidget(context.registry->create("my_files", context, pages));
     pages->addWidget(context.registry->create("file_workspace", context, pages));
+    pages->addWidget(context.registry->create("workspaces", context, pages));
     auto *transition = new PageTransition(pages);
     body->addWidget(transition, 1);
     auto *notice = new NotificationBanner(*context.settings, 20);
@@ -100,7 +101,12 @@ QWidget *shell(const ui_context &context, QWidget *const parent) {
     QObject::connect(service, &DesktopService::navigation_changed, widget,
                      [=] {
                          const auto section = service->section();
-                         const int next = service->file_search_active() ? 3 : section == "scenarios" ? 1 : section == "files" ? 2 : 0;
+                         search_bar->setVisible(section != "workspaces");
+                         const int next = service->file_search_active() ? 3
+                                          : section == "scenarios"      ? 1
+                                          : section == "files"          ? 2
+                                          : section == "workspaces"     ? 4
+                                                                        : 0;
                          if (next == pages->currentIndex())
                              return;
                          const int direction = next == 3 ? 1 : pages->currentIndex() == 3 ? -1 : 0;
@@ -335,12 +341,13 @@ void MainWindow::refresh_actions() {
     for (const auto &id : {"launch", "new_instance", "terminate", "edit_application", "remove_application", "favorite",
                            "open_folder", "copy_path", "copy_arguments", "details"})
         context.actions.value(id)->setEnabled(profile_available && record != nullptr &&
-                                              service.section() != "scenarios" && service.section() != "files" &&
-                                              !service.file_search_active());
+                                              (service.section() != "scenarios" && service.section() != "workspaces") &&
+                                              service.section() != "files" && !service.file_search_active());
     if (service.file_search_active() || service.section() == "files")
         context.actions.value("details")->setEnabled(profile_available && !service.selected_file().isEmpty());
     auto *terminate = context.actions.value("terminate");
-    terminate->setVisible(record && record->running && service.section() != "scenarios" &&
+    terminate->setVisible(record && record->running &&
+                          (service.section() != "scenarios" && service.section() != "workspaces") &&
                           service.section() != "files" && !service.file_search_active());
     terminate->setEnabled(terminate->isEnabled() && record && record->running);
     const bool folder_supported = record && (Application::file_target(*record) ||
@@ -356,8 +363,8 @@ void MainWindow::refresh_actions() {
     context.actions.value("launch")->setEnabled(context.actions.value("launch")->isEnabled() && record && record->available);
     auto *new_instance = context.actions.value("new_instance");
     const bool can_start = profile_available && record && record->available && record->new_instance_error.isEmpty();
-    new_instance->setEnabled(can_start && service.section() != "scenarios" && service.section() != "files" &&
-                             !service.file_search_active());
+    new_instance->setEnabled(can_start && (service.section() != "scenarios" && service.section() != "workspaces") &&
+                             service.section() != "files" && !service.file_search_active());
     new_instance->setText(QCoreApplication::translate("XLibrary", "Request new instance"));
     new_instance->setToolTip(
         record && !record->new_instance_error.isEmpty()
@@ -501,7 +508,7 @@ void MainWindow::update_layout() {
     if (centralWidget())
         for (auto *splitter : centralWidget()->findChildren<QSplitter *>("library_splitter"))
             if (auto *library = dynamic_cast<LibrarySplitter *>(splitter))
-                library->update_layout(service.section() != "scenarios");
+                library->update_layout((service.section() != "scenarios" && service.section() != "workspaces"));
 }
 
 void MainWindow::show_library() {

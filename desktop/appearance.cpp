@@ -106,6 +106,11 @@ QIcon appearance::icon(const QString &name, const QColor &requested_color) {
         painter.drawPath(path);
     } else if (name == "play") {
         painter.drawPolygon(QPolygonF{QPointF(8, 4), QPointF(20, 12), QPointF(8, 20)});
+    } else if (name == "workspaces") {
+        painter.drawRoundedRect(QRectF(3, 4, 18, 14), 2, 2);
+        painter.drawLine(QPointF(10, 5), QPointF(10, 17));
+        painter.drawLine(QPointF(11, 11), QPointF(20, 11));
+        painter.drawLine(QPointF(9, 21), QPointF(15, 21));
     } else if (name == "scenarios") {
         painter.drawLine(QPointF(6, 6), QPointF(6, 18));
         for (int y : {5, 12, 19}) {
@@ -427,12 +432,13 @@ void appearance::apply(const QSettings &settings, const QString &additional_styl
         QLineEdit#search_input { min-height: @launch_height@px; }
         QLineEdit QToolButton { background: transparent; border: none; border-radius: 0; padding: 0; min-height: 0; }
         QComboBox::drop-down { border: none; width: 24px; }
-        QTabBar#shortcut_tabs::tab { background: transparent; color: %4; border: 1px solid transparent; border-radius: 8px; padding: 8px 12px; margin-right: 8px; min-height: %10px; }
-        QTabBar#shortcut_tabs::tab:last { margin-right: 0; }
-        QTabBar#shortcut_tabs::tab:hover { background: %5; }
-        QTabBar#shortcut_tabs::tab:selected { color: %1; background: %7; border-color: %16; }
-        QTabBar#shortcut_tabs::scroller { width: 2em; }
-        QTabBar#shortcut_tabs QToolButton { padding: 0; min-width: 0; min-height: 0; border-radius: 6px; }
+        QTabWidget#workspaces_tabs::pane { border: 0; background: transparent; }
+        QTabBar#shortcut_tabs::tab, QTabBar#workspace_report_tabs::tab { background: transparent; color: %4; border: 1px solid transparent; border-radius: 8px; padding: 8px 12px; margin-right: 8px; min-height: %10px; }
+        QTabBar#shortcut_tabs::tab:last, QTabBar#workspace_report_tabs::tab:last { margin-right: 0; }
+        QTabBar#shortcut_tabs::tab:hover, QTabBar#workspace_report_tabs::tab:hover { background: %5; }
+        QTabBar#shortcut_tabs::tab:selected, QTabBar#workspace_report_tabs::tab:selected { color: %1; background: %7; border-color: %16; }
+        QTabBar#shortcut_tabs::scroller, QTabBar#workspace_report_tabs::scroller { width: 2em; }
+        QTabBar#shortcut_tabs QToolButton, QTabBar#workspace_report_tabs QToolButton { padding: 0; min-width: 0; min-height: 0; border-radius: 6px; }
         QAbstractItemView { background: %2; border: none; outline: none; selection-background-color: %7; }
         QAbstractItemView::item { padding: 6px; border: 2px solid transparent; border-radius: 8px; }
         QAbstractItemView::item:hover { background: %17; }

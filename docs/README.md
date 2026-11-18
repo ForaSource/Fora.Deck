@@ -7,7 +7,7 @@ an older release may have a different interface or feature set.
 
 | Guide | Contents |
 | --- | --- |
-| [User guide](usage.md) | Search, file indexing, shortcuts, Linux setup, and launch scenarios. |
+| [User guide](usage.md) | Search, file indexing, shortcuts, Linux setup, scenarios and workspaces. |
 | [Catalog management](catalog.md) | Discovery, import/export, duplicate handling, bulk editing, and removal. |
 | [Profiles and recovery](profile.md) | Storage modes, complete backups, moved applications, and diagnostics. |
 | [Updates](updates.md) | Stable/Preview channels, installers, portable upgrades, and optional GitHub tokens. |
@@ -22,6 +22,7 @@ an older release may have a different interface or feature set.
 | [Packaging and releases](releasing.md) | Windows and Linux packages, compatibility, and release workflow. |
 | [Continuous integration](ci.md) | Workflows, artifacts, required checks, and repository settings. |
 | [Architecture](architecture.md) | Backend and desktop responsibilities and data flow. |
+| [Workspaces](workspaces.md) | Platform capabilities, verification, and the five-person pilot. |
 | [Interface design](design.md) | Palettes, typography, interactions and [brand assets](../assets/README.md). |
 
 [AGENTS.md](../AGENTS.md) owns agent working rules and documentation conventions.

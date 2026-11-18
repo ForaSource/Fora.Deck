@@ -3558,4 +3558,639 @@ Qt: %4
         <translation>Сведения о файле</translation>
     </message>
 </context>
+<context>
+    <name>Workspaces</name>
+    <message>
+        <source>Invalid resource details.</source>
+        <translation>Недопустимые параметры ресурса.</translation>
+    </message>
+    <message>
+        <source>Choose an application from the library.</source>
+        <translation>Выберите приложение из библиотеки.</translation>
+    </message>
+    <message>
+        <source>Application options require a library application.</source>
+        <translation>Параметры запуска доступны для приложений из библиотеки.</translation>
+    </message>
+    <message>
+        <source>Invalid window placement.</source>
+        <translation>Недопустимое положение окна.</translation>
+    </message>
+    <message>
+        <source>Enter an absolute file or folder path.</source>
+        <translation>Введите абсолютный путь к файлу или папке.</translation>
+    </message>
+    <message>
+        <source>Enter an HTTP or HTTPS URL without credentials.</source>
+        <translation>Введите HTTP- или HTTPS-адрес без учётных данных.</translation>
+    </message>
+    <message>
+        <source>Unknown resource type.</source>
+        <translation>Неизвестный тип ресурса.</translation>
+    </message>
+    <message>
+        <source>Enter a workspace name of up to 128 characters.</source>
+        <translation>Введите название рабочего пространства длиной до 128 символов.</translation>
+    </message>
+    <message>
+        <source>Add between 1 and %1 resources.</source>
+        <translation>Добавьте от 1 до %1 ресурсов.</translation>
+    </message>
+    <message>
+        <source>A resource ID occurs more than once.</source>
+        <translation>Идентификатор ресурса повторяется.</translation>
+    </message>
+    <message>
+        <source>Profile contains an invalid workspace item</source>
+        <translation>В профиле есть некорректный ресурс рабочего пространства</translation>
+    </message>
+    <message>
+        <source>Profile contains an invalid workspace</source>
+        <translation>В профиле есть некорректное рабочее пространство</translation>
+    </message>
+    <message>
+        <source>Application configuration changed. Run preflight again.</source>
+        <translation>Конфигурация приложения изменилась. Повторите предварительную проверку.</translation>
+    </message>
+    <message>
+        <source>This workspace name is already in use.</source>
+        <translation>Рабочее пространство с таким названием уже есть.</translation>
+    </message>
+    <message>
+        <source>The workspace was removed.</source>
+        <translation>Рабочее пространство удалено.</translation>
+    </message>
+    <message>
+        <source>The resource list has changed.</source>
+        <translation>Список ресурсов изменился.</translation>
+    </message>
+    <message>
+        <source>The library application was removed.</source>
+        <translation>Приложение удалено из библиотеки.</translation>
+    </message>
+    <message>
+        <source>Wayland workspaces can launch resources only. Window capture and placement are unavailable.</source>
+        <translation>В Wayland доступно открытие ресурсов. Захват и размещение окон недоступны.</translation>
+    </message>
+    <message>
+        <source>The X11 server cannot verify window ownership. Workspaces can launch resources only.</source>
+        <translation>Сервер X11 не может подтвердить принадлежность окон. Доступно открытие ресурсов.</translation>
+    </message>
+    <message>
+        <source>Window capture and placement require a local X11 session with a compatible window manager.</source>
+        <translation>Для захвата и размещения окон нужен локальный сеанс X11 с совместимым оконным менеджером.</translation>
+    </message>
+    <message>
+        <source>Window placement is unavailable with this X11 window manager.</source>
+        <translation>Оконный менеджер X11 не поддерживает размещение окон.</translation>
+    </message>
+    <message>
+        <source>Window capture and placement are unavailable on this display. Workspaces can launch resources only.</source>
+        <translation>На этом дисплее захват и размещение окон недоступны. Ресурсы можно открывать.</translation>
+    </message>
+    <message>
+        <source>This build lacks X11 window management support. Workspaces can launch resources only.</source>
+        <translation>В этой сборке доступно открытие ресурсов. Управление окнами X11 недоступно.</translation>
+    </message>
+    <message>
+        <source>Window capture and placement require the Windows desktop.</source>
+        <translation>Для захвата и размещения окон нужен рабочий стол Windows.</translation>
+    </message>
+    <message>
+        <source>Windows could not read the desktop layout.</source>
+        <translation>Не удалось прочитать расположение окон Windows.</translation>
+    </message>
+    <message>
+        <source>Unrecognized window</source>
+        <translation>Окно не распознано</translation>
+    </message>
+    <message>
+        <source>Launch configuration could not be identified</source>
+        <translation>Конфигурация запуска не определена</translation>
+    </message>
+    <message>
+        <source>File or folder is missing.</source>
+        <translation>Файл или папка отсутствует.</translation>
+    </message>
+    <message>
+        <source>Permission to open the resource is unavailable.</source>
+        <translation>Нет доступа к ресурсу.</translation>
+    </message>
+    <message>
+        <source>Add executable targets from the application library.</source>
+        <translation>Добавляйте исполняемые файлы из библиотеки приложений.</translation>
+    </message>
+    <message>
+        <source>The launch request did not respond in time.</source>
+        <translation>Истекло время ожидания ответа на запрос запуска.</translation>
+    </message>
+    <message>
+        <source>Library application is missing.</source>
+        <translation>Приложение отсутствует в библиотеке.</translation>
+    </message>
+    <message>
+        <source>Application target is unavailable.</source>
+        <translation>Цель запуска недоступна.</translation>
+    </message>
+    <message>
+        <source>Application working directory is unavailable.</source>
+        <translation>Рабочая папка приложения недоступна.</translation>
+    </message>
+    <message>
+        <source>Application lacks permission to execute.</source>
+        <translation>Нет прав на запуск приложения.</translation>
+    </message>
+    <message>
+        <source>The existing window matches several launch configurations. Turn off reuse to request a fresh launch.</source>
+        <translation>Существующее окно подходит нескольким конфигурациям запуска. Отключите повторное использование окон, чтобы запросить новый запуск.</translation>
+    </message>
+    <message>
+        <source>Several windows match. This resource will be skipped while the match is ambiguous.</source>
+        <translation>Найдено несколько подходящих окон. Ресурс будет пропущен, пока совпадение неоднозначно.</translation>
+    </message>
+    <message>
+        <source>Existing windows cannot be reused with these launch options. A fresh launch will be requested.</source>
+        <translation>С этими параметрами нельзя использовать существующие окна. Будет запрошен новый запуск.</translation>
+    </message>
+    <message>
+        <source>Window placement is unavailable.</source>
+        <translation>Размещение окон недоступно.</translation>
+    </message>
+    <message>
+        <source>Window identity cannot be verified for this launch configuration.</source>
+        <translation>Для этой конфигурации запуска не удалось подтвердить принадлежность окна.</translation>
+    </message>
+    <message>
+        <source>Saved monitor unavailable. The primary monitor will be used if available.</source>
+        <translation>Сохранённый монитор недоступен. При наличии будет выбран основной монитор.</translation>
+    </message>
+    <message>
+        <source>Open request accepted.</source>
+        <translation>Запрос на открытие принят.</translation>
+    </message>
+    <message>
+        <source>The system did not accept the open request.</source>
+        <translation>Система отклонила запрос на открытие.</translation>
+    </message>
+    <message>
+        <source>Several windows match. Turn off reuse to request a fresh launch.</source>
+        <translation>Найдено несколько подходящих окон. Отключите повторное использование окон, чтобы запросить новый запуск.</translation>
+    </message>
+    <message>
+        <source>The application is busy.</source>
+        <translation>Приложение занято.</translation>
+    </message>
+    <message>
+        <source>Could not open the application.</source>
+        <translation>Не удалось открыть приложение.</translation>
+    </message>
+    <message>
+        <source>Launch accepted. Window verification is unavailable.</source>
+        <translation>Запрос запуска принят. Проверка окон недоступна.</translation>
+    </message>
+    <message>
+        <source>Launch accepted. Window identity could not be verified.</source>
+        <translation>Запрос запуска принят. Принадлежность окна не подтверждена.</translation>
+    </message>
+    <message>
+        <source>Launch accepted. Several new windows match.</source>
+        <translation>Запрос запуска принят. Найдено несколько новых подходящих окон.</translation>
+    </message>
+    <message>
+        <source>Launch accepted. No matching window appeared in time.</source>
+        <translation>Запрос запуска принят. Подходящее окно не появилось за отведённое время.</translation>
+    </message>
+    <message>
+        <source>The saved monitor was unavailable.</source>
+        <translation>Сохранённый монитор недоступен.</translation>
+    </message>
+    <message>
+        <source>Window activation was refused.</source>
+        <translation>Система отклонила активацию окна.</translation>
+    </message>
+    <message>
+        <source>The existing window could not be activated.</source>
+        <translation>Не удалось активировать существующее окно.</translation>
+    </message>
+    <message>
+        <source>Window placement was refused.</source>
+        <translation>Система отклонила изменение положения окна.</translation>
+    </message>
+    <message>
+        <source>Window positioned on %1.</source>
+        <translation>Окно размещено на мониторе %1.</translation>
+    </message>
+    <message>
+        <source>The window manager did not confirm the requested placement.</source>
+        <translation>Оконный менеджер не подтвердил размещение.</translation>
+    </message>
+    <message>
+        <source>Run cancelled. Open applications stay open.</source>
+        <translation>Запуск отменён. Открытые приложения продолжат работу.</translation>
+    </message>
+    <message>
+        <source>Missing application</source>
+        <translation>Приложение отсутствует</translation>
+    </message>
+    <message>
+        <source>Pending</source>
+        <translation>Ожидает</translation>
+    </message>
+    <message>
+        <source>Disabled</source>
+        <translation>Отключено</translation>
+    </message>
+    <message>
+        <source>Checking</source>
+        <translation>Проверка</translation>
+    </message>
+    <message>
+        <source>Opening</source>
+        <translation>Открытие</translation>
+    </message>
+    <message>
+        <source>Waiting for window</source>
+        <translation>Ожидание окна</translation>
+    </message>
+    <message>
+        <source>Positioning window</source>
+        <translation>Размещение окна</translation>
+    </message>
+    <message>
+        <source>Open request accepted</source>
+        <translation>Запрос на открытие принят</translation>
+    </message>
+    <message>
+        <source>Window ready</source>
+        <translation>Окно готово</translation>
+    </message>
+    <message>
+        <source>Reused existing window</source>
+        <translation>Использовано существующее окно</translation>
+    </message>
+    <message>
+        <source>Window positioned</source>
+        <translation>Окно размещено</translation>
+    </message>
+    <message>
+        <source>Unverified</source>
+        <translation>Результат не подтверждён</translation>
+    </message>
+    <message>
+        <source>Skipped</source>
+        <translation>Пропущено</translation>
+    </message>
+    <message>
+        <source>Failed</source>
+        <translation>Ошибка</translation>
+    </message>
+    <message>
+        <source>Cancelled</source>
+        <translation>Отменено</translation>
+    </message>
+    <message>
+        <source>Workspace completed</source>
+        <translation>Запуск завершён</translation>
+    </message>
+    <message>
+        <source>Workspace partially completed</source>
+        <translation>Запуск завершён частично</translation>
+    </message>
+    <message>
+        <source>Workspace failed</source>
+        <translation>Запуск не удался</translation>
+    </message>
+    <message>
+        <source>Workspace cancelled</source>
+        <translation>Запуск отменён</translation>
+    </message>
+    <message>
+        <source>Application</source>
+        <translation>Приложение</translation>
+    </message>
+    <message>
+        <source>File</source>
+        <translation>Файл</translation>
+    </message>
+    <message>
+        <source>Folder</source>
+        <translation>Папка</translation>
+    </message>
+    <message>
+        <source>URL</source>
+        <translation>Ссылка</translation>
+    </message>
+    <message>
+        <source>Edit resource</source>
+        <translation>Изменить ресурс</translation>
+    </message>
+    <message>
+        <source>Add resource</source>
+        <translation>Добавить ресурс</translation>
+    </message>
+    <message>
+        <source>Resource type</source>
+        <translation>Тип ресурса</translation>
+    </message>
+    <message>
+        <source>Missing application · %1</source>
+        <translation>Приложение отсутствует · %1</translation>
+    </message>
+    <message>
+        <source>Library application</source>
+        <translation>Приложение из библиотеки</translation>
+    </message>
+    <message>
+        <source>Browser launch profile</source>
+        <translation>Профиль браузера</translation>
+    </message>
+    <message>
+        <source>Reuse existing window when identity is verified</source>
+        <translation>Использовать существующее подтверждённое окно</translation>
+    </message>
+    <message>
+        <source>Use application default</source>
+        <translation>Как в приложении</translation>
+    </message>
+    <message>
+        <source>Use configured launch</source>
+        <translation>Использовать настроенный запуск</translation>
+    </message>
+    <message>
+        <source>Unavailable profile · %1</source>
+        <translation>Профиль недоступен · %1</translation>
+    </message>
+    <message>
+        <source>Restore window placement</source>
+        <translation>Восстановить положение окна</translation>
+    </message>
+    <message>
+        <source>Primary monitor</source>
+        <translation>Основной монитор</translation>
+    </message>
+    <message>
+        <source>Maximized</source>
+        <translation>Развёрнуто</translation>
+    </message>
+    <message>
+        <source>Unavailable monitor · %1</source>
+        <translation>Монитор недоступен · %1</translation>
+    </message>
+    <message>
+        <source>&amp;Monitor</source>
+        <translation>&amp;Монитор</translation>
+    </message>
+    <message>
+        <source>Left offset</source>
+        <translation>Отступ слева</translation>
+    </message>
+    <message>
+        <source>Top offset</source>
+        <translation>Отступ сверху</translation>
+    </message>
+    <message>
+        <source>Width</source>
+        <translation>Ширина</translation>
+    </message>
+    <message>
+        <source>Height</source>
+        <translation>Высота</translation>
+    </message>
+    <message>
+        <source>Path or URL</source>
+        <translation>Путь или ссылка</translation>
+    </message>
+    <message>
+        <source>Browse…</source>
+        <translation>Обзор…</translation>
+    </message>
+    <message>
+        <source>Apply</source>
+        <translation>Применить</translation>
+    </message>
+    <message>
+        <source>Edit workspace</source>
+        <translation>Изменить пространство</translation>
+    </message>
+    <message>
+        <source>New workspace</source>
+        <translation>Новое пространство</translation>
+    </message>
+    <message>
+        <source>Workspace name</source>
+        <translation>Название пространства</translation>
+    </message>
+    <message>
+        <source>Resource</source>
+        <translation>Ресурс</translation>
+    </message>
+    <message>
+        <source>Type</source>
+        <translation>Тип</translation>
+    </message>
+    <message>
+        <source>Resources in launch order</source>
+        <translation>Ресурсы в порядке запуска</translation>
+    </message>
+    <message>
+        <source>Remove resource</source>
+        <translation>Убрать ресурс</translation>
+    </message>
+    <message>
+        <source>Move up</source>
+        <translation>Выше</translation>
+    </message>
+    <message>
+        <source>Move down</source>
+        <translation>Ниже</translation>
+    </message>
+    <message>
+        <source>Save workspace</source>
+        <translation>Сохранить</translation>
+    </message>
+    <message>
+        <source>Save current desktop</source>
+        <translation>Сохранить рабочий стол</translation>
+    </message>
+    <message>
+        <source>Select one window per application. You can add other resources before saving.</source>
+        <translation>Выберите по одному окну для каждого приложения. Перед сохранением можно добавить другие ресурсы.</translation>
+    </message>
+    <message>
+        <source>Detected window</source>
+        <translation>Обнаруженное окно</translation>
+    </message>
+    <message>
+        <source>Application and monitor</source>
+        <translation>Приложение и монитор</translation>
+    </message>
+    <message>
+        <source>Detected windows</source>
+        <translation>Обнаруженные окна</translation>
+    </message>
+    <message>
+        <source>Untitled window</source>
+        <translation>Окно без заголовка</translation>
+    </message>
+    <message>
+        <source>Several windows for this application</source>
+        <translation>У приложения несколько окон</translation>
+    </message>
+    <message>
+        <source>No eligible windows were found.</source>
+        <translation>Подходящих окон не найдено.</translation>
+    </message>
+    <message>
+        <source>Continue to editor</source>
+        <translation>Перейти к редактированию</translation>
+    </message>
+    <message>
+        <source>Select only one window for each application.</source>
+        <translation>Выберите по одному окну для каждого приложения.</translation>
+    </message>
+    <message>
+        <source>Select up to %1 windows.</source>
+        <translation>Выберите не более %1 окон.</translation>
+    </message>
+    <message>
+        <source>Workspace preflight</source>
+        <translation>Проверка пространства</translation>
+    </message>
+    <message>
+        <source>Review these warnings before opening resources.</source>
+        <translation>Проверьте предупреждения перед открытием ресурсов.</translation>
+    </message>
+    <message>
+        <source>Warnings</source>
+        <translation>Предупреждения</translation>
+    </message>
+    <message>
+        <source>Preflight warnings</source>
+        <translation>Предупреждения предварительной проверки</translation>
+    </message>
+    <message>
+        <source>Run workspace</source>
+        <translation>Запустить пространство</translation>
+    </message>
+    <message>
+        <source>Workspaces</source>
+        <translation>Рабочие пространства</translation>
+    </message>
+    <message>
+        <source>Open the apps, files, folders and links for your work in one action. Create a workspace to get started.</source>
+        <translation>Открывайте нужные приложения, файлы, папки и ссылки одним действием. Создайте рабочее пространство, чтобы начать.</translation>
+    </message>
+    <message>
+        <source>Name</source>
+        <translation>Название</translation>
+    </message>
+    <message>
+        <source>Resources</source>
+        <translation>Ресурсы</translation>
+    </message>
+    <message>
+        <source>Saved workspaces</source>
+        <translation>Сохранённые рабочие пространства</translation>
+    </message>
+    <message>
+        <source>Run</source>
+        <translation>Запустить</translation>
+    </message>
+    <message>
+        <source>Edit</source>
+        <translation>Изменить</translation>
+    </message>
+    <message>
+        <source>Duplicate</source>
+        <translation>Дублировать</translation>
+    </message>
+    <message>
+        <source>Delete</source>
+        <translation>Удалить</translation>
+    </message>
+    <message>
+        <source>Status</source>
+        <translation>Состояние</translation>
+    </message>
+    <message>
+        <source>Selected workspace resources</source>
+        <translation>Ресурсы выбранного пространства</translation>
+    </message>
+    <message>
+        <source>Last run</source>
+        <translation>Последний запуск</translation>
+    </message>
+    <message>
+        <source>Workspace run progress</source>
+        <translation>Ход запуска пространства</translation>
+    </message>
+    <message>
+        <source>Details</source>
+        <translation>Подробности</translation>
+    </message>
+    <message>
+        <source>Workspace run report</source>
+        <translation>Отчёт о запуске пространства</translation>
+    </message>
+    <message>
+        <source>Cancel run</source>
+        <translation>Отменить запуск</translation>
+    </message>
+    <message>
+        <source>Export run diagnostics…</source>
+        <translation>Экспорт диагностики…</translation>
+    </message>
+    <message>
+        <source>Checking open windows…</source>
+        <translation>Проверка открытых окон…</translation>
+    </message>
+    <message>
+        <source>Invalid resource</source>
+        <translation>Недопустимый ресурс</translation>
+    </message>
+    <message>
+        <source>Copy of %1</source>
+        <translation>Копия %1</translation>
+    </message>
+    <message>
+        <source>Delete workspace</source>
+        <translation>Удалить пространство</translation>
+    </message>
+    <message>
+        <source>Delete “%1”?</source>
+        <translation>Удалить «%1»?</translation>
+    </message>
+    <message>
+        <source>Export run diagnostics</source>
+        <translation>Экспорт диагностики запуска</translation>
+    </message>
+    <message>
+        <source>JSON files (*.json)</source>
+        <translation>Файлы JSON (*.json)</translation>
+    </message>
+    <message>
+        <source>Finish the workspace operation first.</source>
+        <translation>Сначала завершите операцию с рабочим пространством.</translation>
+    </message>
+    <message>
+        <source>Finish the current operation before running a workspace.</source>
+        <translation>Завершите текущую операцию перед запуском пространства.</translation>
+    </message>
+    <message>
+        <source>Stop the workspace before running a scenario.</source>
+        <translation>Остановите запуск рабочего пространства перед запуском сценария.</translation>
+    </message>
+    <message>
+        <source>Workspaces (%1)</source>
+        <translation>Рабочие пространства (%1)</translation>
+    </message>
+    <message>
+        <source>Workspace resources (%1)</source>
+        <translation>Ресурсы рабочих пространств (%1)</translation>
+    </message>
+    <message>
+        <source>Saved window placements (%1)</source>
+        <translation>Сохранённые положения окон (%1)</translation>
+    </message>
+</context>
 </TS>

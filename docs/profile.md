@@ -25,7 +25,7 @@ the index is not a copy of the documents themselves.
 ## Complete backups
 
 Choose **Settings → Profile → Back up profile…** to create a `.xlprofile` file.
-It includes application cards and launch configurations, aliases, all tags, scenarios, settings, hotkey assignments,
+It includes application cards and launch configurations, aliases, all tags, scenarios, workspaces with resource order and placement, settings, hotkey assignments,
 saved filter records, saved file paths and file favorites/tags, discovery sources, and launch/file usage history.
 This transfers more than the [JSON catalog format](catalog.md#json-import-and-export).
 
