@@ -2,6 +2,15 @@
 
 Run commands from the repository root after [configuring a Release build](building.md). Build directories hold CMake files and binaries; output directories hold transferable packages. The packagers accept absolute paths or paths relative to the repository. Quote paths with spaces. Output directories must not already exist; choose a new output path when rebuilding.
 
+## v0.9.0 release notes
+
+- Workspaces save ordered applications, browser launch profiles, files, folders and links. Launches show a
+  per-resource report, with cancellation and opt-in diagnostics.
+- Capture and window placement are best effort on Windows and local X11. Wayland provides launch-only workspaces.
+- Profile schema 10 adds workspace persistence and includes the new data in complete backups. Open a v9 profile to
+  create the pre-migration snapshot and upgrade.
+- Complete the [Workspaces pilot and interactive checks](workspaces.md#interactive-matrix) before the v0.9.0 release.
+
 ## Versions and metadata
 
 [VERSION](../VERSION) is the single source of the full SemVer string: `major.minor.patch[-prerelease][+build]`. It is retained in the application, metadata and Windows/AppImage names. Windows numeric resources and Inno Setup use `major.minor.patch.0`, with each component at most 65535, plus a full product version string. Rebuilding after a version change reconfigures CMake.

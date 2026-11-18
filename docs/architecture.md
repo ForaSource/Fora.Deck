@@ -23,6 +23,7 @@ identifiers, translation contexts and plugin IID keep their existing names.
 | [`ProfileSchema`](../src/ProfileSchema.h), [`ProfileBackup`](../src/ProfileBackup.h), [`ProfileSettings`](../src/ProfileSettings.h) | Schema validation/migration and profile backup, recovery and settings handling. |
 | [`SearchQuery`](../src/SearchQuery.h), [`LaunchIdentity`](../src/LaunchIdentity.h), [`LaunchArguments`](../src/LaunchArguments.h) | Shared search matching and launch identity/argument rules. |
 | [`DesktopService`](../desktop/DesktopService.h) | Qt-facing coordination, operation state, settings, selection, scenarios and signals consumed by the UI. |
+| [`WorkspaceCoordinator`](../desktop/WorkspaceCoordinator.h) | Preflight, confirmation, serial execution, and cancellation. A dedicated executor queries the native window backend and verifies placement. |
 | [`LibraryModel`](../desktop/LibraryModel.h) | Application model, filtered/sorted views and the shared asynchronous application/file icon cache. |
 | [`MainWindow`](../desktop/MainWindow.h), [`LibraryViews`](../desktop/LibraryViews.h), [`SettingsView`](../desktop/SettingsView.h), [`editors`](../desktop/editors.h) | Windows, navigation, library views, settings and editing forms. |
 | [`SearchResults`](../desktop/SearchResults.h), [`SearchOverlay`](../desktop/SearchOverlay.h), [`SearchTools`](../desktop/SearchTools.h) | Search presentation shared by the library and compact launcher. |

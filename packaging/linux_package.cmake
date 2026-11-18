@@ -49,7 +49,7 @@ set(CPACK_PACKAGE_CONTACT "ForaSource (https://github.com/ForaSource)" CACHE STR
 set(CPACK_PACKAGE_VERSION "${XLIBRARY_RELEASE_VERSION}")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Application launcher and organizer")
 set(CPACK_PACKAGE_DESCRIPTION
-        "Fora.Deck organizes desktop applications, tags and launch scenarios in a Qt interface.")
+        "Fora.Deck organizes desktop applications, tags, launch scenarios and workspaces in a Qt interface.")
 set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/ForaSource/Fora.Deck")
 set(CPACK_RESOURCE_FILE_LICENSE "${PROJECT_SOURCE_DIR}/LICENSE")
 set(CPACK_GENERATOR "DEB")

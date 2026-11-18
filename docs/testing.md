@@ -21,6 +21,14 @@ ctest --test-dir build-msvc -C Release --output-on-failure
 
 Use `-DBUILD_TESTING=OFF` for an application-only build. Tests and Qt Test are not installed with the application. Current targets and environment settings are in [tests/CMakeLists.txt](../tests/CMakeLists.txt); [CI](ci.md) runs them across its build matrix.
 
+## Workspaces
+
+`core_test` exercises schema migration, workspace edits, seeding and restoring complete backups and deleted app
+references. `workspaces_test` uses a fake window backend for capture confidence, normalized geometry,
+preflight, typed resource dispatch, ambiguity, PID filtering, cancellation, stale results and readiness timeouts.
+Run the [interactive matrix](workspaces.md#interactive-matrix) and [pilot](workspaces.md#five-person-opt-in-pilot)
+for release verification.
+
 ## Startup checks
 
 `--check-startup` creates the application/window and catalog in a temporary profile, then exits. It must not modify the normal/portable profile and does not perform the startup network update check.
