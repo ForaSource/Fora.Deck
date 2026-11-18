@@ -84,9 +84,14 @@ bool eligible_window(HWND window, window_owner owner) {
 }
 
 workspace_window window_identity(HWND window, DWORD pid, HANDLE process) {
+    // Some MinGW headers omit this API even though supported Windows versions export it.
+    using is_process_critical = BOOL (WINAPI *)(HANDLE, PBOOL);
+    static const auto query_critical = std::bit_cast<is_process_critical>(
+        GetProcAddress(GetModuleHandleW(L"kernel32.dll"), "IsProcessCritical"));
+
     FILETIME created{}, exited{}, kernel{}, user{};
     BOOL critical = FALSE;
-    if (!process || !IsProcessCritical(process, &critical) || critical ||
+    if (!process || !query_critical || !query_critical(process, &critical) || critical ||
         !GetProcessTimes(process, &created, &exited, &kernel, &user)) {
         return {};
     }
