@@ -196,6 +196,14 @@ void validate_columns(sqlite3 *const connection, const int version) {
         if (invalid.next())
             throw std::runtime_error("Profile contains invalid usage history");
     }
+    if (version >= 10) {
+        require_unique(connection, "workspace", {"name_key"});
+        require_unique(connection, "workspace_item", {"workspace_id", "position"});
+        require_reference(connection, "workspace_item", "application_id", "applications", "SET NULL");
+        require_reference(connection, "workspace_item", "workspace_id", "workspace", "CASCADE");
+        require_reference(connection, "workspace_window", "item_id", "workspace_item", "CASCADE");
+        xlibrary::read_workspaces(connection);
+    }
     check_integrity(connection);
 }
 
@@ -428,6 +436,42 @@ void xlibrary::migrate_profile(sqlite3 *const connection, const std::filesystem:
                     CREATE TABLE file_usage(path TEXT PRIMARY KEY NOT NULL,
                         use_count INTEGER NOT NULL CHECK(use_count>=0),
                         last_used INTEGER NOT NULL CHECK(last_used>=0));
+                )");
+                break;
+            case 9:
+                sqlite_execute(connection, R"(
+                    CREATE TABLE workspace(
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name TEXT NOT NULL CHECK(length(trim(name)) BETWEEN 1 AND 128),
+                        name_key TEXT NOT NULL UNIQUE,
+                        created_at INTEGER NOT NULL,
+                        updated_at INTEGER NOT NULL
+                    ) STRICT;
+                    CREATE TABLE workspace_item(
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        workspace_id INTEGER NOT NULL REFERENCES workspace(id) ON DELETE CASCADE,
+                        position INTEGER NOT NULL CHECK(position BETWEEN 0 AND 31),
+                        kind INTEGER NOT NULL CHECK(kind BETWEEN 0 AND 3),
+                        application_id INTEGER REFERENCES applications(id) ON DELETE SET NULL,
+                        target TEXT NOT NULL CHECK(length(target)<=4096),
+                        display_name TEXT NOT NULL CHECK(length(display_name)<=256),
+                        launch_profile TEXT NOT NULL,
+                        enabled INTEGER NOT NULL CHECK(enabled IN (0,1)),
+                        reuse_existing INTEGER NOT NULL CHECK(reuse_existing IN (0,1)),
+                        CHECK(kind=0 OR (application_id IS NULL AND launch_profile='')),
+                        CHECK((kind=0)=(target='')),
+                        UNIQUE(workspace_id,position)
+                    ) STRICT;
+                    CREATE INDEX workspace_item_application_idx ON workspace_item(application_id);
+                    CREATE TABLE workspace_window(
+                        item_id INTEGER PRIMARY KEY REFERENCES workspace_item(id) ON DELETE CASCADE,
+                        monitor_id TEXT NOT NULL,
+                        x REAL NOT NULL CHECK(x>=0),
+                        y REAL NOT NULL CHECK(y>=0),
+                        width REAL NOT NULL CHECK(width>0 AND x+width<=1.000001),
+                        height REAL NOT NULL CHECK(height>0 AND y+height<=1.000001),
+                        maximized INTEGER NOT NULL CHECK(maximized IN (0,1))
+                    ) STRICT;
                 )");
                 break;
             default:

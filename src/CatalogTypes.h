@@ -8,6 +8,8 @@
 #include <QVector>
 #include <stdexcept>
 
+#include "WorkspaceTypes.h"
+
 namespace catalog_limits {
 inline constexpr qint64 json_bytes = 32 * 1024 * 1024;
 inline constexpr qsizetype applications = 50000;
@@ -148,6 +150,7 @@ struct catalog_snapshot {
     QHash<QString, usage_record> file_usage;
     QStringList tags;
     QVector<scenario_record> scenarios;
+    QVector<workspace_record> workspaces;
     QVector<saved_filter> filters;
     QVector<target_shortcut> target_shortcuts;
 };

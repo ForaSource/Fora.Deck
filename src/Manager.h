@@ -78,6 +78,7 @@ signals:
     void result(const operation_result &result);
     void resolved(quint64 request_id, const QString &requested_path, const app_record &record);
     void application_saved(quint64 request_id, qint64 id);
+    void workspace_saved(quint64 request_id, qint64 id);
     void scenario_saved(quint64 request_id, qint64 id);
     void tag_renamed(const QString &old_name, const QString &new_name);
     void launched(qint64 id, const operation_result &result, quint64 scenario);
@@ -101,6 +102,8 @@ public:
     void remove_filter(qint64 id);
     void save_tag(const QString &old_name, const QString &new_name);
     void remove_tag(const QString &name);
+    void save_workspace(const workspace_record &record);
+    void remove_workspace(qint64 id);
     void save_scenario(const scenario_record &record);
     static QStringList scenario_issues(const scenario_record &record, const QVector<app_record> &applications);
     void remove_scenario(qint64 id);

@@ -75,9 +75,8 @@ DesktopService::DesktopService(QObject *const parent, const QString &profile_pat
     qRegisterMetaType<profile_manifest>();
     qRegisterMetaType<QVector<path_relocation>>();
     connect(this, &DesktopService::catalog_changed, this, &DesktopService::sync_target_hotkeys);
-    connect(this, &DesktopService::catalog_changed, this, [this] {
-        launch_failures.removeIf([this](auto entry) { return !model.find(entry.key()); });
-    });
+    connect(this, &DesktopService::catalog_changed, this,
+            [this] { launch_failures.removeIf([this](auto entry) { return !model.find(entry.key()); }); });
     connect(this, &DesktopService::appearance_changed, this, &DesktopService::sync_target_hotkeys);
     connect(this, &DesktopService::appearance_changed, this, &DesktopService::sync_process_monitoring);
     connect(this, &DesktopService::operation_changed, this, [this](const operation_result &result) {
@@ -202,6 +201,7 @@ DesktopService::DesktopService(QObject *const parent, const QString &profile_pat
     });
     connect(worker, &Manager::resolved, this, &DesktopService::application_resolved);
     connect(worker, &Manager::application_saved, this, &DesktopService::application_saved);
+    connect(worker, &Manager::workspace_saved, this, &DesktopService::workspace_saved);
     connect(worker, &Manager::scenario_saved, this, &DesktopService::scenario_saved);
     connect(worker, &Manager::tag_renamed, this, [this](const QString &old_name, const QString &new_name) {
         if (old_name.isEmpty())
@@ -486,7 +486,8 @@ void DesktopService::select(const qint64 id) {
 }
 
 void DesktopService::select_file(const QString &path, const QString &volume_root, const QString &volume_device) {
-    if (selected_file_path == path && selected_file_volume_root == volume_root && selected_file_volume_device == volume_device)
+    if (selected_file_path == path && selected_file_volume_root == volume_root &&
+        selected_file_volume_device == volume_device)
         return;
     selected_file_path = path;
     selected_file_volume_root = volume_root;
@@ -513,8 +514,8 @@ QString DesktopService::saved_filter_query() const {
     auto query = filter.text();
     // Saved filters store one sidebar tag; preserve the others as exact query conditions.
     for (qsizetype index = 1; index < current_tags.size(); ++index)
-        query += (query.isEmpty() || query.back().isSpace() ? QString{} : QStringLiteral(" ")) +
-                 '#' + current_tags[index];
+        query +=
+            (query.isEmpty() || query.back().isSpace() ? QString{} : QStringLiteral(" ")) + '#' + current_tags[index];
     return query;
 }
 
@@ -603,6 +604,15 @@ void DesktopService::remove_tag(const QString &name) {
     enqueue("remove_tag", [name](Manager &worker) { worker.remove_tag(name); });
 }
 
+quint64 DesktopService::save_workspace(workspace_record record) {
+    return enqueue("save_workspace",
+                   [record = std::move(record)](Manager &manager) { manager.save_workspace(record); });
+}
+
+quint64 DesktopService::remove_workspace(const qint64 id) {
+    return enqueue("remove_workspace", [id](Manager &manager) { manager.remove_workspace(id); });
+}
+
 quint64 DesktopService::save_scenario(scenario_record record) {
     return enqueue("scenario", [record = std::move(record)](Manager &worker) { worker.save_scenario(record); });
 }
@@ -653,9 +663,8 @@ void DesktopService::sync_process_monitoring() {
     const bool memory = settings.value("monitoring/memory", true).toBool();
     const bool cpu = settings.value("monitoring/cpu", true).toBool();
     model.set_process_display(memory, cpu);
-    QMetaObject::invokeMethod(worker, [worker = worker, memory, cpu] {
-        worker->set_process_monitoring(memory, cpu);
-    }, Qt::AutoConnection);
+    QMetaObject::invokeMethod(
+        worker, [worker = worker, memory, cpu] { worker->set_process_monitoring(memory, cpu); }, Qt::AutoConnection);
 }
 
 void DesktopService::terminate_application(const qint64 id) {

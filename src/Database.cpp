@@ -397,6 +397,7 @@ catalog_snapshot Database::read() const {
             result.applications[*row].tags.append(links.qtext(1));
         }
     }
+    result.workspaces = xlibrary::read_workspaces(connection);
     xlibrary::SqliteStatement scenarios(connection, "SELECT id, name FROM desktop_scenario ORDER BY name;");
     while (scenarios.next()) {
         scenario_record record{scenarios.number(0), scenarios.qtext(1), {}};
@@ -866,6 +867,109 @@ void Database::remove_scenario(const qint64 id) {
     xlibrary::SqliteStatement statement(get_connection(), "DELETE FROM desktop_scenario WHERE id = ?;");
     statement.bind(1, id);
     statement.next();
+}
+
+qint64 Database::save_workspace(const workspace_record &record) {
+    if (const auto issue = xlibrary::workspace_record_issue(record); !issue.isEmpty())
+        throw std::invalid_argument(issue.toStdString());
+    auto *connection = get_connection();
+    Transaction transaction(connection);
+    auto id = record.id;
+    const auto name = record.name.trimmed();
+    const auto key = xlibrary::workspace_name_key(name);
+    const auto now = QDateTime::currentSecsSinceEpoch();
+    xlibrary::SqliteStatement duplicate(connection, "SELECT 1 FROM workspace WHERE name_key=? AND id<>?;");
+    duplicate.bind(1, key);
+    duplicate.bind(2, id);
+    if (duplicate.next())
+        throw std::invalid_argument(
+            QCoreApplication::translate("Workspaces", "This workspace name is already in use.").toStdString());
+    if (id == 0) {
+        xlibrary::SqliteStatement insert(connection,
+                                         "INSERT INTO workspace(name,name_key,created_at,updated_at) VALUES(?,?,?,?);");
+        insert.bind(1, name);
+        insert.bind(2, key);
+        insert.bind(3, now);
+        insert.bind(4, now);
+        insert.next();
+        id = sqlite3_last_insert_rowid(connection);
+    } else {
+        xlibrary::SqliteStatement update(connection, "UPDATE workspace SET name=?,name_key=?,updated_at=? WHERE id=?;");
+        update.bind(1, name);
+        update.bind(2, key);
+        update.bind(3, now);
+        update.bind(4, id);
+        update.next();
+        if (sqlite3_changes(connection) != 1)
+            throw std::invalid_argument(
+                QCoreApplication::translate("Workspaces", "The workspace was removed.").toStdString());
+    }
+
+    QSet<qint64> old_items;
+    {
+        xlibrary::SqliteStatement select(connection, "SELECT id FROM workspace_item WHERE workspace_id=?;");
+        select.bind(1, id);
+        while (select.next())
+            old_items.insert(select.number(0));
+    }
+    for (const auto &item : record.items)
+        if (item.id && !old_items.contains(item.id))
+            throw std::invalid_argument(
+                QCoreApplication::translate("Workspaces", "The resource list has changed.").toStdString());
+
+    xlibrary::SqliteStatement clear(connection, "DELETE FROM workspace_item WHERE workspace_id=?;");
+    clear.bind(1, id);
+    clear.next();
+    for (qsizetype position = 0; position < record.items.size(); ++position) {
+        const auto &item = record.items[position];
+        QString display_name = item.display_name;
+        if (item.application_id) {
+            xlibrary::SqliteStatement app(connection, "SELECT name FROM applications WHERE id=?;");
+            app.bind(1, item.application_id);
+            if (!app.next())
+                throw std::invalid_argument(
+                    QCoreApplication::translate("Workspaces", "The library application was removed.").toStdString());
+            display_name = app.qtext(0).left(256);
+            display_name.removeIf([](const QChar character) { return character.category() == QChar::Other_Control; });
+        }
+        xlibrary::SqliteStatement insert(connection, R"(
+            INSERT INTO workspace_item(id,workspace_id,position,kind,application_id,target,display_name,
+                                       launch_profile,enabled,reuse_existing)
+            VALUES(nullif(?,0),?,?,?,nullif(?,0),?,?,?,?,?);
+        )");
+        insert.bind(1, item.id);
+        insert.bind(2, id);
+        insert.bind(3, position);
+        insert.bind(4, static_cast<qint64>(item.kind));
+        insert.bind(5, item.application_id);
+        insert.bind(6, item.target);
+        insert.bind(7, display_name);
+        insert.bind(8, item.launch_profile);
+        insert.bind(9, item.enabled);
+        insert.bind(10, item.reuse_existing);
+        insert.next();
+        if (!item.placement)
+            continue;
+        const auto &placement = *item.placement;
+        const auto item_id = sqlite3_last_insert_rowid(connection);
+        xlibrary::SqliteStatement window(connection, "INSERT INTO workspace_window VALUES(?,?,?,?,?,?,?);");
+        window.bind(1, item_id);
+        window.bind(2, placement.monitor_id);
+        window.bind_real(3, placement.geometry.x());
+        window.bind_real(4, placement.geometry.y());
+        window.bind_real(5, placement.geometry.width());
+        window.bind_real(6, placement.geometry.height());
+        window.bind(7, placement.maximized);
+        window.next();
+    }
+    transaction.commit();
+    return id;
+}
+
+void Database::remove_workspace(const qint64 id) {
+    xlibrary::SqliteStatement remove(get_connection(), "DELETE FROM workspace WHERE id=?;");
+    remove.bind(1, id);
+    remove.next();
 }
 
 void Database::record_launch(const qint64 id) {

@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cctype>
+#include <limits>
 #include <QElapsedTimer>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -8,7 +9,6 @@
 #include <QSaveFile>
 #include <QScopeGuard>
 #include <QThread>
-#include <limits>
 #include <stdexcept>
 
 #include "LaunchArguments.h"
@@ -174,8 +174,8 @@ void Manager::set_process_monitoring(const bool memory, const bool cpu) {
 }
 
 void Manager::terminate_application(const qint64 id) {
-    const auto found = std::ranges::find_if(std::as_const(catalog.applications),
-                                          [id](const auto &record) { return record.id == id; });
+    const auto found =
+        std::ranges::find_if(std::as_const(catalog.applications), [id](const auto &record) { return record.id == id; });
     if (found == catalog.applications.cend())
         return;
     // Publish any partial termination even when another process denied access.
@@ -349,8 +349,7 @@ void Manager::poll(const bool force) {
         for (const auto &sample : it.value()) {
             const auto old = previous.constFind(sample.pid);
             if (sample.cpu_seconds < 0 || !sample.start_time || old == previous.cend() ||
-                sample.start_time != old->start_time || old->cpu_seconds < 0 ||
-                sample.cpu_seconds < old->cpu_seconds)
+                sample.start_time != old->start_time || old->cpu_seconds < 0 || sample.cpu_seconds < old->cpu_seconds)
                 cpu_valid = false;
             else
                 cpu_seconds += sample.cpu_seconds - old->cpu_seconds;
@@ -360,14 +359,14 @@ void Manager::poll(const bool force) {
                 memory_bytes += sample.memory_bytes;
         }
         measurements.insert(it.key(), {cpu_valid ? qBound(0.0, 100.0 * cpu_seconds / seconds / processors, 100.0) : -1,
-                                      memory_valid ? memory_bytes : -1});
+                                       memory_valid ? memory_bytes : -1});
     }
     for (auto &record : catalog.applications) {
         const auto path = normalized_path(Application::process_path(record));
         record.running = paths.contains(path);
         const auto values = measurements.value(path, {-1, -1});
-        measurements_changed = measurements_changed || record.cpu_percent != values.first ||
-                               record.memory_bytes != values.second;
+        measurements_changed =
+            measurements_changed || record.cpu_percent != values.first || record.memory_bytes != values.second;
         record.cpu_percent = values.first;
         record.memory_bytes = values.second;
     }
@@ -376,8 +375,8 @@ void Manager::poll(const bool force) {
         emit volumes_observed(known_volume_roots);
     if (locations_changed)
         emit locations_observed(verified_locations);
-    if (force || capabilities_changed || measurements_changed || paths != last_running || unavailable != last_unavailable ||
-        missing_volumes != last_missing_volumes) {
+    if (force || capabilities_changed || measurements_changed || paths != last_running ||
+        unavailable != last_unavailable || missing_volumes != last_missing_volumes) {
         last_running = paths;
         last_unavailable = unavailable;
         last_missing_volumes = missing_volumes;
@@ -451,6 +450,17 @@ void Manager::remove_tag(const QString &name) {
     this->store->remove_tag(name);
     emit this->tag_renamed(name, {});
     this->refresh();
+}
+
+void Manager::save_workspace(const workspace_record &record) {
+    const auto id = store->save_workspace(record);
+    refresh();
+    emit workspace_saved(request_id, id);
+}
+
+void Manager::remove_workspace(const qint64 id) {
+    store->remove_workspace(id);
+    refresh();
 }
 
 void Manager::save_scenario(const scenario_record &record) {

@@ -100,6 +100,7 @@ target_link_libraries(sqlite3 PUBLIC
 # ------------------------------------------------------------
 
 add_library(xlibrary_core STATIC
+        src/WorkspaceTypes.h src/WorkspaceTypes.cpp
         src/CatalogTypes.h
         src/OperationTypes.h
         src/PathHelpers.h

@@ -215,6 +215,8 @@ public:
     Q_INVOKABLE void remove_application(qint64 id);
     Q_INVOKABLE quint64 save_tag(const QString &old_name, const QString &new_name);
     Q_INVOKABLE void remove_tag(const QString &name);
+    quint64 save_workspace(workspace_record record);
+    quint64 remove_workspace(qint64 id);
     Q_INVOKABLE quint64 save_scenario(scenario_record record);
     Q_INVOKABLE void remove_scenario(qint64 id);
     Q_INVOKABLE void run_scenario(qint64 id);
@@ -260,6 +262,7 @@ signals:
     void operation_finished(const QString &operation, bool success);
     void application_saved(quint64 request_id, qint64 id);
     void application_resolved(quint64 request_id, const QString &requested_path, const app_record &record);
+    void workspace_saved(quint64 request_id, qint64 id);
     void scenario_saved(quint64 request_id, qint64 id);
     void discovery_changed();
     void discovery_progress_changed();
