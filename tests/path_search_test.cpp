@@ -14,6 +14,70 @@ class PathSearchTest : public QObject {
             qFatal("Cannot create path fixture");
     }
 private slots:
+    void working_files_apply_metadata_and_keep_directories_navigable() {
+        QTemporaryDir directory;
+        QVERIFY(directory.isValid());
+        QVERIFY(QDir(directory.path()).mkdir("folder"));
+        const auto report = directory.filePath("report.PDF");
+        const auto unrelated = directory.filePath("other.txt");
+        touch(report);
+        touch(unrelated);
+        touch(directory.filePath("program.exe"));
+        const auto key = normalized_path(report);
+        const QVariantMap metadata{{key, QVariantMap{{"tags", QStringList{"Work", "Team"}}, {"favorite", true}}},
+                                   {normalized_path(unrelated), QVariantMap{{"tags", QStringList{"Work"}}}}};
+        const auto generation = std::make_shared<std::atomic<quint64>>(1);
+        const auto lookup = [&](const QStringList &tags, bool favorites_only) {
+            return search_results::directory_entries(directory.path(), generation, 1, {{key, {3, 50}}}, {key}, true,
+                                                     metadata, tags, favorites_only, {{key, 25}});
+        };
+        const auto entries = lookup({}, false);
+        QCOMPARE(entries.size(), 3);
+        QCOMPARE(entries.front().type, search_entry::kind::directory);
+        QCOMPARE(entries[1].path, report);
+        QCOMPARE(entries[1].extension, "pdf");
+        QCOMPARE(entries[1].added, 25);
+        QCOMPARE(entries[1].last_used, 50);
+        QCOMPARE(entries[1].use_count, 3);
+        QVERIFY(entries[1].saved);
+        QVERIFY(entries[1].favorite);
+        QCOMPARE(entries[2].path, unrelated);
+        for (const auto &filtered : {lookup({"work", "team"}, false), lookup({}, true)}) {
+            QCOMPARE(filtered.size(), 2);
+            QCOMPARE(filtered[0].type, search_entry::kind::directory);
+            QCOMPARE(filtered[1].path, report);
+        }
+        const auto no_files = lookup({"unknown"}, true);
+        QCOMPARE(no_files.size(), 1);
+        QCOMPARE(no_files.front().type, search_entry::kind::directory);
+    }
+
+    void calculator_data() {
+        QTest::addColumn<QString>("query");
+        QTest::addColumn<bool>("recognized");
+        QTest::addColumn<QVariant>("expected");
+        QTest::newRow("precedence") << "2 + 3 * 4" << true << QVariant(14.);
+        QTest::newRow("right-associative-power") << "2**3^2" << true << QVariant(512.);
+        QTest::newRow("negative-power-base") << "-2^2" << true << QVariant(-4.);
+        QTest::newRow("decimal-comma") << "(1,5 + 2) × 4 ÷ 2" << true << QVariant(7.);
+        QTest::newRow("root-and-remainder") << "sqrt(81) % 4" << true << QVariant(1.);
+        QTest::newRow("divide-by-zero") << "42 / 0" << true << QVariant{};
+        QTest::newRow("negative-root") << "sqrt(-9)" << true << QVariant{};
+        QTest::newRow("incomplete") << "2 + (" << true << QVariant{};
+        QTest::newRow("ordinary-search") << "report 2026" << false << QVariant{};
+    }
+
+    void calculator() {
+        QFETCH(QString, query);
+        QFETCH(bool, recognized);
+        QFETCH(QVariant, expected);
+        const auto calculation = search_query::calculate(query);
+        QCOMPARE(calculation.recognized, recognized);
+        QCOMPARE(calculation.value.has_value(), expected.isValid());
+        if (expected.isValid())
+            QCOMPARE(*calculation.value, expected.toDouble());
+    }
+
     void ordering_identity_and_prefix() {
         QTemporaryDir temporary;
         QVERIFY(temporary.isValid());

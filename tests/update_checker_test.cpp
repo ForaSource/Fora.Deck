@@ -172,6 +172,36 @@ private slots:
         checker.set_channel("unknown");
         QCOMPARE(checker.channel(), "stable");
     }
+
+    void unavailable_installer_and_bad_credentials_allow_retry() {
+        QCoreApplication::setApplicationVersion("0.8.0");
+        UpdateChecker checker;
+        QSignalSpy operations(&checker, &UpdateChecker::operation_changed);
+        QSignalSpy errors(&checker, &UpdateChecker::failed);
+        QSignalSpy ready(&checker, &UpdateChecker::installer_ready);
+        const auto download = checker.download();
+        QVERIFY(download != 0);
+        QVERIFY(!operations.isEmpty());
+        const auto unavailable = operations.last().first().value<operation_result>();
+        QCOMPARE(unavailable.id, download);
+        QCOMPARE(unavailable.state, operation_state::error);
+        QCOMPARE(unavailable.error.source, operation_error_source::platform);
+        QString explanation;
+        QVERIFY(!checker.launch_installer(explanation));
+        QVERIFY(!explanation.isEmpty());
+        QVERIFY(!checker.is_busy());
+
+        const auto check = checker.check("invalid token!");
+        QVERIFY(check > download);
+        const auto invalid = operations.last().first().value<operation_result>();
+        QCOMPARE(invalid.id, check);
+        QCOMPARE(invalid.state, operation_state::error);
+        QCOMPARE(invalid.error.source, operation_error_source::validation);
+        QCOMPARE(errors.size(), 2);
+        QVERIFY(!checker.is_busy());
+        QVERIFY(!checker.can_install());
+        QVERIFY(ready.isEmpty());
+    }
 };
 QTEST_GUILESS_MAIN(UpdateCheckerTest)
 #include "update_checker_test.moc"

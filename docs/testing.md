@@ -21,6 +21,18 @@ ctest --test-dir build-msvc -C Release --output-on-failure
 
 Use `-DBUILD_TESTING=OFF` for an application-only build. Tests and Qt Test are not installed with the application. Current targets and environment settings are in [tests/CMakeLists.txt](../tests/CMakeLists.txt); [CI](ci.md) runs them across its build matrix.
 
+| Test target | Behavior covered |
+| --- | --- |
+| `catalog_test` | JSON import preview, malformed records and limits, metadata transfer, skip/replace conflicts, bulk edits, undo after deletion or conflicting edits, and transactional recovery of moved applications. |
+| `file_manager_test` | File eligibility, names and masks with tags, exclusions, saved paths, favorites and metadata, queued saves during shutdown, and added dates from an older index. |
+| `launch_test` | Argument parsing, scenario preflight, workspace launch dispatch and cancellation, history on success or failure, and process monitoring using the test process itself. |
+| `profile_settings_test` | Typed settings in backups, malformed values, retention of the destination's credential marker, and preservation of previous settings during restore. |
+| `library_model_test` and `path_search_test` | Application filters, ranking and sorting, CPU/RAM display, directory browsing with file metadata, bounded results, cancellation, and calculator queries. |
+| `notification_banner_test` | Action activation, replacement and dismissal, and the countdown when the parent window is hidden. |
+| `update_checker_test` and `ui_registry_test` | Offline release selection, update error and cancellation paths, and plugin compatibility and configuration rollback. |
+
+The interactive checks below cover OS integrations such as installers, mounted drives and desktop sessions.
+
 ## Workspaces
 
 `core_test` exercises schema migration, workspace edits, seeding and restoring complete backups and deleted app
@@ -86,7 +98,7 @@ Use a disposable profile and a small folder of documents, images, unsupported ex
 1. Check names, aliases, tag combinations, exclusions, initials, typo suggestions, and English/Russian layout correction in both search surfaces.
    Compare match categories and positions before checking favorites and usage ordering. Clear the query and sidebar filters when checking the full catalog.
 2. Enable Basic file search, add an additional recursive folder and file/folder exclusions, save, and refresh the index. Check plain names, extension filters, `*.pdf` and `report-??.txt` masks;
-   excluded files must stay absent, and an empty query must not show indexed files.
+   excluded files must stay absent. In Files mode an empty query should show eligible indexed files.
 3. Switch file search Off during scanning, then back to Basic or Full. Off must stop indexing; enabled modes must resume it. Change the query and folder scope while work is pending;
    old results must not overwrite the new query or scope. Check Basic depth limits and recursive standard/additional folders.
    Confirm Full is marked not recommended. The Applications / Files choice must appear in both search surfaces only in Basic and Full.
