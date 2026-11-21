@@ -225,16 +225,7 @@ SearchResults::SearchResults(DesktopService &service, QLineEdit &input, const bo
     connect(&file_delay, &QTimer::timeout, this, &SearchResults::update_files);
     setAccessibleName(QCoreApplication::translate("XLibrary", "Search results"));
     setModel(results);
-    connect(selectionModel(), &QItemSelectionModel::currentChanged, this, [this](const QModelIndex &index) {
-        if (this->compact || !this->file_workspace || !this->service.file_search_active())
-            return;
-        const auto row = index.row();
-        const auto *entry = row >= 0 && row < results->entries.size() ? &results->entries[row] : nullptr;
-        this->service.select_file(entry && (entry->type == search_entry::kind::file ||
-                                            entry->type == search_entry::kind::working_file)
-                                      ? entry->path : QString{}, entry ? entry->volume_root : QString{},
-                                      entry ? entry->volume_device : QString{});
-    });
+    connect(selectionModel(), &QItemSelectionModel::currentChanged, this, &SearchResults::sync_file_selection);
     results->favorite_changed = [this](const search_entry &entry, const bool favorite) {
         if (!isEnabled() || this->service.profile_busy() || this->service.restart_required() ||
             (entry.type != search_entry::kind::file && entry.type != search_entry::kind::working_file))
@@ -267,7 +258,7 @@ SearchResults::SearchResults(DesktopService &service, QLineEdit &input, const bo
     setMouseTracking(true);
     setFrameShape(QFrame::NoFrame);
     input.installEventFilter(this);
-    connect(&input, &QLineEdit::textChanged, this, &SearchResults::update_query);
+    connect(&input, &QLineEdit::textChanged, this, [this] { update_query(true); });
     connect(this, &QTreeView::clicked, this, [this](const QModelIndex &index) {
         if (this->compact)
             activate_current();
@@ -299,13 +290,9 @@ SearchResults::SearchResults(DesktopService &service, QLineEdit &input, const bo
             update_applications();
         update_entries();
     });
-    connect(&service, &DesktopService::navigation_changed, this, [this] {
-        if (!this->compact)
-            update_query();
-    });
     connect(&service, &DesktopService::profile_state_changed, this,
             [this] { setEnabled(!this->service.profile_busy() && !this->service.restart_required()); });
-    connect(&service, &DesktopService::appearance_changed, this, &SearchResults::update_query);
+    connect(&service, &DesktopService::appearance_changed, this, [this] { update_query(); });
     connect(&service, &DesktopService::application_launch_finished, this,
             [this](qint64, const operation_result &result) {
                 if (pending_launch && pending_launch == result.id) {
@@ -328,22 +315,38 @@ SearchResults::SearchResults(DesktopService &service, QLineEdit &input, const bo
             read_path();
     });
     connect(service.files, &FileManager::changed, this, [this] {
+        ++*generation;
         file_matches.clear();
-        QTimer::singleShot(0, this, &SearchResults::update_query);
+        rendered_file_query.reset();
+        QTimer::singleShot(0, this, [this] { update_query(); });
     });
     const auto configure_files = [this] {
-        set_files_enabled(this->compact ? this->service.searching_files()
-                                       : this->file_workspace && this->service.file_search_active());
+        const bool enabled = this->compact ? this->service.searching_files()
+                                          : this->file_workspace && this->service.file_search_active();
+        if (this->compact && files_enabled == enabled)
+            return;
+        files_enabled = enabled;
+        update_query();
     };
-    connect(service.files, &FileManager::configuration_changed, this, configure_files);
     connect(&service, &DesktopService::navigation_changed, this, configure_files);
-    configure_files();
+    files_enabled = compact ? service.searching_files() : file_workspace && service.file_search_active();
     update_query();
 }
 
 SearchResults::~SearchResults() {
     file_delay.stop();
     ++*generation;
+}
+
+void SearchResults::sync_file_selection(const QModelIndex &index) {
+    if (!file_workspace || !service.file_search_active())
+        return;
+    const auto row = index.row();
+    const auto *entry = row >= 0 && row < results->entries.size() ? &results->entries[row] : nullptr;
+    service.select_file(entry && (entry->type == search_entry::kind::file ||
+                                  entry->type == search_entry::kind::working_file)
+                            ? entry->path : QString{}, entry ? entry->volume_root : QString{},
+                            entry ? entry->volume_device : QString{});
 }
 
 void SearchResults::replace_entries(QVector<search_entry> entries) {
@@ -457,7 +460,7 @@ void SearchResults::update_applications() {
     application_entries = entries;
 }
 
-void SearchResults::update_query() {
+void SearchResults::update_query(const bool debounce_files) {
     if (action_menu)
         action_menu->close();
     pending_launch = 0;
@@ -468,13 +471,16 @@ void SearchResults::update_query() {
     pending_path.clear();
     if (!compact && ((file_workspace && !files_enabled) || (!file_workspace && service.file_search_active()))) {
         special = false;
-        file_matches.clear();
-        replace_entries({});
+        if (file_workspace)
+            setCurrentIndex({});
+        else
+            replace_entries({});
         return;
     }
     const auto text = input.text().trimmed();
     special = files_enabled && search_query::is_path(text);
     if (special) {
+        rendered_file_query.reset();
         file_matches.clear();
         pending_path = search_query::expanded_path(text);
         replace_entries({{search_entry::kind::message, QCoreApplication::translate("XLibrary", "…"), {}, 0}});
@@ -487,6 +493,7 @@ void SearchResults::update_query() {
     special = calculation.recognized &&
               !(files_enabled && !calculation.value && search_query::file_pattern(text).has_value());
     if (special) {
+        rendered_file_query.reset();
         file_matches.clear();
         if (calculation.value) {
             const auto number = QString::number(*calculation.value, 'g', 15);
@@ -499,47 +506,66 @@ void SearchResults::update_query() {
         application_entries.clear();
         if (compact && !files_enabled)
             update_applications();
-        update_entries();
-        if (files_enabled)
+        if (file_workspace && rendered_file_query == current_file_query()) {
+            if (!currentIndex().isValid())
+                setCurrentIndex(results->index(0, 0));
+            else
+                sync_file_selection(currentIndex());
+        } else {
+            rendered_file_query.reset();
+            if (file_workspace && !debounce_files) {
+                file_matches.clear();
+                replace_entries({{search_entry::kind::message, QCoreApplication::translate("XLibrary", "…"), {}, 0}});
+            } else {
+                update_entries();
+            }
+        }
+        if (files_enabled && debounce_files)
             file_delay.start();
+        else if (files_enabled)
+            update_files();
     }
 }
 
-void SearchResults::set_files_enabled(const bool enabled) {
-    if (files_enabled == enabled)
-        return;
-    files_enabled = enabled;
-    file_matches.clear();
-    update_query();
-}
-void SearchResults::update_files() {
-    const auto expected = generation->load();
-    service.files->search(
-        input.text(), expected, this,
-        [this](quint64 request, QVector<file_match> matches) {
-            if (request != generation->load() || !files_enabled)
-                return;
-            file_matches = std::move(matches);
-            update_entries();
-        },
-        generation, service.catalog().file_usage, compact ? QStringList{} : service.tags(),
-        !compact && service.section() == "favorites", compact ? 30 : 200, sort_mode);
+SearchResults::file_query SearchResults::current_file_query() const {
+    const int limit = compact ? 30 :
+        qBound(1, service.settings.value("files/result_limit", FileManager::default_result_limit).toInt(),
+               FileManager::max_result_limit);
+    return {input.text(), compact ? QStringList{} : service.tags(),
+            !compact && service.section() == "favorites", limit, sort_mode};
 }
 
-void SearchResults::update_entries() {
+void SearchResults::update_files() {
+    const auto expected = generation->load();
+    const auto query = current_file_query();
+    service.files->search(
+        query.text, expected, this,
+        [this, query](quint64 request, QVector<file_match> matches) {
+            if (request != generation->load() || !files_enabled)
+                return;
+            if (file_workspace)
+                rendered_file_query = query;
+            file_matches = std::move(matches);
+            update_entries(false);
+        },
+        generation, service.catalog().file_usage, query.tags, query.favorites_only, query.limit, query.sort_mode);
+}
+
+void SearchResults::update_entries(const bool refine_files) {
     if (!files_enabled) {
         replace_entries(compact ? application_entries : QVector<search_entry>{});
         return;
     }
     // Refine the last completed file search while its replacement is still pending.
-    const auto matches = FileManager::filter_matches(input.text(), file_matches);
+    const auto matches = refine_files ? FileManager::filter_matches(input.text(), file_matches) : file_matches;
     if (matches.isEmpty()) {
         replace_entries({});
         return;
     }
     QVector<search_entry> entries;
+    entries.reserve(matches.size());
     for (const auto &match : matches) {
-        if (!compact && ((service.section() == "favorites" && !match.favorite) ||
+        if (refine_files && !compact && ((service.section() == "favorites" && !match.favorite) ||
                          !std::all_of(service.tags().cbegin(), service.tags().cend(),
                                       [&](const auto &tag) { return has_tag(match.tags, tag); })))
             continue;
@@ -557,7 +583,8 @@ void SearchResults::update_entries() {
         entries.last().volume_root = match.volume_root;
         entries.last().volume_device = match.volume_device;
     }
-    replace_entries(std::move(entries));
+    if (!file_workspace || entries != results->entries)
+        replace_entries(std::move(entries));
 }
 
 void SearchResults::read_path() {

@@ -185,9 +185,14 @@ public:
 protected:
     void paintEvent(QPaintEvent *) override {
         QPainter painter(this);
-        // An opaque background preserves the surface color during transitions.
-        painter.fillRect(rect(), palette().base());
         const int distance = qRound(width() * 0.025) * direction;
+        if (snapshot.isNull()) {
+            // Fade the previous page over the live destination while its results arrive.
+            painter.setOpacity(1.0 - opacity);
+            painter.drawPixmap(rect().translated(qRound(-distance * opacity), 0), previous_snapshot);
+            return;
+        }
+        painter.fillRect(rect(), palette().base());
         if (!previous_snapshot.isNull()) {
             painter.setOpacity(1.0);
             painter.drawPixmap(rect().translated(qRound(-distance * opacity), 0), previous_snapshot);
@@ -235,7 +240,7 @@ public:
         });
     }
 
-    void transition_to(const std::function<void()> &change, const int direction = 0) {
+    void transition_to(const std::function<void()> &change, const int direction = 0, const bool live_contents = false) {
         const bool animate = isVisible() && desktop_platform::animations_enabled();
         // Include an in-flight transition so rapid reversals start from the displayed frame.
         const auto previous = animate ? grab() : QPixmap{};
@@ -248,8 +253,8 @@ public:
         if (!animate)
             return;
         overlay->previous_snapshot = previous;
-        // Capture the opaque surface; grabbing transparent contents forces their Window background.
-        overlay->snapshot = grab();
+        if (!live_contents)
+            overlay->snapshot = grab();
         overlay->direction = direction;
         overlay->setGeometry(rect());
         overlay->opacity = 0.0;

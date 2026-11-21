@@ -1,4 +1,5 @@
 #include <QApplication>
+#include <QComboBox>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QDir>
@@ -11,6 +12,7 @@
 #include <QPushButton>
 #include <QSignalSpy>
 #include <QSlider>
+#include <QSpinBox>
 #include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QTimer>
@@ -447,6 +449,77 @@ private slots:
         QTRY_COMPARE(motion->currentValue().toRect(), applications->geometry());
         desktop.service->files->configure(file_search_mode::off);
         QVERIFY(group->isHidden());
+    }
+
+    void file_limit_applies_on_save_and_results_survive_a_tab_switch() {
+        TestDesktop desktop;
+        QTRY_VERIFY(desktop.service->is_ready());
+        QStringList paths;
+        for (int index = 0; index < 4; ++index) {
+            const auto path = desktop.file(QString("limit-fixture-%1.txt").arg(index), "notes");
+            QVERIFY(!path.isEmpty());
+            paths.append(path);
+        }
+        QStringList exclusions;
+        for (const auto location :
+             {QStandardPaths::DesktopLocation, QStandardPaths::DocumentsLocation, QStandardPaths::DownloadLocation})
+            exclusions.append(QStandardPaths::writableLocation(location));
+        desktop.service->settings.setValue("files/mode", "basic");
+        desktop.service->settings.setValue("files/roots", QStringList{});
+        desktop.service->settings.setValue("files/exclusions", exclusions);
+        desktop.service->files->configure(file_search_mode::basic, {}, exclusions);
+        bool saved = false;
+        QObject receiver;
+        desktop.service->files->save_files(paths, &receiver, [&](const file_save_result &result) {
+            saved = result.added.size() == paths.size();
+        });
+        QTRY_VERIFY(saved);
+
+        auto *search = desktop.window->findChild<QLineEdit *>("search_input");
+        auto *group = desktop.window->findChild<QWidget *>("file_search_switch");
+        auto *view = desktop.window->findChild<SearchResults *>("file_list");
+        QVERIFY(search && group && view);
+        auto *files = group->findChild<QPushButton *>("search_files");
+        auto *applications = group->findChild<QPushButton *>("search_applications");
+        QVERIFY(files && applications);
+        search->setText("limit-fixture-*.txt");
+        files->click();
+        QTRY_COMPARE(view->result_count(), 4);
+        applications->click();
+        files->click();
+        QCOMPARE(view->result_count(), 4);
+        QVERIFY(view->currentIndex().isValid());
+
+        for (const auto action : {QDialogButtonBox::Cancel, QDialogButtonBox::Save}) {
+            desktop.trigger("settings");
+            auto *dialog = desktop.window->findChild<QDialog *>("settings");
+            QVERIFY(dialog);
+            auto *section = dialog->findChild<QAbstractButton *>("settings_files_category");
+            QVERIFY(section);
+            section->click();
+            auto *preset = dialog->findChild<QComboBox *>("file_result_limit_preset");
+            auto *manual = dialog->findChild<QSpinBox *>("file_result_limit");
+            QVERIFY(preset && manual);
+            QCOMPARE(preset->currentData().toInt(), 200);
+            preset->setCurrentIndex(preset->findData(500));
+            QCOMPARE(manual->value(), 500);
+            QVERIFY(manual->isHidden());
+            preset->setCurrentIndex(preset->findData(0));
+            QVERIFY(manual->isVisible());
+            manual->setValue(2);
+            dialog->findChild<QDialogButtonBox *>()->button(action)->click();
+            QTRY_VERIFY(!desktop.window->findChild<QDialog *>("settings"));
+            QTRY_COMPARE(view->result_count(), action == QDialogButtonBox::Save ? 2 : 4);
+        }
+        desktop.trigger("settings");
+        auto *dialog = desktop.window->findChild<QDialog *>("settings");
+        QVERIFY(dialog);
+        auto *preset = dialog->findChild<QComboBox *>("file_result_limit_preset");
+        auto *manual = dialog->findChild<QSpinBox *>("file_result_limit");
+        QVERIFY(preset && manual);
+        QCOMPARE(preset->currentData().toInt(), 0);
+        QCOMPARE(manual->value(), 2);
+        dialog->reject();
     }
 
     void overlay_rows_follow_save_and_cancel() {

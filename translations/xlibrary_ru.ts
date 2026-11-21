@@ -3570,6 +3570,18 @@ Qt: %4
         <translation>Режим индексации</translation>
     </message>
     <message>
+        <source>Maximum results in the Files tab</source>
+        <translation>Максимум результатов во вкладке «Файлы»</translation>
+    </message>
+    <message>
+        <source>Custom</source>
+        <translation>Свой вариант</translation>
+    </message>
+    <message>
+        <source>Custom file result limit</source>
+        <translation>Свой лимит результатов для файлов</translation>
+    </message>
+    <message>
         <source>Off by default. Basic: Desktop, Documents and Downloads, including all subfolders; other local drives are checked only at the root and one folder level below it (max-depth=1). Full: all accessible local drives recursively. Not recommended: indexing can take a long time.</source>
         <translation>По умолчанию выключен. Базовый: рабочий стол, документы и загрузки со всеми вложенными папками; остальные локальные диски — только корень и один уровень папок (max-depth=1). Полный: все доступные локальные диски рекурсивно. Не рекомендуется: индексация может занять много времени.</translation>
     </message>

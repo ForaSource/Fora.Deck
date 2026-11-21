@@ -274,6 +274,33 @@ private slots:
         QVERIFY(saved.first().available);
     }
 
+    void search_honors_large_limit_and_refills_after_rejected_files() {
+        QTemporaryDir temporary;
+        QVERIFY(temporary.isValid());
+        QStringList paths;
+        for (int index = 0; index < 240; ++index) {
+            const auto path = temporary.filePath(QString("draft-%1.txt").arg(index, 3, 10, QLatin1Char('0')));
+            QVERIFY(write_file(path, index < 10 ? QByteArray("MZ") : QByteArray("notes")));
+            paths.append(path);
+        }
+        FileManager manager(temporary.filePath("profile"), paths);
+        QStringList exclusions;
+        for (const auto location :
+             {QStandardPaths::DesktopLocation, QStandardPaths::DocumentsLocation, QStandardPaths::DownloadLocation})
+            exclusions.append(QStandardPaths::writableLocation(location));
+        manager.configure(file_search_mode::basic, {}, exclusions);
+        for (const auto &path : paths)
+            manager.update_metadata(path, {}, true);
+        const auto entries = wait_for_result<QVector<file_match>>([&](QObject *receiver, auto completed) {
+            manager.search({}, 1, receiver,
+                           [completed](quint64, QVector<file_match> matches) { completed(std::move(matches)); },
+                           std::make_shared<std::atomic<quint64>>(1), {}, {}, true, 225, 1);
+        });
+        QCOMPARE(entries.size(), 225);
+        QCOMPARE(entries.first().name, QString("draft-010.txt"));
+        QCOMPARE(entries.last().name, QString("draft-234.txt"));
+    }
+
     void filename_queries_data() {
         QTest::addColumn<QString>("query");
         QTest::addColumn<QStringList>("expected");

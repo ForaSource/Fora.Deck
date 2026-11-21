@@ -113,7 +113,7 @@ QWidget *shell(const ui_context &context, QWidget *const parent) {
                          if (next == pages->currentIndex())
                              return;
                          const int direction = next == 3 ? 1 : pages->currentIndex() == 3 ? -1 : 0;
-                         transition->transition_to([=] { pages->setCurrentIndex(next); }, direction);
+                         transition->transition_to([=] { pages->setCurrentIndex(next); }, direction, next == 3);
                      });
     return widget;
 }

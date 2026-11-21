@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <atomic>
 #include <memory>
+#include <optional>
 #include <QCoreApplication>
 #include <QDateTime>
 #include <QDirIterator>
@@ -42,6 +43,7 @@ struct search_entry {
     bool available = true;
     QString volume_root{};
     QString volume_device{};
+    bool operator==(const search_entry &) const = default;
 };
 
 namespace search_results {
@@ -188,15 +190,26 @@ class SearchResults : public QTreeView {
     bool files_enabled = false;
     int sort_mode = 0;
     QTimer file_delay;
+    struct file_query {
+        QString text;
+        QStringList tags;
+        bool favorites_only;
+        int limit;
+        int sort_mode;
+        bool operator==(const file_query &) const = default;
+    };
+    std::optional<file_query> rendered_file_query;
     QVector<search_entry> application_entries;
     QVector<file_match> file_matches;
+    file_query current_file_query() const;
     void update_files();
-    void update_entries();
+    void update_entries(bool refine_files = true);
     bool path_busy = false;
     quint64 pending_launch = 0;
     QMenu *action_menu = nullptr;
-    void update_query();
+    void update_query(bool debounce_files = false);
     void update_applications();
+    void sync_file_selection(const QModelIndex &index);
     void read_path();
     void replace_entries(QVector<search_entry> entries);
     QAbstractItemView *active_view();
@@ -209,7 +222,6 @@ public:
     SearchResults(DesktopService &service, QLineEdit &input, bool compact, QWidget *parent = nullptr,
                   bool file_workspace = false);
     ~SearchResults() override;
-    void set_files_enabled(bool enabled);
     bool handles_query() const { return special; }
     void reset_launch() { pending_launch = 0; }
     void activate_current();

@@ -92,6 +92,9 @@ class FileManager : public QObject {
                             std::function<void(file_save_result)> completed = {});
 
 public:
+    static constexpr int default_result_limit = 200;
+    static constexpr int max_result_limit = 5000;
+
     explicit FileManager(const QString &profile_directory, const QStringList &saved_paths = {},
                          QObject *parent = nullptr);
     ~FileManager() override;

@@ -895,7 +895,7 @@ void FileManager::search(const QString &text, const quint64 request, QObject *re
                                                        exclusions = excluded_paths, cache = search_cache,
                                                        generation = query_generation, expected, field_generation,
                                                        request, metadata = metadata, tags, favorites_only,
-                                                       limit = qBound(1, limit, 200), sort_mode] {
+                                                       limit = qBound(1, limit, max_result_limit), sort_mode] {
         QVector<file_match> matches;
         const auto cancelled = [&] { return generation->load() != expected || field_generation->load() != request; };
         if (!enabled || cancelled())
@@ -954,6 +954,7 @@ void FileManager::search(const QString &text, const quint64 request, QObject *re
                 for (;;) {
                     const auto capacity = limit - matches.size();
                     QVector<file_match> candidates;
+                    candidates.reserve(capacity);
                     xlibrary::SqliteStatement rows(
                         db.get(),
                         "SELECT f.path,f.name,EXISTS(SELECT 1 FROM saved s WHERE s.path=f.path),f.added,f.volume_root,f.volume_device "
@@ -1020,26 +1021,30 @@ void FileManager::search(const QString &text, const quint64 request, QObject *re
                                     static_cast<int>(file_path.mid(preferred[location].size() + 1).count('/'));
                                 break;
                             }
-                        auto position = std::lower_bound(candidates.begin(), candidates.end(), match, better);
-                        if (position != candidates.end() || candidates.size() < capacity) {
-                            // Content checks belong to indexing and the final bounded subset, not every competitive row.
-                            const QFileInfo info(file_path);
-                            match.available = info.isFile() && info.isReadable() &&
-                                (rows.qtext(4).isEmpty() || volume_identity(file_path) == QStringList{rows.qtext(4), rows.qtext(5)});
-                            match.modified = info.lastModified().toMSecsSinceEpoch();
-                            match.size = info.size();
-                            candidates.insert(position, std::move(match));
-                            if (candidates.size() > capacity)
-                                candidates.removeLast();
+                        // Keep the worst candidate at the top for logarithmic replacement.
+                        if (candidates.size() == capacity) {
+                            if (!better(match, candidates.front()))
+                                continue;
+                            std::pop_heap(candidates.begin(), candidates.end(), better);
+                            candidates.removeLast();
                         }
+                        candidates.append(std::move(match));
+                        std::push_heap(candidates.begin(), candidates.end(), better);
                     }
-                    for (const auto &entry : candidates) {
+                    // Only probe files that survived ranking. Availability does not affect their order.
+                    for (auto &entry : candidates) {
                         if (cancelled())
                             return QVector<file_match>{};
                         inspected.insert(entry.path);
+                        const QFileInfo info(entry.path);
+                        entry.available = info.isFile() && info.isReadable() &&
+                            (entry.volume_root.isEmpty() ||
+                             volume_identity(entry.path) == QStringList{entry.volume_root, entry.volume_device});
+                        entry.modified = info.lastModified().toMSecsSinceEpoch();
+                        entry.size = info.size();
                         if (!entry.available || (accepts_file(entry.path) &&
-                            !excluded_path(exclusions, QFileInfo(entry.path).canonicalFilePath())))
-                            matches.append(entry);
+                            !excluded_path(exclusions, info.canonicalFilePath())))
+                            matches.append(std::move(entry));
                     }
                     // Refill after rejected candidates without reading every matching file's contents.
                     if (matches.size() == limit || candidates.size() < capacity)

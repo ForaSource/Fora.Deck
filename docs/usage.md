@@ -115,8 +115,9 @@ Use **Open**, **Open folder** or **Copy path** in the pane. On narrower windows,
 The pane keeps its width when switching between applications and files and prompts for a selection when empty.
 Favorites and sidebar tags filter the selected result type. Running applications, scenarios and My files return
 search to applications. Disabling file search hides this choice and shows applications.
-An empty file query shows indexed files. The main workspace shows
-up to 200 results with a count, sorting, list/cards views and file actions, using the same layout as applications.
+An empty file query shows indexed files. The main workspace shows a count, sorting, list/cards views and file actions.
+In **Settings → File search**, choose how many indexed results to show in the **Files** tab. The default is 200.
+Choose 50, 100, 200, 500 or 1000, or enter a custom limit from 1 to 5000.
 Switching between applications and files uses a brief fade and slide, respecting disabled interface/system animations.
 The file list, cards and quick search load icons in the background. Images show small previews when their format
 is supported by Qt or the Windows thumbnail provider. Other files use their associated application's icon on Windows

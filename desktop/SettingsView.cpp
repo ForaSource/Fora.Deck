@@ -16,6 +16,7 @@
 #include <QProgressBar>
 #include <QRegularExpressionValidator>
 #include <QSlider>
+#include <QSpinBox>
 #include <QStackedWidget>
 #include <QStylePainter>
 #include <QSysInfo>
@@ -510,6 +511,37 @@ QWidget *file_settings(const ui_context &context, QWidget *) {
                   "other local drives are checked only at the root and one folder level below it (max-depth=1). "
                   "Full: all accessible local drives recursively. Not recommended: indexing can take a long time."),
               "muted"));
+    auto *limit_preset = new QComboBox;
+    limit_preset->setObjectName("file_result_limit_preset");
+    for (const int limit : {50, 100, FileManager::default_result_limit, 500, 1000})
+        limit_preset->addItem(QString::number(limit), limit);
+    limit_preset->addItem(QCoreApplication::translate("XLibrary", "Custom"), 0);
+    auto *result_limit = new QSpinBox;
+    result_limit->setObjectName("file_result_limit");
+    result_limit->setProperty("setting_key", "files/result_limit");
+    result_limit->setRange(1, FileManager::max_result_limit);
+    result_limit->setValue(context.settings->value("files/result_limit", FileManager::default_result_limit).toInt());
+    const auto preset = limit_preset->findData(result_limit->value());
+    limit_preset->setCurrentIndex(preset >= 0 ? preset : limit_preset->count() - 1);
+    auto *limit_control = new QWidget;
+    limit_control->setFocusProxy(limit_preset);
+    auto *limit_layout = new QHBoxLayout(limit_control);
+    limit_layout->setContentsMargins(0, 0, 0, 0);
+    limit_layout->addWidget(limit_preset);
+    limit_layout->addWidget(result_limit);
+    result_limit->setAccessibleName(QCoreApplication::translate("XLibrary", "Custom file result limit"));
+    result_limit->setVisible(preset < 0);
+    QObject::connect(limit_preset, &QComboBox::currentIndexChanged, result_limit, [=] {
+        const auto value = limit_preset->currentData().toInt();
+        result_limit->setVisible(value == 0);
+        if (value)
+            result_limit->setValue(value);
+        else
+            result_limit->setFocus();
+    });
+    const auto limit_label = QCoreApplication::translate("XLibrary", "Maximum results in the Files tab");
+    limit_preset->setAccessibleName(limit_label);
+    field(static_cast<QVBoxLayout *>(widget->layout()), limit_label, limit_control);
     const auto path_list = [=](const QString &title, const QString &key, const bool allow_files) {
         widget->layout()->addWidget(label(title, "subheading"));
         auto *paths = new QListWidget;
@@ -1131,6 +1163,10 @@ QDialog *settings_dialog(const ui_context &context, QWidget *const parent) {
                 values.insert(key, combo->currentData());
             if (auto *slider = qobject_cast<QSlider *>(control))
                 values.insert(key, slider->value());
+            if (auto *spin = qobject_cast<QSpinBox *>(control)) {
+                spin->interpretText();
+                values.insert(key, spin->value());
+            }
             if (auto *list = qobject_cast<QListWidget *>(control)) {
                 QStringList paths;
                 for (int i = 0; i < list->count(); ++i) {

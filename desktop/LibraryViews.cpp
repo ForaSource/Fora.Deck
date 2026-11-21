@@ -1130,6 +1130,7 @@ QWidget *file_workspace(const ui_context &context, QWidget *const parent) {
     cards->setProperty("cards", true);
     cards->setProperty("file_workspace", true);
     cards->setModel(view->model());
+    cards->setUniformItemSizes(true);
     cards->setSelectionModel(view->selectionModel());
     cards->setItemDelegate(new ApplicationDelegate(cards));
     cards->setViewMode(QListView::IconMode);
