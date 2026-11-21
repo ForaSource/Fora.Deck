@@ -173,8 +173,7 @@ target_link_libraries(xlibrary_core PUBLIC
 
 )
 
-qt_add_executable(XLibrary WIN32
-        main.cpp
+add_library(xlibrary_desktop STATIC
         desktop/CatalogReview.h desktop/CatalogReview.cpp
         desktop/ProfileView.h desktop/ProfileView.cpp
         desktop/PlatformIntegration.h
@@ -200,7 +199,8 @@ qt_add_executable(XLibrary WIN32
         desktop/UpdateChecker.h desktop/UpdateChecker.cpp
         desktop/MainWindow.h desktop/MainWindow.cpp
 )
-set_target_properties(XLibrary PROPERTIES AUTOMOC ON)
+set_target_properties(xlibrary_desktop PROPERTIES AUTOMOC ON)
+qt_add_executable(XLibrary WIN32 main.cpp)
 qt_add_lrelease(XLibrary TS_FILES translations/xlibrary_ru.ts translations/qt_widgets_ru.ts
         QM_FILES_OUTPUT_VARIABLE xlibrary_qm_files)
 qt_add_resources(XLibrary application_translations
@@ -209,7 +209,8 @@ qt_add_resources(XLibrary application_translations
         FILES ${xlibrary_qm_files}
 )
 if(WIN32)
-    target_sources(XLibrary PRIVATE desktop/WindowsIntegration.cpp desktop/WindowsWorkspaceBackend.cpp assets/application_icon.rc)
+    target_sources(xlibrary_desktop PRIVATE desktop/WindowsIntegration.cpp desktop/WindowsWorkspaceBackend.cpp)
+    target_sources(XLibrary PRIVATE assets/application_icon.rc)
     target_include_directories(XLibrary PRIVATE "$<$<COMPILE_LANGUAGE:RC>:${CMAKE_CURRENT_SOURCE_DIR}>")
     set_source_files_properties(assets/application_icon.rc PROPERTIES
             OBJECT_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/assets/xlibrary.ico"
@@ -219,18 +220,18 @@ if(WIN32)
         set_property(SOURCE assets/application_icon.rc APPEND PROPERTY COMPILE_OPTIONS --use-temp-file)
     endif()
 else()
-    target_sources(XLibrary PRIVATE desktop/LinuxIntegration.cpp desktop/LinuxWorkspaceBackend.cpp)
+    target_sources(xlibrary_desktop PRIVATE desktop/LinuxIntegration.cpp desktop/LinuxWorkspaceBackend.cpp)
     if(workspace_x11_FOUND)
-        target_link_libraries(XLibrary PRIVATE PkgConfig::workspace_x11)
-        target_compile_definitions(XLibrary PRIVATE XLIBRARY_HAVE_WORKSPACE_X11=1)
+        target_link_libraries(xlibrary_desktop PRIVATE PkgConfig::workspace_x11)
+        target_compile_definitions(xlibrary_desktop PRIVATE XLIBRARY_HAVE_WORKSPACE_X11=1)
     endif()
     target_link_libraries(xlibrary_core PUBLIC Qt6::DBus)
     if(X11_FOUND)
-        target_link_libraries(XLibrary PRIVATE X11::X11)
-        target_compile_definitions(XLibrary PRIVATE XLIBRARY_HAVE_X11=1)
+        target_link_libraries(xlibrary_desktop PRIVATE X11::X11)
+        target_compile_definitions(xlibrary_desktop PRIVATE XLIBRARY_HAVE_X11=1)
     endif()
 endif()
-qt_add_resources(XLibrary application_images
+qt_add_resources(xlibrary_desktop application_images
         PREFIX "/"
         FILES assets/xlibrary.ico
         assets/checkbox-check.png
@@ -243,10 +244,11 @@ qt_add_resources(XLibrary application_images
 )
 target_compile_definitions(XLibrary PRIVATE XLIBRARY_VERSION="${XLIBRARY_RELEASE_VERSION}")
 
-target_link_libraries(XLibrary PRIVATE xlibrary_core Qt6::Widgets Qt6::Concurrent Qt6::Network qt6keychain)
+target_link_libraries(xlibrary_desktop PUBLIC xlibrary_core Qt6::Widgets Qt6::Network PRIVATE qt6keychain)
+target_link_libraries(XLibrary PRIVATE xlibrary_desktop)
 
 if(WIN32)
-    target_link_libraries(XLibrary PRIVATE ole32 uuid dwmapi shlwapi)
+    target_link_libraries(xlibrary_desktop PRIVATE ole32 uuid dwmapi shlwapi)
     configure_file(packaging/windows_version.rc.in windows_version.rc @ONLY)
     target_sources(XLibrary PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/windows_version.rc")
     if(MINGW)
@@ -258,7 +260,7 @@ if(WIN32)
     configure_file(packaging/build_config.json.in packaging-config.json @ONLY)
 endif()
 
-foreach(xlibrary_target IN ITEMS XLibrary xlibrary_core)
+foreach(xlibrary_target IN ITEMS XLibrary xlibrary_desktop xlibrary_core)
     if(MSVC)
         target_compile_options(${xlibrary_target} PRIVATE /utf-8 /W4)
     else()
@@ -280,7 +282,7 @@ if(XLIBRARY_ENABLE_CLANG_TIDY)
         list(APPEND xlibrary_tidy_command "--extra-arg-before=--driver-mode=cl" "--extra-arg=/EHsc")
     endif()
     # Анализируем только собственные цели; Qt помечает RCC-файлы свойством SKIP_LINTING.
-    foreach(xlibrary_target IN ITEMS XLibrary xlibrary_core)
+    foreach(xlibrary_target IN ITEMS XLibrary xlibrary_desktop xlibrary_core)
         set_property(TARGET ${xlibrary_target} PROPERTY CXX_CLANG_TIDY "${xlibrary_tidy_command}")
         get_target_property(xlibrary_sources ${xlibrary_target} SOURCES)
         foreach(xlibrary_source IN LISTS xlibrary_sources)
@@ -289,11 +291,11 @@ if(XLIBRARY_ENABLE_CLANG_TIDY)
             endif()
         endforeach()
     endforeach()
-    set_source_files_properties("${CMAKE_CURRENT_BINARY_DIR}/XLibrary_autogen/mocs_compilation.cpp"
+    set_source_files_properties("${CMAKE_CURRENT_BINARY_DIR}/xlibrary_desktop_autogen/mocs_compilation.cpp"
             PROPERTIES SKIP_LINTING ON)
     foreach(xlibrary_configuration IN LISTS CMAKE_CONFIGURATION_TYPES)
         set_source_files_properties(
-                "${CMAKE_CURRENT_BINARY_DIR}/XLibrary_autogen/mocs_compilation_${xlibrary_configuration}.cpp"
+                "${CMAKE_CURRENT_BINARY_DIR}/xlibrary_desktop_autogen/mocs_compilation_${xlibrary_configuration}.cpp"
                 PROPERTIES SKIP_LINTING ON)
     endforeach()
 endif()

@@ -5,8 +5,13 @@
 ## Discovering and adding applications
 
 Discovery finds Windows system apps, registry and Start menu entries, Linux desktop entries, and installed Steam games.
-You can also add entries manually or drop supported files onto the main window:
-EXE, LNK, BAT, and CMD on Windows; desktop entries and executable files on Linux.
+Use **Find installed applications** beside **Add** to start discovery.
+To add your own application, use **Add** to choose or drop an application file or shortcut. You can also drop it onto the main window.
+Review the suggested name, target and launch options, then confirm with **Add**.
+The editor accepts EXE, LNK, BAT and CMD on Windows, and desktop entries, AppImages and supported executables on Linux.
+Select several application files to review a batch import.
+If your selection also contains documents, review the **My files** draft first. Adding or skipping the files continues
+to the application review. Cancelling the file draft stops the entire selection.
 
 Discovery and imports open a review window before changes. For discovery, review names and paths, then choose **Add selected**.
 JSON/file previews also show sources, arguments, and working directories; choose **Import selected** to save those entries.

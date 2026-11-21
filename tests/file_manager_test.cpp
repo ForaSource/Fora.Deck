@@ -71,6 +71,94 @@ private slots:
         QCOMPARE(FileManager::can_open(path), accepted);
     }
 
+    void batch_save_reports_each_path_and_keeps_overlapping_writes() {
+        QTemporaryDir temporary;
+        const auto first = temporary.filePath("one/draft.txt");
+        const auto second = temporary.filePath("two/draft.txt");
+        const auto third = temporary.filePath("third.txt");
+        const auto excluded = temporary.filePath("excluded.exe");
+        QVERIFY(write_file(first));
+        QVERIFY(write_file(second));
+        QVERIFY(write_file(third));
+        QVERIFY(write_file(excluded));
+        FileManager manager(temporary.path());
+        QSignalSpy updated(&manager, &FileManager::saved_paths_changed);
+        QObject receiver;
+        std::optional<file_save_result> initial;
+        std::optional<file_save_result> overlap;
+        manager.save_files({first, first, second, excluded}, &receiver,
+                           [&](file_save_result result) { initial = std::move(result); });
+        manager.save_files({second, third}, &receiver,
+                           [&](file_save_result result) { overlap = std::move(result); });
+        QTRY_VERIFY(initial && overlap);
+        QCOMPARE(initial->added.size(), 2);
+        QCOMPARE(initial->rejected.size(), 1);
+        QCOMPARE(overlap->already_saved.size(), 1);
+        QCOMPARE(overlap->added.size(), 1);
+        QCOMPARE(updated.size(), 2);
+        QCOMPARE(manager.persisted_saved_paths().size(), 3);
+    }
+
+    void batch_rolls_back_and_can_retry_after_write_error() {
+        QTemporaryDir temporary;
+        const auto first = temporary.filePath("first.txt");
+        const auto blocked = temporary.filePath("blocked.txt");
+        const auto vanished = temporary.filePath("vanished.txt");
+        QVERIFY(write_file(first));
+        QVERIFY(write_file(blocked));
+        QVERIFY(write_file(vanished));
+        FileManager manager(temporary.path());
+        const auto inspected = wait_for_result<file_save_result>(
+            [&](QObject *receiver, auto completed) { manager.inspect_saved_files({vanished}, receiver, completed); });
+        QCOMPARE(inspected.added, QStringList{FileManager::saved_path_identity(vanished)});
+        QVERIFY(QFile::remove(vanished));
+        sqlite3 *raw = nullptr;
+        QCOMPARE(sqlite3_open(temporary.filePath("file-index.sqlite").toUtf8().constData(), &raw), SQLITE_OK);
+        std::unique_ptr<sqlite3, decltype(&sqlite3_close)> db(raw, sqlite3_close);
+        xlibrary::sqlite_execute(db.get(), "CREATE TRIGGER blocked_document BEFORE INSERT ON saved "
+                                           "WHEN NEW.path LIKE '%/blocked.txt' "
+                                           "BEGIN SELECT RAISE(ABORT, 'blocked document'); END");
+        QSignalSpy updated(&manager, &FileManager::saved_paths_changed);
+        const auto failure = wait_for_result<file_save_result>([&](QObject *receiver, auto completed) {
+            manager.save_files({first, blocked, vanished}, receiver, completed);
+        });
+        QVERIFY(failure.error.contains("blocked document"));
+        QVERIFY(failure.added.isEmpty());
+        QVERIFY(manager.persisted_saved_paths().isEmpty());
+        QCOMPARE(updated.size(), 0);
+        xlibrary::sqlite_execute(db.get(), "DROP TRIGGER blocked_document");
+        const auto retry = wait_for_result<file_save_result>([&](QObject *receiver, auto completed) {
+            manager.save_files({first, blocked, vanished}, receiver, completed);
+        });
+        QVERIFY(retry.error.isEmpty());
+        QCOMPARE(retry.added.size(), 2);
+        QVERIFY(retry.rejected.contains(FileManager::saved_path_identity(vanished)));
+        QCOMPARE(updated.size(), 1);
+        QCOMPARE(manager.persisted_saved_paths().size(), 2);
+    }
+
+    void closing_receiver_does_not_cancel_confirmed_write() {
+        QTemporaryDir temporary;
+        const auto path = temporary.filePath("notes.txt");
+        QVERIFY(write_file(path));
+        QStringList paths;
+        {
+            FileManager manager(temporary.path());
+            {
+                QObject receiver;
+                manager.save_files({path}, &receiver, [](file_save_result) {
+                    QFAIL("A destroyed receiver must not see the result");
+                });
+            }
+            manager.shutdown();
+            QCoreApplication::processEvents();
+            paths = manager.persisted_saved_paths();
+            QCOMPARE(paths, QStringList{FileManager::saved_path_identity(path)});
+        }
+        FileManager restored(temporary.path(), paths);
+        QCOMPARE(restored.persisted_saved_paths(), QStringList{FileManager::saved_path_identity(path)});
+    }
+
     void saved_paths_survive_restart_independently_of_favorites() {
         QTemporaryDir temporary;
         QVERIFY(temporary.isValid());

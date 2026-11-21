@@ -20,6 +20,7 @@
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPlainTextEdit>
+#include <QPointer>
 #include <QProgressBar>
 #include <QPushButton>
 #include <QResizeEvent>
@@ -28,10 +29,15 @@
 #include <QStackedLayout>
 #include <QStyle>
 #include <QStyledItemDelegate>
+#include <QStyleOptionFrame>
+#include <QStyleOptionButton>
+#include <QTextEdit>
+#include <QAbstractTextDocumentLayout>
 #include <QtConcurrent/QtConcurrentRun>
 #include <QTreeView>
 #include <QTreeWidget>
 #include <QUrl>
+#include <QtMath>
 
 #include "appearance.h"
 #include "Application.h"
@@ -49,6 +55,54 @@
 
 namespace {
 using namespace ui_helpers;
+
+class FavoriteButton final : public QPushButton {
+    WidgetMotion burst{this, 190};
+
+protected:
+    void hideEvent(QHideEvent *event) override {
+        pending_request = 0;
+        QPushButton::hideEvent(event);
+    }
+
+    void paintEvent(QPaintEvent *event) override {
+        const qreal progress = burst.currentValue().toReal();
+        if (burst.state() != QAbstractAnimation::Running || progress >= 1.0) {
+            QPushButton::paintEvent(event);
+            return;
+        }
+        QStyleOptionButton option;
+        initStyleOption(&option);
+        option.icon = {};
+        QPainter painter(this);
+        style()->drawControl(QStyle::CE_PushButton, &option, &painter, this);
+        painter.setRenderHint(QPainter::Antialiasing);
+        const QRect area = contentsRect();
+        const int limit = qMin(area.width(), area.height());
+        const int size = qMin(limit, qRound(iconSize().width() * (1.0 + 0.12 * (1.0 - qAbs(2.0 * progress - 1.0)))));
+        const QPointF center = QRectF(area).center();
+        icon().paint(&painter, QRect(qRound(center.x() - size / 2.0), qRound(center.y() - size / 2.0), size, size));
+        auto color = palette().color(QPalette::Link);
+        color.setAlphaF(static_cast<float>(1.0 - progress));
+        painter.setPen(QPen(color, 1.5, Qt::SolidLine, Qt::RoundCap));
+        const qreal inner = limit * (0.26 + 0.10 * progress);
+        const qreal outer = inner + limit * 0.10;
+        for (const auto direction : {QPointF(-0.7, -0.7), QPointF(0.7, -0.7), QPointF(-0.7, 0.7), QPointF(0.7, 0.7)})
+            painter.drawLine(center + direction * inner, center + direction * outer);
+    }
+
+public:
+    quint64 pending_request = 0;
+    qint64 pending_application = 0;
+
+    FavoriteButton() {
+        burst.setEasingCurve(QEasingCurve::Linear);
+        connect(&burst, &QVariantAnimation::valueChanged, this, qOverload<>(&QWidget::update));
+    }
+
+    void play_burst() { burst.move(0.0, 1.0); }
+    void clear_burst() { burst.move(1.0, 1.0, false); }
+};
 
 // A toolbar wraps controls using their native text and scale-dependent size hints.
 class AdaptiveToolbar : public QLayout {
@@ -138,14 +192,61 @@ public:
 };
 
 class SearchInput : public QLineEdit {
+    QLabel *key_hint = nullptr;
+    QAction *search_action = nullptr;
+    bool showing_hint = false;
+
+    void update_hint() {
+        if (!key_hint)
+            return;
+        key_hint->setText(search_action->shortcut().toString(QKeySequence::NativeText));
+        key_hint->adjustSize();
+        QStyleOptionFrame frame;
+        initStyleOption(&frame);
+        const auto contents = style()->subElementRect(QStyle::SE_LineEditContents, &frame, this);
+        const auto reserved = key_hint->width() + 12;
+        const bool show = isVisible() && text().isEmpty() && !key_hint->text().isEmpty() &&
+                          contents.width() > reserved + fontMetrics().horizontalAdvance(placeholderText()) +
+                                                 fontMetrics().height() * 2;
+        key_hint->move(contents.right() - key_hint->width() - 6, contents.center().y() - key_hint->height() / 2);
+        if (show != showing_hint) {
+            showing_hint = show;
+            setTextMargins(0, 0, show ? reserved : 0, 0);
+            key_hint->setVisible(show);
+            if (hint_visibility_changed)
+                hint_visibility_changed();
+        } else if (show && textMargins().right() != reserved) {
+            setTextMargins(0, 0, reserved, 0);
+        }
+    }
+
 public:
     std::function<void(int)> move_selection;
     std::function<void()> synchronize_search;
+    std::function<void()> hint_visibility_changed;
     QList<QAction *> application_actions;
+
+    void show_shortcut_hint(QAction *action) {
+        search_action = action;
+        key_hint = label({}, "key_hint");
+        key_hint->setObjectName("search_shortcut_hint");
+        key_hint->setWordWrap(false);
+        key_hint->setAttribute(Qt::WA_TransparentForMouseEvents);
+        key_hint->setParent(this);
+        key_hint->hide();
+        connect(action, &QAction::changed, this, [this] { update_hint(); });
+        connect(this, &QLineEdit::textChanged, this, [this] { update_hint(); });
+        update_hint();
+    }
+
+    bool shortcut_hint_visible() const { return showing_hint; }
 
 protected:
     bool event(QEvent *const event) override {
         const bool handled = QLineEdit::event(event);
+        if (event->type() == QEvent::Resize || event->type() == QEvent::Show || event->type() == QEvent::Hide ||
+            event->type() == QEvent::FontChange || event->type() == QEvent::StyleChange)
+            update_hint();
         if (event->type() == QEvent::PaletteChange)
             for (auto *action : actions())
                 if (action->property("appearance_icon").toString() == "search")
@@ -278,8 +379,7 @@ public:
                 if (QRect(body.right() - slot * 2, body.top(), slot, slot).contains(mouse->position().toPoint()))
                     return model->setData(index, !index.data(LibraryModel::favorite_role).toBool(), LibraryModel::favorite_role);
             }
-            const int expansion = scaled_size(option, 6);
-            const auto menu_area = card_menu_rect(option).adjusted(-expansion, -expansion, expansion, expansion);
+            const auto menu_area = card_menu_rect(option);
             if (mouse->button() == Qt::LeftButton && menu_area.contains(mouse->position().toPoint())) {
                 emit view->customContextMenuRequested(mouse->position().toPoint());
                 return true;
@@ -292,7 +392,7 @@ public:
         painter->setRenderHint(QPainter::Antialiasing);
         painter->setFont(option.font);
         if (!(index.flags() & Qt::ItemIsEnabled)) {
-            painter->setPen(option.palette.color(QPalette::PlaceholderText));
+            painter->setPen(option.palette.color(QPalette::Disabled, QPalette::Text));
             painter->drawText(option.rect.adjusted(12, 0, -12, 0), Qt::AlignVCenter,
                               option.fontMetrics.elidedText(index.data().toString(), Qt::ElideRight, option.rect.width() - 24));
             painter->restore();
@@ -427,7 +527,9 @@ public:
             paint_tags(painter, option, text_rect, index.data(LibraryModel::tags_role).toStringList());
         } else {
             if (parent()->property("file_workspace").toBool()) {
-                painter->setPen(option.palette.color(QPalette::PlaceholderText));
+                const bool available = index.data(LibraryModel::available_role).toBool();
+                painter->setPen(available ? option.palette.color(QPalette::Active, QPalette::PlaceholderText)
+                                          : option.palette.color(QPalette::Disabled, QPalette::PlaceholderText));
                 painter->drawText(text_rect, Qt::AlignVCenter,
                                   option.fontMetrics.elidedText(index.data().toString(), Qt::ElideMiddle, text_rect.width()));
                 painter->restore();
@@ -661,11 +763,21 @@ QWidget *my_files(const ui_context &context, QWidget *const parent) {
     auto *service = static_cast<DesktopService *>(context.service);
     auto *widget = new QWidget(parent);
     auto *layout = new QVBoxLayout(widget);
-    layout->addWidget(label(QCoreApplication::translate("XLibrary", "My files"), "heading"));
+    auto *heading = new AdaptiveToolbar;
+    heading->addWidget(label(QCoreApplication::translate("XLibrary", "My files"), "heading"), 1);
+    auto *add = action_button(context.actions.value("add_items"));
+    heading->addWidget(add);
+    const auto show_add = [=] {
+        auto *toolbar_add = context.window->findChild<QWidget *>("contextual_add");
+        add->setVisible(!toolbar_add || !toolbar_add->isVisibleTo(context.window));
+    };
+    QObject::connect(service, &DesktopService::navigation_changed, widget, show_add, Qt::QueuedConnection);
+    QTimer::singleShot(0, widget, show_add);
+    layout->addLayout(heading);
     layout->addWidget(
         label(QCoreApplication::translate(
                   "XLibrary",
-                  "Save files from search results using the context menu. Removing a saved file keeps it on disk."),
+                  "Use Add or save a file from the search result menu. Removing a saved file keeps it on disk."),
               "muted"));
     auto *list = new QTreeWidget;
     list->setObjectName("my_files_list");
@@ -721,7 +833,7 @@ QWidget *my_files(const ui_context &context, QWidget *const parent) {
         if (service->section() == "files")
             reload();
     });
-    auto *tools = new QHBoxLayout;
+    auto *tools = new AdaptiveToolbar;
     const auto action = [=](const QString &title, const std::function<void(QString)> &callback) {
         auto *control = button(title);
         tools->addWidget(control);
@@ -771,6 +883,7 @@ QWidget *search_bar(const ui_context &context, QWidget *const parent) {
         QCoreApplication::translate("XLibrary", "Search applications and files, calculate or enter a path"));
     search->setPlaceholderText(QCoreApplication::translate("XLibrary", "Search, calculate or enter a path"));
     search->setClearButtonEnabled(true);
+    search->show_shortcut_hint(context.actions.value("focus_search"));
     auto *search_icon = search->addAction(appearance::icon("search"), QLineEdit::LeadingPosition);
     search_icon->setProperty("appearance_icon", "search");
     auto *timer = new QTimer(widget);
@@ -815,17 +928,12 @@ QWidget *search_bar(const ui_context &context, QWidget *const parent) {
     };
     layout->addWidget(search, 1);
     layout->addWidget(file_search_switch(*service, widget));
-    auto *add = action_button(context.actions.value("add_application"));
-    add->setProperty("primary", true);
+    auto *add = action_button(context.actions.value("add_items"));
+    add->setObjectName("contextual_add");
     layout->addWidget(add);
-    auto *more = button({}, nullptr, "more");
-    more->setAccessibleName(QCoreApplication::translate("XLibrary", "More add options"));
-    more->setToolTip(more->accessibleName());
-    more->setFixedWidth(appearance::scaled(service->settings, 40));
-    auto *add_menu = new QMenu(more);
-    add_menu->addAction(context.actions.value("discover"));
-    more->setMenu(add_menu);
-    layout->addWidget(more);
+    auto *discover = action_button(context.actions.value("discover"), false, QStringLiteral(""));
+    discover->setObjectName("discover_applications");
+    layout->addWidget(discover);
     auto *results = new SearchResults(*service, *search, false, widget);
     root->addWidget(results);
     auto *tools = search_tools(*service, *search, widget);
@@ -1218,7 +1326,7 @@ QWidget *library(const ui_context &context, QWidget *const parent) {
     auto *empty_actions_layout = new QVBoxLayout(empty_actions);
     empty_actions_layout->setContentsMargins(0, 0, 0, 0);
     empty_actions_layout->setSpacing(12);
-    empty_actions_layout->addWidget(action_button(context.actions.value("add_application")));
+    empty_actions_layout->addWidget(action_button(context.actions.value("add_items")));
     empty_actions_layout->addWidget(action_button(context.actions.value("discover")));
     empty_layout->addWidget(empty_actions, 0, Qt::AlignHCenter);
     auto *reset_filters = button(QCoreApplication::translate("XLibrary", "Clear all filters"));
@@ -1281,15 +1389,24 @@ QWidget *library(const ui_context &context, QWidget *const parent) {
     root->addWidget(library_transition, 1);
     auto *footer = new AdaptiveToolbar;
     auto *shortcut_hint = label({}, "caption");
+    const QPointer<SearchInput> search_input(
+        dynamic_cast<SearchInput *>(context.window->findChild<QLineEdit *>("search_input")));
     const auto update_shortcut_hint = [=] {
         QStringList hints{QCoreApplication::translate("XLibrary", "↑↓  Select")};
         for (const auto &id : {"launch", "focus_search"}) {
+            if (id == QLatin1String("focus_search") && search_input && search_input->shortcut_hint_visible())
+                continue;
             const auto *action = context.actions.value(id);
             if (!action->shortcut().isEmpty())
                 hints.append(action->shortcut().toString(QKeySequence::NativeText) + "  " + action->text());
         }
         shortcut_hint->setText(hints.join("     "));
     };
+    if (search_input)
+        search_input->hint_visibility_changed = [hint = QPointer<QLabel>(shortcut_hint), update_shortcut_hint] {
+            if (hint)
+                update_shortcut_hint();
+        };
     for (const auto &id : {"launch", "remove_application", "focus_search"})
         QObject::connect(context.actions.value(id), &QAction::changed, shortcut_hint, update_shortcut_hint);
     update_shortcut_hint();
@@ -1506,8 +1623,48 @@ QWidget *details(const ui_context &context, QWidget *const parent) {
     identity_text->addWidget(name);
     identity_text->addWidget(status);
     identity->addLayout(identity_text, 1);
-    auto *favorite = action_button(context.actions.value("favorite"), false, "");
-    favorite->setAccessibleName(context.actions.value("favorite")->text());
+    auto *favorite = new FavoriteButton;
+    favorite->setObjectName("inspector_favorite");
+    favorite->setProperty("icon_only", true);
+    auto *favorite_action = context.actions.value("favorite");
+    const auto refresh_favorite = [=] {
+        favorite->setIcon(favorite_action->icon());
+        favorite->setAccessibleName(favorite_action->text());
+        favorite->setToolTip(favorite_action->text());
+        favorite->setEnabled(favorite_action->isEnabled());
+        const auto size = appearance::scaled(service->settings, 20);
+        favorite->setIconSize({size, size});
+    };
+    QObject::connect(favorite_action, &QAction::changed, favorite, refresh_favorite);
+    refresh_favorite();
+    QObject::connect(favorite, &QPushButton::clicked, favorite, [=] {
+        const auto *record = service->selected();
+        favorite->clear_burst();
+        favorite->pending_request = 0;
+        favorite->pending_application = record && !record->favorite ? record->id : 0;
+        favorite_action->trigger();
+        if (favorite->pending_application)
+            favorite->pending_request = favorite_action->property("favorite_request_id").toULongLong();
+    });
+    QObject::connect(service, &DesktopService::selection_changed, favorite, [=] {
+        if (service->selection() != favorite->pending_application) {
+            favorite->pending_request = 0;
+            favorite->clear_burst();
+        }
+    });
+    QObject::connect(service, &DesktopService::application_saved, favorite, [=](quint64 request, qint64 id) {
+        if (request != favorite->pending_request)
+            return;
+        favorite->pending_request = 0;
+        const auto *selected = service->selected();
+        if (favorite->isVisible() && id == favorite->pending_application && selected && selected->id == id &&
+            selected->favorite && favorite_action->property("favorite_request_id").toULongLong() == request)
+            favorite->play_burst();
+    });
+    QObject::connect(service, &DesktopService::operation_changed, favorite, [=](const operation_result &result) {
+        if (result.state != operation_state::loading && result.id == favorite->pending_request)
+            favorite->pending_request = 0;
+    });
     favorite->setFixedWidth(appearance::scaled(service->settings, 36));
     auto *identity_tools = new QHBoxLayout;
     identity_tools->addStretch();
@@ -1554,21 +1711,32 @@ QWidget *details(const ui_context &context, QWidget *const parent) {
     root->addSpacing(8);
     auto *path_caption = label(QCoreApplication::translate("XLibrary", "Application path"), "muted");
     root->addWidget(path_caption);
-    auto *path = label({}, "muted");
+    auto *path = new QTextEdit;
+    path->setObjectName("inspector_application_path");
+    path->setReadOnly(true);
+    path->setFrameShape(QFrame::NoFrame);
+    path->setLineWrapMode(QTextEdit::WidgetWidth);
+    path->setWordWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
+    path->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    path->setTabChangesFocus(true);
+    path->document()->setDocumentMargin(2);
     path->setTextInteractionFlags(Qt::TextSelectableByMouse | Qt::TextSelectableByKeyboard);
     path->setAccessibleName(QCoreApplication::translate("XLibrary", "Application path"));
     path->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
     path->setMinimumWidth(0);
-    auto *path_row = new QHBoxLayout;
+    QObject::connect(path->document()->documentLayout(), &QAbstractTextDocumentLayout::documentSizeChanged, path,
+                     [=](const QSizeF &size) {
+                         path->setFixedHeight(qBound(path->fontMetrics().height() + 6, qCeil(size.height()) + 2,
+                                                     path->fontMetrics().lineSpacing() * 5 + 6));
+                     });
+    root->addWidget(path);
+    auto *path_row = new AdaptiveToolbar;
     path_row->setSpacing(8);
-    path_row->addWidget(path, 1);
-    auto *copy_path = action_button(context.actions.value("copy_path"), false, "");
+    auto *copy_path = action_button(context.actions.value("copy_path"));
     copy_path->setAccessibleName(context.actions.value("copy_path")->text());
-    copy_path->setFixedWidth(appearance::scaled(service->settings, 36));
     path_row->addWidget(copy_path);
-    auto *folder = action_button(context.actions.value("open_folder"), false, "");
+    auto *folder = action_button(context.actions.value("open_folder"));
     folder->setAccessibleName(QCoreApplication::translate("XLibrary", "Open application folder"));
-    folder->setFixedWidth(appearance::scaled(service->settings, 44));
     path_row->addWidget(folder);
     root->addLayout(path_row);
     auto *recover_path = button(QCoreApplication::translate("XLibrary", "Locate application…"));
@@ -1617,7 +1785,8 @@ QWidget *details(const ui_context &context, QWidget *const parent) {
     root->addWidget(action_button(context.actions.value("edit_application")));
     root->addSpacing(12);
     auto *separator = new QFrame;
-    separator->setFrameShape(QFrame::HLine);
+    separator->setObjectName("inspector_separator");
+    separator->setFixedHeight(1);
     root->addWidget(separator);
     auto *remove = action_button(context.actions.value("remove_application"));
     remove->setProperty("danger", true);
@@ -1801,8 +1970,11 @@ QWidget *details(const ui_context &context, QWidget *const parent) {
         path_caption->setText(local_path ? QCoreApplication::translate("XLibrary", "Application path")
                                          : QCoreApplication::translate("XLibrary", "Launch target"));
         path->setAccessibleName(path_caption->text());
-        path->setText(!record ? QString{} : local_path ? QDir::toNativeSeparators(target_path) : record->path);
-        path->setToolTip(path->text());
+        const auto shown_path = !record ? QString{} : local_path ? QDir::toNativeSeparators(target_path) : record->path;
+        if (path->toPlainText() != shown_path) {
+            path->setPlainText(shown_path);
+            path->setToolTip(shown_path);
+        }
         folder->setVisible(record && (Application::file_target(*record) || !record->installation_directory.isEmpty()));
         copy_path->setAccessibleName(context.actions.value("copy_path")->text());
         recover_path->setVisible(record && Application::file_target(*record) && !record->available);

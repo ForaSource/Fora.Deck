@@ -4,6 +4,150 @@
 <context>
     <name>XLibrary</name>
     <message>
+        <source>Drop files or applications here</source>
+        <translation>Перетащите сюда файлы или приложения</translation>
+    </message>
+    <message>
+        <source>Add application manually…</source>
+        <translation>Добавить приложение вручную…</translation>
+    </message>
+    <message>
+        <source>Next, review the selected applications.</source>
+        <translation>Затем проверьте выбранные приложения.</translation>
+    </message>
+    <message>
+        <source>Skip files</source>
+        <translation>Пропустить файлы</translation>
+    </message>
+    <message>
+        <source>Wait for the current scan or import to finish, then try again.</source>
+        <translation>Дождитесь окончания сканирования или импорта и попробуйте снова.</translation>
+    </message>
+    <message>
+        <source>Add to My files</source>
+        <translation>Добавить в «Свои файлы»</translation>
+    </message>
+    <message>
+        <source>Choose files…</source>
+        <translation>Выбрать файлы…</translation>
+    </message>
+    <message>
+        <source>Drop documents to add to My files</source>
+        <translation>Перетащите документы в «Свои файлы»</translation>
+    </message>
+    <message>
+        <source>Drop an application file or shortcut here</source>
+        <translation>Перетащите сюда файл приложения или ярлык</translation>
+    </message>
+    <message>
+        <source>Drop to check files</source>
+        <translation>Отпустите для проверки</translation>
+    </message>
+    <message>
+        <source>Drop local files or use the file picker.</source>
+        <translation>Перетащите локальные файлы или выберите их кнопкой.</translation>
+    </message>
+    <message>
+        <source>Choose one application here. Drop several on the main window to review an import.</source>
+        <translation>Выберите одно приложение. Для пакетного импорта перетащите несколько файлов в главное окно.</translation>
+    </message>
+    <message>
+        <source>Choose a file inside the folder.</source>
+        <translation>Выберите файл внутри папки.</translation>
+    </message>
+    <message>
+        <source>The file no longer exists or is inaccessible.</source>
+        <translation>Файл исчез или недоступен.</translation>
+    </message>
+    <message>
+        <source>Files to add</source>
+        <translation>Файлы для добавления</translation>
+    </message>
+    <message>
+        <source>Remove from selection</source>
+        <translation>Убрать из списка</translation>
+    </message>
+    <message>
+        <source>Checking file…</source>
+        <translation>Проверяем файл…</translation>
+    </message>
+    <message>
+        <source>Checking files…</source>
+        <translation>Проверяем файлы…</translation>
+    </message>
+    <message>
+        <source>Adding files…</source>
+        <translation>Добавляем файлы…</translation>
+    </message>
+    <message>
+        <source>Already in My files</source>
+        <translation>Уже в коллекции</translation>
+    </message>
+    <message>
+        <source>1 file ready to add</source>
+        <translation>Можно добавить 1 файл</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n files ready to add</source>
+        <translation>
+            <numerusform>Можно добавить %n файл</numerusform>
+            <numerusform>Можно добавить %n файла</numerusform>
+            <numerusform>Можно добавить %n файлов</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Added 1 file to My files</source>
+        <translation>В «Свои файлы» добавлен 1 файл</translation>
+    </message>
+    <message numerus="yes">
+        <source>Added %n files to My files</source>
+        <translation>
+            <numerusform>В «Свои файлы» добавлен %n файл</numerusform>
+            <numerusform>В «Свои файлы» добавлено %n файла</numerusform>
+            <numerusform>В «Свои файлы» добавлено %n файлов</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n already in My files</source>
+        <translation>
+            <numerusform>%n уже в коллекции</numerusform>
+            <numerusform>%n уже в коллекции</numerusform>
+            <numerusform>%n уже в коллекции</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n skipped</source>
+        <translation>
+            <numerusform>Пропущен %n файл</numerusform>
+            <numerusform>Пропущено %n файла</numerusform>
+            <numerusform>Пропущено %n файлов</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Could not add files to My files.</source>
+        <translation>Не удалось добавить файлы в «Свои файлы».</translation>
+    </message>
+    <message>
+        <source>Use Add or save a file from the search result menu. Removing a saved file keeps it on disk.</source>
+        <translation>Нажмите «Добавить» или сохраните файл из меню результата поиска. При удалении из коллекции файл остаётся на диске.</translation>
+    </message>
+    <message>
+        <source>↑↓ Select</source>
+        <translation>↑↓ Выбор</translation>
+    </message>
+    <message>
+        <source>Enter Open</source>
+        <translation>Enter Открыть</translation>
+    </message>
+    <message>
+        <source>Esc Close</source>
+        <translation>Esc Закрыть</translation>
+    </message>
+    <message>
+        <source>%1 Quick search</source>
+        <translation>%1 Быстрый поиск</translation>
+    </message>
+    <message>
         <source>Show memory usage</source>
         <translation>Показывать потребление памяти</translation>
     </message>
@@ -3484,10 +3628,6 @@ Qt: %4
     <message>
         <source>Open</source>
         <translation>Открыть</translation>
-    </message>
-    <message>
-        <source>More add options</source>
-        <translation>Другие способы добавления</translation>
     </message>
     <message>
         <source>List</source>

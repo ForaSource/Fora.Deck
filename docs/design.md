@@ -13,6 +13,9 @@ model, filtering, sorting and selection. Related rows share
 a surface; spacing and thin dividers separate groups. Primary launch actions use
 coral and placement for emphasis. In the inspector, launch precedes tags and technical details;
 browser launch-profile controls stay next to it. Removal is separated from the other actions.
+The toolbar keeps the add command and its adjacent menu grouped, with a neutral surface.
+The current workspace determines whether the command opens the application editor or the My files form.
+The inspector gives the full launch target its own width, with path actions below.
 Status color belongs to a small indicator or
 message, with text describing the state.
 
@@ -28,7 +31,8 @@ Favorites and sidebar tags apply to the selected result type; running applicatio
 remain separate sections. An empty file query shows ranked indexed files. File metadata remains separate from
 application metadata and from the saved-file collection.
 Both search surfaces show the shared **Applications / Files** segments only while indexing mode is Basic or Full.
-The segments select applications or files exclusively; indexing mode belongs to Settings.
+The segments select applications or files exclusively. Each surface moves a single selection background
+between the segments over 160 ms while keyboard focus has a separate outline. Indexing mode belongs to Settings.
 Changing result type fades between snapshots with a small directional slide over 220 ms. Rapid reversals capture
 the displayed frame; resizing cancels the transition. Disabled interface or system animations switch immediately.
 
@@ -58,6 +62,12 @@ typography, icons and control styles as the library. Their headings and spacing
 provide hierarchy without introducing large decorative cards. Scenario state
 belongs next to the step it describes; confirmations and detailed reports use
 dialogs.
+
+The empty library search field shows the configured focus shortcut when there is room.
+The **Add** dialog, application editor and document draft share a drop surface that highlights local file drags.
+The application editor uses a turning chevron for its additional options, and the quick-search
+row-count slider keeps its value visible while dragging. A successful addition to favorites from
+the inspector briefly highlights the star. Each control reflects its state with animations disabled.
 
 ## Shared implementation
 

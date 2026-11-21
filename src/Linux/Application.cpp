@@ -872,6 +872,11 @@ QString Application::configured_arguments(const app_record &record) {
     return record.arguments;
 }
 
+bool Application::is_application_file_candidate(const QFileInfo &info) {
+    return info.suffix() == "desktop" || info.suffix().compare("appimage", Qt::CaseInsensitive) == 0 ||
+           (info.isFile() && info.isExecutable());
+}
+
 app_record Application::resolve_application(const QString &path) {
     app_record result;
     result.discovery_source = path;

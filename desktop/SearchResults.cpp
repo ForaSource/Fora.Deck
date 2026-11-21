@@ -110,6 +110,20 @@ namespace {
 class SearchDelegate : public QStyledItemDelegate {
     DesktopService &service;
     bool compact;
+    mutable QFont badge_font;
+    mutable int badge_text_width = 0;
+
+    int shortcut_width(const QFont &font) const {
+        if (badge_text_width == 0 || badge_font != font) {
+            badge_font = font;
+            badge_text_width = 0;
+            const QFontMetrics metrics(font);
+            for (int digit = 0; digit < 10; ++digit)
+                badge_text_width = qMax(badge_text_width, metrics.horizontalAdvance(
+                    QKeySequence(Qt::ALT | (Qt::Key_0 + digit)).toString(QKeySequence::NativeText)));
+        }
+        return badge_text_width;
+    }
 
 public:
     SearchDelegate(DesktopService &service, const bool compact, QObject *const parent)
@@ -162,12 +176,19 @@ public:
                                       .toString(QKeySequence::NativeText);
             auto shortcut_font = option.font;
             shortcut_font.setPixelSize(appearance::scaled(service.settings, 12));
-            const int shortcut_width = QFontMetrics(shortcut_font).horizontalAdvance(shortcut);
-            const QRect shortcut_rect(text_rect.right() - shortcut_width + 1, text_rect.top(),
-                                      shortcut_width, text_rect.height());
+            const QFontMetrics metrics(shortcut_font);
+            const auto padding = appearance::scaled(service.settings, 7);
+            const auto height = metrics.height() + padding;
+            const auto width = shortcut_width(shortcut_font) + 2 * padding;
+            const QRect shortcut_rect(text_rect.right() - width + 1, text_rect.center().y() - height / 2,
+                                      width, height);
+            const auto badge_palette = QApplication::palette();
+            painter->setPen(Qt::NoPen);
+            painter->setBrush(badge_palette.button());
+            painter->drawRoundedRect(shortcut_rect, 5, 5);
             painter->setFont(shortcut_font);
-            painter->setPen(option.palette.color(QPalette::PlaceholderText));
-            painter->drawText(shortcut_rect, Qt::AlignRight | Qt::AlignVCenter, shortcut);
+            painter->setPen(badge_palette.color(QPalette::PlaceholderText));
+            painter->drawText(shortcut_rect, Qt::AlignCenter, shortcut);
             text_rect.setRight(shortcut_rect.left() - appearance::scaled(service.settings, 16));
             painter->setFont(option.font);
             painter->setPen(option.palette.color(QPalette::Text));

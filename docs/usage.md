@@ -17,11 +17,13 @@ Switching views keeps the selected applications. Use Ctrl/Shift for multiple sel
 the footer then offers tag assignment, removal and clearing the selection.
 Right-click an application or use its actions menu for launch options and editing.
 **Library actions** contains availability refresh, discovery, the last scan report and undo removal.
-To add an application, choose **Add application → Choose file…**, select a file or shortcut, and click **Add**.
-Fora.Deck suggests a name that you can change. You can also paste a file path and click **Add**.
+Use **Add** or press **Ctrl+N** to choose or drop local files. Fora.Deck opens an application editor, a batch import,
+or a **My files** draft based on the selection. You can also drop files onto the main window.
+Use **Add application manually…** to paste a path or enter a Steam AppID, Windows settings URI or AUMID.
+Review the suggested name and target in the editor, then click **Add**.
 Open **More options** for **Launch settings**, including launch arguments and a shortcut key, or choose a target such as a Steam game.
 Use **In the library** to set tags, favorites, or search aliases.
-The menu next to **Add application** offers discovery.
+The scan button beside **Add** starts discovery for installed applications.
 Settings and quick help are at the bottom of navigation.
 On narrower windows the inspector is hidden; **Details** opens the selected application's dialog.
 
@@ -70,7 +72,7 @@ On Linux, safe termination requires kernel support for `pidfd_open` and `pidfd_s
 
 ## Quick search and keyboard shortcuts
 
-Choose 3–10 visible results in **Settings → Appearance → Visible results in quick search** (default: 5).
+Set the **Visible results in quick search** slider in **Settings → Appearance** to 3–10 rows (default: 5).
 The compact launcher keeps matching applications available beyond these visible rows; scroll with the mouse wheel
 or use ↑/↓ to reach them, and Enter to launch. The panel height is limited by the available screen space.
 Quick-search rows show the name and a shortcut on the right: Alt+1–Alt+9 opens the first nine results,
@@ -173,6 +175,9 @@ files remain excluded. Directory traversal does not follow symbolic links or Win
 virtual/network filesystems are skipped. Search is by filename; document contents are not indexed or uploaded.
 
 Right-click a result, or use Shift+F10, to open it, open its folder, copy its path, or **Save to My files**.
+Use **Add** to choose or drop documents. Review the list in the **My files** draft, remove unwanted selections
+and confirm with **Add**. The form reports duplicates and unavailable or excluded files.
+The collection stores links to the original files, including files outside the indexed folders.
 The **My files** section retains saved paths after restart, independently of the index's folder scope.
 Removing a saved entry keeps the file on disk. Unavailable saved files are marked accordingly.
 Indexed matches from unavailable sources are also retained and marked **Source or file unavailable**;

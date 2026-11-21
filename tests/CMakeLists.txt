@@ -44,6 +44,9 @@ target_link_libraries(library_model_test PRIVATE Qt6::Widgets Qt6::Concurrent)
 xlibrary_add_test(ui_registry_test ui_registry_test.cpp)
 target_link_libraries(ui_registry_test PRIVATE Qt6::Widgets)
 
+xlibrary_add_test(desktop_motion_test desktop_motion_test.cpp)
+target_link_libraries(desktop_motion_test PRIVATE xlibrary_desktop)
+
 xlibrary_add_test(notification_banner_test notification_banner_test.cpp
     ../desktop/NotificationBanner.cpp ../desktop/appearance.cpp)
 target_link_libraries(notification_banner_test PRIVATE Qt6::Widgets)

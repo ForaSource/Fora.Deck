@@ -2,16 +2,20 @@
 #define XLIBRARY_UI_HELPERS_H
 
 #include <QDialog>
+#include <QDragEnterEvent>
+#include <QDir>
 #include <QEvent>
 #include <QFrame>
 #include <QLabel>
 #include <QMessageBox>
+#include <QMimeData>
 #include <QPainter>
 #include <QPushButton>
 #include <QResizeEvent>
 #include <QScreen>
 #include <QScrollArea>
 #include <QVariantAnimation>
+#include <QUrl>
 #include <QVBoxLayout>
 
 #include "appearance.h"
@@ -20,6 +24,58 @@
 #include "UiRegistry.h"
 
 namespace ui_helpers {
+inline QStringList local_drop_paths(const QDropEvent &event) {
+    if (!event.possibleActions().testFlag(Qt::CopyAction) || !event.mimeData()->hasUrls())
+        return {};
+    QStringList paths;
+    for (const auto &url : event.mimeData()->urls()) {
+        const auto path = url.toLocalFile();
+        if (!url.isLocalFile() || !QDir::isAbsolutePath(path))
+            return {};
+        paths.append(path);
+    }
+    return paths;
+}
+
+class WidgetMotion : public QVariantAnimation {
+    QWidget *owner;
+
+    void settle() {
+        if (state() == Running) {
+            stop();
+            setCurrentTime(duration());
+        }
+    }
+
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override {
+        if (watched == owner && event->type() == QEvent::Hide)
+            settle();
+        return QVariantAnimation::eventFilter(watched, event);
+    }
+
+public:
+    WidgetMotion(QWidget *widget, int milliseconds) : QVariantAnimation(widget), owner(widget) {
+        setDuration(milliseconds);
+        setEasingCurve(QEasingCurve::OutCubic);
+        owner->installEventFilter(this);
+        connect(this, &QVariantAnimation::valueChanged, owner, [this] {
+            if (state() == Running && !desktop_platform::animations_enabled())
+                settle();
+        });
+    }
+
+    void move(const QVariant &from, const QVariant &to, bool animate = true) {
+        stop();
+        setStartValue(from);
+        setEndValue(to);
+        if (animate && from != to && owner->isVisible() && desktop_platform::animations_enabled())
+            start();
+        else
+            setCurrentTime(duration());
+    }
+};
+
 inline QList<QKeySequence> shortcut_sequences(const QKeySequence &sequence) {
     if (sequence.isEmpty())
         return {};

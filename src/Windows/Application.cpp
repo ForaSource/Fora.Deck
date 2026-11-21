@@ -318,13 +318,18 @@ qint64 Application::launch_application(const app_record &record, const launch_mo
     return application.launch(record.arguments.toStdWString(), std::filesystem::path(directory.toStdWString()));
 }
 
+bool Application::is_application_file_candidate(const QFileInfo &info) {
+    const auto suffix = info.suffix().toLower();
+    return suffix == "exe" || suffix == "bat" || suffix == "cmd" || suffix == "lnk";
+}
+
 app_record Application::resolve_application(const QString &path) {
     const auto supported_target = [](const QString &value) {
-        const auto suffix = QFileInfo(value).suffix().toLower();
-        if (suffix != "exe" && suffix != "bat" && suffix != "cmd" && suffix != "lnk")
+        const QFileInfo info(value);
+        if (!is_application_file_candidate(info))
             throw std::invalid_argument(
                 QCoreApplication::translate("XLibrary", "Supported files: .exe, .lnk, .bat, .cmd.").toStdString());
-        if (!QFileInfo(value).isFile())
+        if (!info.isFile())
             throw std::invalid_argument(
                 QCoreApplication::translate("XLibrary", "The application file is unavailable.").toStdString());
     };

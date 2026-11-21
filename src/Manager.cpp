@@ -843,16 +843,6 @@ void Manager::preview_files(const QStringList &paths, const std::shared_ptr<disc
         if (cancelled->requested.load())
             throw DiscoveryCancelled();
         try {
-            const QFileInfo info(path);
-#ifdef Q_OS_WIN
-            const auto suffix = info.suffix().toLower();
-            if (suffix != "exe" && suffix != "lnk" && suffix != "bat" && suffix != "cmd")
-                throw std::invalid_argument(
-                    QCoreApplication::translate("XLibrary", "Supported files: .exe, .lnk, .bat, .cmd.").toStdString());
-#endif
-            if (!info.isFile())
-                throw std::invalid_argument(
-                    QCoreApplication::translate("XLibrary", "The application file is unavailable.").toStdString());
             auto record = Application::resolve_application(path);
             Database::validate_application(record);
             records.append(std::move(record));

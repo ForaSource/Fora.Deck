@@ -3,13 +3,10 @@
 #include <QClipboard>
 #include <QCloseEvent>
 #include <QDir>
-#include <QDragEnterEvent>
-#include <QDropEvent>
 #include <QFileInfo>
 #include <QJsonObject>
 #include <QLineEdit>
 #include <QMenu>
-#include <QMimeData>
 #include <QStackedWidget>
 #include <QStyleHints>
 
@@ -58,6 +55,10 @@ QWidget *shell(const ui_context &context, QWidget *const parent) {
     body->addWidget(notice);
     const auto show_notice = [=](const QString &text) { notice->show_message(text); };
     QObject::connect(service, &DesktopService::message, notice, show_notice);
+    QObject::connect(service, &DesktopService::saved_files_notice, notice, [=](const QString &text, bool link) {
+        notice->activated = [=] { service->navigate("files"); };
+        notice->show_message(text, {}, link ? QCoreApplication::translate("XLibrary", "My files") : QString{});
+    });
     QObject::connect(service, &DesktopService::scenario_changed, notice, show_notice);
     QObject::connect(service, &DesktopService::undo_removal_changed, notice, [=] {
         if (service->can_undo_removal()) {
@@ -101,7 +102,9 @@ QWidget *shell(const ui_context &context, QWidget *const parent) {
     QObject::connect(service, &DesktopService::navigation_changed, widget,
                      [=] {
                          const auto section = service->section();
-                         search_bar->setVisible(section != "workspaces");
+                         const bool show_search = section != "workspaces";
+                         if (search_bar->isHidden() == show_search)
+                             search_bar->setVisible(show_search);
                          const int next = service->file_search_active() ? 3
                                           : section == "scenarios"      ? 1
                                           : section == "files"          ? 2
@@ -252,6 +255,7 @@ void MainWindow::create_actions() {
     });
     add("add_application", QCoreApplication::translate("XLibrary", "Add application"), "add",
         [this] { open_dialog("application_editor", context); });
+    add("add_items", QCoreApplication::translate("XLibrary", "Add"), "add", [this] { open_add_items(); });
     add("welcome", QCoreApplication::translate("XLibrary", "Open welcome screen"), "app", [this] { show_welcome(); });
     add("tutorial", QCoreApplication::translate("XLibrary", "Take a quick tour"), "help", [this] { show_tutorial(); });
     add("edit_application", QCoreApplication::translate("XLibrary", "Edit"), "edit", [this] {
@@ -277,10 +281,12 @@ void MainWindow::create_actions() {
         ->setToolTip(QCoreApplication::translate(
             "XLibrary", "Remove the selected application from the library. Application files will be kept."));
     add("favorite", QCoreApplication::translate("XLibrary", "Add to favorites"), "favorite", [this] {
+        auto *action = context.actions.value("favorite");
+        action->setProperty("favorite_request_id", {});
         if (const auto *record = service.selected()) {
             auto updated = *record;
             updated.favorite = !updated.favorite;
-            service.save_application(std::move(updated));
+            action->setProperty("favorite_request_id", QVariant::fromValue(service.save_application(std::move(updated))));
         }
     });
     add("open_folder", QCoreApplication::translate("XLibrary", "Open folder"), "folder",
@@ -372,6 +378,7 @@ void MainWindow::refresh_actions() {
             : QCoreApplication::translate(
                   "XLibrary", "Runs the launch command directly. The application may reuse an existing window."));
     context.actions.value("add_application")->setEnabled(profile_available && service.is_ready());
+    context.actions.value("add_items")->setEnabled(can_add_items());
     context.actions.value("refresh_availability")->setEnabled(profile_available && service.is_ready());
     context.actions.value("bulk_edit")
         ->setEnabled(profile_available && service.is_ready() && !service.file_search_active() &&
@@ -430,7 +437,7 @@ void MainWindow::apply_settings() {
             error))
         service.notify(error);
     const QList<QStringList> shortcuts{{"focus_search", "shortcuts/search", "Ctrl+K"},
-                                       {"add_application", "shortcuts/add", "Ctrl+N"},
+                                       {"add_items", "shortcuts/add", "Ctrl+N"},
                                        {"settings", "shortcuts/settings", "Ctrl+,"},
                                        {"launch", "shortcuts/launch", "Return"},
                                        {"new_instance", "shortcuts/new_instance", "Ctrl+Return"},
@@ -775,23 +782,85 @@ void MainWindow::resizeEvent(QResizeEvent *const event) {
     update_layout();
 }
 
-void MainWindow::dragEnterEvent(QDragEnterEvent *const event) {
-    if (event->mimeData()->hasUrls() && service.is_ready() && !service.is_discovering() && !service.profile_busy() &&
-        !service.restart_required()) {
-        for (const auto &url : event->mimeData()->urls())
-            if (!url.isLocalFile())
+bool MainWindow::can_add_items() const {
+    return service.is_ready() && !service.profile_busy() && !service.restart_required();
+}
+
+void MainWindow::open_add_items() {
+    static const QString id = "add_items_dialog";
+    const bool already_open = findChild<QDialog *>(id, Qt::FindDirectChildrenOnly);
+    open_dialog(id, context);
+    if (already_open)
+        return;
+    if (auto *dialog = findChild<QDialog *>(id, Qt::FindDirectChildrenOnly)) {
+        connect(dialog, &QDialog::accepted, this, [this, dialog] {
+            if (!can_add_items())
                 return;
-        event->acceptProposedAction();
+            if (dialog->property("manual_application").toBool())
+                context.actions.value("add_application")->trigger();
+            else
+                review_add_items(dialog->property("selected_paths").toStringList());
+        });
     }
 }
 
-void MainWindow::dropEvent(QDropEvent *const event) {
-    QStringList paths;
-    for (const auto &url : event->mimeData()->urls())
-        if (url.isLocalFile())
-            paths.append(url.toLocalFile());
-    if (!paths.isEmpty()) {
-        service.preview_files(paths);
-        event->acceptProposedAction();
+void MainWindow::review_add_applications(const QStringList &paths) {
+    if (!can_add_items() || paths.isEmpty())
+        return;
+    if (paths.size() > 1) {
+        if (service.is_discovering())
+            service.notify(QCoreApplication::translate(
+                "XLibrary", "Wait for the current scan or import to finish, then try again."));
+        else
+            service.preview_files(paths);
+        return;
     }
+    auto editor_context = context;
+    editor_context.parameters.insert("initial_application_path", paths.first());
+    open_dialog("application_editor", editor_context);
+}
+
+void MainWindow::review_add_items(const QStringList &paths) {
+    QStringList applications;
+    QStringList documents;
+    for (const auto &path : paths) {
+        const QFileInfo info(path);
+        if (!FileManager::supports_file_extension(info.suffix()) && Application::is_application_file_candidate(info))
+            applications.append(path);
+        else
+            documents.append(path);
+    }
+    applications.removeDuplicates();
+    if (documents.isEmpty()) {
+        review_add_applications(applications);
+        return;
+    }
+    auto files_context = context;
+    files_context.parameters.insert("initial_file_paths", documents);
+    files_context.parameters.insert("pending_applications", !applications.isEmpty());
+    open_dialog("add_files_dialog", files_context);
+    if (!applications.isEmpty())
+        if (auto *dialog = findChild<QDialog *>("add_files_dialog", Qt::FindDirectChildrenOnly))
+            connect(dialog, &QDialog::accepted, this, [this, applications] { review_add_applications(applications); },
+                    Qt::SingleShotConnection);
+}
+
+void MainWindow::dragEnterEvent(QDragEnterEvent *const event) {
+    if (!can_add_items() || service.is_discovering() || local_drop_paths(*event).isEmpty()) {
+        event->ignore();
+        return;
+    }
+    event->setDropAction(Qt::CopyAction);
+    event->accept();
+}
+
+void MainWindow::dropEvent(QDropEvent *const event) {
+    const auto paths = local_drop_paths(*event);
+    if (!can_add_items() || service.is_discovering() || paths.isEmpty()) {
+        event->ignore();
+        return;
+    }
+    review_add_items(paths);
+    event->setDropAction(Qt::CopyAction);
+    event->accept();
 }

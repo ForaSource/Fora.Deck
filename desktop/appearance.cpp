@@ -19,10 +19,10 @@ public:
 
 protected:
     bool eventFilter(QObject *const object, QEvent *const event) override {
-        auto *button = qobject_cast<QAbstractButton *>(object);
-        if (!button)
+        auto *control = qobject_cast<QWidget *>(object);
+        if (!control || (!qobject_cast<QAbstractButton *>(object) && control->objectName() != "application_options_tabs"))
             return QObject::eventFilter(object, event);
-        bool keyboard_focus = button->property("keyboard_focus").toBool();
+        bool keyboard_focus = control->property("keyboard_focus").toBool();
         if (event->type() == QEvent::FocusIn) {
             const auto reason = static_cast<QFocusEvent *>(event)->reason();
             if (reason != Qt::ActiveWindowFocusReason && reason != Qt::PopupFocusReason)
@@ -34,16 +34,16 @@ protected:
                 keyboard_focus = false;
         } else if (event->type() == QEvent::MouseButtonPress) {
             keyboard_focus = false;
-        } else if (event->type() == QEvent::KeyPress && button->hasFocus()) {
+        } else if (event->type() == QEvent::KeyPress && control->hasFocus()) {
             keyboard_focus = true;
         } else {
             return QObject::eventFilter(object, event);
         }
-        if (keyboard_focus != button->property("keyboard_focus").toBool()) {
-            button->setProperty("keyboard_focus", keyboard_focus);
-            button->style()->unpolish(button);
-            button->style()->polish(button);
-            button->update();
+        if (keyboard_focus != control->property("keyboard_focus").toBool()) {
+            control->setProperty("keyboard_focus", keyboard_focus);
+            control->style()->unpolish(control);
+            control->style()->polish(control);
+            control->update();
         }
         return QObject::eventFilter(object, event);
     }
@@ -385,6 +385,7 @@ void appearance::apply(const QSettings &settings, const QString &additional_styl
     palette.setColor(QPalette::HighlightedText, text);
     palette.setColor(QPalette::PlaceholderText, secondary);
     palette.setColor(QPalette::Disabled, QPalette::Text, secondary);
+    palette.setColor(QPalette::Disabled, QPalette::PlaceholderText, QColor(dark ? "#8D96A3" : "#747E8B"));
     palette.setColor(QPalette::Disabled, QPalette::ButtonText, secondary);
     qApp->setPalette(palette);
     static const bool fonts_loaded = [] {
@@ -433,7 +434,7 @@ void appearance::apply(const QSettings &settings, const QString &additional_styl
         QPushButton[quiet="true"]:hover { background: %17; }
         QPushButton[quiet="true"]:checked { background: %7; border-color: transparent; }
         QPushButton[disclosure="true"] { padding: 4px 2px; }
-        QPushButton[disclosure="true"]:checked { background: transparent; }
+        QPushButton[disclosure="true"]:checked { background: %5; }
         QPushButton[disclosure="true"]:checked:hover { background: %17; }
         QPushButton[navigation="true"] { background: transparent; border: 2px solid transparent; border-radius: 8px; padding: 8px 10px; min-height: @navigation_height@px; text-align: left; }
         QPushButton[navigation="true"]:hover { background: %17; }
@@ -443,15 +444,20 @@ void appearance::apply(const QSettings &settings, const QString &additional_styl
         QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QKeySequenceEdit:focus, QPushButton[keyboard_focus="true"]:focus, QToolButton[keyboard_focus="true"]:focus { border-color: %16; }
         QWidget[segmented="true"] { background: %5; border-radius: 8px; }
         QPushButton[segment="true"] { background: transparent; border: 2px solid transparent; padding: 3px 10px; min-height: %10px; }
-        QPushButton[segment="true"]:checked { background: %7; color: %1; border-color: %16; font-weight: 600; }
+        QPushButton[segment="true"]:checked { background: transparent; color: %1; border-color: transparent; }
         QPushButton[segment="true"]:hover { background: %17; }
-        QPushButton[segment="true"]:checked:hover { background: %7; }
+        QPushButton[segment="true"]:checked:hover { background: transparent; }
         QPushButton[segment="true"][keyboard_focus="true"]:focus { border-color: %16; }
         QLineEdit[invalid="true"] { border-color: %15; }
         QLineEdit#search_input { min-height: @launch_height@px; }
+        QLabel[key_hint="true"] { background: %3; color: %4; border: 1px solid %6; border-radius: 5px; padding: 1px 5px; }
         QLineEdit QToolButton { background: transparent; border: none; border-radius: 0; padding: 0; min-height: 0; }
-        QComboBox::drop-down { border: none; width: 24px; }
-        QDialog[fit_content="true"] QComboBox::down-arrow { image: url(:/assets/combobox-chevron.png); width: 0.8em; height: 0.55em; }
+        QComboBox { padding-right: 1.75em; }
+        QComboBox::drop-down { border: none; width: 1.65em; }
+        QComboBox::down-arrow { image: url(:/assets/combobox-chevron.png); width: 0.8em; height: 0.55em; }
+        QFrame#inspector_separator { background: %6; border: none; }
+        QTextEdit#inspector_application_path { background: transparent; color: %4; border: 1px solid transparent; }
+        QTextEdit#inspector_application_path:focus { border-color: %16; border-radius: 5px; }
         QDialog[fit_content="true"] QPlainTextEdit#application_aliases { background: %5; border: 2px solid @input_border@; border-radius: 8px; padding: 2px 4px; selection-background-color: %7; }
         QDialog[fit_content="true"] QPlainTextEdit#application_aliases:focus { border-color: %16; }
         QTabWidget#workspaces_tabs::pane { border: 0; background: transparent; }
@@ -463,7 +469,8 @@ void appearance::apply(const QSettings &settings, const QString &additional_styl
         QTabBar#shortcut_tabs QToolButton, QTabBar#workspace_report_tabs QToolButton { padding: 0; min-width: 0; min-height: 0; border-radius: 6px; }
         QTabBar#application_options_tabs::tab { background: %5; color: %4; border: 1px solid transparent; border-radius: 8px; padding: 5px 10px; margin-right: 6px; min-height: %10px; }
         QTabBar#application_options_tabs::tab:hover { color: %1; background: %17; }
-        QTabBar#application_options_tabs::tab:selected { color: %1; background: %7; border-color: %16; }
+        QTabBar#application_options_tabs::tab:selected { color: %1; background: %7; font-weight: 600; }
+        QTabBar#application_options_tabs[keyboard_focus="true"]::tab:selected:focus { border-color: %16; }
         QTabBar#application_options_tabs::scroller { width: 2em; }
         QTabBar#application_options_tabs QToolButton { padding: 0; min-width: 0; min-height: 0; border-radius: 6px; }
         QAbstractItemView { background: %2; border: none; outline: none; selection-background-color: %7; }

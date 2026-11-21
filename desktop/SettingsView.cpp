@@ -15,7 +15,9 @@
 #include <QPlainTextEdit>
 #include <QProgressBar>
 #include <QRegularExpressionValidator>
+#include <QSlider>
 #include <QStackedWidget>
+#include <QStylePainter>
 #include <QSysInfo>
 #include <QTabBar>
 #include <QTreeWidget>
@@ -63,6 +65,46 @@ void choices(QWidget *const page, QSettings &settings, const QString &key, const
     control->setCurrentIndex(qMax(0, index));
     field(static_cast<QVBoxLayout *>(page->layout()), text, control);
 }
+
+class OverlayRowsSlider final : public QSlider {
+    WidgetMotion squeeze{this, 120};
+
+protected:
+    void paintEvent(QPaintEvent *event) override {
+        const auto scale = squeeze.currentValue().isValid() ? squeeze.currentValue().toReal() : 1.0;
+        if (qFuzzyCompare(scale, 1.0)) {
+            QSlider::paintEvent(event);
+            return;
+        }
+        QStylePainter painter(this);
+        QStyleOptionSlider option;
+        initStyleOption(&option);
+        const auto handle = style()->subControlRect(QStyle::CC_Slider, &option, QStyle::SC_SliderHandle, this);
+        option.subControls = QStyle::SC_SliderGroove | QStyle::SC_SliderTickmarks;
+        painter.drawComplexControl(QStyle::CC_Slider, option);
+        option.subControls = QStyle::SC_SliderHandle;
+        const auto center = QRectF(handle).center();
+        painter.translate(center);
+        painter.scale(1.0, scale);
+        painter.translate(-center);
+        painter.drawComplexControl(QStyle::CC_Slider, option);
+    }
+
+public:
+    OverlayRowsSlider() : QSlider(Qt::Horizontal) {
+        setRange(3, 10);
+        setSingleStep(1);
+        setPageStep(1);
+        setTickInterval(maximum() - minimum());
+        setTickPosition(QSlider::TicksBelow);
+        connect(&squeeze, &QVariantAnimation::valueChanged, this, qOverload<>(&QWidget::update));
+        const auto animate = [this](qreal target) {
+            squeeze.move(squeeze.currentValue().isValid() ? squeeze.currentValue().toReal() : 1.0, target);
+        };
+        connect(this, &QSlider::sliderPressed, this, [animate] { animate(0.9); });
+        connect(this, &QSlider::sliderReleased, this, [animate] { animate(1.0); });
+    }
+};
 
 QWidget *general(const ui_context &context, QWidget *) {
     auto *widget = page(QCoreApplication::translate("XLibrary", "Application behavior"));
@@ -137,9 +179,28 @@ QWidget *appearance_page(const ui_context &context, QWidget *) {
 #endif
     choices(widget, settings, "appearance/text_scale", QCoreApplication::translate("XLibrary", "Text size"),
             {{"100%", 100}, {"125%", 125}, {"150%", 150}, {"200%", 200}}, 100);
-    choices(widget, settings, "search/overlay_rows",
-            QCoreApplication::translate("XLibrary", "Visible results in quick search"),
-            {{"3", 3}, {"4", 4}, {"5", 5}, {"6", 6}, {"7", 7}, {"8", 8}, {"9", 9}, {"10", 10}}, 5);
+    auto *slider = new OverlayRowsSlider;
+    slider->setObjectName("overlay_rows");
+    slider->setProperty("setting_key", "search/overlay_rows");
+    slider->setValue(qBound(slider->minimum(), settings.value("search/overlay_rows", 5).toInt(), slider->maximum()));
+    auto *number = label(QString::number(slider->value()));
+    number->setAlignment(Qt::AlignCenter);
+    number->setWordWrap(false);
+    number->setMinimumWidth(number->fontMetrics().horizontalAdvance("10") + appearance::scaled(settings, 12));
+    auto *row = new QWidget;
+    auto *row_layout = new QHBoxLayout(row);
+    row_layout->setContentsMargins(0, 0, 0, 0);
+    row_layout->addWidget(slider, 1);
+    row_layout->addWidget(number);
+    QObject::connect(slider, &QSlider::valueChanged, number, [number](int value) {
+        number->setText(QString::number(value));
+    });
+    const auto caption = QCoreApplication::translate("XLibrary", "Visible results in quick search");
+    auto *buddy = label(caption, "muted");
+    buddy->setBuddy(slider);
+    slider->setAccessibleName(caption);
+    widget->layout()->addWidget(buddy);
+    widget->layout()->addWidget(row);
     widget->layout()->addWidget(label(
         QCoreApplication::translate("XLibrary", "Scroll to see more results. The height is limited by the screen size."),
         "muted"));
@@ -180,7 +241,7 @@ QWidget *hotkeys(const ui_context &context, QWidget *) {
          {{"shortcuts/search", QCoreApplication::translate("XLibrary", "Search the library"), "Ctrl+K"},
           {"shortcuts/settings", QCoreApplication::translate("XLibrary", "Open settings"), "Ctrl+,"}}},
         {QCoreApplication::translate("XLibrary", "Application actions"),
-         {{"shortcuts/add", QCoreApplication::translate("XLibrary", "Add application"), "Ctrl+N"},
+         {{"shortcuts/add", QCoreApplication::translate("XLibrary", "Add"), "Ctrl+N"},
           {"shortcuts/launch", QCoreApplication::translate("XLibrary", "Launch application"), "Return"},
           {"shortcuts/new_instance", QCoreApplication::translate("XLibrary", "New instance"), "Ctrl+Return"},
           {"shortcuts/open_folder", QCoreApplication::translate("XLibrary", "Open application folder"), "Alt+Return"},
@@ -1068,6 +1129,8 @@ QDialog *settings_dialog(const ui_context &context, QWidget *const parent) {
                 values.insert(key, box->isChecked());
             if (auto *combo = qobject_cast<QComboBox *>(control))
                 values.insert(key, combo->currentData());
+            if (auto *slider = qobject_cast<QSlider *>(control))
+                values.insert(key, slider->value());
             if (auto *list = qobject_cast<QListWidget *>(control)) {
                 QStringList paths;
                 for (int i = 0; i < list->count(); ++i) {

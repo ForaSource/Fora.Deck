@@ -24,7 +24,8 @@ Use `-DBUILD_TESTING=OFF` for an application-only build. Tests and Qt Test are n
 | Test target | Behavior covered |
 | --- | --- |
 | `catalog_test` | JSON import preview, malformed records and limits, metadata transfer, skip/replace conflicts, bulk edits, undo after deletion or conflicting edits, and transactional recovery of moved applications. |
-| `file_manager_test` | File eligibility, names and masks with tags, exclusions, saved paths, favorites and metadata, queued saves during shutdown, and added dates from an older index. |
+| `file_manager_test` | File eligibility, names and masks with tags, exclusions, saved paths, batch skips and rollback, queued saves during shutdown, favorites and metadata, and added dates from an older index. |
+| `desktop_motion_test` | Drop routing in the add forms, cancellation before confirmation, isolation of asynchronous results, and saving the quick-search row count. |
 | `launch_test` | Argument parsing, scenario preflight, workspace launch dispatch and cancellation, history on success or failure, and process monitoring using the test process itself. |
 | `profile_settings_test` | Typed settings in backups, malformed values, retention of the destination's credential marker, and preservation of previous settings during restore. |
 | `library_model_test` and `path_search_test` | Application filters, ranking and sorting, CPU/RAM display, directory browsing with file metadata, bounded results, cancellation, and calculator queries. |

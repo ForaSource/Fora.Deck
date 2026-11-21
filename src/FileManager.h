@@ -49,6 +49,14 @@ struct file_index_source {
     QStringList unavailable_directories;
 };
 
+struct file_save_result {
+    // Inspection returns paths eligible to add. Saving returns paths committed by this request.
+    QStringList added;
+    QStringList already_saved;
+    QHash<QString, QString> rejected;
+    QString error;
+};
+
 class FileManager : public QObject {
     Q_OBJECT
     QString database_path;
@@ -80,6 +88,8 @@ class FileManager : public QObject {
     void start_scan(const QStringList &only_roots = {}, bool allow_volume_change = false);
     void check_sources();
     void schedule_refresh();
+    void update_saved_files(QStringList paths, bool saved, QObject *receiver,
+                            std::function<void(file_save_result)> completed = {});
 
 public:
     explicit FileManager(const QString &profile_directory, const QStringList &saved_paths = {},
@@ -102,6 +112,10 @@ public:
                          std::function<void(QHash<QString, qint64>)> completed);
     void saved_files(QObject *receiver, std::function<void(QVector<file_match>)> completed);
     void set_saved(const QString &path, bool saved);
+    void inspect_saved_files(QStringList paths, QObject *receiver,
+                             std::function<void(file_save_result)> completed);
+    void save_files(QStringList paths, QObject *receiver, std::function<void(file_save_result)> completed);
+    static QString saved_path_identity(const QString &path);
     void restore_metadata(const QVariantMap &values);
     const QVariantMap &metadata_values() const { return metadata; }
     QStringList tags_for(const QString &path) const;
@@ -113,6 +127,7 @@ public:
     QString status() const { return state; }
     QString diagnostics_text() const;
     const QVector<file_index_source> &sources() const { return source_states; }
+    static bool supports_file_extension(const QString &extension);
     static bool accepts_file(const QString &path);
     static bool can_open(const QString &path, const QString &volume_root = {}, const QString &volume_device = {});
     static QStringList volume_roots();

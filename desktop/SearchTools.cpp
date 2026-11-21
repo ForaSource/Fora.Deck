@@ -13,6 +13,52 @@
 namespace {
 using namespace ui_helpers;
 
+class SearchSegments final : public QFrame {
+    QPushButton *selected = nullptr;
+    WidgetMotion motion{this, 160};
+
+    void align_selection(bool force = false) {
+        if (selected && (force || motion.endValue().toRect() != selected->geometry()))
+            motion.move(selected->geometry(), selected->geometry(), false);
+    }
+
+protected:
+    bool event(QEvent *event) override {
+        const bool handled = QFrame::event(event);
+        if (event->type() == QEvent::Resize)
+            align_selection(true);
+        else if (event->type() == QEvent::Show || event->type() == QEvent::LayoutRequest)
+            align_selection();
+        return handled;
+    }
+
+    void paintEvent(QPaintEvent *event) override {
+        QFrame::paintEvent(event);
+        if (!selected)
+            return;
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing);
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(palette().highlight());
+        const auto geometry = motion.currentValue().toRect();
+        painter.drawRoundedRect(QRectF(geometry.isValid() ? geometry : selected->geometry()), 7, 7);
+    }
+
+public:
+    explicit SearchSegments(QWidget *parent) : QFrame(parent) {
+        connect(&motion, &QVariantAnimation::valueChanged, this, qOverload<>(&QWidget::update));
+    }
+
+    void select(QPushButton *button) {
+        if (selected == button)
+            return;
+        const auto from = selected ? motion.currentValue().toRect() : button->geometry();
+        selected = button;
+        motion.move(from, selected->geometry(), from.isValid());
+        update();
+    }
+};
+
 void edit_filter(DesktopService &service, QLineEdit &input, QWidget *const parent, const saved_filter &record) {
     auto *dialog = new QDialog(parent);
     dialog->setAttribute(Qt::WA_DeleteOnClose);
@@ -238,7 +284,7 @@ QWidget *search_tools(DesktopService &service, QLineEdit &input, QWidget *const 
 }
 
 QWidget *file_search_switch(DesktopService &service, QWidget *parent) {
-    auto *segments = new QFrame(parent);
+    auto *segments = new SearchSegments(parent);
     segments->setObjectName("file_search_switch");
     segments->setProperty("segmented", true);
     auto *layout = new QHBoxLayout(segments);
@@ -260,9 +306,12 @@ QWidget *file_search_switch(DesktopService &service, QWidget *parent) {
     auto *applications = make_segment(QCoreApplication::translate("XLibrary", "Applications"), "search_applications");
     auto *files = make_segment(QCoreApplication::translate("XLibrary", "Files"), "search_files");
     const auto refresh = [=, &service] {
-        segments->setVisible(service.files->is_enabled());
+        const bool enabled = service.files->is_enabled();
+        if (segments->isHidden() == enabled)
+            segments->setVisible(enabled);
         applications->setChecked(!service.searching_files());
         files->setChecked(service.searching_files());
+        segments->select(service.searching_files() ? files : applications);
     };
     QObject::connect(applications, &QPushButton::clicked, &service, [&service] { service.set_searching_files(false); });
     QObject::connect(files, &QPushButton::clicked, &service, [&service] { service.set_searching_files(true); });

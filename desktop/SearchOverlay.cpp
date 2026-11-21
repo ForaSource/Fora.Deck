@@ -131,8 +131,14 @@ void SearchOverlay::refresh_appearance() {
     const auto shortcut = QKeySequence::fromString(
         service.settings.value("shortcuts/overlay", desktop_platform::default_overlay_shortcut()).toString(),
         QKeySequence::PortableText).toString(QKeySequence::NativeText);
-    shortcut_hint->setText(QCoreApplication::translate("XLibrary", "↑↓ Select · Enter Open · Esc Close · %1 Quick search")
-                               .arg(shortcut));
+    QStringList hints{QCoreApplication::translate("XLibrary", "↑↓ Select"),
+                      QCoreApplication::translate("XLibrary", "Enter Open"),
+                      QCoreApplication::translate("XLibrary", "Esc Close")};
+    if (!shortcut.isEmpty())
+        hints.append(QCoreApplication::translate("XLibrary", "%1 Quick search").arg(shortcut));
+    for (auto &hint : hints)
+        hint.replace(' ', QChar(0x00a0));
+    shortcut_hint->setText(hints.join("    "));
     input->findChild<QAction *>("overlay_search_icon")->setIcon(appearance::icon("search"));
     open_button->setIcon(appearance::icon("library"));
     inset = appearance::scaled(service.settings, 16);

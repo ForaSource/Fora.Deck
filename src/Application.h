@@ -14,6 +14,8 @@
 
 #include "CatalogTypes.h"
 
+class QFileInfo;
+
 class Application {
 private:
     std::uint32_t pid = 0;
@@ -61,6 +63,7 @@ public:
                                               const std::function<void(const discovery_progress &)> &progress = {});
     static qint64 launch_application(const app_record &record, launch_mode mode);
     static QString new_instance_error(const app_record &record);
+    static bool is_application_file_candidate(const QFileInfo &info);
     static app_record resolve_application(const QString &path);
     static QVector<app_record> discover(bool system, bool user, QVector<discovery_issue> &issues,
                                         const std::atomic_bool &cancelled,

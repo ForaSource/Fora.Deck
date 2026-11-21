@@ -265,6 +265,7 @@ signals:
     void catalog_preview_ready();
     void navigation_changed();
     void message(const QString &text);
+    void saved_files_notice(const QString &text, bool show_collection_link);
     void operation_changed(const operation_result &result);
     void operation_finished(const QString &operation, bool success);
     void application_saved(quint64 request_id, qint64 id);

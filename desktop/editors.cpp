@@ -13,12 +13,15 @@
 #include <QPlainTextEdit>
 #include <QRegularExpression>
 #include <QScrollBar>
+#include <QScopedValueRollback>
 #include <QSignalBlocker>
 #include <QSpinBox>
+#include <QStylePainter>
 #include <QTabBar>
 #include <QTableWidget>
 #include <QTextDocument>
 #include <QTimer>
+#include <QTreeWidget>
 #include <QWindow>
 
 #include "Application.h"
@@ -42,6 +45,127 @@ void confirm_application_termination(DesktopService &service, const qint64 id, Q
 namespace {
 using namespace ui_helpers;
 
+class FileDropZone final : public QWidget {
+    QLabel *caption;
+    WidgetMotion lift{this, 110};
+    QString prompt;
+    QString selection;
+    int limit;
+    bool accepting = false;
+
+    bool can_receive(const QStringList &paths) const {
+        return isEnabled() && available() && !paths.isEmpty() && (limit == 0 || paths.size() <= limit);
+    }
+
+    void highlight(bool active) {
+        if (accepting == active)
+            return;
+        accepting = active;
+        lift.move(lift.currentValue().toReal(), active ? 3.0 : 0.0, active);
+        caption->setText(active ? QCoreApplication::translate("XLibrary", "Drop to check files")
+                                : selection.isEmpty() ? prompt : selection);
+        update();
+    }
+
+protected:
+    bool event(QEvent *event) override {
+        if (event->type() == QEvent::Show)
+            window()->installEventFilter(this);
+        if (event->type() == QEvent::Hide) {
+            window()->removeEventFilter(this);
+            highlight(false);
+        }
+        if (event->type() == QEvent::EnabledChange && !isEnabled())
+            highlight(false);
+        return QWidget::event(event);
+    }
+
+    bool eventFilter(QObject *watched, QEvent *event) override {
+        if (watched == window() && event->type() == QEvent::WindowDeactivate)
+            highlight(false);
+        return QWidget::eventFilter(watched, event);
+    }
+
+    void paintEvent(QPaintEvent *) override {
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing);
+        painter.setBrush(palette().color(accepting ? QPalette::Highlight : QPalette::Base));
+        painter.setPen(palette().color(accepting ? QPalette::Link : QPalette::Mid));
+        painter.drawRoundedRect(QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5), 10, 10);
+        const int size = qMax(fontMetrics().height(), 18);
+        appearance::icon("download", palette().color(accepting ? QPalette::Link : QPalette::PlaceholderText))
+            .paint(&painter, QRect((width() - size) / 2, 9 - qRound(lift.currentValue().toReal()), size, size));
+    }
+
+    void dragEnterEvent(QDragEnterEvent *event) override {
+        const auto paths = local_drop_paths(*event);
+        if (!can_receive(paths)) {
+            if (limit == 1 && paths.size() > 1 && available())
+                rejected(QCoreApplication::translate(
+                    "XLibrary", "Choose one application here. Drop several on the main window to review an import."));
+            else if (paths.isEmpty() && available())
+                rejected(QCoreApplication::translate("XLibrary", "Drop local files or use the file picker."));
+            event->ignore();
+            return;
+        }
+        event->setDropAction(Qt::CopyAction);
+        event->accept();
+        highlight(true);
+    }
+
+    void dragMoveEvent(QDragMoveEvent *event) override {
+        const bool valid = can_receive(local_drop_paths(*event));
+        highlight(valid);
+        event->setDropAction(Qt::CopyAction);
+        event->setAccepted(valid);
+    }
+
+    void dragLeaveEvent(QDragLeaveEvent *event) override {
+        highlight(false);
+        event->accept();
+    }
+
+    void dropEvent(QDropEvent *event) override {
+        highlight(false);
+        const auto paths = local_drop_paths(*event);
+        if (!can_receive(paths)) {
+            event->ignore();
+            return;
+        }
+        event->setDropAction(Qt::CopyAction);
+        event->accept();
+        received(paths);
+    }
+
+public:
+    std::function<bool()> available;
+    std::function<void(const QStringList &)> received;
+    std::function<void(const QString &)> rejected = [](const QString &) {};
+
+    FileDropZone(QPushButton *button, QString instruction, int max_files)
+        : caption(label(instruction)), prompt(std::move(instruction)), limit(max_files) {
+        setObjectName("file_drop_zone");
+        setAcceptDrops(true);
+        setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
+        auto *layout = new QVBoxLayout(this);
+        layout->setContentsMargins(10, qMax(fontMetrics().height(), 18) + 13, 10, 8);
+        layout->setSpacing(3);
+        caption->setAlignment(Qt::AlignCenter);
+        caption->setAttribute(Qt::WA_TransparentForMouseEvents);
+        layout->addWidget(caption);
+        button->setObjectName("drop_file_picker");
+        layout->addWidget(button, 0, Qt::AlignHCenter);
+        connect(&lift, &QVariantAnimation::valueChanged, this, qOverload<>(&QWidget::update));
+    }
+
+    void set_selection(const QString &name, const QString &path) {
+        selection = name;
+        setToolTip(path);
+        highlight(false);
+        caption->setText(selection.isEmpty() ? prompt : selection);
+    }
+};
+
 QStringList parse_tags(const QString &input) {
     QStringList result;
     for (auto tag : input.split(',', Qt::SkipEmptyParts)) {
@@ -53,6 +177,305 @@ QStringList parse_tags(const QString &input) {
     }
     return result;
 }
+
+QDialog *add_items_dialog(const ui_context &context, QWidget *parent) {
+    auto *service = static_cast<DesktopService *>(context.service);
+    auto *dialog = new QDialog(parent);
+    dialog->setWindowTitle(QCoreApplication::translate("XLibrary", "Add"));
+    prepare_dialog(dialog, context, QSize(460, 215), QSize(330, 195));
+    auto *layout = new QVBoxLayout(dialog);
+    auto *picker = button(QCoreApplication::translate("XLibrary", "Choose files…"), nullptr, "folder");
+    auto *zone = new FileDropZone(
+        picker, QCoreApplication::translate("XLibrary", "Drop files or applications here"), 0);
+    layout->addWidget(zone, 1);
+    auto *error = label({}, "error");
+    error->hide();
+    layout->addWidget(error);
+    auto *buttons = new QDialogButtonBox(QDialogButtonBox::Cancel);
+    auto *manual = buttons->addButton(QCoreApplication::translate("XLibrary", "Add application manually…"),
+                                      QDialogButtonBox::ActionRole);
+    manual->setObjectName("add_application_manually");
+    layout->addWidget(buttons);
+
+    const auto available = [=] {
+        return service->is_ready() && !service->profile_busy() && !service->restart_required();
+    };
+    const auto update_controls = [=] {
+        zone->setEnabled(available());
+        manual->setEnabled(available());
+    };
+    zone->available = available;
+    zone->received = [=](const QStringList &paths) {
+        if (paths.isEmpty() || !available())
+            return;
+        dialog->setProperty("selected_paths", paths);
+        dialog->accept();
+    };
+    zone->rejected = [=](const QString &message) {
+        error->setText(message);
+        error->show();
+    };
+    QObject::connect(picker, &QPushButton::clicked, dialog, [=] {
+        const auto paths = QFileDialog::getOpenFileNames(dialog, picker->text(), {}, {}, nullptr,
+                                                        QFileDialog::DontResolveSymlinks);
+        zone->received(paths);
+    });
+    QObject::connect(manual, &QPushButton::clicked, dialog, [=] {
+        dialog->setProperty("manual_application", true);
+        dialog->accept();
+    });
+    QObject::connect(buttons, &QDialogButtonBox::rejected, dialog, &QDialog::reject);
+    QObject::connect(service, &DesktopService::profile_state_changed, dialog, update_controls);
+    update_controls();
+    picker->setFocus();
+    return dialog;
+}
+
+class AddFilesDialog final : public QDialog {
+public:
+    using QDialog::QDialog;
+    bool writing = false;
+
+    void reject() override {
+        // The transaction has already been queued and cannot be cancelled by closing the form.
+        if (!writing)
+            QDialog::reject();
+    }
+};
+
+QDialog *add_files_dialog(const ui_context &context, QWidget *parent) {
+    auto *service = static_cast<DesktopService *>(context.service);
+    auto *dialog = new AddFilesDialog(parent);
+    dialog->setWindowTitle(QCoreApplication::translate("XLibrary", "Add to My files"));
+    prepare_dialog(dialog, context, QSize(630, 430), QSize(350, 320));
+    auto *root = new QVBoxLayout(dialog);
+    auto *form = new QWidget;
+    form->setBackgroundRole(QPalette::Base);
+    form->setAutoFillBackground(true);
+    auto *layout = new QVBoxLayout(form);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->addWidget(label(dialog->windowTitle(), "heading"));
+    const bool pending_applications = context.parameters.value("pending_applications").toBool();
+    if (pending_applications)
+        layout->addWidget(label(QCoreApplication::translate("XLibrary", "Next, review the selected applications."),
+                                "muted"));
+    auto *picker = button(QCoreApplication::translate("XLibrary", "Choose files…"), nullptr, "folder");
+    auto *zone = new FileDropZone(picker, QCoreApplication::translate("XLibrary", "Drop documents to add to My files"), 0);
+    layout->addWidget(zone);
+    auto *list = new QTreeWidget;
+    list->setObjectName("add_files_draft");
+    list->setAccessibleName(QCoreApplication::translate("XLibrary", "Files to add"));
+    list->setRootIsDecorated(false);
+    list->setTextElideMode(Qt::ElideMiddle);
+    list->setHeaderLabels({QCoreApplication::translate("XLibrary", "Name"),
+                           QCoreApplication::translate("XLibrary", "Path"),
+                           QCoreApplication::translate("XLibrary", "Status")});
+    list->header()->setSectionResizeMode(QHeaderView::Stretch);
+    list->setMinimumHeight(100);
+    layout->addWidget(list, 1);
+    auto *tools = new QHBoxLayout;
+    auto *remove = button(QCoreApplication::translate("XLibrary", "Remove from selection"), nullptr, "x");
+    auto *retry = button(QCoreApplication::translate("XLibrary", "Check again"), nullptr, "refresh");
+    tools->addWidget(remove);
+    tools->addWidget(retry);
+    tools->addStretch(1);
+    auto *summary = label({}, "muted");
+    auto *error = label({}, "error");
+    zone->rejected = [error](const QString &reason) {
+        error->setText(reason);
+        error->show();
+    };
+    auto *body = scroll(form);
+    root->addWidget(body, 1);
+    root->addLayout(tools);
+    root->addWidget(summary);
+    root->addWidget(error);
+    auto *buttons = new QDialogButtonBox(QDialogButtonBox::Cancel);
+    auto *skip = pending_applications
+                     ? buttons->addButton(QCoreApplication::translate("XLibrary", "Skip files"), QDialogButtonBox::ActionRole)
+                     : nullptr;
+    if (skip) {
+        skip->setObjectName("skip_add_files");
+        QObject::connect(skip, &QPushButton::clicked, dialog, &QDialog::accept);
+    }
+    auto *add = button(QCoreApplication::translate("XLibrary", "Add"), "primary", "add");
+    add->setObjectName("confirm_add_files");
+    buttons->addButton(add, QDialogButtonBox::AcceptRole);
+    root->addWidget(buttons);
+
+    struct draft_state {
+        QStringList paths;
+        file_save_result outcome;
+        bool checking = false;
+    };
+    const auto draft = std::make_shared<draft_state>();
+    const auto profile_available = [=] {
+        return service->is_ready() && !service->profile_busy() && !service->restart_required();
+    };
+    zone->available = [=] { return profile_available() && !draft->checking && !dialog->writing; };
+    const auto update_controls = [=] {
+        const auto enabled = zone->available();
+        zone->setEnabled(enabled);
+        remove->setEnabled(enabled && list->currentItem());
+        retry->setEnabled(enabled && !draft->paths.isEmpty());
+        retry->setVisible(!draft->outcome.rejected.isEmpty() || !draft->outcome.error.isEmpty());
+        add->setEnabled(enabled && !draft->outcome.added.isEmpty() && draft->outcome.error.isEmpty());
+        buttons->button(QDialogButtonBox::Cancel)->setEnabled(!dialog->writing);
+        if (skip)
+            skip->setEnabled(profile_available() && !dialog->writing);
+        const auto count = static_cast<int>(draft->outcome.added.size());
+        summary->setText(draft->checking ? QCoreApplication::translate("XLibrary", "Checking files…")
+                         : dialog->writing ? QCoreApplication::translate("XLibrary", "Adding files…")
+                         : count == 1 ? QCoreApplication::translate("XLibrary", "1 file ready to add")
+                         : QCoreApplication::translate("XLibrary", "%n files ready to add", nullptr, count));
+        error->setText(draft->outcome.error);
+        error->setVisible(!draft->outcome.error.isEmpty());
+    };
+    const auto populate = [=] {
+        const QSignalBlocker blocker(list);
+        const auto selected = list->currentItem() ? list->currentItem()->data(0, Qt::UserRole).toString() : QString{};
+        list->clear();
+        for (const auto &path : draft->paths) {
+            const auto native = QDir::toNativeSeparators(path);
+            const auto status = draft->outcome.already_saved.contains(path)
+                                    ? QCoreApplication::translate("XLibrary", "Already in My files")
+                                    : draft->outcome.rejected.value(path);
+            const QFileInfo file(path);
+            auto *item = new QTreeWidgetItem(list, {file.fileName(), QDir::toNativeSeparators(file.absolutePath()), status});
+            item->setData(0, Qt::UserRole, path);
+            item->setToolTip(0, native);
+            item->setToolTip(1, native);
+            item->setToolTip(2, status);
+            if (path == selected)
+                list->setCurrentItem(item);
+        }
+        update_controls();
+    };
+    const auto check = [=] {
+        draft->checking = true;
+        populate();
+        service->files->inspect_saved_files(draft->paths, dialog, [=](file_save_result outcome) {
+            draft->checking = false;
+            draft->outcome = std::move(outcome);
+            populate();
+        });
+    };
+    zone->received = [=](const QStringList &paths) {
+        if (paths.isEmpty() || !zone->available())
+            return;
+        for (const auto &path : paths) {
+            const auto key = FileManager::saved_path_identity(path);
+            if (!draft->paths.contains(key))
+                draft->paths.append(key);
+        }
+        check();
+    };
+    QObject::connect(picker, &QPushButton::clicked, dialog, [=] {
+        const auto paths = QFileDialog::getOpenFileNames(dialog, picker->text(), {}, {}, nullptr,
+                                                        QFileDialog::DontResolveSymlinks);
+        if (!paths.isEmpty())
+            zone->received(paths);
+    });
+    QObject::connect(remove, &QPushButton::clicked, dialog, [=] {
+        if (!list->currentItem())
+            return;
+        const auto key = list->currentItem()->data(0, Qt::UserRole).toString();
+        draft->paths.removeAll(key);
+        draft->outcome.added.removeAll(key);
+        draft->outcome.already_saved.removeAll(key);
+        draft->outcome.rejected.remove(key);
+        populate();
+    });
+    QObject::connect(retry, &QPushButton::clicked, dialog, check);
+    QObject::connect(list, &QTreeWidget::currentItemChanged, dialog, update_controls);
+    QObject::connect(service, &DesktopService::profile_state_changed, dialog, update_controls);
+    QObject::connect(buttons, &QDialogButtonBox::rejected, dialog, &QDialog::reject);
+    QObject::connect(buttons, &QDialogButtonBox::accepted, dialog, [=] {
+        if (!add->isEnabled() || !zone->available())
+            return;
+        dialog->writing = true;
+        update_controls();
+        service->files->save_files(draft->outcome.added, dialog, [=](file_save_result outcome) {
+            dialog->writing = false;
+            draft->outcome.added.clear();
+            draft->outcome.error = outcome.error;
+            draft->outcome.already_saved.append(outcome.already_saved);
+            draft->outcome.rejected.insert(outcome.rejected);
+            for (const auto &path : outcome.added)
+                draft->paths.removeAll(path);
+            const int added = static_cast<int>(outcome.added.size());
+            const int already = static_cast<int>(draft->outcome.already_saved.size());
+            const int skipped = static_cast<int>(draft->outcome.rejected.size());
+            QString message = added == 1 ? QCoreApplication::translate("XLibrary", "Added 1 file to My files")
+                                         : QCoreApplication::translate("XLibrary", "Added %n files to My files", nullptr, added);
+            if (already)
+                message += " · " + QCoreApplication::translate("XLibrary", "%n already in My files", nullptr, already);
+            if (skipped)
+                message += " · " + QCoreApplication::translate("XLibrary", "%n skipped", nullptr, skipped);
+            if (!outcome.error.isEmpty())
+                message = QCoreApplication::translate("XLibrary", "Could not add files to My files.");
+            emit service->saved_files_notice(message, added > 0 && service->section() != "files");
+            if (outcome.error.isEmpty() && skipped == 0)
+                dialog->accept();
+            else {
+                populate();
+                summary->setText(message);
+            }
+        });
+    });
+    update_controls();
+    zone->received(context.parameters.value("initial_file_paths").toStringList());
+    picker->setFocus();
+    return dialog;
+}
+
+class DisclosureButton final : public QPushButton {
+    WidgetMotion turn{this, 140};
+    bool manual_toggle = false;
+
+protected:
+    void nextCheckState() override {
+        const QScopedValueRollback guard(manual_toggle, true);
+        QPushButton::nextCheckState();
+    }
+
+    void paintEvent(QPaintEvent *) override {
+        QStyleOptionButton option;
+        initStyleOption(&option);
+        const auto size = iconSize();
+        const qreal ratio = devicePixelRatioF();
+        QPixmap icon_image(size * ratio);
+        icon_image.setDevicePixelRatio(ratio);
+        icon_image.fill(Qt::transparent);
+        QPainter icon_painter(&icon_image);
+        icon_painter.setRenderHint(QPainter::SmoothPixmapTransform);
+        icon_painter.translate(size.width() / 2.0, size.height() / 2.0);
+        const double angle = turn.currentValue().isValid() ? turn.currentValue().toDouble()
+                                                           : isChecked() ? 90.0 : 0.0;
+        icon_painter.rotate(angle);
+        appearance::icon("chevron_right", palette().color(QPalette::PlaceholderText))
+            .paint(&icon_painter, QRect(-size.width() / 2, -size.height() / 2, size.width(), size.height()));
+        icon_painter.end();
+        option.icon = QIcon(icon_image);
+        QStylePainter painter(this);
+        painter.drawControl(QStyle::CE_PushButton, option);
+    }
+
+public:
+    explicit DisclosureButton(const QString &text) : QPushButton(text) {
+        // Keep an icon in the size hint while the painted icon rotates in the same slot.
+        setIcon(appearance::icon("chevron_right"));
+        setProperty("quiet", true);
+        setProperty("disclosure", true);
+        setCheckable(true);
+        setAutoDefault(false);
+        connect(&turn, &QVariantAnimation::valueChanged, this, qOverload<>(&QWidget::update));
+        connect(this, &QPushButton::toggled, this, [this](bool expanded) {
+            const auto angle = turn.currentValue().isValid() ? turn.currentValue().toDouble() : 0.0;
+            turn.move(angle, expanded ? 90.0 : 0.0, manual_toggle);
+        });
+    }
+};
 
 QDialog *application_editor(const ui_context &context, QWidget *const parent) {
     auto *service = static_cast<DesktopService *>(context.service);
@@ -120,11 +543,16 @@ QDialog *application_editor(const ui_context &context, QWidget *const parent) {
     path->setText(record.path);
     path->setObjectName("application_path");
     auto *browse = button(QCoreApplication::translate("XLibrary", "Choose file…"), nullptr, "folder");
+    auto *drop_zone = editing ? nullptr : new FileDropZone(
+        browse, QCoreApplication::translate("XLibrary", "Drop an application file or shortcut here"), 1);
     auto *file_row = new QWidget;
-    auto *file_layout = new QHBoxLayout(file_row);
+    auto *file_layout = new QBoxLayout(editing ? QBoxLayout::LeftToRight : QBoxLayout::TopToBottom, file_row);
     file_layout->setContentsMargins(0, 0, 0, 0);
+    if (drop_zone)
+        file_layout->addWidget(drop_zone);
     file_layout->addWidget(path, 1);
-    file_layout->addWidget(browse);
+    if (editing)
+        file_layout->addWidget(browse);
     auto *path_caption =
         add_field(form_layout, QCoreApplication::translate("XLibrary", "Launch target"), file_row, path);
     auto *name = new QLineEdit(record.name);
@@ -188,10 +616,9 @@ QDialog *application_editor(const ui_context &context, QWidget *const parent) {
     });
     refresh_icon();
 
-    auto *more = button(QCoreApplication::translate("XLibrary", "More options"), "quiet", "chevron_right");
-    more->setProperty("disclosure", true);
-    more->setCheckable(true);
-    more->setAutoDefault(false);
+    auto *more = new DisclosureButton(QCoreApplication::translate("XLibrary", "More options"));
+    const auto disclosure_icon_size = appearance::scaled(*settings, 20);
+    more->setIconSize({disclosure_icon_size, disclosure_icon_size});
     form_layout->addWidget(more, 0, Qt::AlignLeft);
     auto *options = new QWidget;
     form_layout->addWidget(options);
@@ -227,9 +654,6 @@ QDialog *application_editor(const ui_context &context, QWidget *const parent) {
     });
     options->hide();
     QObject::connect(more, &QPushButton::toggled, dialog, [=](const bool expanded) {
-        const QString icon_name = expanded ? "chevron_down" : "chevron_right";
-        more->setProperty("appearance_icon", icon_name);
-        more->setIcon(appearance::icon(icon_name));
         options->setVisible(expanded);
         request_fit();
     });
@@ -289,8 +713,9 @@ QDialog *application_editor(const ui_context &context, QWidget *const parent) {
     const auto update_target_fields = [=] {
         const auto kind = target_type->currentData().toString();
         const bool file = kind.isEmpty() || kind == "executable" || kind == "desktop";
-        browse->setVisible(file);
-        browse->setEnabled(file && !dialog->property("resolve_request_id").isValid());
+        (drop_zone ? static_cast<QWidget *>(drop_zone) : browse)->setVisible(file);
+        browse->setEnabled(file && service->is_ready() && !service->profile_busy() && !service->restart_required() &&
+                           !dialog->property("resolve_request_id").isValid());
         arguments->setEnabled(file);
         directory->setEnabled(file);
         file_options->setVisible(file);
@@ -472,8 +897,14 @@ QDialog *application_editor(const ui_context &context, QWidget *const parent) {
         set_error(message);
     };
     const auto update_save = [=] {
-        save->setEnabled(!dialog->property("resolve_request_id").isValid() &&
-                         !dialog->property("save_request_id").isValid() &&
+        const bool available = service->is_ready() && !service->profile_busy() && !service->restart_required();
+        const bool choosing = available && !dialog->property("resolve_request_id").isValid() &&
+                              !dialog->property("save_request_id").isValid();
+        if (drop_zone)
+            drop_zone->setEnabled(choosing);
+        else
+            browse->setEnabled(choosing && Application::file_target(read_target()));
+        save->setEnabled(choosing &&
                          !dialog->property("waiting_shortcut").toBool() &&
                          (editing || !path->text().trimmed().isEmpty()));
     };
@@ -484,11 +915,41 @@ QDialog *application_editor(const ui_context &context, QWidget *const parent) {
         browse->setEnabled(false);
         dialog->setProperty("add_after_resolution", add_after_resolution);
         dialog->setProperty("resolved_path", {});
-        dialog->setProperty("resolve_request_id", QVariant::fromValue(service->resolve_application(file)));
+        const auto request = service->resolve_application(file);
+        if (request)
+            dialog->setProperty("resolve_request_id", QVariant::fromValue(request));
+        else {
+            path->setReadOnly(false);
+            target_type->setEnabled(true);
+            update_target_fields();
+        }
         update_save();
     };
     QObject::connect(path, &QLineEdit::textChanged, dialog, update_save);
-    QObject::connect(path, &QLineEdit::textEdited, dialog, [=] { set_error({}); });
+    QObject::connect(path, &QLineEdit::textEdited, dialog, [=] {
+        set_error({});
+        if (drop_zone)
+            drop_zone->set_selection({}, {});
+    });
+    QObject::connect(service, &DesktopService::profile_state_changed, dialog, update_save);
+    const auto can_choose = [=] {
+        return service->is_ready() && !service->profile_busy() && !service->restart_required() &&
+               !dialog->property("resolve_request_id").isValid() && !dialog->property("save_request_id").isValid() &&
+               Application::file_target(read_target());
+    };
+    const auto choose_file = [=](const QString &file) {
+        if (file.isEmpty() || !can_choose())
+            return;
+        if (drop_zone)
+            drop_zone->set_selection(QCoreApplication::translate("XLibrary", "Checking file…"), file);
+        set_error({});
+        resolve_file(file, false);
+    };
+    if (drop_zone) {
+        drop_zone->available = can_choose;
+        drop_zone->received = [=](const QStringList &paths) { choose_file(paths.first()); };
+        drop_zone->rejected = set_error;
+    }
     (editing ? static_cast<QWidget *>(name) : browse)->setFocus();
     update_save();
     QObject::connect(buttons, &QDialogButtonBox::rejected, dialog, &QDialog::reject);
@@ -505,10 +966,7 @@ QDialog *application_editor(const ui_context &context, QWidget *const parent) {
 #endif
         const auto file = QFileDialog::getOpenFileName(
             dialog, QCoreApplication::translate("XLibrary", "Select an application"), {}, filter, nullptr, options);
-        if (!file.isEmpty()) {
-            set_error({});
-            resolve_file(file, false);
-        }
+        choose_file(file);
     });
     QObject::connect(service, &DesktopService::application_resolved, dialog,
                      [=](const quint64 request_id, const QString &requested_path, const app_record &resolved) {
@@ -516,6 +974,8 @@ QDialog *application_editor(const ui_context &context, QWidget *const parent) {
                              return;
                          if (QDir::cleanPath(path->text()) != QDir::cleanPath(requested_path))
                              return;
+                         if (drop_zone)
+                             drop_zone->set_selection(QFileInfo(requested_path).fileName(), requested_path);
                          path->setText(resolved.path);
                          dialog->setProperty("resolved_path", path->text());
                          if (editing)
@@ -645,9 +1105,11 @@ QDialog *application_editor(const ui_context &context, QWidget *const parent) {
             target_type->setEnabled(true);
             update_target_fields();
             update_save();
-            if (result.state == operation_state::error)
+            if (result.state == operation_state::error) {
+                if (drop_zone)
+                    drop_zone->set_selection({}, {});
                 set_error(result.error.user_message);
-            else if (result.state == operation_state::completed && add_after_resolution)
+            } else if (result.state == operation_state::completed && add_after_resolution)
                 save->click();
             return;
         }
@@ -674,6 +1136,8 @@ QDialog *application_editor(const ui_context &context, QWidget *const parent) {
             }
         }
     });
+    if (!editing)
+        choose_file(context.parameters.value("initial_application_path").toString());
     return dialog;
 }
 
@@ -957,6 +1421,8 @@ QDialog *scenario_editor(const ui_context &context, QWidget *const parent) {
 
 void register_editors(UiRegistry &registry) {
     registry.add_default("application_editor", application_editor);
+    registry.add_default("add_items_dialog", add_items_dialog);
+    registry.add_default("add_files_dialog", add_files_dialog);
     registry.add_default("tag_editor", tag_editor);
     registry.add_default("scenario_editor", scenario_editor);
 }

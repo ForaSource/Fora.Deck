@@ -13,6 +13,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QFutureWatcher>
+#include <QPointer>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QLocale>
@@ -43,6 +44,13 @@ connection open_index(const QString &path) {
         throw std::runtime_error(raw ? sqlite3_errmsg(raw) : "Cannot open file index");
     sqlite3_busy_timeout(raw, 3000);
     return db;
+}
+QStringList saved_paths(sqlite3 *db) {
+    xlibrary::SqliteStatement rows(db, "SELECT path FROM saved ORDER BY path");
+    QStringList paths;
+    while (rows.next())
+        paths.append(rows.qtext(0));
+    return paths;
 }
 bool local_volume(const QStorageInfo &volume) {
     const auto type = volume.fileSystemType().toLower();
@@ -155,10 +163,14 @@ QStringList volume_identity(const QString &path) {
 }
 }
 
+bool FileManager::supports_file_extension(const QString &extension) {
+    return extensions().contains(extension.toLower());
+}
+
 bool FileManager::accepts_file(const QString &path) {
     const QFileInfo info(path);
     const auto name = info.fileName();
-    if (!extensions().contains(info.suffix().toLower()) || name.startsWith('.') || name.startsWith('~') ||
+    if (!supports_file_extension(info.suffix()) || name.startsWith('.') || name.startsWith('~') ||
         name.endsWith('~') || info.isHidden() || info.isSymLink() || !info.isFile() || !info.isReadable())
         return false;
     const auto lower = name.toLower();
@@ -281,11 +293,7 @@ void FileManager::shutdown() {
 }
 QStringList FileManager::persisted_saved_paths() const {
     auto db = open_index(database_path);
-    xlibrary::SqliteStatement rows(db.get(), "SELECT path FROM saved ORDER BY path");
-    QStringList paths;
-    while (rows.next())
-        paths.append(rows.qtext(0));
-    return paths;
+    return saved_paths(db.get());
 }
 file_search_mode FileManager::mode_from_setting(const QString &value) {
     if (value == "basic")
@@ -1201,57 +1209,139 @@ void FileManager::saved_files(QObject *receiver, std::function<void(QVector<file
         return entries;
     }));
 }
+QString FileManager::saved_path_identity(const QString &path) {
+    return identity(path);
+}
+
+namespace {
+void inspect_saved_path(const QString &path, const QSet<QString> &existing, file_save_result &result,
+                        bool already_validated = false) {
+    if (existing.contains(path))
+        result.already_saved.append(path);
+    else if (already_validated)
+        result.added.append(path);
+    else if (QFileInfo(path).isDir())
+        result.rejected.insert(path, QCoreApplication::translate("XLibrary", "Choose a file inside the folder."));
+    else if (!QFileInfo::exists(path))
+        result.rejected.insert(path, QCoreApplication::translate("XLibrary", "The file no longer exists or is inaccessible."));
+    else if (!FileManager::accepts_file(path))
+        result.rejected.insert(path, QCoreApplication::translate("XLibrary", "The file is unavailable or its type is excluded."));
+    else
+        result.added.append(path);
+}
+
+void normalize_saved_paths(QStringList &paths) {
+    paths.removeAll(QString{});
+    for (auto &path : paths)
+        path = identity(path);
+    paths.removeDuplicates();
+}
+}
+
+void FileManager::inspect_saved_files(QStringList paths, QObject *receiver,
+                                      std::function<void(file_save_result)> completed) {
+    auto *watcher = new QFutureWatcher<file_save_result>(receiver);
+    connect(watcher, &QFutureWatcher<file_save_result>::finished, receiver,
+            [watcher, completed = std::move(completed)] {
+                watcher->deleteLater();
+                completed(watcher->result());
+            });
+    watcher->setFuture(QtConcurrent::run(&query_pool, [database = database_path, paths = std::move(paths)]() mutable {
+        file_save_result result;
+        try {
+            normalize_saved_paths(paths);
+            const auto existing = saved_paths(open_index(database).get());
+            const QSet<QString> keys(existing.cbegin(), existing.cend());
+            for (const auto &path : paths)
+                inspect_saved_path(path, keys, result);
+        } catch (const std::exception &error) {
+            result.error = QString::fromUtf8(error.what());
+        }
+        return result;
+    }));
+}
+
 void FileManager::set_saved(const QString &path, const bool saved) {
+    update_saved_files({path}, saved, nullptr);
+}
+
+void FileManager::save_files(QStringList paths, QObject *receiver, std::function<void(file_save_result)> completed) {
+    update_saved_files(std::move(paths), true, receiver, std::move(completed));
+}
+
+void FileManager::update_saved_files(QStringList paths, const bool saved, QObject *receiver,
+                                     std::function<void(file_save_result)> completed) {
+    const bool single = !completed;
     ++pending_saves;
     emit busy_changed();
-    using save_result = QPair<QString, QStringList>;
-    auto *watcher = new QFutureWatcher<save_result>(this);
-    connect(watcher, &QFutureWatcher<save_result>::finished, this, [this, watcher] {
-        const auto result = watcher->result();
+    struct save_operation {
+        file_save_result outcome;
+        QStringList paths;
+    };
+    auto *watcher = new QFutureWatcher<save_operation>(this);
+    connect(watcher, &QFutureWatcher<save_operation>::finished, this,
+            [this, watcher, receiver = QPointer<QObject>(receiver), completed = std::move(completed)] {
+        auto [outcome, paths] = watcher->result();
         watcher->deleteLater();
-        if (!result.first.isEmpty())
-            emit error(result.first);
-        else
-            emit saved_paths_changed(result.second);
+        if (outcome.error.isEmpty() && (completed || outcome.rejected.isEmpty()))
+            emit saved_paths_changed(paths);
+        else if (!completed && !outcome.error.isEmpty())
+            emit error(outcome.error);
+        else if (!completed && !outcome.rejected.isEmpty())
+            emit error(outcome.rejected.cbegin().value());
         --pending_saves;
         emit busy_changed();
         emit changed();
+        if (receiver && completed)
+            completed(std::move(outcome));
     });
-    watcher->setFuture(
-        QtConcurrent::run(&query_pool, [database = database_path, path = identity(path), saved]() -> save_result {
+    watcher->setFuture(QtConcurrent::run(&query_pool,
+        [database = database_path, paths = std::move(paths), saved, single]() mutable -> save_operation {
+            file_save_result result;
             try {
-                if (saved) {
-                    if (!accepts_file(path))
-                        return {
-                            QCoreApplication::translate("XLibrary", "The file is unavailable or its type is excluded."),
-                            {}};
+                normalize_saved_paths(paths);
+                if (single && saved && !accepts_file(paths.value(0))) {
+                    result.rejected.insert(paths.value(0),
+                        QCoreApplication::translate("XLibrary", "The file is unavailable or its type is excluded."));
+                    return {std::move(result), {}};
                 }
                 auto db = open_index(database);
                 xlibrary::sqlite_execute(db.get(), "BEGIN IMMEDIATE");
-                xlibrary::SqliteStatement statement(db.get(), saved ? "INSERT OR IGNORE INTO saved VALUES(?)"
-                                                                    : "DELETE FROM saved WHERE path=?");
-                statement.bind(1, path);
-                statement.next();
                 if (saved) {
+                    const auto existing = saved_paths(db.get());
+                    const QSet<QString> keys(existing.cbegin(), existing.cend());
                     const auto now = QDateTime::currentMSecsSinceEpoch();
-                    xlibrary::SqliteStatement remember(db.get(), "INSERT OR IGNORE INTO files(path,name,scope,seen,added) "
-                                                               "VALUES(?,?,?,?,?)");
-                    remember.bind(1, path);
-                    remember.bind(2, QFileInfo(path).fileName());
-                    // A saved-only file must not claim membership in the current indexed scope.
-                    remember.bind(3, "");
-                    remember.bind(4, now);
-                    remember.bind(5, now);
-                    remember.next();
+                    for (const auto &path : paths) {
+                        const auto added_before = result.added.size();
+                        inspect_saved_path(path, keys, result, single);
+                        if (result.added.size() == added_before)
+                            continue;
+                        xlibrary::SqliteStatement insert(db.get(), "INSERT OR IGNORE INTO saved VALUES(?)");
+                        insert.bind(1, path);
+                        insert.next();
+                        xlibrary::SqliteStatement remember(db.get(), "INSERT OR IGNORE INTO files(path,name,scope,seen,added) "
+                                                                   "VALUES(?,?,?,?,?)");
+                        remember.bind(1, path);
+                        remember.bind(2, QFileInfo(path).fileName());
+                        // A saved-only file must not claim membership in the current indexed scope.
+                        remember.bind(3, "");
+                        remember.bind(4, now);
+                        remember.bind(5, now);
+                        remember.next();
+                    }
+                } else {
+                    xlibrary::SqliteStatement remove(db.get(), "DELETE FROM saved WHERE path=?");
+                    remove.bind(1, paths.value(0));
+                    remove.next();
                 }
-                QStringList paths;
-                xlibrary::SqliteStatement rows(db.get(), "SELECT path FROM saved ORDER BY path");
-                while (rows.next())
-                    paths.append(rows.qtext(0));
+                auto current = saved_paths(db.get());
                 xlibrary::sqlite_execute(db.get(), "COMMIT");
-                return {{}, paths};
-            } catch (const std::exception &e) {
-                return {QString::fromUtf8(e.what()), {}};
+                return {std::move(result), std::move(current)};
+            } catch (const std::exception &error) {
+                // Closing the SQLite connection rolls back an uncommitted transaction.
+                result.added.clear();
+                result.error = QString::fromUtf8(error.what());
+                return {std::move(result), {}};
             }
         }));
 }
