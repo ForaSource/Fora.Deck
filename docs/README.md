@@ -26,5 +26,6 @@ an older release may have a different interface or feature set.
 | [Interface design](design.md) | Palettes, typography, interactions and [brand assets](../assets/README.md). |
 
 [AGENTS.md](../AGENTS.md) owns agent working rules and documentation conventions.
+The [agent workflow](../AGENT_WORKFLOW.md) covers finding related changes and verifying results.
 Private `local-docs/` notes and ignored implementation archives, when present, are records of past work
 and are not part of the published documentation.
