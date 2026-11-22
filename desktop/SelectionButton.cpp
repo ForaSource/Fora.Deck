@@ -56,8 +56,8 @@ void SelectionButton::paintEvent(QPaintEvent *) {
         painter.setBrush(option.palette.color(QPalette::Link));
         const qreal scale = qMax(14, font().pixelSize()) / 14.0;
         const qreal marker_height = qMin(height() - 8.0, 20 * scale);
-        painter.drawRoundedRect(QRectF(2, (height() - marker_height) / 2, 3 * scale, marker_height),
-                                1.5 * scale, 1.5 * scale);
+        painter.drawRoundedRect(QRectF(2, (height() - marker_height) / 2, 3 * scale, marker_height), 1.5 * scale,
+                                1.5 * scale);
         painter.restore();
     }
     option.state = state;

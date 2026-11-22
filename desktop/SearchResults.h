@@ -11,8 +11,8 @@
 #include <QFileInfo>
 #include <QFutureWatcher>
 #include <QLineEdit>
-#include <QTreeView>
 #include <QTimer>
+#include <QTreeView>
 
 #include "FileManager.h"
 #include "LibraryModel.h"
@@ -51,14 +51,11 @@ namespace search_results {
 inline constexpr int result_limit = 50;
 inline constexpr int scan_limit = 20000;
 
-inline QVector<search_entry> directory_entries(const QString &request,
-                                               const std::shared_ptr<std::atomic<quint64>> &generation,
-                                               const quint64 expected, const QHash<QString, usage_record> &usage = {},
-                                               const QSet<QString> &favorites = {},
-                                               const bool working_files_only = false,
-                                               const QVariantMap &metadata = {}, const QStringList &required_tags = {},
-                                               const bool favorites_only = false,
-                                               const QHash<QString, qint64> &added_dates = {}, const int sort_mode = 0) {
+inline QVector<search_entry> directory_entries(
+    const QString &request, const std::shared_ptr<std::atomic<quint64>> &generation, const quint64 expected,
+    const QHash<QString, usage_record> &usage = {}, const QSet<QString> &favorites = {},
+    const bool working_files_only = false, const QVariantMap &metadata = {}, const QStringList &required_tags = {},
+    const bool favorites_only = false, const QHash<QString, qint64> &added_dates = {}, const int sort_mode = 0) {
     const auto cancelled = [&] { return generation->load() != expected; };
     if (cancelled())
         return {};
@@ -79,13 +76,15 @@ inline QVector<search_entry> directory_entries(const QString &request,
     const QDir directory(path);
     if (!directory.exists() || !QFileInfo(path).isReadable())
         return {{search_entry::kind::message, QCoreApplication::translate("XLibrary", "Folder unavailable"), {}, 0}};
-    const auto ordered = [working_files_only, sort_mode](const search_entry &left, const search_entry &right, const bool rank_results) {
+    const auto ordered = [working_files_only, sort_mode](const search_entry &left, const search_entry &right,
+                                                         const bool rank_results) {
         if (rank_results && left.rank != right.rank)
             return left.rank < right.rank;
         if (working_files_only && left.type != right.type)
             return left.type == search_entry::kind::directory;
         if (working_files_only) {
-            if (const auto comparison = FileManager::compare_file_order(left.extension, left.added, right.extension, right.added, sort_mode))
+            if (const auto comparison = FileManager::compare_file_order(left.extension, left.added, right.extension,
+                                                                        right.added, sort_mode))
                 return comparison < 0;
             if (sort_mode == 1) {
                 const auto comparison = QString::compare(left.title, right.title, Qt::CaseInsensitive);
@@ -95,7 +94,8 @@ inline QVector<search_entry> directory_entries(const QString &request,
             if (sort_mode == 2 && left.last_used != right.last_used)
                 return left.last_used > right.last_used;
             if (sort_mode == 4) {
-                const auto comparison = QString::compare(left.tags.join(','), right.tags.join(','), Qt::CaseInsensitive);
+                const auto comparison =
+                    QString::compare(left.tags.join(','), right.tags.join(','), Qt::CaseInsensitive);
                 if (comparison)
                     return comparison < 0;
             }
@@ -147,7 +147,8 @@ inline QVector<search_entry> directory_entries(const QString &request,
         entry.tags = properties.value("tags").toStringList();
         entry.favorite = properties.value("favorite").toBool();
         if (!file.isDir() && ((favorites_only && !entry.favorite) ||
-            !std::all_of(required_tags.cbegin(), required_tags.cend(), [&](const auto &tag) { return has_tag(entry.tags, tag); })))
+                              !std::all_of(required_tags.cbegin(), required_tags.cend(),
+                                           [&](const auto &tag) { return has_tag(entry.tags, tag); })))
             continue;
         const auto history = usage.value(key);
         entry.saved = favorites.contains(key);
@@ -165,7 +166,8 @@ inline QVector<search_entry> directory_entries(const QString &request,
     if (cancelled())
         return {};
     if (working_files_only && (sort_mode == 0 || sort_mode == 5 || sort_mode == 6))
-        std::sort(entries.begin(), entries.end(), [&](const auto &left, const auto &right) { return ordered(left, right, false); });
+        std::sort(entries.begin(), entries.end(),
+                  [&](const auto &left, const auto &right) { return ordered(left, right, false); });
     if (limited)
         entries.append({search_entry::kind::open_folder,
                         QCoreApplication::translate("XLibrary", "Results limited. Open folder"),

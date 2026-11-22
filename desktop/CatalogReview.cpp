@@ -62,11 +62,12 @@ void show_catalog_review(const ui_context &context) {
     layout->addLayout(tools);
     auto *table = new QTableWidget(static_cast<int>(records.size()), 5);
     table->setObjectName("catalog_review_table");
-    table->setHorizontalHeaderLabels(
-        {QCoreApplication::translate("XLibrary", "Name"),
-         removal ? QCoreApplication::translate("XLibrary", "Reason for removal") : QCoreApplication::translate("XLibrary", "Source"),
-         QCoreApplication::translate("XLibrary", "Target"), QCoreApplication::translate("XLibrary", "Launch arguments"),
-         QCoreApplication::translate("XLibrary", "Working directory")});
+    table->setHorizontalHeaderLabels({QCoreApplication::translate("XLibrary", "Name"),
+                                      removal ? QCoreApplication::translate("XLibrary", "Reason for removal")
+                                              : QCoreApplication::translate("XLibrary", "Source"),
+                                      QCoreApplication::translate("XLibrary", "Target"),
+                                      QCoreApplication::translate("XLibrary", "Launch arguments"),
+                                      QCoreApplication::translate("XLibrary", "Working directory")});
     table->setEditTriggers(QAbstractItemView::NoEditTriggers);
     table->setSelectionBehavior(QAbstractItemView::SelectRows);
     table->verticalHeader()->hide();
@@ -99,7 +100,8 @@ void show_catalog_review(const ui_context &context) {
             name->setToolTip(
                 QCoreApplication::translate("XLibrary", "This launch configuration is already in the library."));
         table->setItem(row, 0, name);
-        const QStringList values{removal ? record.removal_reason : record.discovery_source.isEmpty()
+        const QStringList values{removal ? record.removal_reason
+                                 : record.discovery_source.isEmpty()
                                      ? QCoreApplication::translate("XLibrary", "JSON catalog")
                                      : record.discovery_source,
                                  QDir::toNativeSeparators(Application::application_path(record)), record.arguments,
@@ -236,9 +238,9 @@ void show_application_tags(const ui_context &context) {
     layout->addLayout(heading);
 
     const auto *single = ids.size() == 1 ? service->model.find(ids.front()) : nullptr;
-    layout->addWidget(label(single ? single->name
-                                   : QCoreApplication::translate("XLibrary", "Selected applications: %1").arg(ids.size()),
-                            "muted"));
+    layout->addWidget(label(
+        single ? single->name : QCoreApplication::translate("XLibrary", "Selected applications: %1").arg(ids.size()),
+        "muted"));
     QHash<QString, qsizetype> assignments;
     for (const auto id : ids)
         if (const auto *record = service->model.find(id))
@@ -275,9 +277,9 @@ void show_application_tags(const ui_context &context) {
     auto *empty = label({}, "muted");
     layout->addWidget(empty);
     if (mixed)
-        layout->addWidget(label(QCoreApplication::translate(
-                                    "XLibrary", "A dash means the tag is assigned to some selected applications."),
-                                "caption"));
+        layout->addWidget(label(
+            QCoreApplication::translate("XLibrary", "A dash means the tag is assigned to some selected applications."),
+            "caption"));
     auto *new_tags = new QLineEdit;
     new_tags->setPlaceholderText(QCoreApplication::translate("XLibrary", "Add tags separated by commas"));
     new_tags->setAccessibleName(new_tags->placeholderText());
@@ -318,10 +320,9 @@ void show_application_tags(const ui_context &context) {
         dialog->setFixedSize(width, qMin(height, limit.height()));
         if (dialog->isVisible()) {
             const auto frame = dialog->frameGeometry();
-            const auto position = QPoint(qBound(available.left(), frame.x(),
-                                                qMax(available.left(), available.right() - frame.width() + 1)),
-                                         qBound(available.top(), frame.y(),
-                                                qMax(available.top(), available.bottom() - frame.height() + 1)));
+            const auto position = QPoint(
+                qBound(available.left(), frame.x(), qMax(available.left(), available.right() - frame.width() + 1)),
+                qBound(available.top(), frame.y(), qMax(available.top(), available.bottom() - frame.height() + 1)));
             if (position != frame.topLeft())
                 dialog->move(dialog->pos() + position - frame.topLeft());
         }
@@ -343,7 +344,7 @@ void show_application_tags(const ui_context &context) {
         tags->setVisible(rows > 0);
         tags->setFixedHeight(height);
         empty->setText(tags->count() == 0 ? QCoreApplication::translate("XLibrary", "No tags")
-                                         : QCoreApplication::translate("XLibrary", "No matching tags"));
+                                          : QCoreApplication::translate("XLibrary", "No matching tags"));
         empty->setVisible(rows == 0);
         request_fit();
     };
@@ -361,8 +362,8 @@ void show_application_tags(const ui_context &context) {
             if (tag.startsWith('#'))
                 tag.remove(0, 1);
             if (!valid_tag_name(tag)) {
-                set_error(QCoreApplication::translate(
-                    "XLibrary", "Tag: up to 64 characters, without spaces, commas, or #."));
+                set_error(
+                    QCoreApplication::translate("XLibrary", "Tag: up to 64 characters, without spaces, commas, or #."));
                 new_tags->setFocus();
                 return false;
             }

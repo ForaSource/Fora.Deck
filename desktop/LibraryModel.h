@@ -36,8 +36,15 @@ private:
     void store_icon(const QString &key, const QImage &image);
 
 public:
-    enum role { id_role = Qt::UserRole + 1, record_role, tags_role, running_role, favorite_role, available_role,
-                process_usage_role };
+    enum role {
+        id_role = Qt::UserRole + 1,
+        record_role,
+        tags_role,
+        running_role,
+        favorite_role,
+        available_role,
+        process_usage_role
+    };
     explicit LibraryModel(QObject *parent = nullptr);
     ~LibraryModel() override;
     int rowCount(const QModelIndex &parent = {}) const override;

@@ -49,8 +49,8 @@ constexpr int x11_success = Success;
 #include <QFileIconProvider>
 #include <QFileInfo>
 #include <QIcon>
-#include <QMimeDatabase>
 #include <QLocale>
+#include <QMimeDatabase>
 #include <QProcess>
 #include <QProcessEnvironment>
 #include <QRegularExpression>

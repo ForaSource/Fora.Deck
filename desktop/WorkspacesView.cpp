@@ -163,9 +163,8 @@ std::optional<workspace_item> edit_item(DesktopService &service, const ui_contex
     QDialog dialog(parent);
     dialog.setWindowTitle(editing ? QCoreApplication::translate("Workspaces", "Edit resource")
                                   : add_resource_title(original.kind));
-    prepare_dialog(&dialog, context, original.kind == workspace_item_kind::application ? QSize(640, 580)
-                                                                                    : QSize(540, 290),
-                   {340, 260});
+    prepare_dialog(&dialog, context,
+                   original.kind == workspace_item_kind::application ? QSize(640, 580) : QSize(540, 290), {340, 260});
     auto *layout = new QVBoxLayout(&dialog);
     auto *contents = new QWidget;
     auto *form = new QVBoxLayout(contents);
@@ -236,8 +235,8 @@ std::optional<workspace_item> edit_item(DesktopService &service, const ui_contex
     sync_app_results();
     const auto app_id = [&] { return apps->currentIndex().data(LibraryModel::id_role).toLongLong(); };
 
-    auto *advanced_button = button(QCoreApplication::translate("Workspaces", "Launch and window options"), "quiet",
-                                   "settings");
+    auto *advanced_button =
+        button(QCoreApplication::translate("Workspaces", "Launch and window options"), "quiet", "settings");
     advanced_button->setCheckable(true);
     applications_form->addWidget(advanced_button, 0, Qt::AlignLeft);
     auto *advanced = new QWidget;
@@ -623,8 +622,10 @@ void capture_preview(DesktopService &service, const ui_context &context, QWidget
     prepare_dialog(&dialog, context, {780, 540}, {400, 320});
     auto *layout = new QVBoxLayout(&dialog);
     layout->addWidget(label(QCoreApplication::translate("Workspaces", "Choose windows to save"), "heading"));
-    layout->addWidget(label(QCoreApplication::translate(
-        "Workspaces", "Check one window per application. Where prompted, choose a library launch option."), "muted"));
+    layout->addWidget(
+        label(QCoreApplication::translate(
+                  "Workspaces", "Check one window per application. Where prompted, choose a library launch option."),
+              "muted"));
     auto *list = table({QCoreApplication::translate("Workspaces", "Detected window"),
                         QCoreApplication::translate("Workspaces", "Library application or status")},
                        QCoreApplication::translate("Workspaces", "Detected windows"));
@@ -633,14 +634,16 @@ void capture_preview(DesktopService &service, const ui_context &context, QWidget
     layout->addWidget(list, 1);
     list->setVisible(!candidates.isEmpty());
     if (candidates.isEmpty())
-        layout->addWidget(empty_card(QCoreApplication::translate("Workspaces", "No eligible windows were found."),
-                                    QCoreApplication::translate("Workspaces", "You can still build a workspace manually."),
-                                    "workspaces"), 1);
+        layout->addWidget(
+            empty_card(QCoreApplication::translate("Workspaces", "No eligible windows were found."),
+                       QCoreApplication::translate("Workspaces", "You can still build a workspace manually."),
+                       "workspaces"),
+            1);
 
-    auto *manual_hint = label(
-        QCoreApplication::translate(
-            "Workspaces", "Choosing a different library app adds it without the window position."),
-        "muted");
+    auto *manual_hint =
+        label(QCoreApplication::translate("Workspaces",
+                                          "Choosing a different library app adds it without the window position."),
+              "muted");
     manual_hint->hide();
     layout->addWidget(manual_hint);
     auto *status = label({}, "muted");
@@ -700,8 +703,8 @@ void capture_preview(DesktopService &service, const ui_context &context, QWidget
         {
             const QSignalBlocker blocked(list);
             assignments[index] = std::move(item);
-            list->topLevelItem(index)->setData(
-                0, Qt::CheckStateRole, assignments[index] ? QVariant(Qt::Checked) : QVariant{});
+            list->topLevelItem(index)->setData(0, Qt::CheckStateRole,
+                                               assignments[index] ? QVariant(Qt::Checked) : QVariant{});
         }
         refresh_selection();
         refresh_icons();
@@ -741,8 +744,8 @@ void capture_preview(DesktopService &service, const ui_context &context, QWidget
                 auto name = option.display_name;
                 if (const auto *record = service.model.find(option.application_id)) {
                     QStringList details;
-                    for (const auto &value : {record->arguments, record->default_launch_profile,
-                                              record->working_directory})
+                    for (const auto &value :
+                         {record->arguments, record->default_launch_profile, record->working_directory})
                         if (!value.isEmpty())
                             details.append(value);
                     if (!details.isEmpty())
@@ -757,8 +760,8 @@ void capture_preview(DesktopService &service, const ui_context &context, QWidget
             entry->setSizeHint(0, {0, choice->sizeHint().height() + 4});
             list->setItemWidget(entry, 1, choice);
             QObject::connect(choice, &QComboBox::currentIndexChanged, &dialog, [&, index](const int option) {
-                set_assignment(index, option > 0 ? std::optional(candidates[index].launch_options[option - 1])
-                                                  : std::nullopt);
+                set_assignment(index,
+                               option > 0 ? std::optional(candidates[index].launch_options[option - 1]) : std::nullopt);
             });
         } else {
             manual_hint->show();
@@ -769,8 +772,8 @@ void capture_preview(DesktopService &service, const ui_context &context, QWidget
             auto *reason = label(candidate.issue, "muted");
             manual_layout->addWidget(reason);
             const auto choose_text = QCoreApplication::translate("Workspaces", "Choose application…");
-            auto *add_file = button(QCoreApplication::translate("Workspaces", "Add file to library…"), nullptr,
-                                    "add_app");
+            auto *add_file =
+                button(QCoreApplication::translate("Workspaces", "Add file to library…"), nullptr, "add_app");
             add_file->setAutoDefault(false);
             add_file->setAccessibleName(add_file->text() + ' ' + title);
             add_file->setToolTip(candidate.window.executable.toHtmlEscaped());
@@ -838,7 +841,8 @@ bool confirm_run(const ui_context &context, QWidget *parent, const QStringList &
     for (const auto &warning : warnings)
         row(list, {warning});
     layout->addWidget(list, 1);
-    auto *buttons = dialog_buttons(button(QCoreApplication::translate("Workspaces", "Run workspace"), "primary", "play"));
+    auto *buttons =
+        dialog_buttons(button(QCoreApplication::translate("Workspaces", "Run workspace"), "primary", "play"));
     layout->addWidget(buttons);
     QObject::connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
     QObject::connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
@@ -855,8 +859,9 @@ QWidget *workspaces_view(const ui_context &context, QWidget *const parent) {
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(10);
     layout->addWidget(label(QCoreApplication::translate("Workspaces", "Workspaces"), "heading"));
-    layout->addWidget(label(QCoreApplication::translate(
-        "Workspaces", "Open a group of applications, files, folders and links together."), "muted"));
+    layout->addWidget(label(
+        QCoreApplication::translate("Workspaces", "Open a group of applications, files, folders and links together."),
+        "muted"));
     auto *header = new QHBoxLayout;
     auto *create = button(QCoreApplication::translate("Workspaces", "New workspace"), "primary", "add");
     auto *capture = button(QCoreApplication::translate("Workspaces", "Capture open windows"), nullptr, "workspaces");
@@ -866,10 +871,10 @@ QWidget *workspaces_view(const ui_context &context, QWidget *const parent) {
     layout->addLayout(header);
     auto *limitation = label({}, "muted");
     layout->addWidget(limitation);
-    auto *empty = empty_card(QCoreApplication::translate("Workspaces", "No workspaces yet"),
-                             QCoreApplication::translate(
-                                 "Workspaces", "Start with an empty workspace or capture the windows already open."),
-                             "workspaces");
+    auto *empty = empty_card(
+        QCoreApplication::translate("Workspaces", "No workspaces yet"),
+        QCoreApplication::translate("Workspaces", "Start with an empty workspace or capture the windows already open."),
+        "workspaces");
     layout->addWidget(empty, 1);
     auto *list = table(
         {QCoreApplication::translate("Workspaces", "Name"), QCoreApplication::translate("Workspaces", "Resources")},
@@ -914,7 +919,8 @@ QWidget *workspaces_view(const ui_context &context, QWidget *const parent) {
     report->header()->setSectionResizeMode(2, QHeaderView::Stretch);
     run_layout->addWidget(report, 3);
     auto *cancel = button(QCoreApplication::translate("Workspaces", "Cancel run"), nullptr, "stop");
-    auto *export_report = button(QCoreApplication::translate("Workspaces", "Export run diagnostics…"), nullptr, "export");
+    auto *export_report =
+        button(QCoreApplication::translate("Workspaces", "Export run diagnostics…"), nullptr, "export");
     auto *run_actions = new QHBoxLayout;
     run_actions->addWidget(cancel);
     run_actions->addWidget(export_report);
@@ -963,7 +969,8 @@ QWidget *workspaces_view(const ui_context &context, QWidget *const parent) {
                     status = QCoreApplication::translate("Workspaces", "Invalid resource");
                 else if (item.enabled && item.placement)
                     status = QCoreApplication::translate("Workspaces", "Window layout");
-                row(resources, {workspace_item_label(item, apps), status})->setIcon(0, resource_icon(item, service->model));
+                row(resources, {workspace_item_label(item, apps), status})
+                    ->setIcon(0, resource_icon(item, service->model));
             }
         tabs->setTabEnabled(0, workspace != nullptr);
         if (workspace && runs->report().isEmpty())

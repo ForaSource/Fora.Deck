@@ -4,8 +4,8 @@
 #include <QFileInfo>
 #include <QFutureWatcher>
 #include <QImageReader>
-#include <QMimeDatabase>
 #include <QLocale>
+#include <QMimeDatabase>
 #include <QtConcurrent/QtConcurrentRun>
 #include <QTimer>
 
@@ -78,7 +78,7 @@ QIcon LibraryModel::fallback_icon(const QString &kind) const {
     const auto icon = kind == "steam"        ? QIcon::fromTheme("steam", appearance::icon("library"))
                       : kind == "system_uri" ? QIcon::fromTheme("preferences-system", appearance::icon("settings"))
                       : kind == "aumid" || kind == "executable" || kind == "desktop" ? appearance::icon("app")
-                      : kind == "file" ? appearance::icon("file")
+                      : kind == "file"                                               ? appearance::icon("file")
                                                                                      : appearance::icon("external");
     fallback_icons.insert(cache_key, icon);
     return icon;
@@ -342,8 +342,9 @@ void LibraryModel::update_state(const QVector<app_record> &applications) {
     }
     // Let the proxy update ordering once, after the entire state snapshot has been applied.
     if (first_changed >= 0)
-        emit dataChanged(index(first_changed, 0), index(last_changed, 2),
-                         {Qt::DisplayRole, running_role, available_role, record_role, process_usage_role, Qt::ToolTipRole});
+        emit dataChanged(
+            index(first_changed, 0), index(last_changed, 2),
+            {Qt::DisplayRole, running_role, available_role, record_role, process_usage_role, Qt::ToolTipRole});
 }
 
 const app_record *LibraryModel::find(const qint64 id) const {

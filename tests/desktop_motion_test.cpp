@@ -17,15 +17,15 @@
 #include <QTemporaryDir>
 #include <QTimer>
 #include <QTreeWidget>
+#include <QtTest>
 #include <QUrl>
 #include <QVariantAnimation>
-#include <QtTest>
 
+#include "appearance.h"
 #include "DesktopService.h"
 #include "MainWindow.h"
 #include "PlatformIntegration.h"
 #include "SearchResults.h"
-#include "appearance.h"
 
 namespace {
 void capture_widget(QWidget *widget, const QString &filename) {
@@ -187,8 +187,7 @@ private slots:
         dialog->reject();
         QTRY_COMPARE(notices.size(), 1);
         QTRY_VERIFY(!desktop.window->findChild<QDialog *>("add_files_dialog"));
-        QCOMPARE(desktop.service->files->persisted_saved_paths(),
-                 QStringList{FileManager::saved_path_identity(path)});
+        QCOMPARE(desktop.service->files->persisted_saved_paths(), QStringList{FileManager::saved_path_identity(path)});
         QVERIFY(desktop.service->catalog().applications.isEmpty());
         QVERIFY(!desktop.service->files->is_enabled());
         QCOMPARE(applications.size(), 0);
@@ -227,8 +226,7 @@ private slots:
         QTRY_VERIFY(!editor->property("resolve_request_id").isValid());
         auto *target = editor->findChild<QLineEdit *>("application_path");
         QVERIFY(target);
-        QCOMPARE(FileManager::saved_path_identity(target->text()),
-                 FileManager::saved_path_identity(program));
+        QCOMPARE(FileManager::saved_path_identity(target->text()), FileManager::saved_path_identity(program));
         editor->reject();
         QVERIFY(desktop.service->catalog().applications.isEmpty());
         QVERIFY(desktop.service->files->persisted_saved_paths().isEmpty());
@@ -366,8 +364,8 @@ private slots:
         TestDesktop desktop;
         QTRY_VERIFY(desktop.service->is_ready());
         auto exclusions = FileManager::volume_roots();
-        for (const auto location : {QStandardPaths::DesktopLocation, QStandardPaths::DocumentsLocation,
-                                    QStandardPaths::DownloadLocation})
+        for (const auto location :
+             {QStandardPaths::DesktopLocation, QStandardPaths::DocumentsLocation, QStandardPaths::DownloadLocation})
             exclusions.append(QStandardPaths::writableLocation(location));
         desktop.service->files->configure(file_search_mode::basic, {}, exclusions);
         auto *group = desktop.window->findChild<QWidget *>("file_search_switch");
@@ -410,8 +408,8 @@ private slots:
         TestDesktop desktop;
         QTRY_VERIFY(desktop.service->is_ready());
         auto exclusions = FileManager::volume_roots();
-        for (const auto location : {QStandardPaths::DesktopLocation, QStandardPaths::DocumentsLocation,
-                                    QStandardPaths::DownloadLocation})
+        for (const auto location :
+             {QStandardPaths::DesktopLocation, QStandardPaths::DocumentsLocation, QStandardPaths::DownloadLocation})
             exclusions.append(QStandardPaths::writableLocation(location));
         desktop.service->files->configure(file_search_mode::basic, {}, exclusions);
         auto *group = desktop.window->findChild<QWidget *>("file_search_switch");
@@ -470,9 +468,8 @@ private slots:
         desktop.service->files->configure(file_search_mode::basic, {}, exclusions);
         bool saved = false;
         QObject receiver;
-        desktop.service->files->save_files(paths, &receiver, [&](const file_save_result &result) {
-            saved = result.added.size() == paths.size();
-        });
+        desktop.service->files->save_files(
+            paths, &receiver, [&](const file_save_result &result) { saved = result.added.size() == paths.size(); });
         QTRY_VERIFY(saved);
 
         auto *search = desktop.window->findChild<QLineEdit *>("search_input");

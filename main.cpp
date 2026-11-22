@@ -71,7 +71,7 @@ int main(int argc, char *argv[]) {
         const auto appimage = check_startup ? QString{} : application_paths::appimage_file();
         const auto profile = check_startup         ? startup_profile->path()
                              : !appimage.isEmpty() ? appimage + ".data"
-                             : portable ? application.applicationDirPath() + "/data"
+                             : portable            ? application.applicationDirPath() + "/data"
                                         : QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
         if (!QDir().mkpath(profile))
             throw std::runtime_error(

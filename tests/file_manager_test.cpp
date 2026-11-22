@@ -88,8 +88,7 @@ private slots:
         std::optional<file_save_result> overlap;
         manager.save_files({first, first, second, excluded}, &receiver,
                            [&](file_save_result result) { initial = std::move(result); });
-        manager.save_files({second, third}, &receiver,
-                           [&](file_save_result result) { overlap = std::move(result); });
+        manager.save_files({second, third}, &receiver, [&](file_save_result result) { overlap = std::move(result); });
         QTRY_VERIFY(initial && overlap);
         QCOMPARE(initial->added.size(), 2);
         QCOMPARE(initial->rejected.size(), 1);
@@ -146,9 +145,8 @@ private slots:
             FileManager manager(temporary.path());
             {
                 QObject receiver;
-                manager.save_files({path}, &receiver, [](file_save_result) {
-                    QFAIL("A destroyed receiver must not see the result");
-                });
+                manager.save_files({path}, &receiver,
+                                   [](file_save_result) { QFAIL("A destroyed receiver must not see the result"); });
             }
             manager.shutdown();
             QCoreApplication::processEvents();
@@ -292,9 +290,9 @@ private slots:
         for (const auto &path : paths)
             manager.update_metadata(path, {}, true);
         const auto entries = wait_for_result<QVector<file_match>>([&](QObject *receiver, auto completed) {
-            manager.search({}, 1, receiver,
-                           [completed](quint64, QVector<file_match> matches) { completed(std::move(matches)); },
-                           std::make_shared<std::atomic<quint64>>(1), {}, {}, true, 225, 1);
+            manager.search(
+                {}, 1, receiver, [completed](quint64, QVector<file_match> matches) { completed(std::move(matches)); },
+                std::make_shared<std::atomic<quint64>>(1), {}, {}, true, 225, 1);
         });
         QCOMPARE(entries.size(), 225);
         QCOMPARE(entries.first().name, QString("draft-010.txt"));

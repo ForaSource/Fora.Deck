@@ -897,9 +897,8 @@ void Manager::review_inventory(const QVector<app_record> &records, const QVector
             throw DiscoveryCancelled();
         const auto resume_review = qScopeGuard([&] { cancelled->phase.store(discovery_phase::running); });
         remove_applications(automatically_removed, false);
-        preview.removeIf([&](const app_record &record) {
-            return removed_configurations.contains(Application::launch_key(record));
-        });
+        preview.removeIf(
+            [&](const app_record &record) { return removed_configurations.contains(Application::launch_key(record)); });
         emit notification(QCoreApplication::translate("XLibrary", "Removed unavailable applications without icons: %1.")
                               .arg(automatically_removed.size()));
     }

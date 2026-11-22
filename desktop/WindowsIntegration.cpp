@@ -12,8 +12,8 @@
 #include <QFileInfo>
 #include <QMimeDatabase>
 #include <QRegularExpression>
-#include <QSettings>
 #include <QScopeGuard>
+#include <QSettings>
 #include <QUrl>
 #include <QWidget>
 #include <shlobj.h>
@@ -50,8 +50,8 @@ BOOL CALLBACK find_window(const HWND window, const LPARAM parameter) {
 }
 
 void apply_native_frame(QWidget *const window, const bool dark, const bool glass) {
-    if (!window->isWindow() || (window->windowFlags() & Qt::FramelessWindowHint) ||
-        !window->internalWinId() || QGuiApplication::platformName() != "windows")
+    if (!window->isWindow() || (window->windowFlags() & Qt::FramelessWindowHint) || !window->internalWinId() ||
+        QGuiApplication::platformName() != "windows")
         return;
     const auto handle = reinterpret_cast<HWND>(window->internalWinId());
     // Windows 11 attributes are numeric for compatibility with older MinGW headers.
@@ -209,7 +209,8 @@ desktop_platform::file_association desktop_platform::default_file_application(co
             return QString{};
         std::vector<wchar_t> buffer(length);
         return SUCCEEDED(AssocQueryStringW(ASSOCF_NONE, kind, association.c_str(), L"open", buffer.data(), &length))
-                   ? QString::fromWCharArray(buffer.data()) : QString{};
+                   ? QString::fromWCharArray(buffer.data())
+                   : QString{};
     };
     file_association result;
     result.name = query(ASSOCSTR_FRIENDLYAPPNAME);
@@ -252,7 +253,8 @@ QImage desktop_platform::application_icon(const QString &path) {
         IShellItemImageFactory *raw_factory = nullptr;
         if (SUCCEEDED(SHCreateItemFromParsingName(native_path.c_str(), nullptr, IID_PPV_ARGS(&raw_factory)))) {
             const auto release_factory = [](IShellItemImageFactory *factory) { factory->Release(); };
-            const std::unique_ptr<IShellItemImageFactory, decltype(release_factory)> factory(raw_factory, release_factory);
+            const std::unique_ptr<IShellItemImageFactory, decltype(release_factory)> factory(raw_factory,
+                                                                                             release_factory);
             HBITMAP bitmap = nullptr;
             const auto cleanup_bitmap = qScopeGuard([&bitmap] {
                 if (bitmap)
@@ -271,7 +273,7 @@ QImage desktop_platform::application_icon(const QString &path) {
     if (length > 0 && length <= 32768) {
         std::vector<wchar_t> executable(length);
         if (SUCCEEDED(AssocQueryStringW(ASSOCF_NONE, ASSOCSTR_EXECUTABLE, association.c_str(), L"open",
-                                      executable.data(), &length))) {
+                                        executable.data(), &length))) {
             ExtractIconExW(executable.data(), 0, &large, nullptr, 1);
             if (large) {
                 return QImage::fromHICON(large);

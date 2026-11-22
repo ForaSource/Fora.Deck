@@ -134,10 +134,8 @@ QWidget *general(const ui_context &context, QWidget *) {
              {QCoreApplication::translate("XLibrary", "Start in the tray"), "tray"}},
             "show");
     widget->layout()->addWidget(label(QCoreApplication::translate("XLibrary", "Running applications"), "subheading"));
-    checkbox(widget, settings, "monitoring/memory",
-             QCoreApplication::translate("XLibrary", "Show memory usage"), true);
-    checkbox(widget, settings, "monitoring/cpu",
-             QCoreApplication::translate("XLibrary", "Show CPU usage"), true);
+    checkbox(widget, settings, "monitoring/memory", QCoreApplication::translate("XLibrary", "Show memory usage"), true);
+    checkbox(widget, settings, "monitoring/cpu", QCoreApplication::translate("XLibrary", "Show CPU usage"), true);
     auto *reset = button(QCoreApplication::translate("XLibrary", "Reset settings…"), "danger");
     widget->layout()->addWidget(reset);
     QObject::connect(reset, &QPushButton::clicked, widget, [=] {
@@ -193,18 +191,18 @@ QWidget *appearance_page(const ui_context &context, QWidget *) {
     row_layout->setContentsMargins(0, 0, 0, 0);
     row_layout->addWidget(slider, 1);
     row_layout->addWidget(number);
-    QObject::connect(slider, &QSlider::valueChanged, number, [number](int value) {
-        number->setText(QString::number(value));
-    });
+    QObject::connect(slider, &QSlider::valueChanged, number,
+                     [number](int value) { number->setText(QString::number(value)); });
     const auto caption = QCoreApplication::translate("XLibrary", "Visible results in quick search");
     auto *buddy = label(caption, "muted");
     buddy->setBuddy(slider);
     slider->setAccessibleName(caption);
     widget->layout()->addWidget(buddy);
     widget->layout()->addWidget(row);
-    widget->layout()->addWidget(label(
-        QCoreApplication::translate("XLibrary", "Scroll to see more results. The height is limited by the screen size."),
-        "muted"));
+    widget->layout()->addWidget(
+        label(QCoreApplication::translate("XLibrary",
+                                          "Scroll to see more results. The height is limited by the screen size."),
+              "muted"));
     checkbox(widget, settings, "appearance/animations",
              QCoreApplication::translate("XLibrary", "Enable interface animations"), true);
     widget->layout()->addWidget(
@@ -599,8 +597,10 @@ QWidget *file_settings(const ui_context &context, QWidget *) {
     widget->layout()->addWidget(diagnostics);
     QObject::connect(service->files, &FileManager::status_changed, diagnostics,
                      [=] { diagnostics->setPlainText(service->files->diagnostics_text()); });
-    widget->layout()->addWidget(label(QCoreApplication::translate("XLibrary",
-        "Unavailable sources are checked about every 30 seconds. Returning sources refresh separately from the regular index refresh."), "muted"));
+    widget->layout()->addWidget(label(
+        QCoreApplication::translate("XLibrary", "Unavailable sources are checked about every 30 seconds. Returning "
+                                                "sources refresh separately from the regular index refresh."),
+        "muted"));
     auto *scan = button(QCoreApplication::translate("XLibrary", "Refresh file index"));
     scan->setEnabled(service->files->is_enabled());
     widget->layout()->addWidget(scan);

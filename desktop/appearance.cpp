@@ -20,7 +20,8 @@ public:
 protected:
     bool eventFilter(QObject *const object, QEvent *const event) override {
         auto *control = qobject_cast<QWidget *>(object);
-        if (!control || (!qobject_cast<QAbstractButton *>(object) && control->objectName() != "application_options_tabs"))
+        if (!control ||
+            (!qobject_cast<QAbstractButton *>(object) && control->objectName() != "application_options_tabs"))
             return QObject::eventFilter(object, event);
         bool keyboard_focus = control->property("keyboard_focus").toBool();
         if (event->type() == QEvent::FocusIn) {
@@ -132,7 +133,8 @@ QIcon appearance::icon(const QString &name, const QColor &requested_color) {
     } else if (name == "saved_file") {
         painter.drawPolygon(QPolygonF{QPointF(4, 3), QPointF(14, 3), QPointF(20, 9), QPointF(20, 21), QPointF(4, 21)});
         painter.drawPolyline(QPolygonF{QPointF(14, 3), QPointF(14, 9), QPointF(20, 9)});
-        painter.drawPolygon(QPolygonF{QPointF(8, 11), QPointF(14, 11), QPointF(14, 18), QPointF(11, 16), QPointF(8, 18)});
+        painter.drawPolygon(
+            QPolygonF{QPointF(8, 11), QPointF(14, 11), QPointF(14, 18), QPointF(11, 16), QPointF(8, 18)});
     } else if (name == "folder") {
         QPainterPath path;
         path.moveTo(3, 7);
@@ -342,8 +344,8 @@ void appearance::paint_selection(QPainter &painter, const QRectF &rect, const QP
     const qreal marker_width = qMax(3.0, rect.height() / 18.0);
     const qreal marker_height = qMax(0.0, qMin(rect.height() - 8, rect.height() * 0.5));
     painter.setBrush(palette.color(QPalette::Link));
-    painter.drawRoundedRect(QRectF(rect.left(), rect.center().y() - marker_height / 2,
-                                  marker_width, marker_height), marker_width / 2, marker_width / 2);
+    painter.drawRoundedRect(QRectF(rect.left(), rect.center().y() - marker_height / 2, marker_width, marker_height),
+                            marker_width / 2, marker_width / 2);
     if (focused) {
         painter.setBrush(Qt::NoBrush);
         painter.setPen(QPen(palette.color(QPalette::Link), 2));

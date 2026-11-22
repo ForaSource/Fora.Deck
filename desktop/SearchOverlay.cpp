@@ -5,8 +5,8 @@
 #include <QGraphicsOpacityEffect>
 #include <QHBoxLayout>
 #include <QHideEvent>
-#include <QLineEdit>
 #include <QLabel>
+#include <QLineEdit>
 #include <QPainter>
 #include <QPainterPath>
 #include <QScreen>
@@ -32,10 +32,11 @@ SearchOverlay::SearchOverlay(DesktopService &service, QWidget *const parent)
               Qt::Window |
 #endif
                   Qt::FramelessWindowHint),
-      service(service), contents(new QWidget(this)), input(new QLineEdit), shortcut_hint(new QLabel), open_button(new QToolButton),
-      results(new SearchResults(service, *input, true)), notice(new NotificationBanner(service.settings, 0, 7000)),
-      opacity(new QGraphicsOpacityEffect(contents)), reveal(new QVariantAnimation(this)),
-      height_animation(new QVariantAnimation(this)), activation_check(new QTimer(this)) {
+      service(service), contents(new QWidget(this)), input(new QLineEdit), shortcut_hint(new QLabel),
+      open_button(new QToolButton), results(new SearchResults(service, *input, true)),
+      notice(new NotificationBanner(service.settings, 0, 7000)), opacity(new QGraphicsOpacityEffect(contents)),
+      reveal(new QVariantAnimation(this)), height_animation(new QVariantAnimation(this)),
+      activation_check(new QTimer(this)) {
     setObjectName("search_overlay");
     setWindowTitle(QCoreApplication::translate("XLibrary", "Quick search"));
     setWindowIcon(appearance::logo());
@@ -128,9 +129,11 @@ SearchOverlay::SearchOverlay(DesktopService &service, QWidget *const parent)
 
 void SearchOverlay::refresh_appearance() {
     notice->refresh_appearance();
-    const auto shortcut = QKeySequence::fromString(
-        service.settings.value("shortcuts/overlay", desktop_platform::default_overlay_shortcut()).toString(),
-        QKeySequence::PortableText).toString(QKeySequence::NativeText);
+    const auto shortcut =
+        QKeySequence::fromString(
+            service.settings.value("shortcuts/overlay", desktop_platform::default_overlay_shortcut()).toString(),
+            QKeySequence::PortableText)
+            .toString(QKeySequence::NativeText);
     QStringList hints{QCoreApplication::translate("XLibrary", "↑↓ Select"),
                       QCoreApplication::translate("XLibrary", "Enter Open"),
                       QCoreApplication::translate("XLibrary", "Esc Close")};
@@ -201,8 +204,7 @@ void SearchOverlay::update_surface() {
     // Children keep their final size while the existing reveal fades the surface.
     const qreal surface_width = width() - 16;
     const qreal animated_height = surface_height;
-    const QRectF surface((width() - surface_width) / 2, 8 - 4 * (1 - progress),
-                         surface_width, animated_height);
+    const QRectF surface((width() - surface_width) / 2, 8 - 4 * (1 - progress), surface_width, animated_height);
     // Without an X11 compositor, alpha pixels outside the panel are displayed as black.
     // A native window shape removes those pixels; composited desktops keep the soft shadow.
     if (!translucent_surface) {
@@ -230,8 +232,7 @@ void SearchOverlay::paintEvent(QPaintEvent *) {
     painter.setOpacity(progress);
     const qreal surface_width = width() - 16;
     const qreal animated_height = surface_height;
-    const QRectF surface((width() - surface_width) / 2, 8 - 4 * (1 - progress), surface_width,
-                         animated_height);
+    const QRectF surface((width() - surface_width) / 2, 8 - 4 * (1 - progress), surface_width, animated_height);
     const auto radius = qMin(12.0, animated_height / 2);
     const bool dark = appearance::is_dark(service.settings);
     for (int spread = 7; spread > 0; --spread) {

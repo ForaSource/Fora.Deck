@@ -99,22 +99,21 @@ QWidget *shell(const ui_context &context, QWidget *const parent) {
         new LibrarySplitter(*context.settings, navigation, center, context.registry->create("details", context, widget),
                             widget, [service] { return !service->profile_busy() && !service->restart_required(); });
     root->addWidget(splitter);
-    QObject::connect(service, &DesktopService::navigation_changed, widget,
-                     [=] {
-                         const auto section = service->section();
-                         const bool show_search = section != "workspaces";
-                         if (search_bar->isHidden() == show_search)
-                             search_bar->setVisible(show_search);
-                         const int next = service->file_search_active() ? 3
-                                          : section == "scenarios"      ? 1
-                                          : section == "files"          ? 2
-                                          : section == "workspaces"     ? 4
-                                                                        : 0;
-                         if (next == pages->currentIndex())
-                             return;
-                         const int direction = next == 3 ? 1 : pages->currentIndex() == 3 ? -1 : 0;
-                         transition->transition_to([=] { pages->setCurrentIndex(next); }, direction, next == 3);
-                     });
+    QObject::connect(service, &DesktopService::navigation_changed, widget, [=] {
+        const auto section = service->section();
+        const bool show_search = section != "workspaces";
+        if (search_bar->isHidden() == show_search)
+            search_bar->setVisible(show_search);
+        const int next = service->file_search_active() ? 3
+                         : section == "scenarios"      ? 1
+                         : section == "files"          ? 2
+                         : section == "workspaces"     ? 4
+                                                       : 0;
+        if (next == pages->currentIndex())
+            return;
+        const int direction = next == 3 ? 1 : pages->currentIndex() == 3 ? -1 : 0;
+        transition->transition_to([=] { pages->setCurrentIndex(next); }, direction, next == 3);
+    });
     return widget;
 }
 }
@@ -234,9 +233,8 @@ void MainWindow::create_actions() {
         if (service.selection())
             service.launch(service.selection(), true);
     });
-    add("terminate", QCoreApplication::translate("XLibrary", "Terminate"), "stop", [this] {
-        confirm_application_termination(service, service.selection(), this);
-    });
+    add("terminate", QCoreApplication::translate("XLibrary", "Terminate"), "stop",
+        [this] { confirm_application_termination(service, service.selection(), this); });
     add("focus_search", QCoreApplication::translate("XLibrary", "Search"), "search", [] {});
     add("settings", QCoreApplication::translate("XLibrary", "Settings"), "settings", [this] {
         if (!isVisible())
@@ -286,7 +284,8 @@ void MainWindow::create_actions() {
         if (const auto *record = service.selected()) {
             auto updated = *record;
             updated.favorite = !updated.favorite;
-            action->setProperty("favorite_request_id", QVariant::fromValue(service.save_application(std::move(updated))));
+            action->setProperty("favorite_request_id",
+                                QVariant::fromValue(service.save_application(std::move(updated))));
         }
     });
     add("open_folder", QCoreApplication::translate("XLibrary", "Open folder"), "folder",
@@ -294,8 +293,8 @@ void MainWindow::create_actions() {
     add("copy_path", QCoreApplication::translate("XLibrary", "Copy path"), "copy", [this] {
         if (const auto *record = service.selected()) {
             const auto path = Application::application_path(*record);
-            const bool local_path = Application::file_target(*record) ||
-                                    (Application::target_kind(*record) == "steam" && !path.isEmpty());
+            const bool local_path =
+                Application::file_target(*record) || (Application::target_kind(*record) == "steam" && !path.isEmpty());
             QApplication::clipboard()->setText(local_path ? QDir::toNativeSeparators(path) : record->path);
         }
     });
@@ -356,17 +355,18 @@ void MainWindow::refresh_actions() {
                           (service.section() != "scenarios" && service.section() != "workspaces") &&
                           service.section() != "files" && !service.file_search_active());
     terminate->setEnabled(terminate->isEnabled() && record && record->running);
-    const bool folder_supported = record && (Application::file_target(*record) ||
-                                              !record->installation_directory.isEmpty());
+    const bool folder_supported =
+        record && (Application::file_target(*record) || !record->installation_directory.isEmpty());
     auto *open_folder = context.actions.value("open_folder");
     open_folder->setEnabled(open_folder->isEnabled() && folder_supported);
-    const bool local_path = record && (Application::file_target(*record) ||
-                                        (Application::target_kind(*record) == "steam" &&
-                                         !Application::application_path(*record).isEmpty()));
-    context.actions.value("copy_path")->setText(
-        !record || local_path ? QCoreApplication::translate("XLibrary", "Copy path")
-                              : QCoreApplication::translate("XLibrary", "Copy launch target"));
-    context.actions.value("launch")->setEnabled(context.actions.value("launch")->isEnabled() && record && record->available);
+    const bool local_path =
+        record && (Application::file_target(*record) ||
+                   (Application::target_kind(*record) == "steam" && !Application::application_path(*record).isEmpty()));
+    context.actions.value("copy_path")
+        ->setText(!record || local_path ? QCoreApplication::translate("XLibrary", "Copy path")
+                                        : QCoreApplication::translate("XLibrary", "Copy launch target"));
+    context.actions.value("launch")->setEnabled(context.actions.value("launch")->isEnabled() && record &&
+                                                record->available);
     auto *new_instance = context.actions.value("new_instance");
     const bool can_start = profile_available && record && record->available && record->new_instance_error.isEmpty();
     new_instance->setEnabled(can_start && (service.section() != "scenarios" && service.section() != "workspaces") &&
@@ -538,8 +538,8 @@ void MainWindow::offer_brand_transition() {
         QCoreApplication::arguments().contains("--check-startup") ||
         service.settings.value("onboarding/fora_deck_announced", false).toBool())
         return;
-    const bool existing_profile = service.settings.value("onboarding/completed", false).toBool() ||
-                                  !service.catalog().applications.isEmpty();
+    const bool existing_profile =
+        service.settings.value("onboarding/completed", false).toBool() || !service.catalog().applications.isEmpty();
     service.settings.setValue("onboarding/fora_deck_announced", true);
     if (existing_profile)
         service.notify(QCoreApplication::translate(
@@ -637,8 +637,8 @@ void MainWindow::show_welcome() {
            QCoreApplication::translate("XLibrary", "Review installed applications and choose what to keep."), "scan",
            [this] { service.discover(); });
     choice(QCoreApplication::translate("XLibrary", "Add an application manually"),
-           QCoreApplication::translate("XLibrary", "Choose a file or shortcut to add it to your library."),
-           "add", [this] { context.actions.value("add_application")->trigger(); });
+           QCoreApplication::translate("XLibrary", "Choose a file or shortcut to add it to your library."), "add",
+           [this] { context.actions.value("add_application")->trigger(); });
     choice(QCoreApplication::translate("XLibrary", "Restore my library"),
            QCoreApplication::translate("XLibrary", "Preview and restore a complete .xlprofile backup."), "folder",
            [this] { select_profile_restore(context, this); });
@@ -841,8 +841,9 @@ void MainWindow::review_add_items(const QStringList &paths) {
     open_dialog("add_files_dialog", files_context);
     if (!applications.isEmpty())
         if (auto *dialog = findChild<QDialog *>("add_files_dialog", Qt::FindDirectChildrenOnly))
-            connect(dialog, &QDialog::accepted, this, [this, applications] { review_add_applications(applications); },
-                    Qt::SingleShotConnection);
+            connect(
+                dialog, &QDialog::accepted, this, [this, applications] { review_add_applications(applications); },
+                Qt::SingleShotConnection);
 }
 
 void MainWindow::dragEnterEvent(QDragEnterEvent *const event) {

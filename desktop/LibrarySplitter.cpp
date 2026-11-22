@@ -61,8 +61,8 @@ protected:
         const qreal middle_height = appearance::scaled(settings, 55);
         const qreal half_height = middle_height / 2 + appearance::scaled(settings, 10);
         const qreal center_y = height() >= half_height * 2
-                                  ? qBound(half_height, qreal(cursor_position.y()), height() - half_height)
-                                  : height() / 2.0;
+                                   ? qBound(half_height, qreal(cursor_position.y()), height() - half_height)
+                                   : height() / 2.0;
         const qreal center_x = width() / 2.0;
         const QColor color = dragging ? QColor("#F16647") : palette().color(QPalette::Text);
         QColor backdrop = color;
@@ -71,15 +71,15 @@ protected:
         painter.setRenderHint(QPainter::Antialiasing);
         painter.setPen(Qt::NoPen);
         painter.setBrush(backdrop);
-        painter.drawRoundedRect(QRectF(0, center_y - half_height, width(), half_height * 2),
-                                width() / 2.0, width() / 2.0);
+        painter.drawRoundedRect(QRectF(0, center_y - half_height, width(), half_height * 2), width() / 2.0,
+                                width() / 2.0);
         QColor stroke = color;
         stroke.setAlpha(dragging ? 255 : 160);
         painter.setBrush(stroke);
         for (int index = -1; index <= 1; ++index) {
             const qreal bar_height = index == 0 ? middle_height : outer_height;
-            painter.drawRoundedRect(QRectF(center_x + index * spacing - stroke_width / 2,
-                                          center_y - bar_height / 2, stroke_width, bar_height),
+            painter.drawRoundedRect(QRectF(center_x + index * spacing - stroke_width / 2, center_y - bar_height / 2,
+                                           stroke_width, bar_height),
                                     stroke_width / 2, stroke_width / 2);
         }
     }
@@ -140,9 +140,9 @@ void LibrarySplitter::update_layout(const bool show_details) {
     widget(1)->setMinimumWidth(center_min);
     widget(2)->setMinimumWidth(details_min);
     widget(2)->setMaximumWidth(qMax(details_min, appearance::scaled(settings, 640)));
-    const bool visible = details_requested &&
-                         width() >= qMax(appearance::scaled(settings, 1180),
-                                         navigation_min + center_min + details_min + handleWidth() * 2);
+    const bool visible =
+        details_requested && width() >= qMax(appearance::scaled(settings, 1180),
+                                             navigation_min + center_min + details_min + handleWidth() * 2);
     widget(2)->setVisible(visible);
     const auto navigation_width =
         qMax(navigation_min,

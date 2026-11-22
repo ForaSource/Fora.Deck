@@ -380,7 +380,8 @@ void show_library_health(const ui_context &context) {
     auto *table = new QTableWidget(0, 3);
     table->setObjectName("library_health_applications");
     table->setHorizontalHeaderLabels({QCoreApplication::translate("XLibrary", "Name"),
-        QCoreApplication::translate("XLibrary", "Problem"), QCoreApplication::translate("XLibrary", "Target")});
+                                      QCoreApplication::translate("XLibrary", "Problem"),
+                                      QCoreApplication::translate("XLibrary", "Target")});
     table->setEditTriggers(QAbstractItemView::NoEditTriggers);
     table->setSelectionBehavior(QAbstractItemView::SelectRows);
     table->setSelectionMode(QAbstractItemView::SingleSelection);
@@ -437,13 +438,13 @@ void show_library_health(const ui_context &context) {
             QStringList problems;
             if (!record.available)
                 problems.append(record.volume_unavailable
-                    ? QCoreApplication::translate("XLibrary", "Drive disconnected or unavailable")
-                    : QCoreApplication::translate("XLibrary", "File unavailable; the entry is kept"));
+                                    ? QCoreApplication::translate("XLibrary", "Drive disconnected or unavailable")
+                                    : QCoreApplication::translate("XLibrary", "File unavailable; the entry is kept"));
             if (reasons.contains(record.id))
                 problems.append(reasons.value(record.id));
             if (service->launch_errors().contains(record.id))
                 problems.append(QCoreApplication::translate("XLibrary", "Launch failed this session: %1")
-                    .arg(service->launch_errors().value(record.id)));
+                                    .arg(service->launch_errors().value(record.id)));
             if (problems.isEmpty())
                 continue;
             const auto row = table->rowCount();
@@ -460,13 +461,19 @@ void show_library_health(const ui_context &context) {
                 table->setCurrentCell(row, 0);
         }
         table->resizeRowsToContents();
-        summary->setText(QCoreApplication::translate("XLibrary",
-            "Unavailable applications: %1; on unavailable drives: %2; removal candidates: %3; launch failures: %4.")
-            .arg(unavailable).arg(disconnected).arg(reasons.size()).arg(failed));
+        summary->setText(
+            QCoreApplication::translate(
+                "XLibrary",
+                "Unavailable applications: %1; on unavailable drives: %2; removal candidates: %3; launch failures: %4.")
+                .arg(unavailable)
+                .arg(disconnected)
+                .arg(reasons.size())
+                .arg(failed));
         const auto error = service->last_error().user_message;
-        last_error->setText(error.isEmpty()
-            ? QCoreApplication::translate("XLibrary", "No operation errors recorded this session.")
-            : QCoreApplication::translate("XLibrary", "Last operation error this session: %1").arg(error));
+        last_error->setText(
+            error.isEmpty()
+                ? QCoreApplication::translate("XLibrary", "No operation errors recorded this session.")
+                : QCoreApplication::translate("XLibrary", "Last operation error this session: %1").arg(error));
         files->setPlainText(service->files->diagnostics_text());
         report->setPlainText(service->discovery_report());
         update_actions();

@@ -109,14 +109,13 @@ public:
                 std::shared_ptr<std::atomic<quint64>> field_generation, const QHash<QString, usage_record> &usage = {},
                 const QStringList &tags = {}, bool favorites_only = false, int limit = 30, int sort_mode = 0);
     static QVector<file_match> filter_matches(const QString &text, QVector<file_match> matches);
-    static int compare_file_order(const QString &left_extension, qint64 left_added,
-                                  const QString &right_extension, qint64 right_added, int sort_mode);
+    static int compare_file_order(const QString &left_extension, qint64 left_added, const QString &right_extension,
+                                  qint64 right_added, int sort_mode);
     void directory_dates(const QString &request, QObject *receiver,
                          std::function<void(QHash<QString, qint64>)> completed);
     void saved_files(QObject *receiver, std::function<void(QVector<file_match>)> completed);
     void set_saved(const QString &path, bool saved);
-    void inspect_saved_files(QStringList paths, QObject *receiver,
-                             std::function<void(file_save_result)> completed);
+    void inspect_saved_files(QStringList paths, QObject *receiver, std::function<void(file_save_result)> completed);
     void save_files(QStringList paths, QObject *receiver, std::function<void(file_save_result)> completed);
     static QString saved_path_identity(const QString &path);
     void restore_metadata(const QVariantMap &values);

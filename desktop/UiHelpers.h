@@ -2,8 +2,8 @@
 #define XLIBRARY_UI_HELPERS_H
 
 #include <QDialog>
-#include <QDragEnterEvent>
 #include <QDir>
+#include <QDragEnterEvent>
 #include <QEvent>
 #include <QFrame>
 #include <QLabel>
@@ -14,8 +14,8 @@
 #include <QResizeEvent>
 #include <QScreen>
 #include <QScrollArea>
-#include <QVariantAnimation>
 #include <QUrl>
+#include <QVariantAnimation>
 #include <QVBoxLayout>
 
 #include "appearance.h"

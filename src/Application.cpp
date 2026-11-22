@@ -250,15 +250,18 @@ QString Application::removal_reason(const app_record &record, const QStringList 
     };
     if (kind == "steam") {
         const auto source = record.discovery_source;
-        if (QFileInfo(source).fileName() == "appmanifest_" + record.path + ".acf" &&
-            absent_on_local_volume(source) && absent_on_local_volume(record.installation_directory))
-            return QCoreApplication::translate("XLibrary", "Steam manifest and installation folder are missing on the verified local drive: %1; %2")
+        if (QFileInfo(source).fileName() == "appmanifest_" + record.path + ".acf" && absent_on_local_volume(source) &&
+            absent_on_local_volume(record.installation_directory))
+            return QCoreApplication::translate(
+                       "XLibrary",
+                       "Steam manifest and installation folder are missing on the verified local drive: %1; %2")
                 .arg(QDir::toNativeSeparators(source), QDir::toNativeSeparators(record.installation_directory));
         return {};
     }
     if (kind == "desktop") {
         if (absent_on_local_volume(record.path) && absent_on_local_volume(record.executable_path))
-            return QCoreApplication::translate("XLibrary", "Desktop entry and executable are missing on the verified local drive: %1; %2")
+            return QCoreApplication::translate(
+                       "XLibrary", "Desktop entry and executable are missing on the verified local drive: %1; %2")
                 .arg(QDir::toNativeSeparators(record.path), QDir::toNativeSeparators(record.executable_path));
         return {};
     }

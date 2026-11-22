@@ -1,11 +1,12 @@
-#include <memory>
-#include <stdexcept>
-#include <utility>
-#include <cerrno>
-#include <csignal>
 #include <sys/syscall.h>
 #include <unistd.h>
+
+#include <cerrno>
+#include <csignal>
+#include <memory>
 #include <QScopeGuard>
+#include <stdexcept>
+#include <utility>
 
 #include "Application.h"
 #include "LaunchArguments.h"
@@ -674,8 +675,8 @@ Heartbeat::process_sample read_process_sample(const quint32 pid, const bool memo
 
 }
 
-Heartbeat::process_snapshot Heartbeat::sample_processes(const QVector<app_record> &applications,
-                                                       const bool memory, const bool cpu) {
+Heartbeat::process_snapshot Heartbeat::sample_processes(const QVector<app_record> &applications, const bool memory,
+                                                        const bool cpu) {
     if (!QFileInfo("/proc/self/exe").exists())
         throw std::runtime_error(
             QCoreApplication::translate("XLibrary", "The /proc filesystem is unavailable: process state is unknown.")
@@ -752,7 +753,8 @@ void Heartbeat::terminate_application(const app_record &application) {
             }
             const auto fail = [&](const int error) {
                 errors.append(QCoreApplication::translate("XLibrary", "PID %1: %2")
-                                  .arg(sample.pid).arg(QString::fromStdString(std::generic_category().message(error))));
+                                  .arg(sample.pid)
+                                  .arg(QString::fromStdString(std::generic_category().message(error))));
             };
             // pidfds keep the signal attached to this process even if its PID is reused.
             const auto descriptor = syscall(SYS_pidfd_open, sample.pid, 0);
@@ -774,7 +776,8 @@ void Heartbeat::terminate_application(const app_record &application) {
                 continue;
             if (syscall(SYS_pidfd_send_signal, descriptor, SIGKILL, nullptr, 0) < 0 && errno != ESRCH)
                 errors.append(QCoreApplication::translate("XLibrary", "PID %1: %2")
-                                  .arg(sample.pid).arg(QString::fromStdString(std::generic_category().message(errno))));
+                                  .arg(sample.pid)
+                                  .arg(QString::fromStdString(std::generic_category().message(errno))));
         }
     }
     if (!errors.isEmpty())
