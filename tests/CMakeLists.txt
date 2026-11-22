@@ -46,6 +46,8 @@ target_link_libraries(ui_registry_test PRIVATE Qt6::Widgets)
 
 xlibrary_add_test(desktop_motion_test desktop_motion_test.cpp)
 target_link_libraries(desktop_motion_test PRIVATE xlibrary_desktop)
+# The combined GUI scenarios can take more than a minute with debug Qt on Windows.
+set_tests_properties(desktop_motion_test PROPERTIES TIMEOUT 120)
 
 xlibrary_add_test(notification_banner_test notification_banner_test.cpp
     ../desktop/NotificationBanner.cpp ../desktop/appearance.cpp)
