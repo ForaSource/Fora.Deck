@@ -249,15 +249,19 @@ void LibraryModel::replace(QVector<app_record> applications) {
     icon_keys.clear();
     icon_kinds.clear();
     search_tags.clear();
-    name_sort_keys.clear();
-    tag_sort_keys.clear();
     searchable_records.reserve(records.size());
     icon_keys.reserve(records.size());
     icon_kinds.reserve(records.size());
     search_tags.reserve(records.size());
+#if defined(Q_OS_WIN) && QT_VERSION < QT_VERSION_CHECK(6, 11, 2)
+    collator = QCollator{};
+#else
+    name_sort_keys.clear();
+    tag_sort_keys.clear();
     name_sort_keys.reserve(records.size());
     tag_sort_keys.reserve(records.size());
     const QCollator collator;
+#endif
     for (const auto &record : records) {
         icon_keys.append(icon_cache_key(record));
         icon_kinds.append(Application::target_kind(record));
@@ -266,18 +270,28 @@ void LibraryModel::replace(QVector<app_record> applications) {
         const auto file_name = local_path.isEmpty() ? record.path : QFileInfo(local_path).fileName();
         searchable_records.append(SearchQuery::prepare(record.name, file_name, record.tags, record.aliases));
         search_tags.append(record.tags.join(", ").toCaseFolded());
+#if !defined(Q_OS_WIN) || QT_VERSION >= QT_VERSION_CHECK(6, 11, 2)
         name_sort_keys.append(collator.sortKey(searchable_records.back().names.front().text));
         tag_sort_keys.append(collator.sortKey(search_tags.back()));
+#endif
     }
     endResetModel();
 }
 
 int LibraryModel::compare_names(const int left_row, const int right_row) const {
+#if defined(Q_OS_WIN) && QT_VERSION < QT_VERSION_CHECK(6, 11, 2)
+    return collator.compare(search_name(left_row), search_name(right_row));
+#else
     return name_sort_keys[left_row].compare(name_sort_keys[right_row]);
+#endif
 }
 
 int LibraryModel::compare_tags(const int left_row, const int right_row) const {
+#if defined(Q_OS_WIN) && QT_VERSION < QT_VERSION_CHECK(6, 11, 2)
+    return collator.compare(tag_names(left_row), tag_names(right_row));
+#else
     return tag_sort_keys[left_row].compare(tag_sort_keys[right_row]);
+#endif
 }
 
 QHash<int, QByteArray> LibraryModel::roleNames() const {

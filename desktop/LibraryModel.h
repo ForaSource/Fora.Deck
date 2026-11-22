@@ -23,8 +23,13 @@ private:
     QVector<QString> icon_kinds;
     mutable QHash<QString, QIcon> fallback_icons;
     QStringList search_tags;
+#if defined(Q_OS_WIN) && QT_VERSION < QT_VERSION_CHECK(6, 11, 2)
+    // Older Windows Qt sort keys can compare uninitialized bytes.
+    QCollator collator;
+#else
     QVector<QCollatorSortKey> name_sort_keys;
     QVector<QCollatorSortKey> tag_sort_keys;
+#endif
     mutable QCache<QString, QIcon> icons{256};
     mutable QSet<QString> pending_icons;
     QThreadPool icon_pool;
