@@ -1,5 +1,5 @@
-#ifndef XLIBRARY_SEARCH_TOOLS_H
-#define XLIBRARY_SEARCH_TOOLS_H
+#ifndef FORADECK_SEARCH_TOOLS_H
+#define FORADECK_SEARCH_TOOLS_H
 
 class DesktopService;
 class QLineEdit;

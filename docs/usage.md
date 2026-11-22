@@ -99,8 +99,8 @@ inside text fields. Escape clears library search and cannot be reassigned. Dupli
 Built-in global shortcuts require Fora.Deck to be running; Wayland starts with unassigned global bindings.
 
 Application and scenario editors also accept a global hotkey. Their assignments appear in the corresponding keyboard settings tabs.
-For a system shortcut, copy the persistent-ID command `XLibrary --launch-id ID` from **Edit application → More options →
-Launch settings** or use `XLibrary --scenario-id ID` from the scenario editor.
+For a system shortcut, copy the persistent-ID command `foradeck --launch-id ID` from **Edit application → More options →
+Launch settings** or use `foradeck --scenario-id ID` from the scenario editor.
 Deleting an application or scenario removes its assignment. Complete profile backups retain assignments.
 
 ## File search and My files
@@ -248,8 +248,8 @@ the public baseline is Debian 13, Qt 6.8.2, and glibc 2.41. Mark it executable w
 See [profile storage](profile.md#storage-modes) before moving or replacing an AppImage.
 
 On Wayland, configure a binding in Fora.Deck to request permission through the GlobalShortcuts portal,
-or add a system shortcut running `XLibrary --overlay`. Use the full executable or AppImage path when it is not on PATH.
-`XLibrary` opens the full library; both commands also address an already running instance using the same profile.
+or add a system shortcut running `foradeck --overlay`. Use the full executable or AppImage path when it is not on PATH.
+`foradeck` opens the full library; both commands also address an already running instance using the same profile.
 
 | Desktop | Where to add a system shortcut |
 | --- | --- |

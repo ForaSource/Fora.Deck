@@ -1,5 +1,5 @@
-#ifndef XLIBRARY_SEARCH_QUERY_H
-#define XLIBRARY_SEARCH_QUERY_H
+#ifndef FORADECK_SEARCH_QUERY_H
+#define FORADECK_SEARCH_QUERY_H
 
 #include <optional>
 #include <QRegularExpression>

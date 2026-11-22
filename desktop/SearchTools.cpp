@@ -62,13 +62,13 @@ public:
 void edit_filter(DesktopService &service, QLineEdit &input, QWidget *const parent, const saved_filter &record) {
     auto *dialog = new QDialog(parent);
     dialog->setAttribute(Qt::WA_DeleteOnClose);
-    dialog->setWindowTitle(record.id ? QCoreApplication::translate("XLibrary", "Rename filter")
-                                     : QCoreApplication::translate("XLibrary", "Save current filter"));
+    dialog->setWindowTitle(record.id ? QCoreApplication::translate("Fora.Deck", "Rename filter")
+                                     : QCoreApplication::translate("Fora.Deck", "Save current filter"));
     dialog->setMinimumWidth(360);
     auto *layout = new QVBoxLayout(dialog);
     auto *name = new QLineEdit(record.name);
     name->setMaxLength(128);
-    field(layout, QCoreApplication::translate("XLibrary", "Filter name"), name);
+    field(layout, QCoreApplication::translate("Fora.Deck", "Filter name"), name);
     auto *error = label("", "error");
     layout->addWidget(error);
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Cancel);
@@ -77,7 +77,7 @@ void edit_filter(DesktopService &service, QLineEdit &input, QWidget *const paren
     QObject::connect(buttons, &QDialogButtonBox::accepted, dialog, [=, &service, record = record]() mutable {
         record.name = name->text().trimmed();
         if (record.name.isEmpty()) {
-            error->setText(QCoreApplication::translate("XLibrary", "Enter a filter name."));
+            error->setText(QCoreApplication::translate("Fora.Deck", "Enter a filter name."));
             return;
         }
         buttons->button(QDialogButtonBox::Save)->setEnabled(false);
@@ -112,21 +112,21 @@ QWidget *search_tools(DesktopService &service, QLineEdit &input, QWidget *const 
     root->setContentsMargins(0, 0, 0, 0);
     root->setSpacing(4);
     auto *help =
-        label(QCoreApplication::translate("XLibrary", "#tag includes a tag; -#tag excludes it. All conditions apply."),
+        label(QCoreApplication::translate("Fora.Deck", "#tag includes a tag; -#tag excludes it. All conditions apply."),
               "muted");
     root->addWidget(help);
     auto *row = new QHBoxLayout;
     root->addLayout(row);
     auto *tags = new QComboBox;
     tags->setObjectName("search_tag_suggestions");
-    tags->setAccessibleName(QCoreApplication::translate("XLibrary", "Tag suggestions"));
+    tags->setAccessibleName(QCoreApplication::translate("Fora.Deck", "Tag suggestions"));
     tags->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
     tags->setMinimumContentsLength(8);
     tags->setMaxVisibleItems(12);
     row->addWidget(tags);
     auto *filters = new QComboBox;
     filters->setObjectName("saved_filters");
-    filters->setAccessibleName(QCoreApplication::translate("XLibrary", "Saved filters"));
+    filters->setAccessibleName(QCoreApplication::translate("Fora.Deck", "Saved filters"));
     filters->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
     filters->setMinimumContentsLength(10);
     row->addWidget(filters, 1);
@@ -139,9 +139,9 @@ QWidget *search_tools(DesktopService &service, QLineEdit &input, QWidget *const 
         control->setParent(widget);
         return control;
     };
-    auto *save = compact_button(QCoreApplication::translate("XLibrary", "Save filter"), "add");
-    auto *rename = compact_button(QCoreApplication::translate("XLibrary", "Rename filter"), "settings");
-    auto *remove = compact_button(QCoreApplication::translate("XLibrary", "Remove filter"), "trash");
+    auto *save = compact_button(QCoreApplication::translate("Fora.Deck", "Save filter"), "add");
+    auto *rename = compact_button(QCoreApplication::translate("Fora.Deck", "Rename filter"), "settings");
+    auto *remove = compact_button(QCoreApplication::translate("Fora.Deck", "Remove filter"), "trash");
     row->addWidget(save);
     row->addWidget(rename);
     row->addWidget(remove);
@@ -150,14 +150,14 @@ QWidget *search_tools(DesktopService &service, QLineEdit &input, QWidget *const 
     auto *state = label("", "muted");
     state->setObjectName("active_search_filters");
     state_row->addWidget(state, 1);
-    auto *clear = compact_button(QCoreApplication::translate("XLibrary", "Clear all filters"), "x");
+    auto *clear = compact_button(QCoreApplication::translate("Fora.Deck", "Clear all filters"), "x");
     state_row->addWidget(clear);
 
     const auto refresh = [=, &service, &input] {
         const QSignalBlocker tag_blocker(tags);
         const QSignalBlocker filter_blocker(filters);
         tags->clear();
-        tags->addItem(QCoreApplication::translate("XLibrary", "Insert tag…"));
+        tags->addItem(QCoreApplication::translate("Fora.Deck", "Insert tag…"));
         const auto before_cursor = input.text().left(input.cursorPosition());
         const auto token =
             before_cursor.section(QRegularExpression("\\s+", QRegularExpression::UseUnicodePropertiesOption), -1);
@@ -172,7 +172,7 @@ QWidget *search_tools(DesktopService &service, QLineEdit &input, QWidget *const 
                 tags->addItem("-#" + tag, "-#" + tag);
             }
         filters->clear();
-        filters->addItem(QCoreApplication::translate("XLibrary", "Saved filters"), qint64(0));
+        filters->addItem(QCoreApplication::translate("Fora.Deck", "Saved filters"), qint64(0));
         for (const auto &record : service.catalog().filters) {
             filters->addItem(record.name, record.id);
             if (record.query == service.saved_filter_query() && record.section == service.section() &&
@@ -182,23 +182,24 @@ QWidget *search_tools(DesktopService &service, QLineEdit &input, QWidget *const 
         }
         const auto hint = SearchQuery(input.text()).tag_hint(service.catalog().tags);
         QStringList active;
-        active.append(service.section() == "favorites" ? QCoreApplication::translate("XLibrary", "Favorites")
-                      : service.section() == "running" ? QCoreApplication::translate("XLibrary", "Running applications")
-                      : service.section() == "scenarios" ? QCoreApplication::translate("XLibrary", "Scenarios")
-                                                         : QCoreApplication::translate("XLibrary", "Library"));
+        active.append(service.section() == "favorites" ? QCoreApplication::translate("Fora.Deck", "Favorites")
+                      : service.section() == "running"
+                          ? QCoreApplication::translate("Fora.Deck", "Running applications")
+                      : service.section() == "scenarios" ? QCoreApplication::translate("Fora.Deck", "Scenarios")
+                                                         : QCoreApplication::translate("Fora.Deck", "Library"));
         for (const auto &tag : service.tags())
             active.append('#' + tag);
         if (!input.text().trimmed().isEmpty())
             active.append(input.text().simplified());
-        const QStringList sorts{QCoreApplication::translate("XLibrary", "By name"),
-                                QCoreApplication::translate("XLibrary", "Recent launches"),
-                                QCoreApplication::translate("XLibrary", "Favorites first"),
-                                QCoreApplication::translate("XLibrary", "By tags"),
-                                QCoreApplication::translate("XLibrary", "By status")};
+        const QStringList sorts{QCoreApplication::translate("Fora.Deck", "By name"),
+                                QCoreApplication::translate("Fora.Deck", "Recent launches"),
+                                QCoreApplication::translate("Fora.Deck", "Favorites first"),
+                                QCoreApplication::translate("Fora.Deck", "By tags"),
+                                QCoreApplication::translate("Fora.Deck", "By status")};
         active.append(sorts[service.filter.sort_mode_value()] + (service.filter.sortOrder() == Qt::DescendingOrder
                                                                      ? QStringLiteral(" ↓")
                                                                      : QStringLiteral(" ↑")));
-        state->setText(QCoreApplication::translate("XLibrary", "Active: %1").arg(active.join(" · ")) +
+        state->setText(QCoreApplication::translate("Fora.Deck", "Active: %1").arg(active.join(" · ")) +
                        (hint.isEmpty() ? QString{} : '\n' + hint));
         const bool enabled = service.is_ready() && !service.profile_busy() && !service.restart_required();
         save->setEnabled(enabled && service.section() != "scenarios");
@@ -275,8 +276,8 @@ QWidget *search_tools(DesktopService &service, QLineEdit &input, QWidget *const 
         const auto id = filters->currentData().toLongLong();
         if (id &&
             confirm(
-                widget, QCoreApplication::translate("XLibrary", "Remove filter"),
-                QCoreApplication::translate("XLibrary", "Remove the saved filter “%1”?").arg(filters->currentText())))
+                widget, QCoreApplication::translate("Fora.Deck", "Remove filter"),
+                QCoreApplication::translate("Fora.Deck", "Remove the saved filter “%1”?").arg(filters->currentText())))
             service.remove_filter(id);
     });
     refresh();
@@ -303,8 +304,8 @@ QWidget *file_search_switch(DesktopService &service, QWidget *parent) {
         layout->addWidget(control);
         return control;
     };
-    auto *applications = make_segment(QCoreApplication::translate("XLibrary", "Applications"), "search_applications");
-    auto *files = make_segment(QCoreApplication::translate("XLibrary", "Files"), "search_files");
+    auto *applications = make_segment(QCoreApplication::translate("Fora.Deck", "Applications"), "search_applications");
+    auto *files = make_segment(QCoreApplication::translate("Fora.Deck", "Files"), "search_files");
     const auto refresh = [=, &service] {
         const bool enabled = service.files->is_enabled();
         if (segments->isHidden() == enabled)

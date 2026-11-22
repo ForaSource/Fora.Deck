@@ -21,11 +21,11 @@ bool valid_geometry(const QRectF &rect) {
 }
 }
 
-QString xlibrary::workspace_name_key(const QString &name) {
+QString foradeck::workspace_name_key(const QString &name) {
     return name.trimmed().normalized(QString::NormalizationForm_C).toCaseFolded();
 }
 
-QString xlibrary::workspace_item_issue(const workspace_item &item) {
+QString foradeck::workspace_item_issue(const workspace_item &item) {
     if (item.id < 0 || !valid_text(item.display_name, 256) || !valid_text(item.target, 4096) ||
         !valid_text(item.launch_profile, 1024) || !Application::valid_launch_profile_id(item.launch_profile))
         return QCoreApplication::translate("Workspaces", "Invalid resource details.");
@@ -57,7 +57,7 @@ QString xlibrary::workspace_item_issue(const workspace_item &item) {
     return QCoreApplication::translate("Workspaces", "Unknown resource type.");
 }
 
-QString xlibrary::workspace_record_issue(const workspace_record &record) {
+QString foradeck::workspace_record_issue(const workspace_record &record) {
     if (record.id < 0 || record.name.trimmed().isEmpty() || !valid_text(record.name, 128))
         return QCoreApplication::translate("Workspaces", "Enter a workspace name of up to 128 characters.");
     if (record.items.isEmpty() || record.items.size() > workspace_item_limit)
@@ -74,7 +74,7 @@ QString xlibrary::workspace_record_issue(const workspace_record &record) {
     return {};
 }
 
-QVector<workspace_record> xlibrary::read_workspaces(sqlite3 *const connection) {
+QVector<workspace_record> foradeck::read_workspaces(sqlite3 *const connection) {
     QVector<workspace_record> records;
     SqliteStatement rows(connection, "SELECT id,name,name_key,created_at,updated_at FROM workspace ORDER BY name_key;");
     SqliteStatement columns(connection, R"(

@@ -23,28 +23,28 @@ using namespace ui_helpers;
 QString manifest_summary(const profile_manifest &manifest) {
     const auto created = QDateTime::fromString(manifest.created_utc, Qt::ISODateWithMs);
     QStringList lines{
-        QCoreApplication::translate("XLibrary", "Created: %1")
+        QCoreApplication::translate("Fora.Deck", "Created: %1")
             .arg(created.isValid() ? created.toLocalTime().toString(Qt::TextDate) : manifest.created_utc),
-        QCoreApplication::translate("XLibrary", "Fora.Deck version: %1").arg(manifest.application_version),
-        QCoreApplication::translate("XLibrary", "Database schema: %1").arg(manifest.schema_version)};
-    lines.append(QCoreApplication::translate("XLibrary", "Backup format: %1").arg(manifest.format_version));
+        QCoreApplication::translate("Fora.Deck", "Fora.Deck version: %1").arg(manifest.application_version),
+        QCoreApplication::translate("Fora.Deck", "Database schema: %1").arg(manifest.schema_version)};
+    lines.append(QCoreApplication::translate("Fora.Deck", "Backup format: %1").arg(manifest.format_version));
     const QList<QPair<QString, QString>> entities{
-        {"applications", QCoreApplication::translate("XLibrary", "Applications: %1")},
-        {"desktop_application", QCoreApplication::translate("XLibrary", "Application details: %1")},
-        {"launch_target", QCoreApplication::translate("XLibrary", "Application targets: %1")},
-        {"launch_configuration", QCoreApplication::translate("XLibrary", "Launch configurations: %1")},
-        {"tags", QCoreApplication::translate("XLibrary", "Tags: %1")},
-        {"application_alias", QCoreApplication::translate("XLibrary", "Search aliases: %1")},
-        {"saved_filter", QCoreApplication::translate("XLibrary", "Saved filters: %1")},
-        {"application_tags", QCoreApplication::translate("XLibrary", "Tag assignments: %1")},
-        {"desktop_scenario", QCoreApplication::translate("XLibrary", "Scenarios: %1")},
-        {"desktop_scenario_step", QCoreApplication::translate("XLibrary", "Scenario steps: %1")},
+        {"applications", QCoreApplication::translate("Fora.Deck", "Applications: %1")},
+        {"desktop_application", QCoreApplication::translate("Fora.Deck", "Application details: %1")},
+        {"launch_target", QCoreApplication::translate("Fora.Deck", "Application targets: %1")},
+        {"launch_configuration", QCoreApplication::translate("Fora.Deck", "Launch configurations: %1")},
+        {"tags", QCoreApplication::translate("Fora.Deck", "Tags: %1")},
+        {"application_alias", QCoreApplication::translate("Fora.Deck", "Search aliases: %1")},
+        {"saved_filter", QCoreApplication::translate("Fora.Deck", "Saved filters: %1")},
+        {"application_tags", QCoreApplication::translate("Fora.Deck", "Tag assignments: %1")},
+        {"desktop_scenario", QCoreApplication::translate("Fora.Deck", "Scenarios: %1")},
+        {"desktop_scenario_step", QCoreApplication::translate("Fora.Deck", "Scenario steps: %1")},
         {"workspace", QCoreApplication::translate("Workspaces", "Workspaces (%1)")},
         {"workspace_item", QCoreApplication::translate("Workspaces", "Workspace resources (%1)")},
         {"workspace_window", QCoreApplication::translate("Workspaces", "Saved window placements (%1)")},
-        {"discovery_source", QCoreApplication::translate("XLibrary", "Discovery sources: %1")},
-        {"history", QCoreApplication::translate("XLibrary", "Launch history entries: %1")},
-        {"settings", QCoreApplication::translate("XLibrary", "Settings: %1")}};
+        {"discovery_source", QCoreApplication::translate("Fora.Deck", "Discovery sources: %1")},
+        {"history", QCoreApplication::translate("Fora.Deck", "Launch history entries: %1")},
+        {"settings", QCoreApplication::translate("Fora.Deck", "Settings: %1")}};
     for (const auto &[key, text] : entities)
         if (manifest.counts.contains(key))
             lines.append(text.arg(manifest.counts.value(key)));
@@ -62,37 +62,37 @@ void select_root_recovery(const ui_context &context, QWidget *const parent) {
     auto *service = static_cast<DesktopService *>(context.service);
     bool accepted = false;
     const auto old_root = QDir::fromNativeSeparators(QInputDialog::getText(
-        parent, QCoreApplication::translate("XLibrary", "Recover moved folder"),
-        QCoreApplication::translate("XLibrary", "Previous absolute folder path:"), QLineEdit::Normal, {}, &accepted));
+        parent, QCoreApplication::translate("Fora.Deck", "Recover moved folder"),
+        QCoreApplication::translate("Fora.Deck", "Previous absolute folder path:"), QLineEdit::Normal, {}, &accepted));
     if (!accepted || old_root.isEmpty())
         return;
     if (!QFileInfo(old_root).isAbsolute()) {
-        service->notify(QCoreApplication::translate("XLibrary", "Enter an absolute path to the previous folder."));
+        service->notify(QCoreApplication::translate("Fora.Deck", "Enter an absolute path to the previous folder."));
         return;
     }
     const auto new_root = QFileDialog::getExistingDirectory(
-        parent, QCoreApplication::translate("XLibrary", "Select the replacement folder"));
+        parent, QCoreApplication::translate("Fora.Deck", "Select the replacement folder"));
     if (new_root.isEmpty())
         return;
 
     auto *dialog = new QDialog(parent);
     dialog->setAttribute(Qt::WA_DeleteOnClose);
-    dialog->setWindowTitle(QCoreApplication::translate("XLibrary", "Preview path recovery"));
+    dialog->setWindowTitle(QCoreApplication::translate("Fora.Deck", "Preview path recovery"));
     prepare_dialog(dialog, context, {1040, 600}, {640, 400});
     auto *layout = new QVBoxLayout(dialog);
     layout->addWidget(label(QCoreApplication::translate(
-        "XLibrary", "Select the valid replacements to apply. Application IDs, arguments, tags, favorites, history, "
-                    "and scenario steps are preserved.")));
-    auto *status = label(QCoreApplication::translate("XLibrary", "Checking replacement paths…"), "muted");
+        "Fora.Deck", "Select the valid replacements to apply. Application IDs, arguments, tags, favorites, history, "
+                     "and scenario steps are preserved.")));
+    auto *status = label(QCoreApplication::translate("Fora.Deck", "Checking replacement paths…"), "muted");
     layout->addWidget(status);
     auto *table = new QTableWidget(0, 6);
-    table->setAccessibleName(QCoreApplication::translate("XLibrary", "Path recovery preview"));
-    table->setHorizontalHeaderLabels({QCoreApplication::translate("XLibrary", "Application"),
-                                      QCoreApplication::translate("XLibrary", "Previous path"),
-                                      QCoreApplication::translate("XLibrary", "Replacement path"),
-                                      QCoreApplication::translate("XLibrary", "Previous working directory"),
-                                      QCoreApplication::translate("XLibrary", "Replacement working directory"),
-                                      QCoreApplication::translate("XLibrary", "Status")});
+    table->setAccessibleName(QCoreApplication::translate("Fora.Deck", "Path recovery preview"));
+    table->setHorizontalHeaderLabels({QCoreApplication::translate("Fora.Deck", "Application"),
+                                      QCoreApplication::translate("Fora.Deck", "Previous path"),
+                                      QCoreApplication::translate("Fora.Deck", "Replacement path"),
+                                      QCoreApplication::translate("Fora.Deck", "Previous working directory"),
+                                      QCoreApplication::translate("Fora.Deck", "Replacement working directory"),
+                                      QCoreApplication::translate("Fora.Deck", "Status")});
     table->setEditTriggers(QAbstractItemView::NoEditTriggers);
     table->setSelectionBehavior(QAbstractItemView::SelectRows);
     table->setWordWrap(false);
@@ -101,9 +101,9 @@ void select_root_recovery(const ui_context &context, QWidget *const parent) {
     table->verticalHeader()->hide();
     layout->addWidget(table, 1);
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Cancel);
-    buttons->button(QDialogButtonBox::Cancel)->setText(QCoreApplication::translate("XLibrary", "Cancel"));
+    buttons->button(QDialogButtonBox::Cancel)->setText(QCoreApplication::translate("Fora.Deck", "Cancel"));
     auto *apply =
-        buttons->addButton(QCoreApplication::translate("XLibrary", "Apply selected"), QDialogButtonBox::AcceptRole);
+        buttons->addButton(QCoreApplication::translate("Fora.Deck", "Apply selected"), QDialogButtonBox::AcceptRole);
     apply->setProperty("primary", true);
     apply->setEnabled(false);
     layout->addWidget(buttons);
@@ -117,7 +117,7 @@ void select_root_recovery(const ui_context &context, QWidget *const parent) {
         apply->setEnabled(selected > 0 && !service->profile_busy() && !service->restart_required() &&
                           !service->is_discovering() && !service->is_scenario_active());
         if (!changes->isEmpty())
-            status->setText(QCoreApplication::translate("XLibrary", "Selected replacements: %1 of %2")
+            status->setText(QCoreApplication::translate("Fora.Deck", "Selected replacements: %1 of %2")
                                 .arg(selected)
                                 .arg(changes->size()));
     };
@@ -138,8 +138,8 @@ void select_root_recovery(const ui_context &context, QWidget *const parent) {
                                  QDir::toNativeSeparators(change.new_directory),
                                  !change.issue.isEmpty() ? change.issue
                                  : change.uses_existing_configuration
-                                     ? QCoreApplication::translate("XLibrary", "Uses existing launch configuration")
-                                     : QCoreApplication::translate("XLibrary", "Ready")};
+                                     ? QCoreApplication::translate("Fora.Deck", "Uses existing launch configuration")
+                                     : QCoreApplication::translate("Fora.Deck", "Ready")};
                              for (int column = 0; column < values.size(); ++column) {
                                  auto *item = new QTableWidgetItem(values.at(column));
                                  item->setToolTip(values.at(column));
@@ -151,7 +151,8 @@ void select_root_recovery(const ui_context &context, QWidget *const parent) {
                                  table->setItem(row, column, item);
                              }
                          }
-                         status->setText(QCoreApplication::translate("XLibrary", "No applications match this folder."));
+                         status->setText(
+                             QCoreApplication::translate("Fora.Deck", "No applications match this folder."));
                          update();
                      });
     QObject::connect(table, &QTableWidget::itemChanged, dialog, update);
@@ -183,31 +184,32 @@ void select_root_recovery(const ui_context &context, QWidget *const parent) {
 
 void select_profile_restore(const ui_context &context, QWidget *const parent) {
     auto *service = static_cast<DesktopService *>(context.service);
-    const auto path =
-        QFileDialog::getOpenFileName(parent, QCoreApplication::translate("XLibrary", "Select a profile backup"), {},
-                                     QCoreApplication::translate("XLibrary", "Fora.Deck profile (*.xlprofile)"));
+    const auto path = QFileDialog::getOpenFileName(
+        parent, QCoreApplication::translate("Fora.Deck", "Select a profile backup"), {},
+        QCoreApplication::translate("Fora.Deck", "Fora.Deck profile (%1)").arg("*.foradeckprofile *.xlprofile"));
     if (path.isEmpty())
         return;
     auto *dialog = new QDialog(parent);
     dialog->setAttribute(Qt::WA_DeleteOnClose);
-    dialog->setWindowTitle(QCoreApplication::translate("XLibrary", "Restore complete profile"));
+    dialog->setWindowTitle(QCoreApplication::translate("Fora.Deck", "Restore complete profile"));
     prepare_dialog(dialog, context, {640, 540}, {440, 360});
     auto *layout = new QVBoxLayout(dialog);
     auto *file = label(QDir::toNativeSeparators(path), "muted");
     file->setTextFormat(Qt::PlainText);
     file->setTextInteractionFlags(Qt::TextSelectableByMouse | Qt::TextSelectableByKeyboard);
     layout->addWidget(file);
-    auto *summary = new QPlainTextEdit(QCoreApplication::translate("XLibrary", "Checking profile backup…"));
+    auto *summary = new QPlainTextEdit(QCoreApplication::translate("Fora.Deck", "Checking profile backup…"));
     summary->setReadOnly(true);
-    summary->setAccessibleName(QCoreApplication::translate("XLibrary", "Profile backup contents"));
+    summary->setAccessibleName(QCoreApplication::translate("Fora.Deck", "Profile backup contents"));
     layout->addWidget(summary, 1);
     layout->addWidget(label(QCoreApplication::translate(
-        "XLibrary", "Restore replaces the current library and settings. The current profile is preserved for recovery. "
-                    "Restart Fora.Deck afterward to apply the restored settings. Applications will not be launched.")));
+        "Fora.Deck",
+        "Restore replaces the current library and settings. The current profile is preserved for recovery. "
+        "Restart Fora.Deck afterward to apply the restored settings. Applications will not be launched.")));
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Cancel);
-    buttons->button(QDialogButtonBox::Cancel)->setText(QCoreApplication::translate("XLibrary", "Cancel"));
+    buttons->button(QDialogButtonBox::Cancel)->setText(QCoreApplication::translate("Fora.Deck", "Cancel"));
     auto *restore =
-        buttons->addButton(QCoreApplication::translate("XLibrary", "Restore profile"), QDialogButtonBox::AcceptRole);
+        buttons->addButton(QCoreApplication::translate("Fora.Deck", "Restore profile"), QDialogButtonBox::AcceptRole);
     restore->setProperty("danger", true);
     restore->setEnabled(false);
     layout->addWidget(buttons);
@@ -250,7 +252,7 @@ void select_application_replacement(DesktopService *const service, const app_rec
     // Копия нужна до диалога: обновление модели может инвалидировать выбранную запись.
     const auto original = record;
     const auto path = QFileDialog::getOpenFileName(
-        parent, QCoreApplication::translate("XLibrary", "Select the replacement application"),
+        parent, QCoreApplication::translate("Fora.Deck", "Select the replacement application"),
         QFileInfo(original.path).absolutePath());
     if (path.isEmpty())
         return;
@@ -270,48 +272,48 @@ QWidget *profile_view(const ui_context &context, QWidget *const parent) {
     auto *layout = new QVBoxLayout(widget);
     layout->setContentsMargins(24, 20, 24, 24);
     layout->setSpacing(12);
-    layout->addWidget(label(QCoreApplication::translate("XLibrary", "Profile and diagnostics"), "subheading"));
+    layout->addWidget(label(QCoreApplication::translate("Fora.Deck", "Profile and diagnostics"), "subheading"));
     auto *diagnostics = new QPlainTextEdit;
     diagnostics->setReadOnly(true);
     diagnostics->setMinimumHeight(220);
-    diagnostics->setAccessibleName(QCoreApplication::translate("XLibrary", "Current profile diagnostics"));
+    diagnostics->setAccessibleName(QCoreApplication::translate("Fora.Deck", "Current profile diagnostics"));
     layout->addWidget(diagnostics);
     auto *export_button =
-        button(QCoreApplication::translate("XLibrary", "Export safe diagnostics…"), nullptr, "export");
+        button(QCoreApplication::translate("Fora.Deck", "Export safe diagnostics…"), nullptr, "export");
     layout->addWidget(export_button);
     layout->addWidget(
         label(QCoreApplication::translate(
-                  "XLibrary",
+                  "Fora.Deck",
                   "The diagnostic export contains service versions, mode, and error codes. It excludes the application "
                   "catalog, arguments, settings contents, and tokens."),
               "muted"));
-    layout->addWidget(label(QCoreApplication::translate("XLibrary", "Complete profile backup"), "subheading"));
+    layout->addWidget(label(QCoreApplication::translate("Fora.Deck", "Complete profile backup"), "subheading"));
     layout->addWidget(
         label(QCoreApplication::translate(
-                  "XLibrary",
+                  "Fora.Deck",
                   "A profile backup includes applications, all tags, scenarios, history, and settings. It contains "
                   "private paths and arguments. Native module files and system-stored tokens are not included."),
               "muted"));
-    auto *backup = button(QCoreApplication::translate("XLibrary", "Back up profile…"), nullptr, "export");
-    auto *restore = button(QCoreApplication::translate("XLibrary", "Restore profile…"), nullptr, "import");
+    auto *backup = button(QCoreApplication::translate("Fora.Deck", "Back up profile…"), nullptr, "export");
+    auto *restore = button(QCoreApplication::translate("Fora.Deck", "Restore profile…"), nullptr, "import");
     layout->addWidget(backup);
     layout->addWidget(restore);
-    layout->addWidget(label(QCoreApplication::translate("XLibrary", "Recover application paths"), "subheading"));
+    layout->addWidget(label(QCoreApplication::translate("Fora.Deck", "Recover application paths"), "subheading"));
     layout->addWidget(
         label(QCoreApplication::translate(
-                  "XLibrary",
+                  "Fora.Deck",
                   "After moving a folder, preview replacement paths for missing applications. To replace one target, "
                   "select its missing application in the library."),
               "muted"));
-    auto *recover = button(QCoreApplication::translate("XLibrary", "Recover moved folder…"));
+    auto *recover = button(QCoreApplication::translate("Fora.Deck", "Recover moved folder…"));
     layout->addWidget(recover);
     auto *restart_hint =
         label(QCoreApplication::translate(
-                  "XLibrary",
+                  "Fora.Deck",
                   "The profile was restored. Restart Fora.Deck to apply its settings before making further changes."),
               "muted");
     layout->addWidget(restart_hint);
-    auto *restart = button(QCoreApplication::translate("XLibrary", "Restart Fora.Deck"), "primary");
+    auto *restart = button(QCoreApplication::translate("Fora.Deck", "Restart Fora.Deck"), "primary");
     layout->addWidget(restart);
     layout->addStretch();
     const auto update = [=] {
@@ -334,11 +336,11 @@ QWidget *profile_view(const ui_context &context, QWidget *const parent) {
     QObject::connect(service, &DesktopService::scenario_changed, widget, [=] { update(); });
     QObject::connect(service, &DesktopService::operation_changed, widget, [=] { update(); });
     QObject::connect(backup, &QPushButton::clicked, widget, [=] {
-        QFileDialog dialog(widget, QCoreApplication::translate("XLibrary", "Back up complete profile"));
+        QFileDialog dialog(widget, QCoreApplication::translate("Fora.Deck", "Back up complete profile"));
         dialog.setAcceptMode(QFileDialog::AcceptSave);
-        dialog.setNameFilter(QCoreApplication::translate("XLibrary", "Fora.Deck profile (*.xlprofile)"));
-        dialog.setDefaultSuffix("xlprofile");
-        dialog.selectFile("xlibrary-" + QDateTime::currentDateTimeUtc().toString("yyyy-MM-dd") + ".xlprofile");
+        dialog.setNameFilter(QCoreApplication::translate("Fora.Deck", "Fora.Deck profile (*.foradeckprofile)"));
+        dialog.setDefaultSuffix("foradeckprofile");
+        dialog.selectFile("foradeck-" + QDateTime::currentDateTimeUtc().toString("yyyy-MM-dd") + ".foradeckprofile");
         if (dialog.exec() != QDialog::Accepted || dialog.selectedFiles().isEmpty())
             return;
         service->backup_profile(dialog.selectedFiles().first());
@@ -347,8 +349,8 @@ QWidget *profile_view(const ui_context &context, QWidget *const parent) {
     QObject::connect(recover, &QPushButton::clicked, widget, [=] { select_root_recovery(context, widget); });
     QObject::connect(export_button, &QPushButton::clicked, widget, [=] {
         const auto path = QFileDialog::getSaveFileName(
-            widget, QCoreApplication::translate("XLibrary", "Export safe diagnostics"), "xlibrary-diagnostics.json",
-            QCoreApplication::translate("XLibrary", "JSON files (*.json)"));
+            widget, QCoreApplication::translate("Fora.Deck", "Export safe diagnostics"), "foradeck-diagnostics.json",
+            QCoreApplication::translate("Fora.Deck", "JSON files (*.json)"));
         if (!path.isEmpty())
             service->export_diagnostics(path);
     });
@@ -368,7 +370,7 @@ void show_library_health(const ui_context &context) {
     }
     auto *dialog = new QDialog(context.window);
     dialog->setAttribute(Qt::WA_DeleteOnClose);
-    dialog->setWindowTitle(QCoreApplication::translate("XLibrary", "Library health"));
+    dialog->setWindowTitle(QCoreApplication::translate("Fora.Deck", "Library health"));
     dialog->setObjectName("library_health");
     prepare_dialog(dialog, context, {920, 640}, {640, 420});
     auto *layout = new QVBoxLayout(dialog);
@@ -379,9 +381,9 @@ void show_library_health(const ui_context &context) {
     auto *tabs = new QTabWidget;
     auto *table = new QTableWidget(0, 3);
     table->setObjectName("library_health_applications");
-    table->setHorizontalHeaderLabels({QCoreApplication::translate("XLibrary", "Name"),
-                                      QCoreApplication::translate("XLibrary", "Problem"),
-                                      QCoreApplication::translate("XLibrary", "Target")});
+    table->setHorizontalHeaderLabels({QCoreApplication::translate("Fora.Deck", "Name"),
+                                      QCoreApplication::translate("Fora.Deck", "Problem"),
+                                      QCoreApplication::translate("Fora.Deck", "Target")});
     table->setEditTriggers(QAbstractItemView::NoEditTriggers);
     table->setSelectionBehavior(QAbstractItemView::SelectRows);
     table->setSelectionMode(QAbstractItemView::SingleSelection);
@@ -389,18 +391,18 @@ void show_library_health(const ui_context &context) {
     table->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
     auto *files = new QPlainTextEdit;
     files->setReadOnly(true);
-    files->setAccessibleName(QCoreApplication::translate("XLibrary", "File index diagnostics"));
+    files->setAccessibleName(QCoreApplication::translate("Fora.Deck", "File index diagnostics"));
     auto *report = new QPlainTextEdit;
     report->setReadOnly(true);
-    tabs->addTab(table, QCoreApplication::translate("XLibrary", "Applications"));
-    tabs->addTab(files, QCoreApplication::translate("XLibrary", "File index diagnostics"));
-    tabs->addTab(report, QCoreApplication::translate("XLibrary", "Scan report"));
+    tabs->addTab(table, QCoreApplication::translate("Fora.Deck", "Applications"));
+    tabs->addTab(files, QCoreApplication::translate("Fora.Deck", "File index diagnostics"));
+    tabs->addTab(report, QCoreApplication::translate("Fora.Deck", "Scan report"));
     layout->addWidget(tabs, 1);
     auto *actions = new QHBoxLayout;
     auto *availability = action_button(context.actions.value("refresh_availability"));
-    auto *locate = button(QCoreApplication::translate("XLibrary", "Locate application…"));
-    auto *recover = button(QCoreApplication::translate("XLibrary", "Recover moved folder…"));
-    auto *refresh_files = button(QCoreApplication::translate("XLibrary", "Refresh file index"));
+    auto *locate = button(QCoreApplication::translate("Fora.Deck", "Locate application…"));
+    auto *recover = button(QCoreApplication::translate("Fora.Deck", "Recover moved folder…"));
+    auto *refresh_files = button(QCoreApplication::translate("Fora.Deck", "Refresh file index"));
     actions->addWidget(availability);
     actions->addWidget(locate);
     actions->addWidget(recover);
@@ -438,12 +440,12 @@ void show_library_health(const ui_context &context) {
             QStringList problems;
             if (!record.available)
                 problems.append(record.volume_unavailable
-                                    ? QCoreApplication::translate("XLibrary", "Drive disconnected or unavailable")
-                                    : QCoreApplication::translate("XLibrary", "File unavailable; the entry is kept"));
+                                    ? QCoreApplication::translate("Fora.Deck", "Drive disconnected or unavailable")
+                                    : QCoreApplication::translate("Fora.Deck", "File unavailable; the entry is kept"));
             if (reasons.contains(record.id))
                 problems.append(reasons.value(record.id));
             if (service->launch_errors().contains(record.id))
-                problems.append(QCoreApplication::translate("XLibrary", "Launch failed this session: %1")
+                problems.append(QCoreApplication::translate("Fora.Deck", "Launch failed this session: %1")
                                     .arg(service->launch_errors().value(record.id)));
             if (problems.isEmpty())
                 continue;
@@ -463,7 +465,7 @@ void show_library_health(const ui_context &context) {
         table->resizeRowsToContents();
         summary->setText(
             QCoreApplication::translate(
-                "XLibrary",
+                "Fora.Deck",
                 "Unavailable applications: %1; on unavailable drives: %2; removal candidates: %3; launch failures: %4.")
                 .arg(unavailable)
                 .arg(disconnected)
@@ -472,8 +474,8 @@ void show_library_health(const ui_context &context) {
         const auto error = service->last_error().user_message;
         last_error->setText(
             error.isEmpty()
-                ? QCoreApplication::translate("XLibrary", "No operation errors recorded this session.")
-                : QCoreApplication::translate("XLibrary", "Last operation error this session: %1").arg(error));
+                ? QCoreApplication::translate("Fora.Deck", "No operation errors recorded this session.")
+                : QCoreApplication::translate("Fora.Deck", "Last operation error this session: %1").arg(error));
         files->setPlainText(service->files->diagnostics_text());
         report->setPlainText(service->discovery_report());
         update_actions();

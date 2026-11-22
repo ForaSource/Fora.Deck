@@ -1,5 +1,5 @@
-#ifndef XLIBRARY_SELECTION_BUTTON_H
-#define XLIBRARY_SELECTION_BUTTON_H
+#ifndef FORADECK_SELECTION_BUTTON_H
+#define FORADECK_SELECTION_BUTTON_H
 
 #include <QPushButton>
 #include <QVariantAnimation>

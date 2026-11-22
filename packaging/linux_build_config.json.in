@@ -1,7 +1,7 @@
 {
-  "secret_library": "@xlibrary_secret_library@",
-  "version": "@XLIBRARY_RELEASE_VERSION@",
-  "debian_version": "@XLIBRARY_DEBIAN_VERSION@",
+  "secret_library": "@foradeck_secret_library@",
+  "version": "@FORADECK_RELEASE_VERSION@",
+  "debian_version": "@FORADECK_DEBIAN_VERSION@",
   "system_name": "@CMAKE_SYSTEM_NAME@",
   "system_processor": "@CMAKE_SYSTEM_PROCESSOR@",
   "pointer_size": "@CMAKE_SIZEOF_VOID_P@",
@@ -9,7 +9,7 @@
   "compiler_version": "@CMAKE_CXX_COMPILER_VERSION@",
   "cxx_compiler": "@CMAKE_CXX_COMPILER@",
   "qt_version": "@Qt6_VERSION@",
-  "qmake": "@xlibrary_qmake@",
-  "qt_core_library": "@xlibrary_qt_core_library@",
-  "native_cpu": "@XLIBRARY_NATIVE_CPU@"
+  "qmake": "@foradeck_qmake@",
+  "qt_core_library": "@foradeck_qt_core_library@",
+  "native_cpu": "@FORADECK_NATIVE_CPU@"
 }

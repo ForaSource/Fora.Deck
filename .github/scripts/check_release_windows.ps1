@@ -8,8 +8,8 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $directory = (Resolve-Path -LiteralPath $PackageDirectory).Path
-$base = "XLibrary-$Version-windows-x64-mingw"
-$scratch = Join-Path ([IO.Path]::GetTempPath()) "XLibrary release $([guid]::NewGuid().ToString('N'))"
+$base = "Fora.Deck-$Version-windows-x64-mingw"
+$scratch = Join-Path ([IO.Path]::GetTempPath()) "Fora.Deck release $([guid]::NewGuid().ToString('N'))"
 $installed = Join-Path $scratch 'Установка с пробелами'
 New-Item -ItemType Directory -Path $scratch | Out-Null
 function invoke_installer([string]$executable, [string]$arguments) {
@@ -59,7 +59,7 @@ try {
     }
     & "$PSScriptRoot/check_install.ps1" -InstallPath $installed
     invoke_installer "$installed/unins000.exe" '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART'
-    if (Test-Path -LiteralPath "$installed/XLibrary.exe") { throw 'Uninstall did not remove XLibrary.' }
+    if (Test-Path -LiteralPath "$installed/foradeck.exe") { throw 'Uninstall did not remove Fora.Deck.' }
     Copy-Item -LiteralPath "$portable/build-info.json" -Destination "$directory/build-info.json"
     Write-Output 'Windows ZIP, installer, metadata, checksums, startup and uninstall verified.'
 } finally {

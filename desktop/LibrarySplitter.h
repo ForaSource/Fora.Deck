@@ -1,5 +1,5 @@
-#ifndef XLIBRARY_LIBRARY_SPLITTER_H
-#define XLIBRARY_LIBRARY_SPLITTER_H
+#ifndef FORADECK_LIBRARY_SPLITTER_H
+#define FORADECK_LIBRARY_SPLITTER_H
 
 #include <functional>
 #include <QSettings>

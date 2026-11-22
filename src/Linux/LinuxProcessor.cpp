@@ -123,7 +123,7 @@ public:
 
 } // namespace
 
-bool xlibrary::script_process_matches(const std::uint32_t process_id, const std::filesystem::path &expected_path) {
+bool foradeck::script_process_matches(const std::uint32_t process_id, const std::filesystem::path &expected_path) {
     std::ifstream script(expected_path, std::ios::binary);
     char prefix[2]{};
     if (!script.read(prefix, sizeof(prefix)) || prefix[0] != '#' || prefix[1] != '!')
@@ -159,7 +159,7 @@ bool xlibrary::script_process_matches(const std::uint32_t process_id, const std:
         if (split) {
             command.erase(0, command.starts_with("--split-string=") ? 15 : 2);
             try {
-                interpreter_arguments = xlibrary::split_launch_arguments(command);
+                interpreter_arguments = foradeck::split_launch_arguments(command);
             } catch (const std::invalid_argument &) {
                 return false;
             }
@@ -245,7 +245,7 @@ bool xlibrary::script_process_matches(const std::uint32_t process_id, const std:
     return std::filesystem::equivalent(argument_path, expected_path, error);
 }
 
-std::optional<xlibrary::process_identity> xlibrary::read_process_identity(const std::uint32_t process_id,
+std::optional<foradeck::process_identity> foradeck::read_process_identity(const std::uint32_t process_id,
                                                                           std::error_code &error) {
     const auto contents =
         read_process_file(std::filesystem::path("/proc") / std::to_string(process_id) / "stat", error);
@@ -280,12 +280,12 @@ std::optional<xlibrary::process_identity> xlibrary::read_process_identity(const 
     return identity;
 }
 
-bool xlibrary::is_process_alive(const process_identity &identity, std::error_code &error) {
+bool foradeck::is_process_alive(const process_identity &identity, std::error_code &error) {
     const auto current = read_process_identity(identity.pid, error);
     return current && current->start_time == identity.start_time;
 }
 
-bool xlibrary::process_matches(const process_identity &identity, const std::filesystem::path &executable_path,
+bool foradeck::process_matches(const process_identity &identity, const std::filesystem::path &executable_path,
                                std::error_code &error) {
     if (!is_process_alive(identity, error)) {
         return false;
@@ -311,7 +311,7 @@ bool xlibrary::process_matches(const process_identity &identity, const std::file
     return matches && is_process_alive(identity, error);
 }
 
-std::optional<xlibrary::process_identity> xlibrary::find_process(const std::filesystem::path &executable_path,
+std::optional<foradeck::process_identity> foradeck::find_process(const std::filesystem::path &executable_path,
                                                                  std::error_code &error) {
     error.clear();
     std::filesystem::directory_iterator iterator("/proc", error), end;
@@ -332,7 +332,7 @@ std::optional<xlibrary::process_identity> xlibrary::find_process(const std::file
     return std::nullopt;
 }
 
-xlibrary::process_identity xlibrary::launch_process(const std::filesystem::path &executable_path,
+foradeck::process_identity foradeck::launch_process(const std::filesystem::path &executable_path,
                                                     const std::wstring &arguments,
                                                     const std::filesystem::path &working_directory) {
     if (executable_path.native().find('\0') != std::string::npos ||

@@ -80,10 +80,10 @@ New-Item -ItemType Directory -Path $build_path -Force | Out-Null
 $exports = @(
     @{ source = 'github_header_dark.svg'; target = 'github_header_dark.png'; width = 1600; height = 480 },
     @{ source = 'github_header_light.svg'; target = 'github_header_light.png'; width = 1600; height = 480 },
-    @{ source = 'fora_deck_wordmark_light.svg'; target = 'xlibrary_logo.png'; width = 1600; height = 400 },
+    @{ source = 'fora_deck_wordmark_light.svg'; target = 'foradeck_logo.png'; width = 1600; height = 400 },
     @{ source = 'fora_deck_avatar.svg'; target = 'github_avatar.png'; width = 1024; height = 1024 },
     @{ source = 'fora_deck_avatar.svg'; target = 'github_avatar_256.png'; width = 256; height = 256 },
-    @{ source = 'fora_deck_mark.svg'; target = 'xlibrary_mark.png'; width = 1254; height = 1254 },
+    @{ source = 'fora_deck_mark.svg'; target = 'foradeck_mark.png'; width = 1254; height = 1254 },
     @{ source = 'fora_deck_mark.svg'; target = 'mark-256.png'; width = 256; height = 256; intermediate = $true }
 )
 foreach ($export in $exports) {
@@ -115,7 +115,7 @@ try {
     }
 } finally { $source_image.Dispose() }
 $frames = @($icon_sizes | ForEach-Object { ,([IO.File]::ReadAllBytes((Join-Path $build_path "mark-$_.png"))) })
-$stream = [IO.File]::Create((Join-Path $asset_path 'xlibrary.ico'))
+$stream = [IO.File]::Create((Join-Path $asset_path 'foradeck.ico'))
 $writer = [IO.BinaryWriter]::new($stream)
 try {
     $writer.Write([uint16]0); $writer.Write([uint16]1); $writer.Write([uint16]$icon_sizes.Count)

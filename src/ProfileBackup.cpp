@@ -24,11 +24,15 @@
 #include "ProfileSettings.h"
 
 namespace {
-constexpr auto format_id = "io.github.LapplandJulia.XLibrary.profile";
+constexpr auto format_id = "io.github.ForaSource.ForaDeck.profile";
 constexpr int format_version = 1;
-constexpr auto manifest_table = "_xlibrary_profile_manifest";
-constexpr auto counts_table = "_xlibrary_profile_counts";
-constexpr auto settings_table = "_xlibrary_profile_settings";
+constexpr auto manifest_table = "_foradeck_profile_manifest";
+constexpr auto counts_table = "_foradeck_profile_counts";
+constexpr auto settings_table = "_foradeck_profile_settings";
+constexpr auto previous_format_id = "io.github.LapplandJulia.XLibrary.profile";
+constexpr auto previous_manifest_table = "_xlibrary_profile_manifest";
+constexpr auto previous_counts_table = "_xlibrary_profile_counts";
+constexpr auto previous_settings_table = "_xlibrary_profile_settings";
 constexpr qsizetype settings_bytes_limit = 64 * 1024 * 1024;
 constexpr qsizetype settings_count_limit = 100000;
 constexpr qsizetype journal_bytes_limit = 1024 * 1024;
@@ -255,20 +259,18 @@ QByteArray quote_identifier(const QString &name) {
     return '"' + escaped + '"';
 }
 
-bool service_table(const QString &name) {
-    return name == QLatin1String(manifest_table) || name == QLatin1String(counts_table) ||
-           name == QLatin1String(settings_table);
-}
-
-QMap<QString, qint64> data_counts(sqlite3 *const connection) {
+QMap<QString, qint64> data_counts(sqlite3 *const connection, const bool previous = false) {
+    const auto manifest = QLatin1String(previous ? previous_manifest_table : manifest_table);
+    const auto declared_counts = QLatin1String(previous ? previous_counts_table : counts_table);
+    const auto settings = QLatin1String(previous ? previous_settings_table : settings_table);
     QMap<QString, qint64> counts;
     Statement tables(connection,
                      "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name;");
     while (tables.next()) {
         const auto name = tables.text(0);
-        if (service_table(name)) {
-            if (name == QLatin1String(settings_table)) {
-                Statement settings_count(connection, "SELECT COUNT(*) FROM _xlibrary_profile_settings;");
+        if (name == manifest || name == declared_counts || name == settings) {
+            if (name == settings) {
+                Statement settings_count(connection, "SELECT COUNT(*) FROM " + quote_identifier(name) + ';');
                 if (settings_count.next())
                     counts.insert("settings", settings_count.number(0));
             }
@@ -292,14 +294,14 @@ void validate_staged_database(const QString &path) {
         Connection connection(path);
         integrity_check(connection.get());
         const auto version = schema_version(connection.get());
-        if (version < 0 || version > xlibrary::profile_schema_version)
+        if (version < 0 || version > foradeck::profile_schema_version)
             throw InvalidDatabase("This profile database requires a newer Fora.Deck version");
     }
     try {
         Database store(path);
         (void)store.read();
         Connection connection(path);
-        xlibrary::validate_profile(connection.get());
+        foradeck::validate_profile(connection.get());
         integrity_check(connection.get());
     } catch (const InvalidDatabase &) {
         throw;
@@ -308,10 +310,11 @@ void validate_staged_database(const QString &path) {
     }
 }
 
-profile_manifest read_manifest(sqlite3 *const connection) {
+profile_manifest read_manifest(sqlite3 *const connection, const bool previous) {
     Statement row(connection, "SELECT format_id, format_version, application_version, created_utc, schema_version "
-                              "FROM _xlibrary_profile_manifest;");
-    if (!row.next() || row.text(0) != QLatin1String(format_id))
+                              "FROM " +
+                                  QByteArray(previous ? previous_manifest_table : manifest_table) + ';');
+    if (!row.next() || row.text(0) != QLatin1String(previous ? previous_format_id : format_id))
         fail("This file is not a Fora.Deck profile backup");
     const auto version = row.number(1);
     if (version != format_version)
@@ -321,7 +324,7 @@ profile_manifest read_manifest(sqlite3 *const connection) {
     result.application_version = row.text(2);
     result.created_utc = row.text(3);
     const auto schema = row.number(4);
-    if (schema <= 0 || schema > xlibrary::profile_schema_version)
+    if (schema <= 0 || schema > foradeck::profile_schema_version)
         fail("This profile backup requires a newer or unsupported database schema");
     result.schema_version = static_cast<int>(schema);
     const auto date = QDateTime::fromString(result.created_utc, Qt::ISODateWithMs);
@@ -330,7 +333,8 @@ profile_manifest read_manifest(sqlite3 *const connection) {
         fail("Malformed Fora.Deck profile manifest");
     if (schema_version(connection) != result.schema_version)
         fail("The profile manifest and database schema do not match");
-    Statement counts(connection, "SELECT name, row_count FROM _xlibrary_profile_counts;");
+    Statement counts(connection, "SELECT name, row_count FROM " +
+                                     QByteArray(previous ? previous_counts_table : counts_table) + ';');
     while (counts.next()) {
         const auto name = counts.text(0);
         const auto count = counts.number(1);
@@ -339,22 +343,25 @@ profile_manifest read_manifest(sqlite3 *const connection) {
             fail("Malformed profile data counts");
         result.counts.insert(name, count);
     }
-    if (result.counts != data_counts(connection))
+    if (result.counts != data_counts(connection, previous))
         fail("Profile data counts do not match the manifest");
     return result;
 }
 
-profile_settings::values read_settings(sqlite3 *const connection) {
+profile_settings::values read_settings(sqlite3 *const connection, const bool previous) {
     profile_settings::values result;
     qsizetype total_bytes = 0;
-    Statement settings(connection, "SELECT key, value FROM _xlibrary_profile_settings ORDER BY key;");
+    Statement settings(connection, "SELECT key, value FROM " +
+                                       QByteArray(previous ? previous_settings_table : settings_table) +
+                                       " ORDER BY key;");
     while (settings.next()) {
         const auto key = settings.text(0);
         const auto bytes = settings.bytes(1);
         total_bytes += bytes.size();
         if (key.isEmpty() || key.contains(QChar::Null) || key.size() > 32768 || result.contains(key) ||
             result.size() >= settings_count_limit || total_bytes > settings_bytes_limit ||
-            key.compare(QLatin1String(profile_settings::token_marker), Qt::CaseInsensitive) == 0)
+            key.compare(QLatin1String(profile_settings::token_marker), Qt::CaseInsensitive) == 0 ||
+            key.compare(QLatin1String(profile_settings::previous_token_profile), Qt::CaseInsensitive) == 0)
             fail("Malformed profile settings");
         result.insert(key, profile_settings::decode(bytes));
     }
@@ -378,17 +385,23 @@ staged_profile prepare_backup(const QString &source, const QString &staged_datab
     if (before != fingerprint(staged_database) || before != fingerprint(source))
         fail("The profile backup changed while it was being read");
     staged_profile result;
+    bool previous = false;
     {
         Connection connection(staged_database);
+        Statement manifest(connection.get(), "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?1;");
+        manifest.bind(1, QString::fromLatin1(manifest_table));
+        previous = !manifest.next();
         // Версии проверяются до Database: его конструктор имеет право мигрировать только staging.
-        result.manifest = read_manifest(connection.get());
+        result.manifest = read_manifest(connection.get(), previous);
         integrity_check(connection.get());
-        result.settings = read_settings(connection.get());
+        result.settings = read_settings(connection.get(), previous);
     }
     {
         Connection connection(staged_database, true);
-        connection.execute("DROP TABLE _xlibrary_profile_settings; DROP TABLE _xlibrary_profile_counts; "
-                           "DROP TABLE _xlibrary_profile_manifest;");
+        for (const auto *table :
+             {previous ? previous_settings_table : settings_table, previous ? previous_counts_table : counts_table,
+              previous ? previous_manifest_table : manifest_table})
+            connection.execute("DROP TABLE " + QByteArray(table) + ';');
         connection.execute("PRAGMA journal_mode=DELETE;");
     }
     validate_staged_database(staged_database);
@@ -462,7 +475,9 @@ void recover_locked(const QString &database_path, const QString &settings_path) 
     const auto state = object.value("state").toString();
     if (object.value("version").toInt() != 1 || object.value("database_path").toString() != database_path ||
         object.value("settings_path").toString() != settings_path || recovery_info.absolutePath() != parent ||
-        recovery_info.isSymLink() || !recovery_info.fileName().startsWith(".xlibrary-recovery-") ||
+        recovery_info.isSymLink() ||
+        (!recovery_info.fileName().startsWith(".foradeck-recovery-") &&
+         !recovery_info.fileName().startsWith(".xlibrary-recovery-")) ||
         saved.size() != files.size() || (state != "prepared" && state != "committed"))
         fail("The profile recovery journal does not match this profile");
     for (qsizetype index = 0; index < files.size(); ++index) {
@@ -482,13 +497,67 @@ void lock_profile(QLockFile &lock) {
     if (!lock.tryLock(0))
         fail("Another profile recovery operation is running");
 }
+
+void prepare_migrated_settings(const QString &path, const QString &previous_path) {
+    QSettings settings(path, QSettings::IniFormat);
+    if (settings.value(profile_settings::token_marker, false).toBool() &&
+        !settings.contains(profile_settings::previous_token_profile))
+        settings.setValue(profile_settings::previous_token_profile, previous_path);
+    if (settings.value("behavior/autostart", false).toBool())
+        settings.setValue("profile/autostart_pending", true);
+    settings.sync();
+    if (settings.status() != QSettings::NoError)
+        fail("Cannot migrate the previous profile settings");
+}
+}
+
+void ProfileBackup::migrate_storage(const QString &database_path, const bool portable) {
+    const auto target_dir = QFileInfo(database_path).dir();
+    const auto parent_dir = QFileInfo(target_dir.absolutePath()).dir();
+    const QDir previous_dir(portable ? target_dir : QDir(parent_dir.filePath("XLibrary")));
+    const auto previous_database = previous_dir.filePath("xlibrary.db");
+    const auto previous_settings = previous_dir.filePath("settings.ini");
+    const auto target_exists = [&] { return portable ? QFileInfo::exists(database_path) : target_dir.exists(); };
+    const bool has_database = QFileInfo::exists(previous_database);
+    const bool has_settings = QFileInfo::exists(previous_settings);
+    if (target_exists() || (!has_database && (portable || !has_settings)))
+        return;
+
+    // Portable startup already holds the shared instance lock in data/.
+    QLockFile previous_instance(previous_dir.filePath("instance.lock"));
+    previous_instance.setStaleLockTime(0);
+    if (!portable && !previous_instance.tryLock(5000))
+        fail("Close the previous installation before starting Fora.Deck to migrate its profile.");
+    if (target_exists())
+        return;
+    ProfileBackup::recover(previous_database, previous_settings);
+    QTemporaryDir staging((portable ? target_dir : parent_dir).filePath(".foradeck-migrate-XXXXXX"));
+    if (!staging.isValid())
+        fail("Cannot stage the profile migration");
+    const auto staged_database = staging.filePath(QFileInfo(database_path).fileName());
+    if (QFileInfo::exists(previous_database))
+        snapshot(previous_database, staged_database);
+    if (portable) {
+        prepare_migrated_settings(previous_settings, previous_settings);
+        if (QFileInfo::exists(staged_database) && !QFile::rename(staged_database, database_path))
+            fail("Cannot publish the migrated profile database");
+    } else {
+        if (QFileInfo::exists(previous_settings)) {
+            const auto staged_settings = staging.filePath("settings.ini");
+            copy_file(previous_settings, staged_settings);
+            prepare_migrated_settings(staged_settings, previous_settings);
+        }
+        if (!QDir().rename(staging.path(), target_dir.absolutePath()))
+            fail("Cannot publish the migrated profile directory");
+        staging.setAutoRemove(false);
+    }
 }
 
 void ProfileBackup::create(const QString &backup_path, const QString &database_path, const QString &settings_path) {
     ensure_distinct_backup(backup_path, database_path, settings_path);
     if (!QFileInfo(backup_path).dir().exists())
         fail("The profile backup directory does not exist");
-    QTemporaryDir staging(QFileInfo(backup_path).absolutePath() + "/.xlibrary-backup-XXXXXX");
+    QTemporaryDir staging(QFileInfo(backup_path).absolutePath() + "/.foradeck-backup-XXXXXX");
     if (!staging.isValid())
         fail("Cannot create a profile backup staging directory");
     const auto staged_database = staging.filePath("profile.sqlite");
@@ -497,7 +566,7 @@ void ProfileBackup::create(const QString &backup_path, const QString &database_p
         Connection connection(staged_database);
         Statement reserved(connection.get(),
                            "SELECT name FROM sqlite_master WHERE name IN "
-                           "('_xlibrary_profile_manifest','_xlibrary_profile_counts','_xlibrary_profile_settings');");
+                           "('_foradeck_profile_manifest','_foradeck_profile_counts','_foradeck_profile_settings');");
         if (reserved.next())
             fail("The active profile contains reserved backup tables");
     }
@@ -508,12 +577,12 @@ void ProfileBackup::create(const QString &backup_path, const QString &database_p
         auto counts = data_counts(connection.get());
         counts.insert("settings", settings.size());
         connection.execute(
-            "BEGIN IMMEDIATE; CREATE TABLE _xlibrary_profile_manifest ("
+            "BEGIN IMMEDIATE; CREATE TABLE _foradeck_profile_manifest ("
             "format_id TEXT NOT NULL, format_version INTEGER NOT NULL, application_version TEXT NOT NULL, "
             "created_utc TEXT NOT NULL, schema_version INTEGER NOT NULL);"
-            "CREATE TABLE _xlibrary_profile_counts (name TEXT PRIMARY KEY NOT NULL, row_count INTEGER NOT NULL);"
-            "CREATE TABLE _xlibrary_profile_settings (key TEXT PRIMARY KEY NOT NULL, value BLOB NOT NULL);");
-        Statement manifest(connection.get(), "INSERT INTO _xlibrary_profile_manifest VALUES (?1,?2,?3,?4,?5);");
+            "CREATE TABLE _foradeck_profile_counts (name TEXT PRIMARY KEY NOT NULL, row_count INTEGER NOT NULL);"
+            "CREATE TABLE _foradeck_profile_settings (key TEXT PRIMARY KEY NOT NULL, value BLOB NOT NULL);");
+        Statement manifest(connection.get(), "INSERT INTO _foradeck_profile_manifest VALUES (?1,?2,?3,?4,?5);");
         manifest.bind(1, QLatin1String(format_id));
         manifest.bind(2, static_cast<qint64>(format_version));
         const auto version = QCoreApplication::applicationVersion();
@@ -521,16 +590,16 @@ void ProfileBackup::create(const QString &backup_path, const QString &database_p
             fail("The application version is unavailable");
         manifest.bind(3, version);
         manifest.bind(4, QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs));
-        manifest.bind(5, static_cast<qint64>(xlibrary::profile_schema_version));
+        manifest.bind(5, static_cast<qint64>(foradeck::profile_schema_version));
         (void)manifest.next();
-        Statement count(connection.get(), "INSERT INTO _xlibrary_profile_counts VALUES (?1,?2);");
+        Statement count(connection.get(), "INSERT INTO _foradeck_profile_counts VALUES (?1,?2);");
         for (auto it = counts.cbegin(); it != counts.cend(); ++it) {
             count.bind(1, it.key());
             count.bind(2, it.value());
             (void)count.next();
             count.reset();
         }
-        Statement setting(connection.get(), "INSERT INTO _xlibrary_profile_settings VALUES (?1,?2);");
+        Statement setting(connection.get(), "INSERT INTO _foradeck_profile_settings VALUES (?1,?2);");
         qsizetype total_bytes = 0;
         if (settings.size() > settings_count_limit)
             fail("The profile has too many settings");
@@ -569,8 +638,8 @@ QString ProfileBackup::restore(const QString &path, const QString &database_path
     QLockFile lock(database + ".profile-restore.lock");
     lock_profile(lock);
     recover_locked(database, settings);
-    QTemporaryDir database_staging(QFileInfo(database).absolutePath() + "/.xlibrary-restore-XXXXXX");
-    QTemporaryDir settings_staging(QFileInfo(settings).absolutePath() + "/.xlibrary-restore-XXXXXX");
+    QTemporaryDir database_staging(QFileInfo(database).absolutePath() + "/.foradeck-restore-XXXXXX");
+    QTemporaryDir settings_staging(QFileInfo(settings).absolutePath() + "/.foradeck-restore-XXXXXX");
     if (!database_staging.isValid() || !settings_staging.isValid())
         fail("Cannot prepare the profile restoration");
     const auto staged_database = database_staging.filePath("database.sqlite");
@@ -579,11 +648,13 @@ QString ProfileBackup::restore(const QString &path, const QString &database_path
     if (prepared.manifest.fingerprint != expected_fingerprint || fingerprint(path) != expected_fingerprint)
         fail("The profile backup changed after preview; inspect it again");
     bool local_token = false;
+    QString previous_token_profile;
     bool local_settings_valid = true;
     if (QFileInfo::exists(settings)) {
         QSettings local(settings, QSettings::IniFormat);
         local.setFallbacksEnabled(false);
         local_token = local.value(profile_settings::token_marker, false).toBool();
+        previous_token_profile = local.value(profile_settings::previous_token_profile).toString();
         // Повреждённый INI сохраняется raw; неизвестный маркер не объявляет секрет существующим.
         if (local.status() != QSettings::NoError) {
             local_token = false;
@@ -591,9 +662,11 @@ QString ProfileBackup::restore(const QString &path, const QString &database_path
         }
     }
     prepared.settings.insert(profile_settings::token_marker, local_token);
+    if (local_token && !previous_token_profile.isEmpty())
+        prepared.settings.insert(profile_settings::previous_token_profile, previous_token_profile);
     prepared.settings.insert("profile/autostart_pending", true);
     profile_settings::write(staged_settings, prepared.settings);
-    const auto recovery_path = QFileInfo(database).absolutePath() + "/.xlibrary-recovery-" +
+    const auto recovery_path = QFileInfo(database).absolutePath() + "/.foradeck-recovery-" +
                                QDateTime::currentDateTimeUtc().toString("yyyyMMddTHHmmsszzzZ") + "-" +
                                QUuid::createUuid().toString(QUuid::WithoutBraces);
     if (!QDir().mkpath(recovery_path))
@@ -632,7 +705,7 @@ QString ProfileBackup::restore(const QString &path, const QString &database_path
                     Connection previous(previous_database, true);
                     integrity_check(previous.get());
                 }
-                create(QDir(recovery_path).filePath("previous.xlprofile"), previous_database,
+                create(QDir(recovery_path).filePath("previous.foradeckprofile"), previous_database,
                        previous_staging.filePath("settings.ini"));
             } catch (const InvalidDatabase &) {
                 // Для повреждённой БД единственная честная копия — исходные файлы вместе с журналами.

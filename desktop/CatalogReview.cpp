@@ -37,24 +37,24 @@ void show_catalog_review(const ui_context &context) {
     const bool scan = service->is_scan_preview();
     const auto records = service->catalog_preview();
     auto *dialog =
-        make_dialog(context, removal ? QCoreApplication::translate("XLibrary", "Uninstalled applications")
-                             : scan  ? QCoreApplication::translate("XLibrary", "New applications")
-                                     : QCoreApplication::translate("XLibrary", "Review applications before import"));
+        make_dialog(context, removal ? QCoreApplication::translate("Fora.Deck", "Uninstalled applications")
+                             : scan  ? QCoreApplication::translate("Fora.Deck", "New applications")
+                                     : QCoreApplication::translate("Fora.Deck", "Review applications before import"));
     dialog->setObjectName("catalog_review");
     prepare_dialog(dialog, context, {800, 300}, {480, 180});
     auto *layout = new QVBoxLayout(dialog);
     if (removal)
         layout->addWidget(label(QCoreApplication::translate(
-            "XLibrary",
+            "Fora.Deck",
             "These applications appear to have been uninstalled. Remove the checked entries from the library? "
             "Their paths will be checked again before removal.")));
     auto *search = new QLineEdit;
-    search->setPlaceholderText(QCoreApplication::translate("XLibrary", "Search name, source or target"));
+    search->setPlaceholderText(QCoreApplication::translate("Fora.Deck", "Search name, source or target"));
     search->setAccessibleName(search->placeholderText());
     layout->addWidget(search);
     auto *tools = new QHBoxLayout;
-    auto *all = button(QCoreApplication::translate("XLibrary", "Select all"));
-    auto *none = button(QCoreApplication::translate("XLibrary", "Clear selection"));
+    auto *all = button(QCoreApplication::translate("Fora.Deck", "Select all"));
+    auto *none = button(QCoreApplication::translate("Fora.Deck", "Clear selection"));
     auto *count = label({});
     tools->addWidget(all);
     tools->addWidget(none);
@@ -62,12 +62,12 @@ void show_catalog_review(const ui_context &context) {
     layout->addLayout(tools);
     auto *table = new QTableWidget(static_cast<int>(records.size()), 5);
     table->setObjectName("catalog_review_table");
-    table->setHorizontalHeaderLabels({QCoreApplication::translate("XLibrary", "Name"),
-                                      removal ? QCoreApplication::translate("XLibrary", "Reason for removal")
-                                              : QCoreApplication::translate("XLibrary", "Source"),
-                                      QCoreApplication::translate("XLibrary", "Target"),
-                                      QCoreApplication::translate("XLibrary", "Launch arguments"),
-                                      QCoreApplication::translate("XLibrary", "Working directory")});
+    table->setHorizontalHeaderLabels({QCoreApplication::translate("Fora.Deck", "Name"),
+                                      removal ? QCoreApplication::translate("Fora.Deck", "Reason for removal")
+                                              : QCoreApplication::translate("Fora.Deck", "Source"),
+                                      QCoreApplication::translate("Fora.Deck", "Target"),
+                                      QCoreApplication::translate("Fora.Deck", "Launch arguments"),
+                                      QCoreApplication::translate("Fora.Deck", "Working directory")});
     table->setEditTriggers(QAbstractItemView::NoEditTriggers);
     table->setSelectionBehavior(QAbstractItemView::SelectRows);
     table->verticalHeader()->hide();
@@ -98,11 +98,11 @@ void show_catalog_review(const ui_context &context) {
         name->setCheckState(Qt::Checked);
         if (duplicate && !removal)
             name->setToolTip(
-                QCoreApplication::translate("XLibrary", "This launch configuration is already in the library."));
+                QCoreApplication::translate("Fora.Deck", "This launch configuration is already in the library."));
         table->setItem(row, 0, name);
         const QStringList values{removal ? record.removal_reason
                                  : record.discovery_source.isEmpty()
-                                     ? QCoreApplication::translate("XLibrary", "JSON catalog")
+                                     ? QCoreApplication::translate("Fora.Deck", "JSON catalog")
                                      : record.discovery_source,
                                  QDir::toNativeSeparators(Application::application_path(record)), record.arguments,
                                  QDir::toNativeSeparators(record.working_directory)};
@@ -120,7 +120,7 @@ void show_catalog_review(const ui_context &context) {
             selected += table->item(row, 0)->checkState() == Qt::Checked;
             visible += !table->isRowHidden(row);
         }
-        count->setText(QCoreApplication::translate("XLibrary", "Selected: %1 / %2. Shown: %3.")
+        count->setText(QCoreApplication::translate("Fora.Deck", "Selected: %1 / %2. Shown: %3.")
                            .arg(selected)
                            .arg(table->rowCount())
                            .arg(visible));
@@ -136,7 +136,7 @@ void show_catalog_review(const ui_context &context) {
     QObject::connect(all, &QPushButton::clicked, dialog, [=] { set_visible_checked(Qt::Checked); });
     QObject::connect(none, &QPushButton::clicked, dialog, [=] { set_visible_checked(Qt::Unchecked); });
     all->setToolTip(QCoreApplication::translate(
-        "XLibrary", "Applies to the visible search results. Hidden rows keep their selection."));
+        "Fora.Deck", "Applies to the visible search results. Hidden rows keep their selection."));
     none->setToolTip(all->toolTip());
     QObject::connect(search, &QLineEdit::textChanged, dialog, [=](const QString &text) {
         for (int row = 0; row < table->rowCount(); ++row) {
@@ -149,24 +149,24 @@ void show_catalog_review(const ui_context &context) {
     });
     auto *policy = new QComboBox;
     policy->addItems(
-        {QCoreApplication::translate("XLibrary", "Skip matching launch configurations (default)"),
-         QCoreApplication::translate("XLibrary", "Replace name, tags and favorite for matching configurations")});
-    policy->setAccessibleName(QCoreApplication::translate("XLibrary", "Conflict policy"));
+        {QCoreApplication::translate("Fora.Deck", "Skip matching launch configurations (default)"),
+         QCoreApplication::translate("Fora.Deck", "Replace name, tags and favorite for matching configurations")});
+    policy->setAccessibleName(QCoreApplication::translate("Fora.Deck", "Conflict policy"));
     policy->setVisible(service->is_json_preview());
     layout->addWidget(policy);
     auto *remember =
-        new QCheckBox(QCoreApplication::translate("XLibrary", "Do not offer unchecked applications in future scans"));
+        new QCheckBox(QCoreApplication::translate("Fora.Deck", "Do not offer unchecked applications in future scans"));
     remember->setChecked(true);
     remember->setVisible(scan && !removal);
     layout->addWidget(remember);
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
     buttons->button(QDialogButtonBox::Ok)
-        ->setText(removal ? QCoreApplication::translate("XLibrary", "Remove selected")
-                  : scan  ? QCoreApplication::translate("XLibrary", "Add selected")
-                          : QCoreApplication::translate("XLibrary", "Import selected"));
+        ->setText(removal ? QCoreApplication::translate("Fora.Deck", "Remove selected")
+                  : scan  ? QCoreApplication::translate("Fora.Deck", "Add selected")
+                          : QCoreApplication::translate("Fora.Deck", "Import selected"));
     buttons->button(QDialogButtonBox::Cancel)
-        ->setText(removal ? QCoreApplication::translate("XLibrary", "Keep all")
-                          : QCoreApplication::translate("XLibrary", "Cancel"));
+        ->setText(removal ? QCoreApplication::translate("Fora.Deck", "Keep all")
+                          : QCoreApplication::translate("Fora.Deck", "Cancel"));
     layout->addWidget(buttons);
     QObject::connect(buttons, &QDialogButtonBox::accepted, dialog, [=] {
         QVector<int> rows;
@@ -215,7 +215,7 @@ void show_application_tags(const ui_context &context) {
     if (ids.isEmpty())
         return;
     const auto *settings = context.settings;
-    const auto title = QCoreApplication::translate("XLibrary", "Tags");
+    const auto title = QCoreApplication::translate("Fora.Deck", "Tags");
     auto *dialog = new QDialog(context.window);
     dialog->setObjectName("application_tags_dialog");
     dialog->setAttribute(Qt::WA_DeleteOnClose);
@@ -239,7 +239,7 @@ void show_application_tags(const ui_context &context) {
 
     const auto *single = ids.size() == 1 ? service->model.find(ids.front()) : nullptr;
     layout->addWidget(label(
-        single ? single->name : QCoreApplication::translate("XLibrary", "Selected applications: %1").arg(ids.size()),
+        single ? single->name : QCoreApplication::translate("Fora.Deck", "Selected applications: %1").arg(ids.size()),
         "muted"));
     QHash<QString, qsizetype> assignments;
     for (const auto id : ids)
@@ -248,7 +248,7 @@ void show_application_tags(const ui_context &context) {
                 ++assignments[tag_name_key(tag)];
 
     auto *search = new QLineEdit;
-    search->setPlaceholderText(QCoreApplication::translate("XLibrary", "Search tags"));
+    search->setPlaceholderText(QCoreApplication::translate("Fora.Deck", "Search tags"));
     search->setAccessibleName(search->placeholderText());
     search->setClearButtonEnabled(true);
     layout->addWidget(search);
@@ -278,12 +278,12 @@ void show_application_tags(const ui_context &context) {
     layout->addWidget(empty);
     if (mixed)
         layout->addWidget(label(
-            QCoreApplication::translate("XLibrary", "A dash means the tag is assigned to some selected applications."),
+            QCoreApplication::translate("Fora.Deck", "A dash means the tag is assigned to some selected applications."),
             "caption"));
     auto *new_tags = new QLineEdit;
-    new_tags->setPlaceholderText(QCoreApplication::translate("XLibrary", "Add tags separated by commas"));
+    new_tags->setPlaceholderText(QCoreApplication::translate("Fora.Deck", "Add tags separated by commas"));
     new_tags->setAccessibleName(new_tags->placeholderText());
-    auto *add = button(QCoreApplication::translate("XLibrary", "Add"), nullptr, "add");
+    auto *add = button(QCoreApplication::translate("Fora.Deck", "Add"), nullptr, "add");
     add->setAutoDefault(false);
     add->setEnabled(false);
     auto *new_tag_row = new QHBoxLayout;
@@ -297,10 +297,10 @@ void show_application_tags(const ui_context &context) {
     root->addWidget(body, 1);
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Cancel);
     auto *save = buttons->button(QDialogButtonBox::Save);
-    save->setText(QCoreApplication::translate("XLibrary", "Save"));
+    save->setText(QCoreApplication::translate("Fora.Deck", "Save"));
     save->setProperty("primary", true);
     save->setDefault(true);
-    buttons->button(QDialogButtonBox::Cancel)->setText(QCoreApplication::translate("XLibrary", "Cancel"));
+    buttons->button(QDialogButtonBox::Cancel)->setText(QCoreApplication::translate("Fora.Deck", "Cancel"));
     root->addWidget(buttons);
 
     auto *fit_timer = new QTimer(dialog);
@@ -343,8 +343,8 @@ void show_application_tags(const ui_context &context) {
         search->setVisible(tags->count() > 5);
         tags->setVisible(rows > 0);
         tags->setFixedHeight(height);
-        empty->setText(tags->count() == 0 ? QCoreApplication::translate("XLibrary", "No tags")
-                                          : QCoreApplication::translate("XLibrary", "No matching tags"));
+        empty->setText(tags->count() == 0 ? QCoreApplication::translate("Fora.Deck", "No tags")
+                                          : QCoreApplication::translate("Fora.Deck", "No matching tags"));
         empty->setVisible(rows == 0);
         request_fit();
     };
@@ -362,8 +362,8 @@ void show_application_tags(const ui_context &context) {
             if (tag.startsWith('#'))
                 tag.remove(0, 1);
             if (!valid_tag_name(tag)) {
-                set_error(
-                    QCoreApplication::translate("XLibrary", "Tag: up to 64 characters, without spaces, commas, or #."));
+                set_error(QCoreApplication::translate("Fora.Deck",
+                                                      "Tag: up to 64 characters, without spaces, commas, or #."));
                 new_tags->setFocus();
                 return false;
             }

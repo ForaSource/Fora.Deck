@@ -1,5 +1,5 @@
-#ifndef XLIBRARY_DATABASE_H
-#define XLIBRARY_DATABASE_H
+#ifndef FORADECK_DATABASE_H
+#define FORADECK_DATABASE_H
 
 #include <filesystem>
 #include <functional>
@@ -83,4 +83,4 @@ public:
     void refresh_discovery_metadata(const QVector<app_record> &records, const discovery_control &control);
 };
 
-#endif //XLIBRARY_DATABASE_H
+#endif //FORADECK_DATABASE_H

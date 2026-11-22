@@ -38,7 +38,7 @@ SearchOverlay::SearchOverlay(DesktopService &service, QWidget *const parent)
       reveal(new QVariantAnimation(this)), height_animation(new QVariantAnimation(this)),
       activation_check(new QTimer(this)) {
     setObjectName("search_overlay");
-    setWindowTitle(QCoreApplication::translate("XLibrary", "Quick search"));
+    setWindowTitle(QCoreApplication::translate("Fora.Deck", "Quick search"));
     setWindowIcon(appearance::logo());
     setAttribute(Qt::WA_TranslucentBackground);
     auto *dismiss = new QAction(this);
@@ -54,17 +54,17 @@ SearchOverlay::SearchOverlay(DesktopService &service, QWidget *const parent)
     row->setSpacing(8);
     input->setObjectName("overlay_search_input");
     input->setMaxLength(static_cast<int>(catalog_limits::text_length));
-    input->setPlaceholderText(QCoreApplication::translate("XLibrary", "Search"));
+    input->setPlaceholderText(QCoreApplication::translate("Fora.Deck", "Search"));
     input->setAccessibleName(
-        QCoreApplication::translate("XLibrary", "Search applications and files, calculate or enter a path"));
+        QCoreApplication::translate("Fora.Deck", "Search applications and files, calculate or enter a path"));
     input->setToolTip(
-        QCoreApplication::translate("XLibrary", "#tag includes a tag; -#tag excludes it. All conditions apply."));
+        QCoreApplication::translate("Fora.Deck", "#tag includes a tag; -#tag excludes it. All conditions apply."));
     input->setClearButtonEnabled(true);
     auto *search_icon = input->addAction(appearance::icon("search"), QLineEdit::LeadingPosition);
     search_icon->setObjectName("overlay_search_icon");
     row->addWidget(input, 1);
     open_button->setIcon(appearance::icon("external"));
-    open_button->setAccessibleName(QCoreApplication::translate("XLibrary", "Open Fora.Deck"));
+    open_button->setAccessibleName(QCoreApplication::translate("Fora.Deck", "Open Fora.Deck"));
     open_button->setToolTip(open_button->accessibleName());
     open_button->setCursor(Qt::PointingHandCursor);
     row->addWidget(open_button);
@@ -110,8 +110,8 @@ SearchOverlay::SearchOverlay(DesktopService &service, QWidget *const parent)
         if (isVisible() && !isActiveWindow() && QGuiApplication::platformName().startsWith("wayland")) {
             activation_notice = true;
             notice->show_message(QCoreApplication::translate(
-                "XLibrary",
-                "Wayland did not activate quick search. Click the search field or assign XLibrary --overlay "
+                "Fora.Deck",
+                "Wayland did not activate quick search. Click the search field or assign foradeck --overlay "
                 "in the system keyboard settings."));
         }
     });
@@ -134,11 +134,11 @@ void SearchOverlay::refresh_appearance() {
             service.settings.value("shortcuts/overlay", desktop_platform::default_overlay_shortcut()).toString(),
             QKeySequence::PortableText)
             .toString(QKeySequence::NativeText);
-    QStringList hints{QCoreApplication::translate("XLibrary", "↑↓ Select"),
-                      QCoreApplication::translate("XLibrary", "Enter Open"),
-                      QCoreApplication::translate("XLibrary", "Esc Close")};
+    QStringList hints{QCoreApplication::translate("Fora.Deck", "↑↓ Select"),
+                      QCoreApplication::translate("Fora.Deck", "Enter Open"),
+                      QCoreApplication::translate("Fora.Deck", "Esc Close")};
     if (!shortcut.isEmpty())
-        hints.append(QCoreApplication::translate("XLibrary", "%1 Quick search").arg(shortcut));
+        hints.append(QCoreApplication::translate("Fora.Deck", "%1 Quick search").arg(shortcut));
     for (auto &hint : hints)
         hint.replace(' ', QChar(0x00a0));
     shortcut_hint->setText(hints.join("    "));

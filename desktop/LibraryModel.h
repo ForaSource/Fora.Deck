@@ -1,5 +1,5 @@
-#ifndef XLIBRARY_LIBRARY_MODEL_H
-#define XLIBRARY_LIBRARY_MODEL_H
+#ifndef FORADECK_LIBRARY_MODEL_H
+#define FORADECK_LIBRARY_MODEL_H
 
 #include <QAbstractTableModel>
 #include <QCache>

@@ -46,19 +46,19 @@ Your catalog and settings stay on your computer. The interface supports English 
 | **Make it yours** | Choose a light, dark, or system theme, adjust text size, and use English or Russian. |
 | **Keep your library** | Transfer application entries as JSON or create a complete profile backup. |
 
-<a id="get-xlibrary"></a>
+<a id="get-foradeck"></a>
 
 ## Get Fora.Deck
 
 Download a package from [GitHub Releases](https://github.com/ForaSource/Fora.Deck/releases).
 Pre-releases are development builds; read the release notes before upgrading.
 
-Fora.Deck was previously named XLibrary. Executable and package names retain `XLibrary` for compatibility;
-profile locations and the `.xlprofile` backup format are unchanged. See [profiles](docs/profile.md#storage-modes).
+New profile backups use `.foradeckprofile`. Existing profiles and backups are supported when upgrading.
+See [profiles](docs/profile.md#storage-modes).
 
 | Platform | Package |
 | --- | --- |
-| **Windows 10/11 x64** | Use the installer, or extract the portable ZIP into a writable folder and run `XLibrary.exe`. |
+| **Windows 10/11 x64** | Use the installer, or extract the portable ZIP into a writable folder and run `foradeck.exe`. |
 | **Linux x86_64** | Use the DEB on Debian 13, or the AppImage on a compatible system. See [Linux setup](docs/usage.md#linux-setup). |
 
 For a portable upgrade, keep the existing profile data. See [profiles and backups](docs/profile.md) and [updates](docs/updates.md).

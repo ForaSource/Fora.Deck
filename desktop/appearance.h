@@ -1,5 +1,5 @@
-#ifndef XLIBRARY_APPEARANCE_H
-#define XLIBRARY_APPEARANCE_H
+#ifndef FORADECK_APPEARANCE_H
+#define FORADECK_APPEARANCE_H
 
 #include <QIcon>
 #include <QPalette>

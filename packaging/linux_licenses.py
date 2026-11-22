@@ -147,11 +147,11 @@ def _sdk_source(module, version, cache, manifest, license_directory):
 
 def collect_licenses(appdir: Path, config: dict, cache: Path, repository: Path) -> dict:
     """Fail packaging when a bundled library cannot be assigned its own notices."""
-    destination = appdir / "usr/share/XLibrary"
+    destination = appdir / "usr/share/Fora.Deck"
     licenses, sources = destination / "licenses", destination / "sources"
     for directory in (licenses, sources, cache):
         directory.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(repository / "LICENSE", licenses / "XLibrary-MIT.txt")
+    shutil.copyfile(repository / "LICENSE", licenses / "Fora.Deck-MIT.txt")
     qt_libs = Path(_run(config["qmake"], "-query", "QT_INSTALL_LIBS"))
     qt_plugins = Path(_run(config["qmake"], "-query", "QT_INSTALL_PLUGINS"))
     distro_qt = _owner(Path(config["qt_core_library"])) is not None
@@ -222,8 +222,8 @@ def collect_licenses(appdir: Path, config: dict, cache: Path, repository: Path) 
             shutil.copyfile(archive, sources / archive.name)
             source_records.append(dict(info, file=archive.name))
     shutil.copytree("/usr/share/common-licenses", licenses / "common-licenses", dirs_exist_ok=True)
-    notices = ("Fora.Deck by ForaSource is distributed under the MIT license; see licenses/XLibrary-MIT.txt.\n"
-               "Inter is distributed under SIL OFL 1.1; see ../licenses/XLibrary/inter/OFL.txt.\n"
+    notices = ("Fora.Deck by ForaSource is distributed under the MIT license; see licenses/Fora.Deck-MIT.txt.\n"
+               "Inter is distributed under SIL OFL 1.1; see ../licenses/Fora.Deck/inter/OFL.txt.\n"
                "SQLite is statically linked and in the public domain: https://sqlite.org/copyright.html\n"
                "Qt is dynamically linked under LGPLv3. Exact corresponding source is in sources/; "
                "see THIRD_PARTY_MANIFEST.json for source versions and SHA256 values.\n"

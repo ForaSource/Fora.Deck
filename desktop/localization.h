@@ -1,5 +1,5 @@
-#ifndef XLIBRARY_LOCALIZATION_H
-#define XLIBRARY_LOCALIZATION_H
+#ifndef FORADECK_LOCALIZATION_H
+#define FORADECK_LOCALIZATION_H
 
 #include <QCoreApplication>
 #include <QTranslator>

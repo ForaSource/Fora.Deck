@@ -19,8 +19,8 @@ std::uint32_t Application::get_pid() const noexcept {
     }
     try {
         std::error_code error;
-        const auto identity = std::static_pointer_cast<xlibrary::process_identity>(this->process_handle);
-        return xlibrary::is_process_alive(*identity, error) ? this->pid : 0;
+        const auto identity = std::static_pointer_cast<foradeck::process_identity>(this->process_handle);
+        return foradeck::is_process_alive(*identity, error) ? this->pid : 0;
     } catch (...) {
         return 0;
     }
@@ -39,8 +39,8 @@ std::uint32_t Application::launch(const std::wstring &arguments, const std::file
         throw std::invalid_argument("Application executable path is empty");
     }
 
-    auto identity = std::make_shared<xlibrary::process_identity>();
-    *identity = xlibrary::launch_process(executable_path, arguments, working_directory);
+    auto identity = std::make_shared<foradeck::process_identity>();
+    *identity = foradeck::launch_process(executable_path, arguments, working_directory);
     this->pid = identity->pid;
     this->process_handle = std::move(identity);
     return this->pid;
@@ -67,17 +67,17 @@ QProcessEnvironment application_environment() {
     auto environment = QProcessEnvironment::systemEnvironment();
     if (!application_paths::bundled_runtime())
         return environment;
-    // Only XLibrary needs bundled Qt; child applications use the original environment.
+    // Only Fora.Deck needs bundled Qt; child applications use the original environment.
     for (const auto &name :
          {QString("LD_LIBRARY_PATH"), QString("QT_PLUGIN_PATH"), QString("QT_QPA_PLATFORM_PLUGIN_PATH")}) {
-        const auto original = "XLIBRARY_ORIGINAL_" + name;
+        const auto original = "FORADECK_ORIGINAL_" + name;
         if (environment.value(original + "_SET") == "x")
             environment.insert(name, environment.value(original));
         else
             environment.remove(name);
     }
     for (const auto &name : environment.keys()) {
-        if (name.startsWith("XLIBRARY_"))
+        if (name.startsWith("FORADECK_"))
             environment.remove(name);
     }
     for (const auto &name : {"APPDIR", "APPIMAGE", "OWD", "ARGV0"})
@@ -152,12 +152,12 @@ QString unescape_value(const QString &value) {
 desktop_entry read_entry(const QString &path) {
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
-        throw std::runtime_error(QCoreApplication::translate("XLibrary", "Could not read %1: %2")
+        throw std::runtime_error(QCoreApplication::translate("Fora.Deck", "Could not read %1: %2")
                                      .arg(path, file.errorString())
                                      .toStdString());
     if (file.size() > 4 * 1024 * 1024)
         throw std::runtime_error(
-            QCoreApplication::translate("XLibrary", "The .desktop file is too large.").toStdString());
+            QCoreApplication::translate("Fora.Deck", "The .desktop file is too large.").toStdString());
     desktop_entry entry{absolute_path(path), {}};
     bool in_entry = false;
     const auto lines = QString::fromUtf8(file.readAll()).split('\n');
@@ -242,7 +242,7 @@ QStringList split_command(const QString &command) {
         const auto character = command[index];
         if (character == QChar::Null)
             throw std::invalid_argument(
-                QCoreApplication::translate("XLibrary", "The command contains a null character.").toStdString());
+                QCoreApplication::translate("Fora.Deck", "The command contains a null character.").toStdString());
         if (character == '"') {
             quoted = !quoted;
             started = true;
@@ -268,7 +268,7 @@ QStringList split_command(const QString &command) {
     }
     if (quoted)
         throw std::invalid_argument(
-            QCoreApplication::translate("XLibrary", "The command has an unclosed double quote.").toStdString());
+            QCoreApplication::translate("Fora.Deck", "The command has an unclosed double quote.").toStdString());
     if (started)
         result.append(current);
     return result;
@@ -277,7 +277,7 @@ QStringList split_command(const QString &command) {
 QStringList user_arguments(const QString &arguments) {
     const auto utf8 = arguments.toUtf8();
     const auto parsed =
-        xlibrary::split_launch_arguments(std::string_view(utf8.constData(), static_cast<std::size_t>(utf8.size())));
+        foradeck::split_launch_arguments(std::string_view(utf8.constData(), static_cast<std::size_t>(utf8.size())));
     QStringList result;
     result.reserve(static_cast<qsizetype>(parsed.size()));
     for (const auto &argument : parsed)
@@ -305,15 +305,15 @@ QStringList entry_command(const desktop_entry &entry) {
             }
             if (++index == token.size())
                 throw std::invalid_argument(
-                    QCoreApplication::translate("XLibrary", "Invalid Exec field code in .desktop.").toStdString());
+                    QCoreApplication::translate("Fora.Deck", "Invalid Exec field code in .desktop.").toStdString());
             const auto code = token[index];
             if (QStringView(u"fFuU").contains(code) && ++file_codes > 1)
                 throw std::invalid_argument(
-                    QCoreApplication::translate("XLibrary", "Exec may contain only one file or URL field code.")
+                    QCoreApplication::translate("Fora.Deck", "Exec may contain only one file or URL field code.")
                         .toStdString());
             if ((code == 'F' || code == 'U') && token.size() != 2)
                 throw std::invalid_argument(
-                    QCoreApplication::translate("XLibrary", "An Exec file list code must be a separate argument.")
+                    QCoreApplication::translate("Fora.Deck", "An Exec file list code must be a separate argument.")
                         .toStdString());
             if (code == '%')
                 expanded += '%';
@@ -325,15 +325,15 @@ QStringList entry_command(const desktop_entry &entry) {
                 removed_code = true;
             else
                 throw std::invalid_argument(
-                    QCoreApplication::translate("XLibrary", "Unsupported Exec field code in .desktop.").toStdString());
+                    QCoreApplication::translate("Fora.Deck", "Unsupported Exec field code in .desktop.").toStdString());
         }
-        // XLibrary launches applications without files, so %f/%F/%u/%U produce no arguments.
+        // Fora.Deck launches applications without files, so %f/%F/%u/%U produce no arguments.
         if (!expanded.isEmpty() || !removed_code)
             result.append(expanded);
     }
     if (result.isEmpty() || result.front().isEmpty() || result.front().contains('='))
         throw std::invalid_argument(
-            QCoreApplication::translate("XLibrary", "The .desktop file has no valid Exec command.").toStdString());
+            QCoreApplication::translate("Fora.Deck", "The .desktop file has no valid Exec command.").toStdString());
     return result;
 }
 
@@ -350,28 +350,28 @@ QString dbus_service(const desktop_entry &entry) {
 void validate_entry(const desktop_entry &entry) {
     if (entry.values.value("Type") != "Application" || entry.flag("Hidden"))
         throw std::invalid_argument(
-            QCoreApplication::translate("XLibrary", "The .desktop file does not contain an available application.")
+            QCoreApplication::translate("Fora.Deck", "The .desktop file does not contain an available application.")
                 .toStdString());
     if (localized_value(entry, "Name").isEmpty())
         throw std::invalid_argument(
-            QCoreApplication::translate("XLibrary", "The .desktop file has no application name.").toStdString());
+            QCoreApplication::translate("Fora.Deck", "The .desktop file has no application name.").toStdString());
     const auto try_exec = entry.values.value("TryExec");
     if (!try_exec.isEmpty() && executable_path(try_exec).isEmpty())
         throw std::invalid_argument(
-            QCoreApplication::translate("XLibrary", "The TryExec executable is unavailable.").toStdString());
+            QCoreApplication::translate("Fora.Deck", "The TryExec executable is unavailable.").toStdString());
     const auto directory = entry.values.value("Path");
     if (!directory.isEmpty() && !QFileInfo(directory).isAbsolute())
         throw std::invalid_argument(
-            QCoreApplication::translate("XLibrary", "The .desktop working directory must be absolute.").toStdString());
+            QCoreApplication::translate("Fora.Deck", "The .desktop working directory must be absolute.").toStdString());
     if (entry.flag("DBusActivatable")) {
         if (dbus_service(entry).isEmpty())
             throw std::invalid_argument(
-                QCoreApplication::translate("XLibrary", "Invalid D-Bus service name in .desktop.").toStdString());
+                QCoreApplication::translate("Fora.Deck", "Invalid D-Bus service name in .desktop.").toStdString());
     } else {
         const auto command = entry_command(entry);
         if (executable_path(command.front()).isEmpty())
             throw std::invalid_argument(
-                QCoreApplication::translate("XLibrary", "The executable specified by Exec is unavailable.")
+                QCoreApplication::translate("Fora.Deck", "The executable specified by Exec is unavailable.")
                     .toStdString());
     }
 }
@@ -411,7 +411,7 @@ QStringList terminal_command(const QStringList &command) {
         }
     }
     throw std::runtime_error(
-        QCoreApplication::translate("XLibrary",
+        QCoreApplication::translate("Fora.Deck",
                                     "This application requires a terminal. Install one or set the TERMINAL variable.")
             .toStdString());
 }
@@ -507,7 +507,7 @@ process_identity application_identity(const app_record &record) {
         result.executable = canonical_path(result.executable);
     }
     result.arguments = command.mid(1);
-    // Resolve file arguments in the same directory used at launch, not XLibrary's directory.
+    // Resolve file arguments in the same directory used at launch, not Fora.Deck's directory.
     const QDir working_directory(directory.isEmpty() ? QDir::currentPath() : directory);
     for (auto &argument : result.arguments) {
         if (argument.isEmpty() || argument.startsWith('-') || QFileInfo(argument).isAbsolute())
@@ -600,7 +600,7 @@ bool matches_process(const process_identity &identity, const QString &process_di
     }
     // For an executable script, /proc/exe points to the interpreter; the script path remains in argv.
     if (identity.script)
-        return xlibrary::script_process_matches(QFileInfo(process_directory).fileName().toUInt(),
+        return foradeck::script_process_matches(QFileInfo(process_directory).fileName().toUInt(),
                                                 filesystem_path(identity.executable));
     return false;
 }
@@ -679,7 +679,7 @@ Heartbeat::process_snapshot Heartbeat::sample_processes(const QVector<app_record
                                                         const bool cpu) {
     if (!QFileInfo("/proc/self/exe").exists())
         throw std::runtime_error(
-            QCoreApplication::translate("XLibrary", "The /proc filesystem is unavailable: process state is unknown.")
+            QCoreApplication::translate("Fora.Deck", "The /proc filesystem is unavailable: process state is unknown.")
                 .toStdString());
     process_snapshot result;
     QHash<QByteArray, QString> steam_paths;
@@ -748,11 +748,11 @@ void Heartbeat::terminate_application(const app_record &application) {
         });
         for (const auto &sample : it.value()) {
             if (sample.pid == static_cast<quint32>(getpid())) {
-                errors.append(QCoreApplication::translate("XLibrary", "Fora.Deck cannot terminate itself here."));
+                errors.append(QCoreApplication::translate("Fora.Deck", "Fora.Deck cannot terminate itself here."));
                 continue;
             }
             const auto fail = [&](const int error) {
-                errors.append(QCoreApplication::translate("XLibrary", "PID %1: %2")
+                errors.append(QCoreApplication::translate("Fora.Deck", "PID %1: %2")
                                   .arg(sample.pid)
                                   .arg(QString::fromStdString(std::generic_category().message(error))));
             };
@@ -775,7 +775,7 @@ void Heartbeat::terminate_application(const app_record &application) {
             if (start_times.value(sample.pid) != sample.start_time)
                 continue;
             if (syscall(SYS_pidfd_send_signal, descriptor, SIGKILL, nullptr, 0) < 0 && errno != ESRCH)
-                errors.append(QCoreApplication::translate("XLibrary", "PID %1: %2")
+                errors.append(QCoreApplication::translate("Fora.Deck", "PID %1: %2")
                                   .arg(sample.pid)
                                   .arg(QString::fromStdString(std::generic_category().message(errno))));
         }
@@ -786,18 +786,18 @@ void Heartbeat::terminate_application(const app_record &application) {
 
 QString Application::new_instance_error(const app_record &record) {
     if (!file_target(record))
-        return QCoreApplication::translate("XLibrary", "This target supports activation only.");
+        return QCoreApplication::translate("Fora.Deck", "This target supports activation only.");
     if (QFileInfo(record.path).suffix() != "desktop")
         return {};
     try {
         const auto entry = read_entry(record.path);
         validate_entry(entry);
         if (entry.values.value("Exec").isEmpty())
-            return QCoreApplication::translate("XLibrary",
+            return QCoreApplication::translate("Fora.Deck",
                                                "Only activation is available: this desktop entry has no Exec command.");
         const auto command = entry_command(entry);
         if (executable_path(command.front()).isEmpty())
-            return QCoreApplication::translate("XLibrary", "The executable specified by Exec is unavailable.");
+            return QCoreApplication::translate("Fora.Deck", "The executable specified by Exec is unavailable.");
     } catch (const std::exception &error) {
         return QString::fromUtf8(error.what());
     }
@@ -808,17 +808,17 @@ qint64 Application::launch_application(const app_record &record, const launch_mo
     validate_launch_target(record);
     if (mode == launch_mode::elevated)
         throw std::invalid_argument(
-            QCoreApplication::translate("XLibrary", "Elevation is only available on Windows").toStdString());
+            QCoreApplication::translate("Fora.Deck", "Elevation is only available on Windows").toStdString());
     if (!file_target(record)) {
         if (target_kind(record) != "steam")
             throw std::invalid_argument(
-                QCoreApplication::translate("XLibrary", "This target is only supported on Windows").toStdString());
+                QCoreApplication::translate("Fora.Deck", "This target is only supported on Windows").toStdString());
         if (mode == launch_mode::new_instance)
             throw std::invalid_argument(
-                QCoreApplication::translate("XLibrary", "Steam targets support activation only").toStdString());
+                QCoreApplication::translate("Fora.Deck", "Steam targets support activation only").toStdString());
         if (!target_available(record))
             throw std::runtime_error(
-                QCoreApplication::translate("XLibrary", "Steam installation directory is unavailable").toStdString());
+                QCoreApplication::translate("Fora.Deck", "Steam installation directory is unavailable").toStdString());
         QProcess process;
         process.setProcessEnvironment(application_environment());
         process.setProgram("xdg-open");
@@ -850,11 +850,12 @@ qint64 Application::launch_application(const app_record &record, const launch_mo
     const auto executable = executable_path(command.takeFirst());
     if (executable.isEmpty())
         throw std::runtime_error(
-            QCoreApplication::translate("XLibrary", "The application executable is unavailable or is not executable.")
+            QCoreApplication::translate("Fora.Deck", "The application executable is unavailable or is not executable.")
                 .toStdString());
     if (!directory.isEmpty() && (!QFileInfo(directory).isAbsolute() || !QFileInfo(directory).isDir()))
         throw std::runtime_error(
-            QCoreApplication::translate("XLibrary", "The application working directory is unavailable.").toStdString());
+            QCoreApplication::translate("Fora.Deck", "The application working directory is unavailable.")
+                .toStdString());
     QProcess process;
     process.setProcessEnvironment(application_environment());
     process.setProgram(executable);
@@ -863,7 +864,7 @@ qint64 Application::launch_application(const app_record &record, const launch_mo
         process.setWorkingDirectory(directory);
     qint64 pid = 0;
     if (!process.startDetached(&pid))
-        throw std::runtime_error(QCoreApplication::translate("XLibrary", "Could not launch the application: %1")
+        throw std::runtime_error(QCoreApplication::translate("Fora.Deck", "Could not launch the application: %1")
                                      .arg(process.errorString())
                                      .toStdString());
     return pid;
@@ -887,7 +888,7 @@ app_record Application::resolve_application(const QString &path) {
     const QFileInfo info(result.path);
     if (!info.isFile())
         throw std::invalid_argument(
-            QCoreApplication::translate("XLibrary", "The application file is unavailable.").toStdString());
+            QCoreApplication::translate("Fora.Deck", "The application file is unavailable.").toStdString());
     if (info.suffix() == "desktop") {
         const auto entry = read_entry(result.path);
         validate_entry(entry);
@@ -898,7 +899,7 @@ app_record Application::resolve_application(const QString &path) {
     } else {
         if (!info.isExecutable())
             throw std::invalid_argument(
-                QCoreApplication::translate("XLibrary",
+                QCoreApplication::translate("Fora.Deck",
                                             "The file is not executable. Use a .desktop shortcut, executable file, "
                                             "AppImage or script with executable permission.")
                     .toStdString());
@@ -911,7 +912,7 @@ QVector<app_record> Application::discover(const bool system_applications, const 
                                           QVector<discovery_issue> &issues, const std::atomic_bool &cancelled,
                                           const std::function<void(const discovery_progress &)> &progress) {
     if (progress)
-        progress({-1, 0, 0, QCoreApplication::translate("XLibrary", "Preparing the XDG application list…")});
+        progress({-1, 0, 0, QCoreApplication::translate("Fora.Deck", "Preparing the XDG application list…")});
     QStringList entries;
     QSet<QString> desktop_ids;
     const auto directories = application_directories();
@@ -920,7 +921,7 @@ QVector<app_record> Application::discover(const bool system_applications, const 
         const QFileInfo directory_info(directory);
         if (directory_info.isDir() && !directory_info.isReadable()) {
             issues.append(discovery_issue{
-                directory, QCoreApplication::translate("XLibrary", "Cannot access the application folder.")});
+                directory, QCoreApplication::translate("Fora.Deck", "Cannot access the application folder.")});
             continue;
         }
         QDirIterator files(directory, {"*.desktop"}, QDir::Files, QDirIterator::Subdirectories);
@@ -932,11 +933,11 @@ QVector<app_record> Application::discover(const bool system_applications, const 
             desktop_id.replace('/', '-');
             if (desktop_ids.contains(desktop_id)) {
                 if ((index == 0 && user_applications) || (index > 0 && system_applications))
-                    issues.append(
-                        discovery_issue{path,
-                                        QCoreApplication::translate(
-                                            "XLibrary", "An entry from a higher-priority source overrides this entry."),
-                                        discovery_issue_kind::duplicate});
+                    issues.append(discovery_issue{
+                        path,
+                        QCoreApplication::translate("Fora.Deck",
+                                                    "An entry from a higher-priority source overrides this entry."),
+                        discovery_issue_kind::duplicate});
                 continue;
             }
             desktop_ids.insert(desktop_id);
@@ -951,14 +952,14 @@ QVector<app_record> Application::discover(const bool system_applications, const 
             return {};
         if (progress)
             progress({static_cast<int>(90.0 * index / entries.size()), index, entries.size(),
-                      QCoreApplication::translate("XLibrary", "Checking .desktop entries")});
+                      QCoreApplication::translate("Fora.Deck", "Checking .desktop entries")});
         try {
             const auto entry = read_entry(entries[index]);
             if (!visible_entry(entry)) {
                 issues.append(discovery_issue{
                     entry.path,
                     QCoreApplication::translate(
-                        "XLibrary",
+                        "Fora.Deck",
                         "The entry is hidden, is not an application, or does not match the current desktop."),
                     discovery_issue_kind::skipped});
                 continue;
@@ -970,7 +971,7 @@ QVector<app_record> Application::discover(const bool system_applications, const 
     }
     if (progress)
         progress({90, entries.size(), entries.size(),
-                  QCoreApplication::translate("XLibrary", "Application checks complete")});
+                  QCoreApplication::translate("Fora.Deck", "Application checks complete")});
     if (system_applications || user_applications)
         result += discover_steam(issues, cancelled, progress);
     return cancelled.load() ? QVector<app_record>{} : result;
@@ -995,12 +996,12 @@ bool Application::set_autostart(const bool enabled, QString &error) {
     }
     const auto directory = xdg_home("XDG_CONFIG_HOME", "/.config") + "/autostart";
     if (!QDir().mkpath(directory)) {
-        error = QCoreApplication::translate("XLibrary", "Could not create the XDG autostart folder.");
+        error = QCoreApplication::translate("Fora.Deck", "Could not create the XDG autostart folder.");
         return false;
     }
-    QSaveFile file(directory + "/io.github.LapplandJulia.XLibrary.desktop");
+    QSaveFile file(directory + "/io.github.ForaSource.ForaDeck.desktop");
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        error = QCoreApplication::translate("XLibrary", "Could not open the autostart file: ") + file.errorString();
+        error = QCoreApplication::translate("Fora.Deck", "Could not open the autostart file: ") + file.errorString();
         return false;
     }
     const auto content = enabled ? "[Desktop Entry]\nType=Application\nName=Fora.Deck\nExec=" + exec_quote(executable) +
@@ -1008,7 +1009,12 @@ bool Application::set_autostart(const bool enabled, QString &error) {
                                  : QString("[Desktop Entry]\nType=Application\nName=Fora.Deck\nHidden=true\n");
     const auto bytes = content.toUtf8();
     if (file.write(bytes) != bytes.size() || !file.commit()) {
-        error = QCoreApplication::translate("XLibrary", "Could not save XDG autostart: ") + file.errorString();
+        error = QCoreApplication::translate("Fora.Deck", "Could not save XDG autostart: ") + file.errorString();
+        return false;
+    }
+    QFile previous(directory + "/io.github.LapplandJulia.XLibrary.desktop");
+    if (previous.exists() && !previous.remove()) {
+        error = QCoreApplication::translate("Fora.Deck", "Could not save XDG autostart: ") + previous.errorString();
         return false;
     }
     return true;

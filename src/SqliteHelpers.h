@@ -1,5 +1,5 @@
-#ifndef XLIBRARY_SQLITE_HELPERS_H
-#define XLIBRARY_SQLITE_HELPERS_H
+#ifndef FORADECK_SQLITE_HELPERS_H
+#define FORADECK_SQLITE_HELPERS_H
 
 #include <memory>
 #include <QString>
@@ -8,7 +8,7 @@
 #include <string>
 #include <string_view>
 
-namespace xlibrary {
+namespace foradeck {
 inline void sqlite_execute(sqlite3 *const connection, const char *const sql) {
     if (sqlite3_exec(connection, sql, nullptr, nullptr, nullptr) != SQLITE_OK)
         throw std::runtime_error(sqlite3_errmsg(connection));

@@ -9,8 +9,8 @@
 #include "SqliteHelpers.h"
 
 namespace {
-using xlibrary::sqlite_execute;
-using xlibrary::SqliteStatement;
+using foradeck::sqlite_execute;
+using foradeck::SqliteStatement;
 
 void check_integrity(sqlite3 *const connection) {
     SqliteStatement check(connection, "PRAGMA quick_check;");
@@ -145,7 +145,7 @@ void validate_columns(sqlite3 *const connection, const int version) {
                                             "('executable','desktop','system_uri','aumid','steam') LIMIT 1;");
         if (invalid.next())
             throw std::runtime_error(
-                QCoreApplication::translate("XLibrary", "Profile contains an unsupported launch target type")
+                QCoreApplication::translate("Fora.Deck", "Profile contains an unsupported launch target type")
                     .toStdString());
         auto target_query = std::string("SELECT t.kind,c.path,c.arguments,c.working_directory,"
                                         "c.installation_directory,c.icon_path,");
@@ -164,7 +164,7 @@ void validate_columns(sqlite3 *const connection, const int version) {
                 if (targets.qtext(column).size() > catalog_limits::text_length ||
                     targets.qtext(column).contains(QChar::Null))
                     throw std::runtime_error(
-                        QCoreApplication::translate("XLibrary", "Profile contains invalid launch target metadata")
+                        QCoreApplication::translate("Fora.Deck", "Profile contains invalid launch target metadata")
                             .toStdString());
         }
     }
@@ -202,7 +202,7 @@ void validate_columns(sqlite3 *const connection, const int version) {
         require_reference(connection, "workspace_item", "application_id", "applications", "SET NULL");
         require_reference(connection, "workspace_item", "workspace_id", "workspace", "CASCADE");
         require_reference(connection, "workspace_window", "item_id", "workspace_item", "CASCADE");
-        xlibrary::read_workspaces(connection);
+        foradeck::read_workspaces(connection);
     }
     check_integrity(connection);
 }
@@ -213,7 +213,7 @@ int infer_legacy_version(sqlite3 *const connection) {
                            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';");
     while (schema.next()) {
         const auto name = schema.text(0);
-        if (!name.starts_with("_xlibrary_profile_"))
+        if (!name.starts_with("_foradeck_profile_") && !name.starts_with("_xlibrary_profile_"))
             tables.insert(name);
     }
     if (tables.empty())
@@ -285,8 +285,8 @@ void migrate_identity(sqlite3 *const connection) {
             cards.push_back({records.number(0), records.text(1), records.text(2), records.text(3)});
     }
     for (const auto &card : cards) {
-        const auto configuration_id = xlibrary::ensure_launch_configuration(
-            connection, xlibrary::utf8_path(card.path), card.arguments, xlibrary::utf8_path(card.directory));
+        const auto configuration_id = foradeck::ensure_launch_configuration(
+            connection, foradeck::utf8_path(card.path), card.arguments, foradeck::utf8_path(card.directory));
         SqliteStatement update(connection, "UPDATE applications SET configuration_id=? WHERE id=?;");
         update.bind(1, configuration_id);
         update.bind(2, card.id);
@@ -306,21 +306,21 @@ void migrate_identity(sqlite3 *const connection) {
 }
 }
 
-int xlibrary::read_schema_version(sqlite3 *const connection) {
+int foradeck::read_schema_version(sqlite3 *const connection) {
     SqliteStatement version(connection, "PRAGMA user_version;");
     if (!version.next())
         throw std::runtime_error("Cannot read profile schema version");
     return static_cast<int>(version.number(0));
 }
 
-void xlibrary::validate_profile(sqlite3 *const connection) {
+void foradeck::validate_profile(sqlite3 *const connection) {
     const auto version = read_schema_version(connection);
     if (version != profile_schema_version)
         throw std::runtime_error("Unsupported profile schema version " + std::to_string(version));
     validate_columns(connection, version);
 }
 
-void xlibrary::backup_database(sqlite3 *const connection, const std::filesystem::path &destination) {
+void foradeck::backup_database(sqlite3 *const connection, const std::filesystem::path &destination) {
     if (std::filesystem::exists(destination))
         throw std::runtime_error("Backup destination already exists");
     auto partial = destination;
@@ -354,7 +354,7 @@ void xlibrary::backup_database(sqlite3 *const connection, const std::filesystem:
     }
 }
 
-void xlibrary::migrate_profile(sqlite3 *const connection, const std::filesystem::path &path) {
+void foradeck::migrate_profile(sqlite3 *const connection, const std::filesystem::path &path) {
     const auto recorded = read_schema_version(connection);
     if (recorded < 0 || recorded > profile_schema_version)
         throw std::runtime_error("Profile schema " + std::to_string(recorded) + " is newer than supported schema " +

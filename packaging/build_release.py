@@ -57,7 +57,7 @@ def download_tool(cache, name, entry):
 def startup_check(binary, stage):
     environment = os.environ.copy()
     for key in list(environment):
-        if key.startswith(("QT_", "QML", "XLIBRARY_")) or key in ("LD_LIBRARY_PATH", "APPDIR", "APPIMAGE"):
+        if key.startswith(("QT_", "QML", "FORADECK_")) or key in ("LD_LIBRARY_PATH", "APPDIR", "APPIMAGE"):
             environment.pop(key, None)
     environment.update(QT_QPA_PLATFORM="offscreen", APPIMAGE_EXTRACT_AND_RUN="1", TMPDIR="/tmp")
     run([binary, "--check-startup"], cwd=stage, env=environment, timeout=60)
@@ -98,9 +98,9 @@ def build_appimage(repository, build, stage, cache, config, info):
     (appdir / "AppRun").chmod(0o755)
     info["dependencies"] = collect_licenses(appdir, config, cache, repository)
     shutil.copyfile(repository / "packaging/appimage_runtime_license.txt",
-                    appdir / "usr/share/XLibrary/licenses/AppImage-runtime-MIT.txt")
-    (appdir / "usr/share/XLibrary/build-info.json").write_text(json.dumps(info, indent=2) + "\n")
-    image = stage / f"XLibrary-{config['version']}-linux-x86_64.AppImage"
+                    appdir / "usr/share/Fora.Deck/licenses/AppImage-runtime-MIT.txt")
+    (appdir / "usr/share/Fora.Deck/build-info.json").write_text(json.dumps(info, indent=2) + "\n")
+    image = stage / f"Fora.Deck-{config['version']}-linux-x86_64.AppImage"
     run([tools["appimagetool-x86_64.AppImage"], "--no-appstream", "--runtime-file",
          tools["runtime-x86_64"], "--mksquashfs-opt", "-processors", "--mksquashfs-opt", "2",
          appdir, image], env=environment)
@@ -125,18 +125,18 @@ def build_deb(build, stage):
     run(["dpkg-deb", "--extract", package, extracted])
     if list(extracted.rglob("portable.flag")):
         raise RuntimeError("The installed DEB must not enable portable mode")
-    run(["desktop-file-validate", extracted / "usr/share/applications/io.github.LapplandJulia.XLibrary.desktop"])
-    startup_check(extracted / "usr/bin/XLibrary", stage)
+    run(["desktop-file-validate", extracted / "usr/share/applications/io.github.ForaSource.ForaDeck.desktop"])
+    startup_check(extracted / "usr/bin/foradeck", stage)
     return package
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Build XLibrary AppImage and/or DEB on Linux x86_64")
+    parser = argparse.ArgumentParser(description="Build Fora.Deck AppImage and/or DEB on Linux x86_64")
     parser.add_argument("--build-path", default="cmake-build-linux-release")
     parser.add_argument("--output-path")
     parser.add_argument("--format", choices=("all", "appimage", "deb"), default="all")
     cache_home = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache")
-    parser.add_argument("--cache-path", default=str(cache_home / "XLibrary/packaging"))
+    parser.add_argument("--cache-path", default=str(cache_home / "Fora.Deck/packaging"))
     options = parser.parse_args()
     if sys.platform != "linux" or platform.machine() not in ("x86_64", "amd64"):
         parser.error("Run this packager on Linux x86_64 (including Ubuntu WSL)")
@@ -145,7 +145,7 @@ def main():
     cache = (repository / options.cache_path).resolve()
     values = read_cache(build)
     if Path(values.get("CMAKE_HOME_DIRECTORY", "")).resolve() != repository:
-        raise RuntimeError("Build directory must belong to this XLibrary checkout")
+        raise RuntimeError("Build directory must belong to this Fora.Deck checkout")
     if values.get("CMAKE_BUILD_TYPE") != "Release" and "Release" not in values.get("CMAKE_CONFIGURATION_TYPES", "").split(";"):
         raise RuntimeError("Configure a Release build directory first")
     run(["cmake", "-S", repository, "-B", build])
@@ -153,7 +153,7 @@ def main():
     if config["system_name"] != "Linux" or config["pointer_size"] != "8" or config["system_processor"] not in ("x86_64", "amd64"):
         raise RuntimeError("Distribution requires a native Linux x86_64 target")
     if config["native_cpu"] != "OFF":
-        raise RuntimeError("Distribution requires XLIBRARY_NATIVE_CPU=OFF")
+        raise RuntimeError("Distribution requires FORADECK_NATIVE_CPU=OFF")
     output = (repository / (options.output_path or f"release/v{config['version']}-linux")).resolve()
     if output.exists():
         raise RuntimeError(f"Output already exists; choose another --output-path: {output}")
@@ -167,7 +167,7 @@ def main():
             "source_dirty": bool(capture(["git", "-C", repository, "status", "--porcelain"])),
             "built_at_utc": datetime.datetime.now(datetime.timezone.utc).isoformat()}
     # /tmp preserves Unix permissions and symlinks, including when running from WSL on NTFS.
-    stage = Path(tempfile.mkdtemp(prefix="xlibrary-package-", dir="/tmp"))
+    stage = Path(tempfile.mkdtemp(prefix="foradeck-package-", dir="/tmp"))
     try:
         packages = []
         if options.format in ("all", "deb"):

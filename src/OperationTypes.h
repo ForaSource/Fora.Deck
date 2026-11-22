@@ -1,5 +1,5 @@
-#ifndef XLIBRARY_OPERATION_TYPES_H
-#define XLIBRARY_OPERATION_TYPES_H
+#ifndef FORADECK_OPERATION_TYPES_H
+#define FORADECK_OPERATION_TYPES_H
 
 #include <exception>
 #include <QCoreApplication>
@@ -69,15 +69,15 @@ inline operation_error exception_error(const QString &operation, const std::exce
     if (source == operation_error_source::validation || source == operation_error_source::platform)
         message = reason;
     else if (operation == "library")
-        message = QCoreApplication::translate("XLibrary", "Could not open the library: %1").arg(reason);
+        message = QCoreApplication::translate("Fora.Deck", "Could not open the library: %1").arg(reason);
     else if (operation == "application")
-        message = QCoreApplication::translate("XLibrary", "Could not save the application.");
+        message = QCoreApplication::translate("Fora.Deck", "Could not save the application.");
     else if (operation == "tag")
-        message = QCoreApplication::translate("XLibrary", "Could not save the tag.");
+        message = QCoreApplication::translate("Fora.Deck", "Could not save the tag.");
     else if (operation == "scenario")
-        message = QCoreApplication::translate("XLibrary", "Could not save the scenario.");
+        message = QCoreApplication::translate("Fora.Deck", "Could not save the scenario.");
     else
-        message = QCoreApplication::translate("XLibrary", "The operation could not be completed: %1").arg(reason);
+        message = QCoreApplication::translate("Fora.Deck", "The operation could not be completed: %1").arg(reason);
     return {message, reason, source};
 }
 
@@ -98,7 +98,7 @@ inline QString discovery_summary(const qsizetype added, const QVector<discovery_
             break;
         }
     }
-    return QCoreApplication::translate("XLibrary", "%1 Added: %2. Duplicates: %3. Skipped: %4. Errors: %5.")
+    return QCoreApplication::translate("Fora.Deck", "%1 Added: %2. Duplicates: %3. Skipped: %4. Errors: %5.")
         .arg(status)
         .arg(added)
         .arg(duplicates)
@@ -110,9 +110,9 @@ inline QString discovery_details(const QString &summary, const QVector<discovery
     QStringList details{summary};
     for (const auto &issue : issues) {
         const auto kind =
-            issue.kind == discovery_issue_kind::duplicate ? QCoreApplication::translate("XLibrary", "Duplicate")
-            : issue.kind == discovery_issue_kind::skipped ? QCoreApplication::translate("XLibrary", "Skipped")
-                                                          : QCoreApplication::translate("XLibrary", "Error");
+            issue.kind == discovery_issue_kind::duplicate ? QCoreApplication::translate("Fora.Deck", "Duplicate")
+            : issue.kind == discovery_issue_kind::skipped ? QCoreApplication::translate("Fora.Deck", "Skipped")
+                                                          : QCoreApplication::translate("Fora.Deck", "Error");
         details.append(QString("[%1] %2: %3").arg(kind, issue.source, issue.reason));
     }
     return details.join('\n');

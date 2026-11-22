@@ -89,7 +89,7 @@ Conflicts are skipped by default. Explicit replacement changes the matching entr
 while retaining its ID, history, and scenario links. For repeated configurations within one file, the first selected entry wins with skip;
 the last selected entry wins with replacement.
 
-JSON does not transfer the complete profile. Use a [`.xlprofile` backup](profile.md) for settings, scenarios, global hotkeys,
+JSON does not transfer the complete profile. Use a [`.foradeckprofile` backup](profile.md) for settings, scenarios, global hotkeys,
 unused tags, saved filter records, saved file paths, and usage history.
 
 ## Bulk editing and removal

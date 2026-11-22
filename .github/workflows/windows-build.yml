@@ -88,13 +88,13 @@ jobs:
           BUILD_CONFIGURATION: ${{ matrix.configuration }}
           BUILD_COMPILER: ${{ matrix.compiler }}
         run: |
-          $arguments = @('-S', '.', '-B', 'build', '-DXLIBRARY_NATIVE_CPU=OFF')
+          $arguments = @('-S', '.', '-B', 'build', '-DFORADECK_NATIVE_CPU=OFF')
           if ($env:BUILD_COMPILER -eq 'msvc') {
             if ($env:BUILD_CONFIGURATION -eq 'Debug') {
               # Ninja позволяет CMake запускать clang-tidy с окружением активного MSVC.
               $arguments += @('-G', 'Ninja', "-DCMAKE_BUILD_TYPE=$env:BUILD_CONFIGURATION")
               $tidy = (Get-Command clang-tidy.exe -ErrorAction Stop).Source
-              $arguments += @('-DXLIBRARY_ENABLE_CLANG_TIDY=ON', "-DXLIBRARY_CLANG_TIDY=$tidy")
+              $arguments += @('-DFORADECK_ENABLE_CLANG_TIDY=ON', "-DFORADECK_CLANG_TIDY=$tidy")
             } else {
               $arguments += @('-G', 'Visual Studio 17 2022', '-A', 'x64')
             }
@@ -125,7 +125,7 @@ jobs:
         if: matrix.compiler == 'msvc' && matrix.configuration == 'Release'
         timeout-minutes: 2
         run: |
-          $install_path = Join-Path $env:RUNNER_TEMP 'XLibrary установка с пробелами'
+          $install_path = Join-Path $env:RUNNER_TEMP 'Fora.Deck установка с пробелами'
           cmake --install build --config Release --prefix $install_path
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           ./.github/scripts/check_install.ps1 -InstallPath $install_path

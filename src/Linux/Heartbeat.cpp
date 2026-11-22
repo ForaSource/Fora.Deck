@@ -11,14 +11,14 @@ Heartbeat::make_process_checker(const std::uint32_t process_id, const std::files
     }
     const auto expected_path = std::filesystem::weakly_canonical(std::filesystem::absolute(executable_path));
     std::error_code initial_error;
-    auto identity = xlibrary::read_process_identity(process_id, initial_error);
+    auto identity = foradeck::read_process_identity(process_id, initial_error);
     if (initial_error) {
         throw std::system_error(initial_error, "Cannot open heartbeat process");
     }
     auto check_process = [identity, expected_path]() mutable -> std::pair<bool, std::uint32_t> {
         std::error_code error;
         if (identity) {
-            if (xlibrary::process_matches(*identity, expected_path, error)) {
+            if (foradeck::process_matches(*identity, expected_path, error)) {
                 return {true, 0};
             }
             if (error) {
@@ -26,7 +26,7 @@ Heartbeat::make_process_checker(const std::uint32_t process_id, const std::files
             }
             identity.reset();
         }
-        identity = xlibrary::find_process(expected_path, error);
+        identity = foradeck::find_process(expected_path, error);
         return {identity.has_value(), static_cast<std::uint32_t>(error.value())};
     };
 

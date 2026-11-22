@@ -12,7 +12,7 @@
 
 #include "RegistryScan.h"
 
-namespace xlibrary {
+namespace foradeck {
 
 namespace detail {
 
@@ -273,4 +273,4 @@ std::vector<::Application> scan_registry_applications(std::vector<scan_issue> *c
     return detail::make_applications(std::move(scan), issues, progress);
 }
 
-} // namespace xlibrary
+} // namespace foradeck

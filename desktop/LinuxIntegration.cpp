@@ -1,7 +1,7 @@
 #include "LaunchArguments.h"
 #include "Linux/LinuxProcessor.h"
 #include "localization.h"
-#ifdef XLIBRARY_HAVE_X11
+#ifdef FORADECK_HAVE_X11
 #include <X11/keysym.h>
 #include <X11/Xatom.h>
 #include <X11/XKBlib.h>
@@ -78,7 +78,7 @@ bool wayland_session() {
            qEnvironmentVariable("XDG_SESSION_TYPE") == "wayland";
 }
 
-#ifdef XLIBRARY_HAVE_X11
+#ifdef FORADECK_HAVE_X11
 std::mutex x11_mutex;
 int x11_error_code = 0;
 Time hotkey_activation_time = CurrentTime;
@@ -191,7 +191,7 @@ class LinuxHotkeyState : public QObject {
     static constexpr auto request_interface = "org.freedesktop.portal.Request";
     static constexpr auto session_interface = "org.freedesktop.portal.Session";
 
-    static QString token() { return QStringLiteral("xlibrary_") + QUuid::createUuid().toString(QUuid::Id128); }
+    static QString token() { return QStringLiteral("foradeck_") + QUuid::createUuid().toString(QUuid::Id128); }
     QString sender_path() const {
         auto sender = bus.baseService();
         sender.remove(0, 1);
@@ -219,11 +219,11 @@ class LinuxHotkeyState : public QObject {
         failed = true;
         close_portal();
         emit owner->registration_failed(QCoreApplication::translate(
-            "XLibrary",
+            "Fora.Deck",
             "The GlobalShortcuts portal did not register the shortcut. Use system keyboard settings: "
             "KDE: Keyboard → Shortcuts; GNOME: Keyboard → Custom Shortcuts; "
-            "Xfce: Keyboard → Application Shortcuts. Command: XLibrary --overlay "
-            "(quick search) or XLibrary (library). For applications/scenarios use the command in their editor."));
+            "Xfce: Keyboard → Application Shortcuts. Command: foradeck --overlay "
+            "(quick search) or foradeck (library). For applications/scenarios use the command in their editor."));
     }
     void request(const QString &method, const QVariantList &arguments, QVariantMap options) {
         const auto handle_token = token();
@@ -277,7 +277,7 @@ private slots:
                      QVariant::fromValue(PortalShortcuts{
                          {action_id,
                           {{"description",
-                            QCoreApplication::translate("XLibrary", "Fora.Deck shortcut") + " (" + trigger + ')'},
+                            QCoreApplication::translate("Fora.Deck", "Fora.Deck shortcut") + " (" + trigger + ')'},
                            {"preferred_trigger", trigger}}}}),
                      QString{}},
                     {});
@@ -316,7 +316,7 @@ public:
     void start_portal(const QKeySequence &value, const int id) {
         qDBusRegisterMetaType<PortalShortcut>();
         qDBusRegisterMetaType<PortalShortcuts>();
-        action_id = "xlibrary_action_" + QString::number(id);
+        action_id = "foradeck_action_" + QString::number(id);
         const auto combination = value[0];
         const auto modifiers = combination.keyboardModifiers();
         if (modifiers & Qt::ControlModifier)
@@ -358,7 +358,7 @@ public:
             request("CreateSession", {}, {{"session_handle_token", session_token}});
         });
     }
-#ifdef XLIBRARY_HAVE_X11
+#ifdef FORADECK_HAVE_X11
     x11_display display{nullptr, &XCloseDisplay};
     std::unique_ptr<QSocketNotifier> notifier;
     int keycode = 0;
@@ -370,7 +370,7 @@ public:
 
     ~LinuxHotkeyState() override {
         close_portal();
-#ifdef XLIBRARY_HAVE_X11
+#ifdef FORADECK_HAVE_X11
         notifier.reset();
         if (display) {
             const std::lock_guard lock(x11_mutex);
@@ -390,7 +390,7 @@ public:
 bool WindowManager::activate_window(const app_record &record) {
     if (wayland_session())
         return false;
-#ifdef XLIBRARY_HAVE_X11
+#ifdef FORADECK_HAVE_X11
     const auto processes = Application::matching_processes(record);
     if (processes.isEmpty())
         return false;
@@ -425,7 +425,7 @@ bool WindowManager::activate_window(const app_record &record) {
         if (XSendEvent(display.get(), root, False, SubstructureRedirectMask | SubstructureNotifyMask, &event) == 0 ||
             !errors.succeeded())
             throw std::runtime_error(
-                QCoreApplication::translate("XLibrary",
+                QCoreApplication::translate("Fora.Deck",
                                             "Could not send the window activation request to the X11 window manager.")
                     .toStdString());
         return true;
@@ -443,7 +443,7 @@ GlobalHotkey::~GlobalHotkey() = default;
 bool desktop_platform::translucent_windows_supported() {
     if (QGuiApplication::platformName() != "xcb")
         return true;
-#if defined(XLIBRARY_HAVE_X11) && QT_CONFIG(xcb)
+#if defined(FORADECK_HAVE_X11) && QT_CONFIG(xcb)
     if (const auto *native = qGuiApp->nativeInterface<QNativeInterface::QX11Application>()) {
         const std::lock_guard lock(x11_mutex);
         auto *display = native->display();
@@ -459,7 +459,7 @@ bool desktop_platform::translucent_windows_supported() {
 
 void desktop_platform::activate_overlay(QWidget *const window) {
     window->raise();
-#if defined(XLIBRARY_HAVE_X11) && QT_CONFIG(xcb)
+#if defined(FORADECK_HAVE_X11) && QT_CONFIG(xcb)
     if (!wayland_session() && hotkey_activation_time != CurrentTime) {
         if (const auto *native = qGuiApp->nativeInterface<QNativeInterface::QX11Application>()) {
             const std::lock_guard lock(x11_mutex);
@@ -498,7 +498,7 @@ bool GlobalHotkey::set_sequence(const QKeySequence &value, QString &error) {
         return true;
     }
     if (value.count() != 1) {
-        error = QCoreApplication::translate("XLibrary", "Use a single key combination.");
+        error = QCoreApplication::translate("Fora.Deck", "Use a single key combination.");
         return false;
     }
     if (wayland_session()) {
@@ -509,7 +509,7 @@ bool GlobalHotkey::set_sequence(const QKeySequence &value, QString &error) {
               (key >= Qt::Key_F1 && key <= Qt::Key_F24) || key == Qt::Key_Space) ||
             !(modifiers & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier)) ||
             (modifiers & ~(Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier | Qt::ShiftModifier))) {
-            error = QCoreApplication::translate("XLibrary",
+            error = QCoreApplication::translate("Fora.Deck",
                                                 "Use Ctrl, Alt, or Super with a letter, digit, F1–F24, or Space.");
             return false;
         }
@@ -520,20 +520,20 @@ bool GlobalHotkey::set_sequence(const QKeySequence &value, QString &error) {
         linux_state->start_portal(value, current_id);
         return true; // Submission only; registration_failed reports asynchronous refusal.
     }
-#ifdef XLIBRARY_HAVE_X11
+#ifdef FORADECK_HAVE_X11
     const auto combination = value[0];
     const auto symbol = hotkey_symbol(combination.key());
     if (symbol == NoSymbol) {
-        error = QCoreApplication::translate("XLibrary", "Use a letter, digit, F1–F24, or Space.");
+        error = QCoreApplication::translate("Fora.Deck", "Use a letter, digit, F1–F24, or Space.");
         return false;
     }
     const auto qt_modifiers = combination.keyboardModifiers();
     if (!(qt_modifiers & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier))) {
-        error = QCoreApplication::translate("XLibrary", "Add Ctrl, Alt, or Super to the global shortcut.");
+        error = QCoreApplication::translate("Fora.Deck", "Add Ctrl, Alt, or Super to the global shortcut.");
         return false;
     }
     if (qt_modifiers & ~(Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier | Qt::ShiftModifier)) {
-        error = QCoreApplication::translate("XLibrary", "The shortcut contains an unsupported modifier.");
+        error = QCoreApplication::translate("Fora.Deck", "The shortcut contains an unsupported modifier.");
         return false;
     }
     if (!linux_state) {
@@ -542,7 +542,7 @@ bool GlobalHotkey::set_sequence(const QKeySequence &value, QString &error) {
             const std::lock_guard lock(x11_mutex);
             state->display.reset(XOpenDisplay(nullptr));
             if (!state->display) {
-                error = QCoreApplication::translate("XLibrary",
+                error = QCoreApplication::translate("Fora.Deck",
                                                     "Could not connect to the X11 server for the global shortcut.");
                 return false;
             }
@@ -609,7 +609,7 @@ bool GlobalHotkey::set_sequence(const QKeySequence &value, QString &error) {
     if (qt_modifiers & Qt::AltModifier) {
         const auto alt = modifier_mask(display, XK_Alt_L);
         if (!alt) {
-            error = QCoreApplication::translate("XLibrary", "The X11 keymap has no Alt modifier.");
+            error = QCoreApplication::translate("Fora.Deck", "The X11 keymap has no Alt modifier.");
             return false;
         }
         modifiers |= alt;
@@ -617,13 +617,13 @@ bool GlobalHotkey::set_sequence(const QKeySequence &value, QString &error) {
     if (qt_modifiers & Qt::MetaModifier) {
         const auto super = modifier_mask(display, XK_Super_L);
         if (!super) {
-            error = QCoreApplication::translate("XLibrary", "The X11 keymap has no Super modifier.");
+            error = QCoreApplication::translate("Fora.Deck", "The X11 keymap has no Super modifier.");
             return false;
         }
         modifiers |= super;
     }
     if (!keycode) {
-        error = QCoreApplication::translate("XLibrary", "This key is unavailable in the current X11 keymap.");
+        error = QCoreApplication::translate("Fora.Deck", "This key is unavailable in the current X11 keymap.");
         return false;
     }
     if (keycode == linux_state->keycode && modifiers == linux_state->modifiers) {
@@ -636,7 +636,7 @@ bool GlobalHotkey::set_sequence(const QKeySequence &value, QString &error) {
     if (!errors.succeeded()) {
         for (const auto locks : linux_state->lock_combinations)
             XUngrabKey(display, keycode, modifiers | locks, DefaultRootWindow(display));
-        error = QCoreApplication::translate("XLibrary",
+        error = QCoreApplication::translate("Fora.Deck",
                                             "The shortcut is in use by the window manager or another application.");
         return false;
     }
@@ -651,7 +651,7 @@ bool GlobalHotkey::set_sequence(const QKeySequence &value, QString &error) {
     return true;
 #else
     error = QCoreApplication::translate(
-        "XLibrary", "The global shortcut requires an X11-enabled build. Assign Fora.Deck using system settings.");
+        "Fora.Deck", "The global shortcut requires an X11-enabled build. Assign Fora.Deck using system settings.");
     return false;
 #endif
 }
@@ -663,7 +663,7 @@ bool GlobalHotkey::nativeEventFilter(const QByteArray &, void *, qintptr *) {
 void desktop_platform::open_folder(const QString &path) {
     if (!open_url(QUrl::fromLocalFile(QFileInfo(path).absolutePath())))
         throw std::runtime_error(
-            QCoreApplication::translate("XLibrary",
+            QCoreApplication::translate("Fora.Deck",
                                         "Could not open the application folder. Check that xdg-open is available.")
                 .toStdString());
 }
@@ -688,7 +688,7 @@ bool desktop_platform::installed_for_updates() {
 }
 
 bool desktop_platform::start_update_installer(const QString &, QString &error) {
-    error = QCoreApplication::translate("XLibrary", "Use the GitHub release to update this installation.");
+    error = QCoreApplication::translate("Fora.Deck", "Use the GitHub release to update this installation.");
     return false;
 }
 
@@ -766,7 +766,7 @@ QImage desktop_platform::application_icon(const QString &path) {
 }
 
 bool desktop_platform::animations_enabled() {
-    if (qApp->property("xlibrary_disable_animations").toBool())
+    if (qApp->property("foradeck_disable_animations").toBool())
         return false;
     return qApp->style()->styleHint(QStyle::SH_Widget_Animate) != 0;
 }
@@ -776,7 +776,7 @@ QString desktop_platform::default_global_shortcut() {
 }
 
 QString desktop_platform::default_overlay_shortcut() {
-#ifdef XLIBRARY_HAVE_X11
+#ifdef FORADECK_HAVE_X11
     if (!wayland_session() && QGuiApplication::platformName() == "xcb")
         return "Ctrl+Alt+Space";
 #endif

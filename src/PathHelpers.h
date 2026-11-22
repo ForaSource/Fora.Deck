@@ -1,5 +1,5 @@
-#ifndef XLIBRARY_PATH_HELPERS_H
-#define XLIBRARY_PATH_HELPERS_H
+#ifndef FORADECK_PATH_HELPERS_H
+#define FORADECK_PATH_HELPERS_H
 
 #include <filesystem>
 #include <QDir>

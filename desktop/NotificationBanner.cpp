@@ -24,12 +24,12 @@ NotificationBanner::NotificationBanner(QSettings &settings, const int spacing, c
     row->addWidget(message_label, 1);
     dismiss_button->setObjectName("notification_dismiss");
     dismiss_button->setCursor(Qt::PointingHandCursor);
-    dismiss_button->setAccessibleName(QCoreApplication::translate("XLibrary", "Dismiss notification"));
+    dismiss_button->setAccessibleName(QCoreApplication::translate("Fora.Deck", "Dismiss notification"));
     dismiss_button->setToolTip(dismiss_button->accessibleName());
     row->addWidget(dismiss_button, 0, Qt::AlignTop);
     layout->addLayout(row);
     progress->setObjectName("notification_progress");
-    progress->setAccessibleName(QCoreApplication::translate("XLibrary", "Notification display time"));
+    progress->setAccessibleName(QCoreApplication::translate("Fora.Deck", "Notification display time"));
     progress->setRange(0, duration_ms);
     progress->setTextVisible(false);
     layout->addWidget(progress);

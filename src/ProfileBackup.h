@@ -1,5 +1,5 @@
-#ifndef XLIBRARY_PROFILE_BACKUP_H
-#define XLIBRARY_PROFILE_BACKUP_H
+#ifndef FORADECK_PROFILE_BACKUP_H
+#define FORADECK_PROFILE_BACKUP_H
 
 #include <QByteArray>
 #include <QMap>
@@ -23,6 +23,8 @@ public:
     static profile_manifest inspect(const QString &path);
     static QString restore(const QString &path, const QString &database_path, const QString &settings_path,
                            const QByteArray &fingerprint);
+    // Installed profiles move to a new directory; portable profiles keep their adjacent data directory.
+    static void migrate_storage(const QString &database_path, bool portable);
     // Вызывается до открытия QSettings и любых соединений с БД.
     static void recover(const QString &database_path, const QString &settings_path);
 };

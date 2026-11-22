@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 include(cmake/version.cmake)
-project(XLibrary VERSION "${XLIBRARY_NUMERIC_VERSION}" LANGUAGES C CXX)
+project(foradeck VERSION "${FORADECK_NUMERIC_VERSION}" LANGUAGES C CXX)
 
 # Use extraction timestamps for files from downloaded archives.
 if(POLICY CMP0135)
@@ -14,14 +14,14 @@ if(POLICY CMP0138)
 endif()
 
 if(WIN32)
-    foreach(xlibrary_component IN ITEMS XLIBRARY_VERSION_MAJOR XLIBRARY_VERSION_MINOR XLIBRARY_VERSION_PATCH)
-        if(${xlibrary_component} GREATER 65535)
+    foreach(foradeck_component IN ITEMS FORADECK_VERSION_MAJOR FORADECK_VERSION_MINOR FORADECK_VERSION_PATCH)
+        if(${foradeck_component} GREATER 65535)
             message(FATAL_ERROR "Windows version components must be in the range 0..65535.")
         endif()
     endforeach()
     enable_language(RC)
 elseif(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    message(FATAL_ERROR "XLibrary supports Windows and Linux.")
+    message(FATAL_ERROR "Fora.Deck supports Windows and Linux.")
 endif()
 
 # ------------------------------------------------------------
@@ -40,17 +40,17 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Build options
 # ------------------------------------------------------------
 
-option(XLIBRARY_ENABLE_IPO
+option(FORADECK_ENABLE_IPO
         "Enable IPO/LTO for Release builds when supported"
         ON
 )
 
-option(XLIBRARY_NATIVE_CPU
+option(FORADECK_NATIVE_CPU
         "Optimize Release builds for the build computer CPU (not portable)"
         OFF
 )
 
-option(XLIBRARY_ENABLE_CLANG_TIDY "Analyze the project's C++ sources with clang-tidy" OFF)
+option(FORADECK_ENABLE_CLANG_TIDY "Analyze the project's C++ sources with clang-tidy" OFF)
 
 # ------------------------------------------------------------
 # Dependencies
@@ -103,7 +103,7 @@ target_link_libraries(sqlite3 PUBLIC
 # Application
 # ------------------------------------------------------------
 
-add_library(xlibrary_core STATIC
+add_library(foradeck_core STATIC
         src/WorkspaceTypes.h src/WorkspaceTypes.cpp
         src/CatalogTypes.h
         src/OperationTypes.h
@@ -142,7 +142,7 @@ add_library(xlibrary_core STATIC
 )
 
 if(WIN32)
-    target_sources(xlibrary_core PRIVATE
+    target_sources(foradeck_core PRIVATE
             src/Windows/Application.cpp
             src/Windows/Database.cpp
             src/Windows/Heartbeat.cpp
@@ -150,13 +150,13 @@ if(WIN32)
             src/Windows/RegistryScan.cpp src/Windows/RegistryScan.h
     )
     # Expose the Windows 10 APIs required by the application, including AUMID activation.
-    target_compile_definitions(xlibrary_core PUBLIC
+    target_compile_definitions(foradeck_core PUBLIC
             NOMINMAX WIN32_LEAN_AND_MEAN
             WINVER=0x0A00 _WIN32_WINNT=0x0A00 NTDDI_VERSION=0x0A000000
     )
-    target_link_libraries(xlibrary_core PUBLIC version shell32 gdi32 advapi32 ole32 uuid)
+    target_link_libraries(foradeck_core PUBLIC version shell32 gdi32 advapi32 ole32 uuid)
 else()
-    target_sources(xlibrary_core PRIVATE
+    target_sources(foradeck_core PRIVATE
             src/Linux/Application.cpp
             src/Linux/Database.cpp
             src/Linux/Heartbeat.cpp
@@ -164,16 +164,16 @@ else()
             src/Linux/LinuxProcessor.cpp src/Linux/LinuxProcessor.h
     )
 endif()
-target_include_directories(xlibrary_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
-set_target_properties(xlibrary_core PROPERTIES AUTOMOC ON)
-target_link_libraries(xlibrary_core PUBLIC
+target_include_directories(foradeck_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
+set_target_properties(foradeck_core PROPERTIES AUTOMOC ON)
+target_link_libraries(foradeck_core PUBLIC
         Qt6::Core Qt6::Gui Qt6::Concurrent
         sqlite3
         Threads::Threads
 
 )
 
-add_library(xlibrary_desktop STATIC
+add_library(foradeck_desktop STATIC
         desktop/CatalogReview.h desktop/CatalogReview.cpp
         desktop/ProfileView.h desktop/ProfileView.cpp
         desktop/PlatformIntegration.h
@@ -199,41 +199,41 @@ add_library(xlibrary_desktop STATIC
         desktop/UpdateChecker.h desktop/UpdateChecker.cpp
         desktop/MainWindow.h desktop/MainWindow.cpp
 )
-set_target_properties(xlibrary_desktop PROPERTIES AUTOMOC ON)
-qt_add_executable(XLibrary WIN32 main.cpp)
-qt_add_lrelease(XLibrary TS_FILES translations/xlibrary_ru.ts translations/qt_widgets_ru.ts
-        QM_FILES_OUTPUT_VARIABLE xlibrary_qm_files)
-qt_add_resources(XLibrary application_translations
+set_target_properties(foradeck_desktop PROPERTIES AUTOMOC ON)
+qt_add_executable(foradeck WIN32 main.cpp)
+qt_add_lrelease(foradeck TS_FILES translations/foradeck_ru.ts translations/qt_widgets_ru.ts
+        QM_FILES_OUTPUT_VARIABLE foradeck_qm_files)
+qt_add_resources(foradeck application_translations
         PREFIX "/i18n"
         BASE "${CMAKE_CURRENT_BINARY_DIR}"
-        FILES ${xlibrary_qm_files}
+        FILES ${foradeck_qm_files}
 )
 if(WIN32)
-    target_sources(xlibrary_desktop PRIVATE desktop/WindowsIntegration.cpp desktop/WindowsWorkspaceBackend.cpp)
-    target_sources(XLibrary PRIVATE assets/application_icon.rc)
-    target_include_directories(XLibrary PRIVATE "$<$<COMPILE_LANGUAGE:RC>:${CMAKE_CURRENT_SOURCE_DIR}>")
+    target_sources(foradeck_desktop PRIVATE desktop/WindowsIntegration.cpp desktop/WindowsWorkspaceBackend.cpp)
+    target_sources(foradeck PRIVATE assets/application_icon.rc)
+    target_include_directories(foradeck PRIVATE "$<$<COMPILE_LANGUAGE:RC>:${CMAKE_CURRENT_SOURCE_DIR}>")
     set_source_files_properties(assets/application_icon.rc PROPERTIES
-            OBJECT_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/assets/xlibrary.ico"
+            OBJECT_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/assets/foradeck.ico"
     )
     if(MINGW)
         # windres via popen mishandles spaces in the preprocessor path.
         set_property(SOURCE assets/application_icon.rc APPEND PROPERTY COMPILE_OPTIONS --use-temp-file)
     endif()
 else()
-    target_sources(xlibrary_desktop PRIVATE desktop/LinuxIntegration.cpp desktop/LinuxWorkspaceBackend.cpp)
+    target_sources(foradeck_desktop PRIVATE desktop/LinuxIntegration.cpp desktop/LinuxWorkspaceBackend.cpp)
     if(workspace_x11_FOUND)
-        target_link_libraries(xlibrary_desktop PRIVATE PkgConfig::workspace_x11)
-        target_compile_definitions(xlibrary_desktop PRIVATE XLIBRARY_HAVE_WORKSPACE_X11=1)
+        target_link_libraries(foradeck_desktop PRIVATE PkgConfig::workspace_x11)
+        target_compile_definitions(foradeck_desktop PRIVATE FORADECK_HAVE_WORKSPACE_X11=1)
     endif()
-    target_link_libraries(xlibrary_core PUBLIC Qt6::DBus)
+    target_link_libraries(foradeck_core PUBLIC Qt6::DBus)
     if(X11_FOUND)
-        target_link_libraries(xlibrary_desktop PRIVATE X11::X11)
-        target_compile_definitions(xlibrary_desktop PRIVATE XLIBRARY_HAVE_X11=1)
+        target_link_libraries(foradeck_desktop PRIVATE X11::X11)
+        target_compile_definitions(foradeck_desktop PRIVATE FORADECK_HAVE_X11=1)
     endif()
 endif()
-qt_add_resources(xlibrary_desktop application_images
+qt_add_resources(foradeck_desktop application_images
         PREFIX "/"
-        FILES assets/xlibrary.ico
+        FILES assets/foradeck.ico
         assets/checkbox-check.png
         assets/checkbox-mixed.png
         assets/combobox-chevron.png
@@ -242,15 +242,15 @@ qt_add_resources(xlibrary_desktop application_images
         assets/fonts/inter-semibold.ttf
         assets/fonts/OFL.txt
 )
-target_compile_definitions(XLibrary PRIVATE XLIBRARY_VERSION="${XLIBRARY_RELEASE_VERSION}")
+target_compile_definitions(foradeck PRIVATE FORADECK_VERSION="${FORADECK_RELEASE_VERSION}")
 
-target_link_libraries(xlibrary_desktop PUBLIC xlibrary_core Qt6::Widgets Qt6::Network PRIVATE qt6keychain)
-target_link_libraries(XLibrary PRIVATE xlibrary_desktop)
+target_link_libraries(foradeck_desktop PUBLIC foradeck_core Qt6::Widgets Qt6::Network PRIVATE qt6keychain)
+target_link_libraries(foradeck PRIVATE foradeck_desktop)
 
 if(WIN32)
-    target_link_libraries(xlibrary_desktop PRIVATE ole32 uuid dwmapi shlwapi)
+    target_link_libraries(foradeck_desktop PRIVATE ole32 uuid dwmapi shlwapi)
     configure_file(packaging/windows_version.rc.in windows_version.rc @ONLY)
-    target_sources(XLibrary PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/windows_version.rc")
+    target_sources(foradeck PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/windows_version.rc")
     if(MINGW)
         set_property(SOURCE "${CMAKE_CURRENT_BINARY_DIR}/windows_version.rc" APPEND PROPERTY
                 COMPILE_OPTIONS --use-temp-file)
@@ -260,65 +260,65 @@ if(WIN32)
     configure_file(packaging/build_config.json.in packaging-config.json @ONLY)
 endif()
 
-foreach(xlibrary_target IN ITEMS XLibrary xlibrary_desktop xlibrary_core)
+foreach(foradeck_target IN ITEMS foradeck foradeck_desktop foradeck_core)
     if(MSVC)
-        target_compile_options(${xlibrary_target} PRIVATE /utf-8 /W4)
+        target_compile_options(${foradeck_target} PRIVATE /utf-8 /W4)
     else()
-        target_compile_options(${xlibrary_target} PRIVATE -Wall -Wextra -Wpedantic)
+        target_compile_options(${foradeck_target} PRIVATE -Wall -Wextra -Wpedantic)
     endif()
 endforeach()
 
-if(XLIBRARY_ENABLE_CLANG_TIDY)
+if(FORADECK_ENABLE_CLANG_TIDY)
     if(CMAKE_VERSION VERSION_LESS 3.27)
-        message(FATAL_ERROR "XLIBRARY_ENABLE_CLANG_TIDY requires CMake 3.27+ to exclude generated sources.")
+        message(FATAL_ERROR "FORADECK_ENABLE_CLANG_TIDY requires CMake 3.27+ to exclude generated sources.")
     endif()
     if(NOT CMAKE_GENERATOR MATCHES "Ninja|Makefiles")
-        message(FATAL_ERROR "XLIBRARY_ENABLE_CLANG_TIDY requires a Ninja or Makefiles generator.")
+        message(FATAL_ERROR "FORADECK_ENABLE_CLANG_TIDY requires a Ninja or Makefiles generator.")
     endif()
-    find_program(XLIBRARY_CLANG_TIDY NAMES clang-tidy REQUIRED)
-    set(xlibrary_tidy_command "${XLIBRARY_CLANG_TIDY}")
+    find_program(FORADECK_CLANG_TIDY NAMES clang-tidy REQUIRED)
+    set(foradeck_tidy_command "${FORADECK_CLANG_TIDY}")
     if(MSVC)
         # clang-tidy's tooling driver drops the exception mode from MSVC commands.
-        list(APPEND xlibrary_tidy_command "--extra-arg-before=--driver-mode=cl" "--extra-arg=/EHsc")
+        list(APPEND foradeck_tidy_command "--extra-arg-before=--driver-mode=cl" "--extra-arg=/EHsc")
     endif()
     # Анализируем только собственные цели; Qt помечает RCC-файлы свойством SKIP_LINTING.
-    foreach(xlibrary_target IN ITEMS XLibrary xlibrary_desktop xlibrary_core)
-        set_property(TARGET ${xlibrary_target} PROPERTY CXX_CLANG_TIDY "${xlibrary_tidy_command}")
-        get_target_property(xlibrary_sources ${xlibrary_target} SOURCES)
-        foreach(xlibrary_source IN LISTS xlibrary_sources)
-            if(IS_ABSOLUTE "${xlibrary_source}")
-                set_property(SOURCE "${xlibrary_source}" PROPERTY SKIP_LINTING ON)
+    foreach(foradeck_target IN ITEMS foradeck foradeck_desktop foradeck_core)
+        set_property(TARGET ${foradeck_target} PROPERTY CXX_CLANG_TIDY "${foradeck_tidy_command}")
+        get_target_property(foradeck_sources ${foradeck_target} SOURCES)
+        foreach(foradeck_source IN LISTS foradeck_sources)
+            if(IS_ABSOLUTE "${foradeck_source}")
+                set_property(SOURCE "${foradeck_source}" PROPERTY SKIP_LINTING ON)
             endif()
         endforeach()
     endforeach()
-    set_source_files_properties("${CMAKE_CURRENT_BINARY_DIR}/xlibrary_desktop_autogen/mocs_compilation.cpp"
+    set_source_files_properties("${CMAKE_CURRENT_BINARY_DIR}/foradeck_desktop_autogen/mocs_compilation.cpp"
             PROPERTIES SKIP_LINTING ON)
-    foreach(xlibrary_configuration IN LISTS CMAKE_CONFIGURATION_TYPES)
+    foreach(foradeck_configuration IN LISTS CMAKE_CONFIGURATION_TYPES)
         set_source_files_properties(
-                "${CMAKE_CURRENT_BINARY_DIR}/xlibrary_desktop_autogen/mocs_compilation_${xlibrary_configuration}.cpp"
+                "${CMAKE_CURRENT_BINARY_DIR}/foradeck_desktop_autogen/mocs_compilation_${foradeck_configuration}.cpp"
                 PROPERTIES SKIP_LINTING ON)
     endforeach()
 endif()
 
-install(TARGETS XLibrary RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(TARGETS foradeck RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 if(WIN32)
     install(FILES assets/fonts/OFL.txt DESTINATION licenses/inter)
 else()
-    install(FILES assets/fonts/OFL.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/XLibrary/inter)
+    install(FILES assets/fonts/OFL.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/Fora.Deck/inter)
 endif()
 if(WIN32)
     install(IMPORTED_RUNTIME_ARTIFACTS Qt6::Concurrent RUNTIME DESTINATION .)
     # Deploy Qt only during install; the packager adds the CRT from the selected toolchain.
-    qt_generate_deploy_app_script(TARGET XLibrary OUTPUT_SCRIPT xlibrary_deploy_script
+    qt_generate_deploy_app_script(TARGET foradeck OUTPUT_SCRIPT foradeck_deploy_script
             NO_TRANSLATIONS NO_COMPILER_RUNTIME)
-    install(SCRIPT "${xlibrary_deploy_script}")
+    install(SCRIPT "${foradeck_deploy_script}")
     install(FILES LICENSE DESTINATION .)
 else()
-    install(FILES packaging/io.github.LapplandJulia.XLibrary.desktop
+    install(FILES packaging/io.github.ForaSource.ForaDeck.desktop
             DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
     install(FILES assets/github_avatar_256.png DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/256x256/apps
-            RENAME io.github.LapplandJulia.XLibrary.png)
-    install(FILES LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/XLibrary)
+            RENAME io.github.ForaSource.ForaDeck.png)
+    install(FILES LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/Fora.Deck)
     include(packaging/linux_package.cmake)
 endif()
 
@@ -332,13 +332,13 @@ endif()
 # Use -O2 for GCC and Clang with a GNU-compatible interface.
 # Target options follow the default configuration flags.
 
-foreach(xlibrary_target IN ITEMS XLibrary xlibrary_core sqlite3)
+foreach(foradeck_target IN ITEMS foradeck foradeck_core sqlite3)
     if(MSVC)
-        target_compile_options(${xlibrary_target} PRIVATE
+        target_compile_options(${foradeck_target} PRIVATE
                 "$<$<CONFIG:Release>:/O2>"
         )
     else()
-        target_compile_options(${xlibrary_target} PRIVATE
+        target_compile_options(${foradeck_target} PRIVATE
                 "$<$<AND:$<CONFIG:Release>,$<COMPILE_LANG_AND_ID:C,GNU,Clang,AppleClang>>:-O2>"
                 "$<$<AND:$<CONFIG:Release>,$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>>:-O2>"
         )
@@ -349,25 +349,25 @@ endforeach()
 # IPO / LTO for Release
 # ------------------------------------------------------------
 
-if(XLIBRARY_ENABLE_IPO)
+if(FORADECK_ENABLE_IPO)
     include(CheckIPOSupported)
 
     check_ipo_supported(
-            RESULT XLIBRARY_IPO_SUPPORTED
-            OUTPUT XLIBRARY_IPO_ERROR
+            RESULT FORADECK_IPO_SUPPORTED
+            OUTPUT FORADECK_IPO_ERROR
             LANGUAGES C CXX
     )
 
-    if(XLIBRARY_IPO_SUPPORTED)
+    if(FORADECK_IPO_SUPPORTED)
         # Targets created later must also link the LTO-enabled static libraries.
         set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
-        set_property(TARGET XLibrary xlibrary_core sqlite3 PROPERTY
+        set_property(TARGET foradeck foradeck_core sqlite3 PROPERTY
                 INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE
         )
     else()
         message(STATUS
                 "IPO/LTO is unavailable and will be disabled: "
-                "${XLIBRARY_IPO_ERROR}"
+                "${FORADECK_IPO_ERROR}"
         )
     endif()
 endif()
@@ -379,24 +379,24 @@ endif()
 # Leave OFF for publicly distributed binaries.
 # The generated code may not run on a different processor.
 
-if(XLIBRARY_NATIVE_CPU)
+if(FORADECK_NATIVE_CPU)
     if(CMAKE_CROSSCOMPILING)
         message(FATAL_ERROR
-                "XLIBRARY_NATIVE_CPU cannot be used when cross-compiling."
+                "FORADECK_NATIVE_CPU cannot be used when cross-compiling."
         )
     endif()
 
     if(MSVC)
         message(FATAL_ERROR
-                "XLIBRARY_NATIVE_CPU is not implemented for MSVC or clang-cl. "
-                "Configure with -DXLIBRARY_NATIVE_CPU=OFF."
+                "FORADECK_NATIVE_CPU is not implemented for MSVC or clang-cl. "
+                "Configure with -DFORADECK_NATIVE_CPU=OFF."
         )
     endif()
 
     if(NOT CMAKE_C_COMPILER_ID MATCHES "^(GNU|Clang|AppleClang)$"
             OR NOT CMAKE_CXX_COMPILER_ID MATCHES "^(GNU|Clang|AppleClang)$")
         message(FATAL_ERROR
-                "XLIBRARY_NATIVE_CPU requires GCC or Clang "
+                "FORADECK_NATIVE_CPU requires GCC or Clang "
                 "with a GNU-compatible command-line interface."
         )
     endif()
@@ -406,18 +406,18 @@ if(XLIBRARY_NATIVE_CPU)
 
     check_c_compiler_flag(
             "-march=native"
-            XLIBRARY_C_NATIVE_SUPPORTED
+            FORADECK_C_NATIVE_SUPPORTED
     )
 
     check_cxx_compiler_flag(
             "-march=native"
-            XLIBRARY_CXX_NATIVE_SUPPORTED
+            FORADECK_CXX_NATIVE_SUPPORTED
     )
 
-    if(NOT XLIBRARY_C_NATIVE_SUPPORTED
-            OR NOT XLIBRARY_CXX_NATIVE_SUPPORTED)
+    if(NOT FORADECK_C_NATIVE_SUPPORTED
+            OR NOT FORADECK_CXX_NATIVE_SUPPORTED)
         message(FATAL_ERROR
-                "XLIBRARY_NATIVE_CPU was requested, but -march=native "
+                "FORADECK_NATIVE_CPU was requested, but -march=native "
                 "is not supported by both configured compilers."
         )
     endif()
@@ -426,10 +426,10 @@ if(XLIBRARY_NATIVE_CPU)
             "$<$<CONFIG:Release>:-march=native>"
     )
 
-    target_compile_options(XLibrary PRIVATE
+    target_compile_options(foradeck PRIVATE
             "$<$<CONFIG:Release>:-march=native>"
     )
-    target_compile_options(xlibrary_core PRIVATE "$<$<CONFIG:Release>:-march=native>")
+    target_compile_options(foradeck_core PRIVATE "$<$<CONFIG:Release>:-march=native>")
 endif()
 
 if(BUILD_TESTING)

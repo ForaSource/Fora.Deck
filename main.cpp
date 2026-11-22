@@ -9,7 +9,6 @@
 #include <QLocalSocket>
 #include <QLockFile>
 #include <QMessageBox>
-#include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QTimer>
 
@@ -32,10 +31,11 @@ int main(int argc, char *argv[]) {
     QApplication application(argc, argv);
     Localization localization;
     localization.apply();
-    application.setOrganizationName("XLibrary");
-    application.setApplicationName("XLibrary");
+    application.setOrganizationName("Fora.Deck");
+    application.setApplicationName("foradeck");
     application.setApplicationDisplayName("Fora.Deck");
-    application.setApplicationVersion(XLIBRARY_VERSION);
+    application.setDesktopFileName("io.github.ForaSource.ForaDeck");
+    application.setApplicationVersion(FORADECK_VERSION);
     application.setWindowIcon(appearance::logo());
     application.setQuitOnLastWindowClosed(false);
     application.setStyle("Fusion");
@@ -65,21 +65,26 @@ int main(int argc, char *argv[]) {
             startup_profile = std::make_unique<QTemporaryDir>();
             if (!startup_profile->isValid())
                 throw std::runtime_error(QCoreApplication::translate(
-                                             "XLibrary", "Could not create a temporary profile for the startup check.")
+                                             "Fora.Deck", "Could not create a temporary profile for the startup check.")
                                              .toStdString());
         }
         const auto appimage = check_startup ? QString{} : application_paths::appimage_file();
+        const auto installed_database =
+            (portable || check_startup) ? QString{} : path_text(Database::get_database_path());
         const auto profile = check_startup         ? startup_profile->path()
                              : !appimage.isEmpty() ? appimage + ".data"
                              : portable            ? application.applicationDirPath() + "/data"
-                                        : QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
+                                                   : QFileInfo(installed_database).absolutePath();
+        const auto database_path = installed_database.isEmpty() ? profile + "/foradeck.db" : installed_database;
+        if (!installed_database.isEmpty())
+            ProfileBackup::migrate_storage(database_path, false);
         if (!QDir().mkpath(profile))
             throw std::runtime_error(
-                QCoreApplication::translate("XLibrary", "Could not create the Fora.Deck settings folder.")
+                QCoreApplication::translate("Fora.Deck", "Could not create the Fora.Deck settings folder.")
                     .toStdString());
         const auto profile_identity = normalized_path(QFileInfo(profile).canonicalFilePath());
         const auto server_name =
-            "xlibrary-" +
+            "foradeck-" +
             QString::fromLatin1(
                 QCryptographicHash::hash(profile_identity.toUtf8(), QCryptographicHash::Sha256).toHex().left(24));
         QLockFile instance_lock(profile + "/instance.lock");
@@ -88,7 +93,7 @@ int main(int argc, char *argv[]) {
             if (instance_lock.error() != QLockFile::LockFailedError)
                 throw std::runtime_error(
                     QCoreApplication::translate(
-                        "XLibrary", "Could not write the Fora.Deck profile lock file. Check access permissions.")
+                        "Fora.Deck", "Could not write the Fora.Deck profile lock file. Check access permissions.")
                         .toStdString());
             QLocalSocket socket;
             socket.connectToServer(server_name);
@@ -100,11 +105,11 @@ int main(int argc, char *argv[]) {
             }
             QMessageBox::information(nullptr, QGuiApplication::applicationDisplayName(),
                                      QCoreApplication::translate(
-                                         "XLibrary", "Another instance of Fora.Deck is starting or not responding."));
+                                         "Fora.Deck", "Another instance of Fora.Deck is starting or not responding."));
             return 1;
         }
-        const auto database_path =
-            (portable || check_startup) ? profile + "/xlibrary.db" : path_text(Database::get_database_path());
+        if (!check_startup && portable)
+            ProfileBackup::migrate_storage(database_path, true);
         ProfileBackup::recover(database_path, profile + "/settings.ini");
         QSettings language_settings(profile + "/settings.ini", QSettings::IniFormat);
         localization.apply(language_settings.value("interface/language", "system").toString());
@@ -121,12 +126,12 @@ int main(int argc, char *argv[]) {
         server.setSocketOptions(QLocalServer::UserAccessOption);
         if (!server.listen(server_name))
             throw std::runtime_error(
-                QCoreApplication::translate("XLibrary", "Could not open the Fora.Deck local channel.").toStdString());
+                QCoreApplication::translate("Fora.Deck", "Could not open the Fora.Deck local channel.").toStdString());
         // Portable mode and startup checks use their own directory without replacing the child process environment.
         DesktopService service(nullptr, profile, database_path);
         if (!service.settings.isWritable())
             throw std::runtime_error(
-                QCoreApplication::translate("XLibrary", "Cannot write Fora.Deck settings. Choose a writable folder.")
+                QCoreApplication::translate("Fora.Deck", "Cannot write Fora.Deck settings. Choose a writable folder.")
                     .toStdString());
         MainWindow window(service);
         const auto handle_invocation = [&window, &service](const QJsonObject &request) {
@@ -234,7 +239,7 @@ int main(int argc, char *argv[]) {
         if (check_startup)
             qCritical("%s", error.what());
         else
-            QMessageBox::critical(nullptr, QCoreApplication::translate("XLibrary", "Fora.Deck error"),
+            QMessageBox::critical(nullptr, QCoreApplication::translate("Fora.Deck", "Fora.Deck error"),
                                   QString::fromUtf8(error.what()));
         return 1;
     }

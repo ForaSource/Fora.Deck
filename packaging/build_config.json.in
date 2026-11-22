@@ -1,7 +1,7 @@
 {
-  "version": "@XLIBRARY_RELEASE_VERSION@",
-  "windows_numeric_version": "@XLIBRARY_WINDOWS_NUMERIC_VERSION@",
-  "prerelease": "@XLIBRARY_IS_PRERELEASE@",
+  "version": "@FORADECK_RELEASE_VERSION@",
+  "windows_numeric_version": "@FORADECK_WINDOWS_NUMERIC_VERSION@",
+  "prerelease": "@FORADECK_IS_PRERELEASE@",
   "compiler_id": "@CMAKE_CXX_COMPILER_ID@",
   "compiler_version": "@CMAKE_CXX_COMPILER_VERSION@",
   "compiler": "@CMAKE_CXX_COMPILER@",

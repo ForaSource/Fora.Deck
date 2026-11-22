@@ -108,10 +108,10 @@ LibrarySplitter::LibrarySplitter(QSettings &settings, QWidget *const navigation,
     setStretchFactor(0, 0);
     setStretchFactor(1, 1);
     setStretchFactor(2, 0);
-    handle(1)->setToolTip(QCoreApplication::translate("XLibrary", "Drag to resize the navigation pane"));
-    handle(1)->setAccessibleName(QCoreApplication::translate("XLibrary", "Navigation width"));
-    handle(2)->setToolTip(QCoreApplication::translate("XLibrary", "Drag to resize the details pane"));
-    handle(2)->setAccessibleName(QCoreApplication::translate("XLibrary", "Details width"));
+    handle(1)->setToolTip(QCoreApplication::translate("Fora.Deck", "Drag to resize the navigation pane"));
+    handle(1)->setAccessibleName(QCoreApplication::translate("Fora.Deck", "Navigation width"));
+    handle(2)->setToolTip(QCoreApplication::translate("Fora.Deck", "Drag to resize the details pane"));
+    handle(2)->setAccessibleName(QCoreApplication::translate("Fora.Deck", "Details width"));
     connect(this, &QSplitter::splitterMoved, this, [this] {
         if (applying_layout || (this->can_save_layout && !this->can_save_layout()))
             return;

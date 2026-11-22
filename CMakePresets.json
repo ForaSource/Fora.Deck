@@ -7,7 +7,7 @@
       "hidden": true,
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/cmake-build-${presetName}",
-      "cacheVariables": { "XLIBRARY_NATIVE_CPU": "OFF" }
+      "cacheVariables": { "FORADECK_NATIVE_CPU": "OFF" }
     },
     {
       "name": "linux-debug",

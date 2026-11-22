@@ -653,12 +653,12 @@ QWidget *navigation(const ui_context &context, QWidget *const parent) {
     auto *group = new QButtonGroup(widget);
     group->setExclusive(true);
     const QList<QStringList> links{
-        {"library", QCoreApplication::translate("XLibrary", "Library"), "library"},
-        {"favorites", QCoreApplication::translate("XLibrary", "Favorites"), "favorite"},
-        {"running", QCoreApplication::translate("XLibrary", "Running applications"), "running"},
-        {"scenarios", QCoreApplication::translate("XLibrary", "Scenarios"), "scenarios"},
+        {"library", QCoreApplication::translate("Fora.Deck", "Library"), "library"},
+        {"favorites", QCoreApplication::translate("Fora.Deck", "Favorites"), "favorite"},
+        {"running", QCoreApplication::translate("Fora.Deck", "Running applications"), "running"},
+        {"scenarios", QCoreApplication::translate("Fora.Deck", "Scenarios"), "scenarios"},
         {"workspaces", QCoreApplication::translate("Workspaces", "Workspaces"), "workspaces"},
-        {"files", QCoreApplication::translate("XLibrary", "My files"), "saved_file"}};
+        {"files", QCoreApplication::translate("Fora.Deck", "My files"), "saved_file"}};
     for (const auto &link : links) {
         if (link[0] == "scenarios")
             layout->addSpacing(12);
@@ -669,8 +669,8 @@ QWidget *navigation(const ui_context &context, QWidget *const parent) {
         item->setChecked(link[0] == "library");
         if (link[0] == "library") {
             const auto update_mode = [=] {
-                item->setText(service->searching_files() ? QCoreApplication::translate("XLibrary", "Files")
-                                                         : QCoreApplication::translate("XLibrary", "Library"));
+                item->setText(service->searching_files() ? QCoreApplication::translate("Fora.Deck", "Files")
+                                                         : QCoreApplication::translate("Fora.Deck", "Library"));
                 item->setIcon(appearance::icon(service->searching_files() ? "file" : "library"));
                 item->setProperty("appearance_icon", service->searching_files() ? "file" : "library");
             };
@@ -685,11 +685,11 @@ QWidget *navigation(const ui_context &context, QWidget *const parent) {
     }
     layout->addSpacing(20);
     auto *tag_heading = new QHBoxLayout;
-    tag_heading->addWidget(label(QCoreApplication::translate("XLibrary", "My tags"), "muted"), 1);
+    tag_heading->addWidget(label(QCoreApplication::translate("Fora.Deck", "My tags"), "muted"), 1);
     tag_heading->addWidget(action_button(context.actions.value("add_tag"), true, ""));
     layout->addLayout(tag_heading);
     auto *tag_search = new QLineEdit;
-    tag_search->setPlaceholderText(QCoreApplication::translate("XLibrary", "Search tags"));
+    tag_search->setPlaceholderText(QCoreApplication::translate("Fora.Deck", "Search tags"));
     tag_search->setAccessibleName(tag_search->placeholderText());
     layout->addWidget(tag_search);
     auto *tags = new QListWidget;
@@ -776,8 +776,8 @@ QWidget *navigation(const ui_context &context, QWidget *const parent) {
             return;
         const auto tag = item->data(Qt::UserRole).toString();
         QMenu menu;
-        auto *edit = menu.addAction(QCoreApplication::translate("XLibrary", "Rename"));
-        auto *remove = menu.addAction(QCoreApplication::translate("XLibrary", "Remove tag"));
+        auto *edit = menu.addAction(QCoreApplication::translate("Fora.Deck", "Rename"));
+        auto *remove = menu.addAction(QCoreApplication::translate("Fora.Deck", "Remove tag"));
         const auto *chosen = menu.exec(tags->viewport()->mapToGlobal(position));
         if (chosen == edit) {
             auto edit_context = context;
@@ -786,10 +786,10 @@ QWidget *navigation(const ui_context &context, QWidget *const parent) {
         }
         if (chosen == remove &&
             confirm(
-                widget, QCoreApplication::translate("XLibrary", "Remove tag"),
-                QCoreApplication::translate("XLibrary", "Remove #") + tag +
+                widget, QCoreApplication::translate("Fora.Deck", "Remove tag"),
+                QCoreApplication::translate("Fora.Deck", "Remove #") + tag +
                     QCoreApplication::translate(
-                        "XLibrary", " from all applications and files? Saved filters will also stop using this tag.")))
+                        "Fora.Deck", " from all applications and files? Saved filters will also stop using this tag.")))
             service->remove_tag(tag);
     });
     layout->addSpacing(8);
@@ -804,7 +804,7 @@ QWidget *my_files(const ui_context &context, QWidget *const parent) {
     auto *widget = new QWidget(parent);
     auto *layout = new QVBoxLayout(widget);
     auto *heading = new AdaptiveToolbar;
-    heading->addWidget(label(QCoreApplication::translate("XLibrary", "My files"), "heading"), 1);
+    heading->addWidget(label(QCoreApplication::translate("Fora.Deck", "My files"), "heading"), 1);
     auto *add = action_button(context.actions.value("add_items"));
     heading->addWidget(add);
     const auto show_add = [=] {
@@ -816,14 +816,14 @@ QWidget *my_files(const ui_context &context, QWidget *const parent) {
     layout->addLayout(heading);
     layout->addWidget(label(
         QCoreApplication::translate(
-            "XLibrary", "Use Add or save a file from the search result menu. Removing a saved file keeps it on disk."),
+            "Fora.Deck", "Use Add or save a file from the search result menu. Removing a saved file keeps it on disk."),
         "muted"));
     auto *list = new QTreeWidget;
     list->setObjectName("my_files_list");
-    list->setAccessibleName(QCoreApplication::translate("XLibrary", "My files"));
+    list->setAccessibleName(QCoreApplication::translate("Fora.Deck", "My files"));
     list->setRootIsDecorated(false);
     list->setHeaderLabels(
-        {QCoreApplication::translate("XLibrary", "Name"), QCoreApplication::translate("XLibrary", "Path")});
+        {QCoreApplication::translate("Fora.Deck", "Name"), QCoreApplication::translate("Fora.Deck", "Path")});
     list->header()->setSectionResizeMode(QHeaderView::Stretch);
     QObject::connect(list, &QTreeWidget::currentItemChanged, widget, [=](QTreeWidgetItem *item) {
         if (service->section() == "files")
@@ -854,7 +854,7 @@ QWidget *my_files(const ui_context &context, QWidget *const parent) {
                 if (!selected_path.isEmpty() && entry.path == selected_path)
                     list->setCurrentItem(item);
                 if (!entry.available) {
-                    item->setText(0, entry.name + " · " + QCoreApplication::translate("XLibrary", "Unavailable"));
+                    item->setText(0, entry.name + " · " + QCoreApplication::translate("Fora.Deck", "Unavailable"));
                     item->setForeground(0, list->palette().color(QPalette::PlaceholderText));
                 }
             }
@@ -883,18 +883,18 @@ QWidget *my_files(const ui_context &context, QWidget *const parent) {
     };
     const auto open = [=](const QString &path) {
         if (!FileManager::accepts_file(path) || !desktop_platform::open_url(QUrl::fromLocalFile(path)))
-            service->notify(QCoreApplication::translate("XLibrary", "Could not open the file."));
+            service->notify(QCoreApplication::translate("Fora.Deck", "Could not open the file."));
         else
             service->record_file_use(path);
     };
-    action(QCoreApplication::translate("XLibrary", "Open"), open);
-    action(QCoreApplication::translate("XLibrary", "Open folder"), [](const QString &path) {
+    action(QCoreApplication::translate("Fora.Deck", "Open"), open);
+    action(QCoreApplication::translate("Fora.Deck", "Open folder"), [](const QString &path) {
         desktop_platform::open_url(QUrl::fromLocalFile(QFileInfo(path).absolutePath()));
     });
-    action(QCoreApplication::translate("XLibrary", "Copy path"),
+    action(QCoreApplication::translate("Fora.Deck", "Copy path"),
            [](const QString &path) { QApplication::clipboard()->setText(QDir::toNativeSeparators(path)); });
     tools->addWidget(action_button(context.actions.value("details")));
-    action(QCoreApplication::translate("XLibrary", "Remove from My files"),
+    action(QCoreApplication::translate("Fora.Deck", "Remove from My files"),
            [=](const QString &path) { service->files->set_saved(path, false); });
     QObject::connect(list, &QTreeWidget::itemActivated, widget, [=](QTreeWidgetItem *item, int) {
         if (!service->profile_busy() && !service->restart_required())
@@ -919,8 +919,8 @@ QWidget *search_bar(const ui_context &context, QWidget *const parent) {
     search->setMaxLength(static_cast<int>(catalog_limits::text_length));
     search->setObjectName("search_input");
     search->setAccessibleName(
-        QCoreApplication::translate("XLibrary", "Search applications and files, calculate or enter a path"));
-    search->setPlaceholderText(QCoreApplication::translate("XLibrary", "Search, calculate or enter a path"));
+        QCoreApplication::translate("Fora.Deck", "Search applications and files, calculate or enter a path"));
+    search->setPlaceholderText(QCoreApplication::translate("Fora.Deck", "Search, calculate or enter a path"));
     search->setClearButtonEnabled(true);
     search->show_shortcut_hint(context.actions.value("focus_search"));
     auto *search_icon = search->addAction(appearance::icon("search"), QLineEdit::LeadingPosition);
@@ -980,9 +980,9 @@ QWidget *search_bar(const ui_context &context, QWidget *const parent) {
     const auto update_mode = [=] {
         const auto active = service->file_search_active();
         results->setVisible(!active && results->model()->rowCount() > 0);
-        search->setToolTip(active ? QCoreApplication::translate("XLibrary", "Search indexed files by filename")
+        search->setToolTip(active ? QCoreApplication::translate("Fora.Deck", "Search indexed files by filename")
                                   : QCoreApplication::translate(
-                                        "XLibrary", "#tag includes a tag; -#tag excludes it. All conditions apply."));
+                                        "Fora.Deck", "#tag includes a tag; -#tag excludes it. All conditions apply."));
     };
     QObject::connect(service->files, &FileManager::configuration_changed, widget, update_mode);
     QObject::connect(service, &DesktopService::navigation_changed, widget, update_mode);
@@ -993,16 +993,16 @@ QWidget *search_bar(const ui_context &context, QWidget *const parent) {
 void show_scan_report(const ui_context &context, QWidget *parent) {
     auto *service = static_cast<DesktopService *>(context.service);
     QDialog dialog(parent);
-    dialog.setWindowTitle(QCoreApplication::translate("XLibrary", "Scan details"));
+    dialog.setWindowTitle(QCoreApplication::translate("Fora.Deck", "Scan details"));
     prepare_dialog(&dialog, context, QSize(760, 480));
     auto *dialog_layout = new QVBoxLayout(&dialog);
     auto *text = new QPlainTextEdit(service->discovery_report());
     text->setReadOnly(true);
-    text->setAccessibleName(QCoreApplication::translate("XLibrary", "Scan report"));
+    text->setAccessibleName(QCoreApplication::translate("Fora.Deck", "Scan report"));
     dialog_layout->addWidget(text);
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Close);
-    buttons->button(QDialogButtonBox::Close)->setText(QCoreApplication::translate("XLibrary", "Close"));
-    auto *copy = buttons->addButton(QCoreApplication::translate("XLibrary", "Copy all"), QDialogButtonBox::ActionRole);
+    buttons->button(QDialogButtonBox::Close)->setText(QCoreApplication::translate("Fora.Deck", "Close"));
+    auto *copy = buttons->addButton(QCoreApplication::translate("Fora.Deck", "Copy all"), QDialogButtonBox::ActionRole);
     QObject::connect(copy, &QPushButton::clicked, &dialog,
                      [text] { QApplication::clipboard()->setText(text->toPlainText()); });
     QObject::connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
@@ -1038,11 +1038,11 @@ QWidget *discovery_status(const ui_context &context, QWidget *const parent) {
         QString description;
         const auto &progress = service->discovery_status();
         if (progress.percent >= 90)
-            description = QCoreApplication::translate("XLibrary", "Candidates processed: %1 of %2")
+            description = QCoreApplication::translate("Fora.Deck", "Candidates processed: %1 of %2")
                               .arg(progress.processed)
                               .arg(progress.total);
-        details_notice->show_message(QCoreApplication::translate("XLibrary", "Scan result"), description,
-                                     QCoreApplication::translate("XLibrary", "Last scan details…"));
+        details_notice->show_message(QCoreApplication::translate("Fora.Deck", "Scan result"), description,
+                                     QCoreApplication::translate("Fora.Deck", "Last scan details…"));
     };
     QObject::connect(service, &DesktopService::discovery_report_changed, container, update_details);
     update_details();
@@ -1058,14 +1058,14 @@ QWidget *discovery_status(const ui_context &context, QWidget *const parent) {
     percentage->setObjectName("discovery_percentage");
     percentage->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
     header->addWidget(percentage);
-    auto *cancel = button(QCoreApplication::translate("XLibrary", "Cancel"), "quiet");
-    cancel->setAccessibleName(QCoreApplication::translate("XLibrary", "Cancel application scan"));
+    auto *cancel = button(QCoreApplication::translate("Fora.Deck", "Cancel"), "quiet");
+    cancel->setAccessibleName(QCoreApplication::translate("Fora.Deck", "Cancel application scan"));
     QObject::connect(cancel, &QPushButton::clicked, service, &DesktopService::cancel_discovery);
     header->addWidget(cancel);
     layout->addLayout(header);
     auto *bar = new QProgressBar;
     bar->setObjectName("discovery_bar");
-    bar->setAccessibleName(QCoreApplication::translate("XLibrary", "Application scan progress"));
+    bar->setAccessibleName(QCoreApplication::translate("Fora.Deck", "Application scan progress"));
     bar->setTextVisible(false);
     bar->setFixedHeight(8);
     layout->addWidget(bar);
@@ -1085,16 +1085,16 @@ QWidget *discovery_status(const ui_context &context, QWidget *const parent) {
             bar->setValue(progress.percent);
         percentage->setText(indeterminate ? "…" : QString::number(progress.percent) + '%');
         counter->setText(indeterminate
-                             ? QCoreApplication::translate("XLibrary", "Collecting entries from the selected sources")
+                             ? QCoreApplication::translate("Fora.Deck", "Collecting entries from the selected sources")
                              : QString(progress.percent < 90
-                                           ? QCoreApplication::translate("XLibrary", "Entries checked: %1 of %2")
-                                           : QCoreApplication::translate("XLibrary", "Candidates processed: %1 of %2"))
+                                           ? QCoreApplication::translate("Fora.Deck", "Entries checked: %1 of %2")
+                                           : QCoreApplication::translate("Fora.Deck", "Candidates processed: %1 of %2"))
                                    .arg(progress.processed)
                                    .arg(progress.total));
         cancel->setVisible(active);
         cancel->setEnabled(service->can_cancel_discovery());
-        cancel->setText(service->is_cancelling_discovery() ? QCoreApplication::translate("XLibrary", "Cancelling…")
-                                                           : QCoreApplication::translate("XLibrary", "Cancel"));
+        cancel->setText(service->is_cancelling_discovery() ? QCoreApplication::translate("Fora.Deck", "Cancelling…")
+                                                           : QCoreApplication::translate("Fora.Deck", "Cancel"));
         panel_reveal->set_expanded(true);
     };
     QObject::connect(service, &DesktopService::discovery_changed, panel, [=] {
@@ -1116,17 +1116,17 @@ QWidget *file_workspace(const ui_context &context, QWidget *const parent) {
     root->setContentsMargins(0, 0, 0, 0);
     root->setSpacing(12);
     auto *header = new AdaptiveToolbar;
-    header->addWidget(label(QCoreApplication::translate("XLibrary", "Files"), "heading"));
+    header->addWidget(label(QCoreApplication::translate("Fora.Deck", "Files"), "heading"));
     auto *count = label({}, "muted");
     header->addWidget(count, 1);
     auto *sort = new QComboBox;
     sort->addItems(
-        {QCoreApplication::translate("XLibrary", "Recommended"), QCoreApplication::translate("XLibrary", "By name"),
-         QCoreApplication::translate("XLibrary", "Recently opened"),
-         QCoreApplication::translate("XLibrary", "Favorites first"), QCoreApplication::translate("XLibrary", "By tags"),
-         QCoreApplication::translate("XLibrary", "By extension"),
-         QCoreApplication::translate("XLibrary", "By date added")});
-    sort->setAccessibleName(QCoreApplication::translate("XLibrary", "File sort order"));
+        {QCoreApplication::translate("Fora.Deck", "Recommended"), QCoreApplication::translate("Fora.Deck", "By name"),
+         QCoreApplication::translate("Fora.Deck", "Recently opened"),
+         QCoreApplication::translate("Fora.Deck", "Favorites first"),
+         QCoreApplication::translate("Fora.Deck", "By tags"), QCoreApplication::translate("Fora.Deck", "By extension"),
+         QCoreApplication::translate("Fora.Deck", "By date added")});
+    sort->setAccessibleName(QCoreApplication::translate("Fora.Deck", "File sort order"));
     sort->setCurrentIndex(qBound(0, service->settings.value("files/sort", 0).toInt(), 6));
     for (int index = 0; index < sort->count(); ++index)
         sort->setItemIcon(index, appearance::icon("sort"));
@@ -1140,13 +1140,13 @@ QWidget *file_workspace(const ui_context &context, QWidget *const parent) {
     header->addWidget(sort);
     auto *presentation = new QComboBox;
     presentation->addItems(
-        {QCoreApplication::translate("XLibrary", "List"), QCoreApplication::translate("XLibrary", "Cards")});
-    presentation->setAccessibleName(QCoreApplication::translate("XLibrary", "Library view"));
+        {QCoreApplication::translate("Fora.Deck", "List"), QCoreApplication::translate("Fora.Deck", "Cards")});
+    presentation->setAccessibleName(QCoreApplication::translate("Fora.Deck", "Library view"));
     presentation->setCurrentIndex(qBound(0, service->settings.value("files/view", 0).toInt(), 1));
     header->addWidget(presentation);
-    auto *actions = button(QCoreApplication::translate("XLibrary", "File actions"));
+    auto *actions = button(QCoreApplication::translate("Fora.Deck", "File actions"));
     auto *menu = new QMenu(actions);
-    auto *refresh = menu->addAction(QCoreApplication::translate("XLibrary", "Refresh index"));
+    auto *refresh = menu->addAction(QCoreApplication::translate("Fora.Deck", "Refresh index"));
     QObject::connect(refresh, &QAction::triggered, service->files, &FileManager::rescan);
     menu->addAction(context.actions.value("settings"));
     actions->setMenu(menu);
@@ -1213,13 +1213,13 @@ QWidget *file_workspace(const ui_context &context, QWidget *const parent) {
     });
     auto *footer = new AdaptiveToolbar;
     auto *hint =
-        label(QCoreApplication::translate("XLibrary", "↑↓  Select     Enter  Open     Shift+F10  Actions"), "caption");
+        label(QCoreApplication::translate("Fora.Deck", "↑↓  Select     Enter  Open     Shift+F10  Actions"), "caption");
     footer->addWidget(hint, 1);
-    auto *open = button(QCoreApplication::translate("XLibrary", "Open"), "quiet", "file");
+    auto *open = button(QCoreApplication::translate("Fora.Deck", "Open"), "quiet", "file");
     footer->addWidget(open);
     QObject::connect(open, &QPushButton::clicked, view, &SearchResults::activate_current);
     footer->addWidget(action_button(context.actions.value("details")));
-    auto *selected_actions = button(QCoreApplication::translate("XLibrary", "File actions"));
+    auto *selected_actions = button(QCoreApplication::translate("Fora.Deck", "File actions"));
     footer->addWidget(selected_actions);
     QObject::connect(selected_actions, &QPushButton::clicked, view, &SearchResults::show_actions);
     root->addLayout(footer);
@@ -1249,16 +1249,17 @@ QWidget *library(const ui_context &context, QWidget *const parent) {
     root->setContentsMargins(0, 0, 0, 0);
     root->setSpacing(12);
     auto *header = new AdaptiveToolbar;
-    auto *title = label(QCoreApplication::translate("XLibrary", "Library"), "heading");
+    auto *title = label(QCoreApplication::translate("Fora.Deck", "Library"), "heading");
     header->addWidget(title);
     auto *visible_count = label({}, "muted");
     header->addWidget(visible_count, 1);
     auto *sort = new QComboBox;
-    sort->addItems(
-        {QCoreApplication::translate("XLibrary", "By name"), QCoreApplication::translate("XLibrary", "Recent launches"),
-         QCoreApplication::translate("XLibrary", "Favorites first"), QCoreApplication::translate("XLibrary", "By tags"),
-         QCoreApplication::translate("XLibrary", "By status")});
-    sort->setAccessibleName(QCoreApplication::translate("XLibrary", "Application sort order"));
+    sort->addItems({QCoreApplication::translate("Fora.Deck", "By name"),
+                    QCoreApplication::translate("Fora.Deck", "Recent launches"),
+                    QCoreApplication::translate("Fora.Deck", "Favorites first"),
+                    QCoreApplication::translate("Fora.Deck", "By tags"),
+                    QCoreApplication::translate("Fora.Deck", "By status")});
+    sort->setAccessibleName(QCoreApplication::translate("Fora.Deck", "Application sort order"));
     sort->setCurrentIndex(qBound(0, service->settings.value("library/sort", 0).toInt(), 4));
     for (int index = 0; index < sort->count(); ++index)
         sort->setItemIcon(index, appearance::icon("sort"));
@@ -1277,15 +1278,15 @@ QWidget *library(const ui_context &context, QWidget *const parent) {
     header->addWidget(sort);
     auto *presentation = new QComboBox;
     presentation->addItems(
-        {QCoreApplication::translate("XLibrary", "List"), QCoreApplication::translate("XLibrary", "Cards")});
-    presentation->setAccessibleName(QCoreApplication::translate("XLibrary", "Library view"));
+        {QCoreApplication::translate("Fora.Deck", "List"), QCoreApplication::translate("Fora.Deck", "Cards")});
+    presentation->setAccessibleName(QCoreApplication::translate("Fora.Deck", "Library view"));
     presentation->setCurrentIndex(qBound(0, service->settings.value("library/view", 0).toInt(), 1));
     header->addWidget(presentation);
-    auto *library_actions = button(QCoreApplication::translate("XLibrary", "Library actions"));
+    auto *library_actions = button(QCoreApplication::translate("Fora.Deck", "Library actions"));
     auto *library_menu = new QMenu(library_actions);
     for (const auto &id : {"library_health", "refresh_availability", "discover", "undo_removal"})
         library_menu->addAction(context.actions.value(id));
-    auto *report = library_menu->addAction(QCoreApplication::translate("XLibrary", "Scan report"));
+    auto *report = library_menu->addAction(QCoreApplication::translate("Fora.Deck", "Scan report"));
     QObject::connect(library_menu, &QMenu::aboutToShow, widget,
                      [=] { report->setEnabled(!service->discovery_report().isEmpty()); });
     library_actions->setMenu(library_menu);
@@ -1360,7 +1361,7 @@ QWidget *library(const ui_context &context, QWidget *const parent) {
     auto *empty = new QWidget;
     auto *empty_layout = new QVBoxLayout(empty);
     empty_layout->addStretch();
-    auto *empty_title = label(QCoreApplication::translate("XLibrary", "Loading the library…"), "subheading");
+    auto *empty_title = label(QCoreApplication::translate("Fora.Deck", "Loading the library…"), "subheading");
     empty_title->setAlignment(Qt::AlignCenter);
     empty_layout->addWidget(empty_title);
     auto *hint = label("", "muted");
@@ -1373,7 +1374,7 @@ QWidget *library(const ui_context &context, QWidget *const parent) {
     empty_actions_layout->addWidget(action_button(context.actions.value("add_items")));
     empty_actions_layout->addWidget(action_button(context.actions.value("discover")));
     empty_layout->addWidget(empty_actions, 0, Qt::AlignHCenter);
-    auto *reset_filters = button(QCoreApplication::translate("XLibrary", "Clear all filters"));
+    auto *reset_filters = button(QCoreApplication::translate("Fora.Deck", "Clear all filters"));
     reset_filters->setEnabled(false);
     empty_layout->addWidget(reset_filters, 0, Qt::AlignHCenter);
     QObject::connect(reset_filters, &QPushButton::clicked, widget, [=] {
@@ -1386,11 +1387,11 @@ QWidget *library(const ui_context &context, QWidget *const parent) {
     hint->setTextInteractionFlags(Qt::TextSelectableByMouse);
     auto *recovery_actions = new QWidget;
     auto *recovery_layout = new QVBoxLayout(recovery_actions);
-    auto *retry = new QPushButton(QCoreApplication::translate("XLibrary", "Retry"));
-    auto *profile = new QPushButton(QCoreApplication::translate("XLibrary", "Open profile folder"));
-    auto *restore = new QPushButton(QCoreApplication::translate("XLibrary", "Restore database backup…"));
-    auto *restore_profile = new QPushButton(QCoreApplication::translate("XLibrary", "Restore complete profile…"));
-    auto *restart = new QPushButton(QCoreApplication::translate("XLibrary", "Restart Fora.Deck"));
+    auto *retry = new QPushButton(QCoreApplication::translate("Fora.Deck", "Retry"));
+    auto *profile = new QPushButton(QCoreApplication::translate("Fora.Deck", "Open profile folder"));
+    auto *restore = new QPushButton(QCoreApplication::translate("Fora.Deck", "Restore database backup…"));
+    auto *restore_profile = new QPushButton(QCoreApplication::translate("Fora.Deck", "Restore complete profile…"));
+    auto *restart = new QPushButton(QCoreApplication::translate("Fora.Deck", "Restart Fora.Deck"));
     recovery_layout->addWidget(retry);
     recovery_layout->addWidget(profile);
     recovery_layout->addWidget(restore);
@@ -1401,13 +1402,13 @@ QWidget *library(const ui_context &context, QWidget *const parent) {
     QObject::connect(profile, &QPushButton::clicked, service, &DesktopService::open_profile_folder);
     QObject::connect(restore, &QPushButton::clicked, widget, [=] {
         const auto path =
-            QFileDialog::getOpenFileName(widget, QCoreApplication::translate("XLibrary", "Select a SQLite backup"),
+            QFileDialog::getOpenFileName(widget, QCoreApplication::translate("Fora.Deck", "Select a SQLite backup"),
                                          QFileInfo(service->library_path()).absolutePath());
         if (path.isEmpty())
             return;
-        if (QMessageBox::question(widget, QCoreApplication::translate("XLibrary", "Restore library"),
+        if (QMessageBox::question(widget, QCoreApplication::translate("Fora.Deck", "Restore library"),
                                   QCoreApplication::translate(
-                                      "XLibrary",
+                                      "Fora.Deck",
                                       "Replace only the database with this SQLite backup? Settings are not restored. "
                                       "The current database files will be preserved."),
                                   QMessageBox::Yes | QMessageBox::No, QMessageBox::No) == QMessageBox::Yes)
@@ -1435,7 +1436,7 @@ QWidget *library(const ui_context &context, QWidget *const parent) {
     auto *shortcut_hint = label({}, "caption");
     const auto update_shortcut_hint = [=] {
         const auto *search_input = context.window->findChild<SearchInput *>("search_input");
-        QStringList hints{QCoreApplication::translate("XLibrary", "↑↓  Select")};
+        QStringList hints{QCoreApplication::translate("Fora.Deck", "↑↓  Select")};
         for (const auto &id : {"launch", "focus_search"}) {
             if (id == QLatin1String("focus_search") && search_input && search_input->shortcut_hint_visible())
                 continue;
@@ -1456,7 +1457,7 @@ QWidget *library(const ui_context &context, QWidget *const parent) {
     auto *selection_tools = footer;
     auto *selected_count = label({});
     selection_tools->addWidget(selected_count, 1);
-    auto *clear_selection = button(QCoreApplication::translate("XLibrary", "Clear selection"));
+    auto *clear_selection = button(QCoreApplication::translate("Fora.Deck", "Clear selection"));
     selection_tools->addWidget(clear_selection);
     auto *application_tags = action_button(context.actions.value("bulk_edit"));
     auto *bulk_remove = action_button(context.actions.value("remove_application"));
@@ -1479,7 +1480,7 @@ QWidget *library(const ui_context &context, QWidget *const parent) {
         service->select_applications(ids);
         const auto current_id = view->currentIndex().data(LibraryModel::id_role).toLongLong();
         service->select(ids.contains(current_id) ? current_id : ids.value(0));
-        selected_count->setText(QCoreApplication::translate("XLibrary", "Selected applications: %1").arg(ids.size()));
+        selected_count->setText(QCoreApplication::translate("Fora.Deck", "Selected applications: %1").arg(ids.size()));
         clear_selection->setVisible(!ids.isEmpty());
         const bool multiple = ids.size() >= 2;
         selected_count->setVisible(multiple);
@@ -1528,16 +1529,16 @@ QWidget *library(const ui_context &context, QWidget *const parent) {
             progress->show();
         }
         if (!service->is_ready()) {
-            empty_title->setText(failed ? QCoreApplication::translate("XLibrary", "Could not open the library")
-                                        : QCoreApplication::translate("XLibrary", "Loading the library…"));
+            empty_title->setText(failed ? QCoreApplication::translate("Fora.Deck", "Could not open the library")
+                                        : QCoreApplication::translate("Fora.Deck", "Loading the library…"));
             hint->setText(failed ? service->library_error() + '\n' + QDir::toNativeSeparators(service->library_path())
                                  : QString{});
         } else {
-            empty_title->setText(no_apps ? QCoreApplication::translate("XLibrary", "Add your first application")
-                                         : QCoreApplication::translate("XLibrary", "No results"));
-            hint->setText(no_apps
-                              ? QCoreApplication::translate("XLibrary", "Select a file or find installed applications.")
-                              : QCoreApplication::translate("XLibrary", "Change the query or select another section."));
+            empty_title->setText(no_apps ? QCoreApplication::translate("Fora.Deck", "Add your first application")
+                                         : QCoreApplication::translate("Fora.Deck", "No results"));
+            hint->setText(
+                no_apps ? QCoreApplication::translate("Fora.Deck", "Select a file or find installed applications.")
+                        : QCoreApplication::translate("Fora.Deck", "Change the query or select another section."));
         }
         if (previous_page != stack->currentWidget())
             library_transition->start();
@@ -1640,10 +1641,10 @@ QWidget *library(const ui_context &context, QWidget *const parent) {
     });
     QObject::connect(&service->filter, &QAbstractItemModel::layoutChanged, widget, update);
     QObject::connect(service, &DesktopService::navigation_changed, widget, [=] {
-        title->setText(service->section() == "favorites" ? QCoreApplication::translate("XLibrary", "Favorites")
+        title->setText(service->section() == "favorites" ? QCoreApplication::translate("Fora.Deck", "Favorites")
                        : service->section() == "running"
-                           ? QCoreApplication::translate("XLibrary", "Running applications")
-                           : QCoreApplication::translate("XLibrary", "Library"));
+                           ? QCoreApplication::translate("Fora.Deck", "Running applications")
+                           : QCoreApplication::translate("Fora.Deck", "Library"));
         update();
     });
     update();
@@ -1658,7 +1659,7 @@ QWidget *details(const ui_context &context, QWidget *const parent) {
     root->setSpacing(10);
     auto *icon = new QLabel;
     icon->setFixedSize(appearance::scaled(service->settings, 56), appearance::scaled(service->settings, 56));
-    auto *name = label(QCoreApplication::translate("XLibrary", "Select an application"), "application_title");
+    auto *name = label(QCoreApplication::translate("Fora.Deck", "Select an application"), "application_title");
     auto *status = label("", "muted");
     auto *identity = new QHBoxLayout;
     identity->setSpacing(12);
@@ -1714,12 +1715,12 @@ QWidget *details(const ui_context &context, QWidget *const parent) {
     auto *identity_tools = new QHBoxLayout;
     identity_tools->addStretch();
     identity_tools->addWidget(favorite);
-    auto *more = button(QCoreApplication::translate("XLibrary", "More actions"), nullptr, "more");
+    auto *more = button(QCoreApplication::translate("Fora.Deck", "More actions"), nullptr, "more");
     more->setText({});
     more->setProperty("icon_only", true);
     more->setFixedWidth(appearance::scaled(service->settings, 36));
-    more->setToolTip(QCoreApplication::translate("XLibrary", "More actions"));
-    more->setAccessibleName(QCoreApplication::translate("XLibrary", "More actions"));
+    more->setToolTip(QCoreApplication::translate("Fora.Deck", "More actions"));
+    more->setAccessibleName(QCoreApplication::translate("Fora.Deck", "More actions"));
     identity_tools->addWidget(more);
     root->addLayout(identity_tools);
     QObject::connect(more, &QPushButton::clicked, contents, [=] {
@@ -1741,21 +1742,21 @@ QWidget *details(const ui_context &context, QWidget *const parent) {
     process_usage->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
     process_usage->setMinimumWidth(0);
     process_usage->setToolTip(QCoreApplication::translate(
-        "XLibrary",
+        "Fora.Deck",
         "CPU is a percentage of total processor capacity. RAM is the sum of resident memory of matching processes."));
     root->addWidget(process_usage);
     root->addSpacing(8);
     auto *tag_header = new QHBoxLayout;
-    tag_header->addWidget(label(QCoreApplication::translate("XLibrary", "Tags"), "muted"), 1);
-    auto *edit_tags =
-        action_button(context.actions.value("edit_application"), true, QCoreApplication::translate("XLibrary", "Edit"));
-    edit_tags->setAccessibleName(QCoreApplication::translate("XLibrary", "Edit application tags"));
+    tag_header->addWidget(label(QCoreApplication::translate("Fora.Deck", "Tags"), "muted"), 1);
+    auto *edit_tags = action_button(context.actions.value("edit_application"), true,
+                                    QCoreApplication::translate("Fora.Deck", "Edit"));
+    edit_tags->setAccessibleName(QCoreApplication::translate("Fora.Deck", "Edit application tags"));
     tag_header->addWidget(edit_tags);
     root->addLayout(tag_header);
     auto *tags = label("—");
     root->addWidget(tags);
     root->addSpacing(8);
-    auto *path_caption = label(QCoreApplication::translate("XLibrary", "Application path"), "muted");
+    auto *path_caption = label(QCoreApplication::translate("Fora.Deck", "Application path"), "muted");
     root->addWidget(path_caption);
     auto *path = new QTextEdit;
     path->setObjectName("inspector_application_path");
@@ -1767,7 +1768,7 @@ QWidget *details(const ui_context &context, QWidget *const parent) {
     path->setTabChangesFocus(true);
     path->document()->setDocumentMargin(2);
     path->setTextInteractionFlags(Qt::TextSelectableByMouse | Qt::TextSelectableByKeyboard);
-    path->setAccessibleName(QCoreApplication::translate("XLibrary", "Application path"));
+    path->setAccessibleName(QCoreApplication::translate("Fora.Deck", "Application path"));
     path->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
     path->setMinimumWidth(0);
     QObject::connect(path->document()->documentLayout(), &QAbstractTextDocumentLayout::documentSizeChanged, path,
@@ -1782,10 +1783,10 @@ QWidget *details(const ui_context &context, QWidget *const parent) {
     copy_path->setAccessibleName(context.actions.value("copy_path")->text());
     path_row->addWidget(copy_path);
     auto *folder = action_button(context.actions.value("open_folder"));
-    folder->setAccessibleName(QCoreApplication::translate("XLibrary", "Open application folder"));
+    folder->setAccessibleName(QCoreApplication::translate("Fora.Deck", "Open application folder"));
     path_row->addWidget(folder);
     root->addLayout(path_row);
-    auto *recover_path = button(QCoreApplication::translate("XLibrary", "Locate application…"));
+    auto *recover_path = button(QCoreApplication::translate("Fora.Deck", "Locate application…"));
     root->addWidget(recover_path);
     QObject::connect(recover_path, &QPushButton::clicked, contents, [=] {
         if (const auto *record = service->selected())
@@ -1808,11 +1809,11 @@ QWidget *details(const ui_context &context, QWidget *const parent) {
     auto *profile_layout = new QVBoxLayout(profile_actions);
     profile_layout->setContentsMargins(0, 0, 0, 0);
     auto *profiles = new QComboBox;
-    profiles->setAccessibleName(QCoreApplication::translate("XLibrary", "Browser launch profile"));
+    profiles->setAccessibleName(QCoreApplication::translate("Fora.Deck", "Browser launch profile"));
     profile_layout->addWidget(profiles);
-    auto *launch_selected_profile = button(QCoreApplication::translate("XLibrary", "Launch selected profile"));
+    auto *launch_selected_profile = button(QCoreApplication::translate("Fora.Deck", "Launch selected profile"));
     profile_layout->addWidget(launch_selected_profile);
-    auto *default_profile = button(QCoreApplication::translate("XLibrary", "Set as default"));
+    auto *default_profile = button(QCoreApplication::translate("Fora.Deck", "Set as default"));
     profile_layout->addWidget(default_profile);
     root->insertWidget(root->indexOf(launch) + 1, profile_actions);
     QObject::connect(launch_selected_profile, &QPushButton::clicked, contents, [=] {
@@ -1859,7 +1860,7 @@ QWidget *details(const ui_context &context, QWidget *const parent) {
     file_identity_text->addWidget(file_status);
     file_identity->addLayout(file_identity_text, 1);
     file_layout->addLayout(file_identity);
-    auto *file_open = button(QCoreApplication::translate("XLibrary", "Open"), "primary", "file");
+    auto *file_open = button(QCoreApplication::translate("Fora.Deck", "Open"), "primary", "file");
     file_layout->addWidget(file_open);
     const auto selected_file_field = [=](const QString &caption) {
         file_layout->addWidget(label(caption, "muted"));
@@ -1871,24 +1872,24 @@ QWidget *details(const ui_context &context, QWidget *const parent) {
         file_layout->addWidget(value);
         return value;
     };
-    auto *file_type = selected_file_field(QCoreApplication::translate("XLibrary", "File type"));
-    auto *file_size = selected_file_field(QCoreApplication::translate("XLibrary", "Size"));
-    auto *file_modified = selected_file_field(QCoreApplication::translate("XLibrary", "Modified"));
-    auto *file_tags = selected_file_field(QCoreApplication::translate("XLibrary", "Tags"));
-    auto *file_path = selected_file_field(QCoreApplication::translate("XLibrary", "File path"));
+    auto *file_type = selected_file_field(QCoreApplication::translate("Fora.Deck", "File type"));
+    auto *file_size = selected_file_field(QCoreApplication::translate("Fora.Deck", "Size"));
+    auto *file_modified = selected_file_field(QCoreApplication::translate("Fora.Deck", "Modified"));
+    auto *file_tags = selected_file_field(QCoreApplication::translate("Fora.Deck", "Tags"));
+    auto *file_path = selected_file_field(QCoreApplication::translate("Fora.Deck", "File path"));
     auto *file_tools = new QHBoxLayout;
-    auto *file_copy = button(QCoreApplication::translate("XLibrary", "Copy path"), nullptr, "copy");
-    auto *file_folder = button(QCoreApplication::translate("XLibrary", "Open folder"), nullptr, "folder");
+    auto *file_copy = button(QCoreApplication::translate("Fora.Deck", "Copy path"), nullptr, "copy");
+    auto *file_folder = button(QCoreApplication::translate("Fora.Deck", "Open folder"), nullptr, "folder");
     file_tools->addWidget(file_copy);
     file_tools->addWidget(file_folder);
     file_layout->addLayout(file_tools);
     file_layout->addSpacing(8);
-    file_layout->addWidget(label(QCoreApplication::translate("XLibrary", "Opens with"), "muted"));
+    file_layout->addWidget(label(QCoreApplication::translate("Fora.Deck", "Opens with"), "muted"));
     auto *handler_row = new QHBoxLayout;
     auto *handler_icon = new QLabel;
     auto *handler_name = label({});
     handler_name->setObjectName("file_application_name");
-    handler_name->setAccessibleName(QCoreApplication::translate("XLibrary", "Opens with"));
+    handler_name->setAccessibleName(QCoreApplication::translate("Fora.Deck", "Opens with"));
     handler_row->addWidget(handler_icon, 0, Qt::AlignTop);
     handler_row->addWidget(handler_name, 1);
     file_layout->addLayout(handler_row);
@@ -1901,7 +1902,7 @@ QWidget *details(const ui_context &context, QWidget *const parent) {
     auto *association = new QFutureWatcher<desktop_platform::file_association>(file_contents);
     const auto show_association = [=](const desktop_platform::file_association &result) {
         handler_name->setText(result.name.isEmpty()
-                                  ? QCoreApplication::translate("XLibrary", "Default application not found")
+                                  ? QCoreApplication::translate("Fora.Deck", "Default application not found")
                                   : result.name);
         QIcon image;
         if (!result.icon.isNull())
@@ -1933,7 +1934,7 @@ QWidget *details(const ui_context &context, QWidget *const parent) {
         if (selected_path.isEmpty() || service->profile_busy() || service->restart_required())
             return;
         if (!service->selected_file_available() || !desktop_platform::open_url(QUrl::fromLocalFile(selected_path)))
-            service->notify(QCoreApplication::translate("XLibrary", "Could not open the file."));
+            service->notify(QCoreApplication::translate("Fora.Deck", "Could not open the file."));
         else
             service->record_file_use(selected_path);
     });
@@ -1943,14 +1944,14 @@ QWidget *details(const ui_context &context, QWidget *const parent) {
         const auto selected_path = service->selected_file();
         if (!selected_path.isEmpty() &&
             !desktop_platform::open_url(QUrl::fromLocalFile(QFileInfo(selected_path).absolutePath())))
-            service->notify(QCoreApplication::translate("XLibrary", "Could not open the folder."));
+            service->notify(QCoreApplication::translate("Fora.Deck", "Could not open the folder."));
     });
     auto *empty = new QWidget;
     auto *empty_layout = new QVBoxLayout(empty);
     empty_layout->setContentsMargins(20, 24, 20, 24);
     auto *empty_icon = new QLabel;
     empty_icon->setAlignment(Qt::AlignCenter);
-    auto *empty_text = label(QCoreApplication::translate("XLibrary", "Select an application"));
+    auto *empty_text = label(QCoreApplication::translate("Fora.Deck", "Select an application"));
     empty_text->setProperty("muted", true);
     empty_text->setAlignment(Qt::AlignCenter);
     empty_layout->addStretch();
@@ -1963,11 +1964,11 @@ QWidget *details(const ui_context &context, QWidget *const parent) {
         const auto selected_path = file_mode ? service->selected_file() : QString{};
         const auto *record = file_mode ? nullptr : service->selected();
         pages->setCurrentWidget(!selected_path.isEmpty() ? file_contents : record ? contents : empty);
-        empty_text->setText(file_mode ? QCoreApplication::translate("XLibrary", "Select a file")
-                                      : QCoreApplication::translate("XLibrary", "Select an application"));
+        empty_text->setText(file_mode ? QCoreApplication::translate("Fora.Deck", "Select a file")
+                                      : QCoreApplication::translate("Fora.Deck", "Select an application"));
         if (handler_name->property("file_path").toString() != selected_path) {
             handler_name->setProperty("file_path", selected_path);
-            handler_name->setText(QCoreApplication::translate("XLibrary", "Detecting application…"));
+            handler_name->setText(QCoreApplication::translate("Fora.Deck", "Detecting application…"));
             handler_icon->hide();
         }
         load_association();
@@ -1977,13 +1978,13 @@ QWidget *details(const ui_context &context, QWidget *const parent) {
             const auto mime = QMimeDatabase{}.mimeTypeForFile(info, QMimeDatabase::MatchExtension);
             file_name->setText(info.fileName());
             file_status->setText(available ? info.suffix().toUpper()
-                                           : QCoreApplication::translate("XLibrary", "Unavailable"));
+                                           : QCoreApplication::translate("Fora.Deck", "Unavailable"));
             file_type->setText(mime.comment().isEmpty() ? mime.name() : mime.comment());
             file_size->setText(available ? QLocale{}.formattedDataSize(info.size()) : QString::fromUtf8("—"));
             file_modified->setText(available ? QLocale{}.toString(info.lastModified(), QLocale::ShortFormat)
                                              : QString::fromUtf8("—"));
             const auto selected_tags = service->files->tags_for(selected_path);
-            file_tags->setText(selected_tags.isEmpty() ? QCoreApplication::translate("XLibrary", "No tags")
+            file_tags->setText(selected_tags.isEmpty() ? QCoreApplication::translate("Fora.Deck", "No tags")
                                                        : '#' + selected_tags.join("   #"));
             file_path->setText(QDir::toNativeSeparators(selected_path));
             file_path->setToolTip(file_path->text());
@@ -1998,23 +1999,23 @@ QWidget *details(const ui_context &context, QWidget *const parent) {
             file_copy->setEnabled(enabled);
             file_folder->setEnabled(enabled);
         }
-        name->setText(record ? record->name : QCoreApplication::translate("XLibrary", "Select an application"));
+        name->setText(record ? record->name : QCoreApplication::translate("Fora.Deck", "Select an application"));
         terminate->setVisible(record && record->running);
         process_usage->setText(record ? service->model.process_usage(*record) : QString{});
         process_usage->setVisible(!process_usage->text().isEmpty());
-        status->setText(record ? record->running     ? QCoreApplication::translate("XLibrary", "● Running")
-                                 : record->available ? QCoreApplication::translate("XLibrary", "Not running")
+        status->setText(record ? record->running     ? QCoreApplication::translate("Fora.Deck", "● Running")
+                                 : record->available ? QCoreApplication::translate("Fora.Deck", "Not running")
                                  : record->volume_unavailable
-                                     ? QCoreApplication::translate("XLibrary", "Drive disconnected or unavailable")
-                                     : QCoreApplication::translate("XLibrary", "File unavailable; the entry is kept")
-                               : QCoreApplication::translate("XLibrary", "Details will appear here."));
+                                     ? QCoreApplication::translate("Fora.Deck", "Drive disconnected or unavailable")
+                                     : QCoreApplication::translate("Fora.Deck", "File unavailable; the entry is kept")
+                               : QCoreApplication::translate("Fora.Deck", "Details will appear here."));
         tags->setText(record && !record->tags.isEmpty() ? '#' + record->tags.join("   #")
-                                                        : QCoreApplication::translate("XLibrary", "No tags"));
+                                                        : QCoreApplication::translate("Fora.Deck", "No tags"));
         const auto target_path = record ? Application::application_path(*record) : QString{};
         const bool local_path = record && (Application::file_target(*record) ||
                                            (Application::target_kind(*record) == "steam" && !target_path.isEmpty()));
-        path_caption->setText(local_path ? QCoreApplication::translate("XLibrary", "Application path")
-                                         : QCoreApplication::translate("XLibrary", "Launch target"));
+        path_caption->setText(local_path ? QCoreApplication::translate("Fora.Deck", "Application path")
+                                         : QCoreApplication::translate("Fora.Deck", "Launch target"));
         path->setAccessibleName(path_caption->text());
         const auto shown_path = !record ? QString{} : local_path ? QDir::toNativeSeparators(target_path) : record->path;
         if (path->toPlainText() != shown_path) {
@@ -2033,13 +2034,13 @@ QWidget *details(const ui_context &context, QWidget *const parent) {
         profiles->clear();
         const auto browser_profiles = record ? service->launch_profiles(*record) : QVector<launch_profile>{};
         profile_actions->setVisible(!browser_profiles.isEmpty());
-        profiles->addItem(QCoreApplication::translate("XLibrary", "Configured launch arguments"), QString{});
+        profiles->addItem(QCoreApplication::translate("Fora.Deck", "Configured launch arguments"), QString{});
         for (const auto &profile : browser_profiles)
             profiles->addItem(profile.icon_path.isEmpty() ? appearance::icon(profile.kind == "private" ? "lock" : "app")
                                                           : QIcon(profile.icon_path),
                               profile.name, profile.id);
         if (!selected_profile.isEmpty() && profiles->findData(selected_profile) < 0)
-            profiles->addItem(QCoreApplication::translate("XLibrary", "Unavailable profile: %1").arg(selected_profile),
+            profiles->addItem(QCoreApplication::translate("Fora.Deck", "Unavailable profile: %1").arg(selected_profile),
                               selected_profile);
         profiles->setCurrentIndex(qMax(0, profiles->findData(selected_profile)));
         const bool can_change = record && !service->profile_busy() && !service->restart_required();
@@ -2048,7 +2049,7 @@ QWidget *details(const ui_context &context, QWidget *const parent) {
         recover_path->setEnabled(record && !service->profile_busy() && !service->restart_required() &&
                                  !service->is_discovering() && !service->is_scenario_active());
         arguments->setText(record && !record->arguments.isEmpty()
-                               ? QCoreApplication::translate("XLibrary", "Arguments: ") + record->arguments
+                               ? QCoreApplication::translate("Fora.Deck", "Arguments: ") + record->arguments
                                : QString{});
         arguments->setVisible(!arguments->text().isEmpty());
         copy_arguments->setVisible(!arguments->text().isEmpty());
@@ -2106,10 +2107,10 @@ QWidget *application_menu(const ui_context &context, QWidget *const parent) {
     const auto ids = service->selections();
     if (ids.size() > 1) {
         auto *favorites =
-            menu->addMenu(appearance::icon("favorite"), QCoreApplication::translate("XLibrary", "Favorites"));
+            menu->addMenu(appearance::icon("favorite"), QCoreApplication::translate("Fora.Deck", "Favorites"));
         favorites->setEnabled(context.actions.value("favorite")->isEnabled());
-        auto *add = favorites->addAction(QCoreApplication::translate("XLibrary", "Add to favorites"));
-        auto *remove = favorites->addAction(QCoreApplication::translate("XLibrary", "Remove from favorites"));
+        auto *add = favorites->addAction(QCoreApplication::translate("Fora.Deck", "Add to favorites"));
+        auto *remove = favorites->addAction(QCoreApplication::translate("Fora.Deck", "Remove from favorites"));
         QObject::connect(add, &QAction::triggered, favorites, [=] { service->update_metadata(ids, {}, {}, 1); });
         QObject::connect(remove, &QAction::triggered, favorites, [=] { service->update_metadata(ids, {}, {}, 0); });
     } else {
@@ -2120,12 +2121,12 @@ QWidget *application_menu(const ui_context &context, QWidget *const parent) {
     if (const auto *record = service->selected()) {
         const auto profiles = service->launch_profiles(*record);
         if (!profiles.isEmpty()) {
-            auto *launch_profiles = menu->addMenu(QCoreApplication::translate("XLibrary", "Browser launch profiles"));
+            auto *launch_profiles = menu->addMenu(QCoreApplication::translate("Fora.Deck", "Browser launch profiles"));
             auto *defaults =
-                launch_profiles->addMenu(QCoreApplication::translate("XLibrary", "Default launch profile"));
+                launch_profiles->addMenu(QCoreApplication::translate("Fora.Deck", "Default launch profile"));
             const auto application_id = record->id;
             auto *configured =
-                defaults->addAction(QCoreApplication::translate("XLibrary", "Configured launch arguments"));
+                defaults->addAction(QCoreApplication::translate("Fora.Deck", "Configured launch arguments"));
             configured->setCheckable(true);
             configured->setChecked(record->default_launch_profile.isEmpty());
             QObject::connect(configured, &QAction::triggered, menu, [=] {
@@ -2158,7 +2159,7 @@ QWidget *application_menu(const ui_context &context, QWidget *const parent) {
         }
     }
     if (const auto *record = service->selected(); record && Application::file_target(*record) && !record->available) {
-        auto *recover = menu->addAction(QCoreApplication::translate("XLibrary", "Locate application…"));
+        auto *recover = menu->addAction(QCoreApplication::translate("Fora.Deck", "Locate application…"));
         recover->setEnabled(!service->profile_busy() && !service->restart_required() && !service->is_discovering() &&
                             !service->is_scenario_active());
         const auto original = *record;
@@ -2191,7 +2192,7 @@ QWidget *scenarios(const ui_context &context, QWidget *const parent) {
     root->setContentsMargins(0, 0, 0, 0);
     root->setSpacing(16);
     auto *header = new QHBoxLayout;
-    header->addWidget(label(QCoreApplication::translate("XLibrary", "Scenarios"), "heading"), 1);
+    header->addWidget(label(QCoreApplication::translate("Fora.Deck", "Scenarios"), "heading"), 1);
     header->addWidget(action_button(context.actions.value("add_scenario")));
     root->addLayout(header);
     auto *columns = new QBoxLayout(QBoxLayout::LeftToRight);
@@ -2205,10 +2206,10 @@ QWidget *scenarios(const ui_context &context, QWidget *const parent) {
     auto *list = new QListWidget;
     list->setSpacing(4);
     list->setMinimumWidth(0);
-    list->setAccessibleName(QCoreApplication::translate("XLibrary", "Scenarios"));
+    list->setAccessibleName(QCoreApplication::translate("Fora.Deck", "Scenarios"));
     master_layout->addWidget(list, 1);
     auto *empty = label(
-        QCoreApplication::translate("XLibrary", "Create a scenario to open several applications in order."), "muted");
+        QCoreApplication::translate("Fora.Deck", "Create a scenario to open several applications in order."), "muted");
     master_layout->addWidget(empty);
     auto *detail = new QWidget;
     detail->setMinimumWidth(0);
@@ -2216,19 +2217,19 @@ QWidget *scenarios(const ui_context &context, QWidget *const parent) {
     detail_layout->setContentsMargins(0, 0, 0, 0);
     detail_layout->setSpacing(12);
     columns->addWidget(detail, 3);
-    auto *title = label(QCoreApplication::translate("XLibrary", "Select a scenario"), "subheading");
+    auto *title = label(QCoreApplication::translate("Fora.Deck", "Select a scenario"), "subheading");
     detail_layout->addWidget(title);
     auto *status = label("", "muted");
     detail_layout->addWidget(status);
     auto *steps = new QTreeWidget;
     steps->setRootIsDecorated(false);
-    steps->setHeaderLabels({QCoreApplication::translate("XLibrary", "Application"),
-                            QCoreApplication::translate("XLibrary", "Step status")});
+    steps->setHeaderLabels({QCoreApplication::translate("Fora.Deck", "Application"),
+                            QCoreApplication::translate("Fora.Deck", "Step status")});
     steps->header()->setSectionResizeMode(0, QHeaderView::Stretch);
     steps->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
     steps->setSelectionMode(QAbstractItemView::NoSelection);
     steps->setWordWrap(true);
-    steps->setAccessibleName(QCoreApplication::translate("XLibrary", "Scenario steps"));
+    steps->setAccessibleName(QCoreApplication::translate("Fora.Deck", "Scenario steps"));
     class StepDelegate final : public QStyledItemDelegate {
     public:
         using QStyledItemDelegate::QStyledItemDelegate;
@@ -2260,7 +2261,7 @@ QWidget *scenarios(const ui_context &context, QWidget *const parent) {
     const auto rebuild_steps = [=] {
         steps->clear();
         if (!list->currentItem()) {
-            title->setText(QCoreApplication::translate("XLibrary", "Select a scenario"));
+            title->setText(QCoreApplication::translate("Fora.Deck", "Select a scenario"));
             return;
         }
         const auto id = list->currentItem()->data(Qt::UserRole).toLongLong();
@@ -2279,13 +2280,13 @@ QWidget *scenarios(const ui_context &context, QWidget *const parent) {
         for (qsizetype index = 0; index < records.size(); ++index) {
             const auto &step = records[index];
             const auto *app = service->model.find(step.application_id);
-            const auto name = app ? app->name : QCoreApplication::translate("XLibrary", "Missing application");
+            const auto name = app ? app->name : QCoreApplication::translate("Fora.Deck", "Missing application");
             const auto state = has_run        ? service->scenario_step_status(index)
-                               : step.enabled ? QCoreApplication::translate("XLibrary", "Waiting")
-                                              : QCoreApplication::translate("XLibrary", "Skipped");
+                               : step.enabled ? QCoreApplication::translate("Fora.Deck", "Waiting")
+                                              : QCoreApplication::translate("Fora.Deck", "Skipped");
             QStringList information;
             if (step.delay_ms > 0)
-                information << QCoreApplication::translate("XLibrary", "Delay: %1 s").arg(step.delay_ms / 1000.0);
+                information << QCoreApplication::translate("Fora.Deck", "Delay: %1 s").arg(step.delay_ms / 1000.0);
             if (!step.launch_profile.isEmpty()) {
                 QString profile_name = step.launch_profile;
                 if (app)
@@ -2294,7 +2295,7 @@ QWidget *scenarios(const ui_context &context, QWidget *const parent) {
                             profile_name = profile.name;
                             break;
                         }
-                information << QCoreApplication::translate("XLibrary", "Profile: %1").arg(profile_name);
+                information << QCoreApplication::translate("Fora.Deck", "Profile: %1").arg(profile_name);
             }
             const auto description = QString::number(index + 1) + ". " + name +
                                      (information.isEmpty() ? QString{} : "\n" + information.join(" · "));
@@ -2309,8 +2310,8 @@ QWidget *scenarios(const ui_context &context, QWidget *const parent) {
             }
             item->setIcon(0, image);
             const bool current_step = has_run && service->is_scenario_active() &&
-                                      (state == QCoreApplication::translate("XLibrary", "Delay") ||
-                                       state == QCoreApplication::translate("XLibrary", "Launching"));
+                                      (state == QCoreApplication::translate("Fora.Deck", "Delay") ||
+                                       state == QCoreApplication::translate("Fora.Deck", "Launching"));
             if (current_step)
                 for (int column = 0; column < 2; ++column) {
                     item->setBackground(column, steps->palette().highlight());
@@ -2325,19 +2326,19 @@ QWidget *scenarios(const ui_context &context, QWidget *const parent) {
     QObject::connect(service, &DesktopService::catalog_changed, widget, rebuild_steps);
     QObject::connect(list, &QListWidget::currentRowChanged, widget, [=] { rebuild_steps(); });
     auto *tools = new QHBoxLayout;
-    auto *run = button(QCoreApplication::translate("XLibrary", "Run scenario"), "primary", "play");
-    auto *edit = button(QCoreApplication::translate("XLibrary", "Edit"), nullptr, "edit");
-    auto *remove = button(QCoreApplication::translate("XLibrary", "Remove"), "danger", "trash");
-    auto *stop = button(QCoreApplication::translate("XLibrary", "Stop"), nullptr, "stop");
+    auto *run = button(QCoreApplication::translate("Fora.Deck", "Run scenario"), "primary", "play");
+    auto *edit = button(QCoreApplication::translate("Fora.Deck", "Edit"), nullptr, "edit");
+    auto *remove = button(QCoreApplication::translate("Fora.Deck", "Remove"), "danger", "trash");
+    auto *stop = button(QCoreApplication::translate("Fora.Deck", "Stop"), nullptr, "stop");
     stop->setToolTip(QCoreApplication::translate(
-        "XLibrary", "The scenario stopped. Applications already opened will keep running."));
+        "Fora.Deck", "The scenario stopped. Applications already opened will keep running."));
     remove->setProperty("quiet", true);
     auto *issues = new QPlainTextEdit;
     issues->setReadOnly(true);
-    issues->setAccessibleName(QCoreApplication::translate("XLibrary", "Scenario issues"));
+    issues->setAccessibleName(QCoreApplication::translate("Fora.Deck", "Scenario issues"));
     issues->setMinimumHeight(appearance::scaled(*context.settings, 60));
     issues->setMaximumHeight(appearance::scaled(*context.settings, 150));
-    auto *recheck = button(QCoreApplication::translate("XLibrary", "Check again"), nullptr, "refresh");
+    auto *recheck = button(QCoreApplication::translate("Fora.Deck", "Check again"), nullptr, "refresh");
     detail_layout->addWidget(issues);
     const auto check_selected = [=] {
         const auto id = list->currentItem() ? list->currentItem()->data(Qt::UserRole).toLongLong() : 0;
@@ -2346,10 +2347,10 @@ QWidget *scenarios(const ui_context &context, QWidget *const parent) {
             service->check_scenario(id);
         const bool checked = service->scenario_checked(id);
         const auto problems = service->scenario_issues(id);
-        issues->setPlainText(!checked ? QCoreApplication::translate("XLibrary", "Checking scenario…")
+        issues->setPlainText(!checked ? QCoreApplication::translate("Fora.Deck", "Checking scenario…")
                              : problems.isEmpty()
                                  ? QString{}
-                                 : QCoreApplication::translate("XLibrary", "Fix the scenario before running it:") +
+                                 : QCoreApplication::translate("Fora.Deck", "Fix the scenario before running it:") +
                                        "\n" + problems.join('\n'));
         issues->setVisible(can_check && (!checked || !problems.isEmpty()));
         run->setEnabled(can_check && checked && problems.isEmpty());
@@ -2404,7 +2405,7 @@ QWidget *scenarios(const ui_context &context, QWidget *const parent) {
             preview_painter.end();
             auto *item = new QListWidgetItem(
                 preview_count ? QIcon(preview) : appearance::icon("scenarios"),
-                record.name + QCoreApplication::translate("XLibrary", "\nApplications: %1").arg(record.steps.size()),
+                record.name + QCoreApplication::translate("Fora.Deck", "\nApplications: %1").arg(record.steps.size()),
                 list);
             item->setData(Qt::UserRole, record.id);
             item->setData(Qt::UserRole + 1, record.name);
@@ -2444,8 +2445,8 @@ QWidget *scenarios(const ui_context &context, QWidget *const parent) {
             }
     });
     QObject::connect(remove, &QPushButton::clicked, widget, [=] {
-        if (list->currentItem() && confirm(widget, QCoreApplication::translate("XLibrary", "Remove scenario"),
-                                           QCoreApplication::translate("XLibrary", "Remove the selected scenario?")))
+        if (list->currentItem() && confirm(widget, QCoreApplication::translate("Fora.Deck", "Remove scenario"),
+                                           QCoreApplication::translate("Fora.Deck", "Remove the selected scenario?")))
             service->remove_scenario(list->currentItem()->data(Qt::UserRole).toLongLong());
     });
     QObject::connect(stop, &QPushButton::clicked, service, &DesktopService::cancel_scenario);
@@ -2476,13 +2477,13 @@ void register_library_views(UiRegistry &registry) {
         auto *dialog = new QDialog(parent);
         const auto *service = static_cast<DesktopService *>(context.service);
         dialog->setWindowTitle(QCoreApplication::translate(
-            "XLibrary",
+            "Fora.Deck",
             service->file_search_active() || service->section() == "files" ? "File details" : "Application details"));
         prepare_dialog(dialog, context, {400, 660}, {300, 320});
         auto *layout = new QVBoxLayout(dialog);
         layout->setContentsMargins(0, 0, 0, 0);
         layout->addWidget(context.registry->create("details", context, dialog), 1);
-        auto *close = button(QCoreApplication::translate("XLibrary", "Close"));
+        auto *close = button(QCoreApplication::translate("Fora.Deck", "Close"));
         layout->addWidget(close);
         QObject::connect(close, &QPushButton::clicked, dialog, &QDialog::accept);
         return dialog;

@@ -7,7 +7,7 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $install_path = (Resolve-Path -LiteralPath $InstallPath).Path
-$required_files = @('XLibrary.exe', 'qt.conf', 'Qt6Core.dll', 'Qt6Gui.dll',
+$required_files = @('foradeck.exe', 'qt.conf', 'Qt6Core.dll', 'Qt6Gui.dll',
     'Qt6Widgets.dll', 'Qt6Network.dll', 'Qt6Concurrent.dll',
     'plugins/platforms/qwindows.dll', 'LICENSE', 'licenses/QtKeychain-BSD-3-Clause.txt')
 foreach ($file in $required_files) {
@@ -19,7 +19,7 @@ foreach ($file in $required_files) {
 $diagnostics = Join-Path $PSScriptRoot '../../build/install-check'
 New-Item -ItemType Directory -Force -Path $diagnostics | Out-Null
 $start_info = [System.Diagnostics.ProcessStartInfo]::new()
-$start_info.FileName = Join-Path $install_path 'XLibrary.exe'
+$start_info.FileName = Join-Path $install_path 'foradeck.exe'
 $start_info.Arguments = '--check-startup'
 $start_info.WorkingDirectory = [IO.Path]::GetTempPath()
 $start_info.UseShellExecute = $false

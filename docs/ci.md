@@ -20,7 +20,7 @@ PR events are the default `opened`, `synchronize` and `reopened`. Title/descript
 | [Clang Format](../.github/workflows/clang-format.yml) | All tracked C/C++ files with clang-format 18.1.8 |
 | [Prepare Release Draft](../.github/workflows/release.yml) | Separate manual main-only release packaging, metadata/hash checks and unpublished Draft; see [releasing](releasing.md#github-release-draft) |
 
-Ordinary CI creates no tags, release Drafts or deployments. Its Linux packages are retained for **14 days** as `XLibrary-linux-x86_64` artifacts.
+Ordinary CI creates no tags, release Drafts or deployments. Its Linux packages are retained for **14 days** as `Fora.Deck-linux-x86_64` artifacts.
 
 ## Diagnostics and limits
 

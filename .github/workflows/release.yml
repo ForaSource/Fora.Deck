@@ -8,7 +8,7 @@ permissions:
 
 # Serialize all versions and reruns, including the tag/Draft creation window.
 concurrency:
-  group: xlibrary-release
+  group: foradeck-release
   cancel-in-progress: false
 
 jobs:
@@ -85,7 +85,7 @@ jobs:
       - name: Configure portable Release
         run: |
           $toolchain = Join-Path $env:IQTA_TOOLS 'mingw1310_64/bin'
-          cmake -S . -B build/release-mingw -G Ninja -DCMAKE_BUILD_TYPE=Release -DXLIBRARY_NATIVE_CPU=OFF `
+          cmake -S . -B build/release-mingw -G Ninja -DCMAKE_BUILD_TYPE=Release -DFORADECK_NATIVE_CPU=OFF `
             "-DCMAKE_C_COMPILER=$toolchain/gcc.exe" "-DCMAKE_CXX_COMPILER=$toolchain/g++.exe"
           if ($LASTEXITCODE -ne 0) { throw 'Release configuration failed.' }
 
@@ -142,7 +142,7 @@ jobs:
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Configure Release with distribution Qt
-        run: cmake --preset linux-release -DCMAKE_PREFIX_PATH=/usr -DXLIBRARY_NATIVE_CPU=OFF
+        run: cmake --preset linux-release -DCMAKE_PREFIX_PATH=/usr -DFORADECK_NATIVE_CPU=OFF
 
       - name: Build and verify AppImage and DEB
         run: python3 packaging/build_release.py --output-path release/linux
@@ -151,13 +151,13 @@ jobs:
         env:
           SOURCE_SHA: ${{ needs.validation.outputs.source_sha }}
         run: |
-          images=(release/linux/XLibrary-*-linux-x86_64.AppImage)
+          images=(release/linux/Fora.Deck-*-linux-x86_64.AppImage)
           test "${#images[@]}" -eq 1
           image=$(realpath "${images[0]}")
           APPIMAGE_EXTRACT_AND_RUN=1 QT_QPA_PLATFORM=xcb timeout 45s xvfb-run -a dbus-run-session -- "$image" --check-startup
           scratch=$(mktemp -d)
-          (cd "$scratch" && "$image" --appimage-extract usr/share/XLibrary/build-info.json)
-          cmp "$scratch/squashfs-root/usr/share/XLibrary/build-info.json" release/linux/build-info.json
+          (cd "$scratch" && "$image" --appimage-extract usr/share/Fora.Deck/build-info.json)
+          cmp "$scratch/squashfs-root/usr/share/Fora.Deck/build-info.json" release/linux/build-info.json
           python3 - <<'PY'
           import json
           import os
@@ -173,12 +173,12 @@ jobs:
 
       - name: Install, run and remove DEB
         run: |
-          packages=(release/linux/xlibrary_*_amd64.deb)
+          packages=(release/linux/foradeck_*_amd64.deb)
           test "${#packages[@]}" -eq 1
           apt-get install -y "./${packages[0]}"
-          QT_QPA_PLATFORM=offscreen timeout 45s /usr/bin/XLibrary --check-startup
-          apt-get remove -y xlibrary
-          test ! -e /usr/bin/XLibrary
+          QT_QPA_PLATFORM=offscreen timeout 45s /usr/bin/foradeck --check-startup
+          apt-get remove -y foradeck
+          test ! -e /usr/bin/foradeck
 
       - name: Upload verified Linux packages
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -237,7 +237,7 @@ jobs:
             -f tag_name="$RELEASE_TAG" -f target_commitish="$SOURCE_SHA" --jq .body > "$RUNNER_TEMP/release-notes.md"
           cat >> "$RUNNER_TEMP/release-notes.md" <<'NOTES'
 
-          Windows x64: MinGW portable ZIP and Inno Setup installer. Back up the profile and exit XLibrary before upgrading. Portable profiles are separate from installed profiles.
+          Windows x64: MinGW portable ZIP and Inno Setup installer. Back up the profile and exit Fora.Deck before upgrading. Portable profiles are separate from installed profiles.
 
           Linux x86_64: AppImage and DEB, built on Debian 13 with system Qt 6.8.2 / glibc 2.41. SHA256SUMS.txt includes all four packages and both build metadata files. Binaries are unsigned.
           NOTES
@@ -249,7 +249,7 @@ jobs:
           flags=()
           if [ "$PRERELEASE" = true ]; then flags+=(--prerelease); fi
           gh release create "$RELEASE_TAG" --verify-tag --draft "${flags[@]}" \
-            --target "$SOURCE_SHA" --title "XLibrary $RELEASE_TAG" --notes-file "$RUNNER_TEMP/release-notes.md" release-upload/*
+            --target "$SOURCE_SHA" --title "Fora.Deck $RELEASE_TAG" --notes-file "$RUNNER_TEMP/release-notes.md" release-upload/*
 
       - name: Verify Draft state and uploaded files
         run: |

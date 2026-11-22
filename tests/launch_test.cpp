@@ -25,7 +25,7 @@ private slots:
         QFETCH(QByteArray, input);
         QFETCH(QByteArrayList, expected);
         QByteArrayList actual;
-        for (const auto &argument : xlibrary::split_launch_arguments(input.toStdString()))
+        for (const auto &argument : foradeck::split_launch_arguments(input.toStdString()))
             actual.append(QByteArray::fromStdString(argument));
         QCOMPARE(actual, expected);
     }
@@ -40,7 +40,7 @@ private slots:
 
     void rejects_incomplete_arguments() {
         QFETCH(QByteArray, input);
-        QVERIFY_THROWS_EXCEPTION(std::invalid_argument, xlibrary::split_launch_arguments(input.toStdString()));
+        QVERIFY_THROWS_EXCEPTION(std::invalid_argument, foradeck::split_launch_arguments(input.toStdString()));
     }
 
     void workspace_launch_data() {

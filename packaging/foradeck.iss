@@ -22,17 +22,18 @@ AppVersion={#AppVersion}
 AppVerName=Fora.Deck {#AppVersion}
 AppPublisher=ForaSource
 AppPublisherURL=https://github.com/ForaSource/Fora.Deck
-DefaultDirName={localappdata}\Programs\XLibrary
-DefaultGroupName=XLibrary
+DefaultDirName={localappdata}\Programs\Fora.Deck
+DefaultGroupName=Fora.Deck
+UsePreviousGroup=no
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0
 LicenseFile={#PackageDir}\LICENSE
-SetupIconFile=..\assets\xlibrary.ico
+SetupIconFile=..\assets\foradeck.ico
 OutputDir={#OutputDir}
-OutputBaseFilename=XLibrary-{#AppVersion}-windows-x64-{#Compiler}-setup
+OutputBaseFilename=Fora.Deck-{#AppVersion}-windows-x64-{#Compiler}-setup
 VersionInfoVersion={#NumericVersion}
 VersionInfoProductVersion={#NumericVersion}
 VersionInfoTextVersion={#AppVersion}
@@ -40,7 +41,7 @@ VersionInfoProductTextVersion={#AppVersion}
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
-UninstallDisplayIcon={app}\XLibrary.exe
+UninstallDisplayIcon={app}\foradeck.exe
 CloseApplications=yes
 RestartApplications=no
 SetupLogging=yes
@@ -54,18 +55,21 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [InstallDelete]
 Type: files; Name: "{app}\portable.flag"
-Type: files; Name: "{group}\XLibrary.lnk"
+Type: files; Name: "{app}\XLibrary.exe"
+Type: files; Name: "{userprograms}\XLibrary\XLibrary.lnk"
+Type: files; Name: "{userprograms}\XLibrary\Fora.Deck.lnk"
+Type: dirifempty; Name: "{userprograms}\XLibrary"
 Type: files; Name: "{autodesktop}\XLibrary.lnk"
 
 [Files]
 Source: "{#PackageDir}\*"; DestDir: "{app}"; Excludes: "portable.flag,data\*"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\Fora.Deck"; Filename: "{app}\XLibrary.exe"
-Name: "{autodesktop}\Fora.Deck"; Filename: "{app}\XLibrary.exe"; Check: ShouldCreateDesktopShortcut
+Name: "{group}\Fora.Deck"; Filename: "{app}\foradeck.exe"
+Name: "{autodesktop}\Fora.Deck"; Filename: "{app}\foradeck.exe"; Check: ShouldCreateDesktopShortcut
 
 [Run]
-Filename: "{app}\XLibrary.exe"; Description: "{cm:LaunchProgram,Fora.Deck}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\foradeck.exe"; Description: "{cm:LaunchProgram,Fora.Deck}"; Flags: nowait postinstall skipifsilent
 
 [Code]
 var
@@ -73,8 +77,8 @@ var
 
 procedure InitializeWizard;
 begin
-  { Record the old shortcut before InstallDelete removes its former name. }
-  HadDesktopShortcut := FileExists(ExpandConstant('{autodesktop}\XLibrary.lnk'));
+  HadDesktopShortcut := FileExists(ExpandConstant('{autodesktop}\Fora.Deck.lnk')) or
+    FileExists(ExpandConstant('{autodesktop}\XLibrary.lnk'));
 end;
 
 function ShouldCreateDesktopShortcut: Boolean;

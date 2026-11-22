@@ -1,5 +1,5 @@
-#ifndef XLIBRARY_CATALOG_TYPES_H
-#define XLIBRARY_CATALOG_TYPES_H
+#ifndef FORADECK_CATALOG_TYPES_H
+#define FORADECK_CATALOG_TYPES_H
 
 #include <atomic>
 #include <QHash>

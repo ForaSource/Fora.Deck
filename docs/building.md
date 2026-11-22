@@ -32,7 +32,7 @@ cmake -S . -B cmake-build-debug -G Ninja `
   "-DCMAKE_C_COMPILER=$compiler_bin/gcc.exe" `
   "-DCMAKE_CXX_COMPILER=$compiler_bin/g++.exe"
 cmake --build cmake-build-debug --parallel 4
-./cmake-build-debug/XLibrary.exe
+./cmake-build-debug/foradeck.exe
 ```
 
 Configure a separate Release directory for distribution:
@@ -42,7 +42,7 @@ cmake -S . -B cmake-build-release -G Ninja `
   -DCMAKE_BUILD_TYPE=Release "-DCMAKE_PREFIX_PATH=$qt" `
   "-DCMAKE_C_COMPILER=$compiler_bin/gcc.exe" `
   "-DCMAKE_CXX_COMPILER=$compiler_bin/g++.exe" `
-  -DXLIBRARY_NATIVE_CPU=OFF
+  -DFORADECK_NATIVE_CPU=OFF
 cmake --build cmake-build-release --parallel 4
 ```
 
@@ -52,7 +52,7 @@ For MSVC, open Developer PowerShell for VS 2022 x64, then start PowerShell 7 wit
 $qt = 'C:/Qt/6.8.3/msvc2022_64'
 $env:PATH = "$qt/bin;$env:PATH"
 cmake -S . -B build-msvc -G 'Visual Studio 17 2022' -A x64 `
-  "-DCMAKE_PREFIX_PATH=$qt" -DXLIBRARY_NATIVE_CPU=OFF
+  "-DCMAKE_PREFIX_PATH=$qt" -DFORADECK_NATIVE_CPU=OFF
 cmake --build build-msvc --config Debug --parallel 4
 cmake --build build-msvc --config Release --parallel 4
 ```
@@ -70,7 +70,7 @@ sudo apt-get install build-essential clang cmake ninja-build qt6-base-dev \
   pkg-config dbus-x11
 cmake --preset linux-debug
 cmake --build --preset linux-debug --parallel 4
-./cmake-build-linux-debug/XLibrary
+./cmake-build-linux-debug/foradeck
 ```
 
 Other distributions need equivalent development packages. An alternative Linux Qt SDK can be selected with `-DCMAKE_PREFIX_PATH=/path/to/Qt/gcc_64` for development; public DEB packages require the [Debian system Qt baseline](releasing.md#linux-compatibility-baseline). Windows Qt cannot be used for Linux builds.
@@ -89,7 +89,7 @@ Installation adds the executable, desktop entry, icon and license. The installed
 
 ## CLion and presets
 
-Open the root `CMakeLists.txt`, load CMake presets and enable the required profile in **Settings → Build, Execution, Deployment → CMake**. Use a matching Windows toolchain for `windows-debug`/`windows-release`, or Linux tools and Linux Qt for Linux profiles. Select target `XLibrary` to build/run/debug.
+Open the root `CMakeLists.txt`, load CMake presets and enable the required profile in **Settings → Build, Execution, Deployment → CMake**. Use a matching Windows toolchain for `windows-debug`/`windows-release`, or Linux tools and Linux Qt for Linux profiles. Select target `foradeck` to build/run/debug.
 
 On Windows with WSL, select a WSL toolchain. If Linux presets are hidden by the host OS condition, create a WSL CMake profile with its own directory and no Windows Qt prefix. Keep `TMPDIR` on the Linux filesystem, normally `/tmp`; Windows-mounted directories may not support Unix-domain sockets. Do not carry Windows PATH or Qt plugin environment variables into Linux runs.
 
@@ -100,12 +100,12 @@ Store personal paths in the ignored `CMakeUserPresets.json`. For Windows develop
 Own application/core sources use `/W4` on MSVC or `-Wall -Wextra -Wpedantic` elsewhere. Optional clang-tidy needs CMake **3.27+**, Ninja/Makefiles and a compatible `clang-tidy`:
 
 ```sh
-cmake --preset linux-clang-debug -DXLIBRARY_ENABLE_CLANG_TIDY=ON
+cmake --preset linux-clang-debug -DFORADECK_ENABLE_CLANG_TIDY=ON
 cmake --build --preset linux-clang-debug --parallel 4
 ```
 
-Analysis runs while compiling own sources and excludes dependencies/generated sources. Release builds use O2 and IPO/LTO when supported; leave `XLIBRARY_NATIVE_CPU=OFF` for distributed binaries.
+Analysis runs while compiling own sources and excludes dependencies/generated sources. Release builds use O2 and IPO/LTO when supported; leave `FORADECK_NATIVE_CPU=OFF` for distributed binaries.
 
-English is the base language. `translations/xlibrary_ru.ts` and `translations/qt_widgets_ru.ts` are compiled by `lrelease` and embedded; runtime does not need separate Fora.Deck translation files. Use `QCoreApplication::translate` with context `XLibrary` for application messages and update the Russian catalog.
+English is the base language. `translations/foradeck_ru.ts` and `translations/qt_widgets_ru.ts` are compiled by `lrelease` and embedded; runtime does not need separate Fora.Deck translation files. Use `QCoreApplication::translate` with context `Fora.Deck` for application messages and update the Russian catalog.
 
 For existing automated commands, startup checks and manual verification, see [testing](testing.md).

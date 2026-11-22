@@ -1,5 +1,5 @@
-#ifndef XLIBRARY_SEARCH_RESULTS_H
-#define XLIBRARY_SEARCH_RESULTS_H
+#ifndef FORADECK_SEARCH_RESULTS_H
+#define FORADECK_SEARCH_RESULTS_H
 
 #include <algorithm>
 #include <atomic>
@@ -69,13 +69,13 @@ inline QVector<search_entry> directory_entries(
     if (!target.isDir()) {
         if (path.endsWith('/'))
             return {
-                {search_entry::kind::message, QCoreApplication::translate("XLibrary", "Folder unavailable"), {}, 0}};
+                {search_entry::kind::message, QCoreApplication::translate("Fora.Deck", "Folder unavailable"), {}, 0}};
         prefix = target.fileName();
         path = target.absolutePath();
     }
     const QDir directory(path);
     if (!directory.exists() || !QFileInfo(path).isReadable())
-        return {{search_entry::kind::message, QCoreApplication::translate("XLibrary", "Folder unavailable"), {}, 0}};
+        return {{search_entry::kind::message, QCoreApplication::translate("Fora.Deck", "Folder unavailable"), {}, 0}};
     const auto ordered = [working_files_only, sort_mode](const search_entry &left, const search_entry &right,
                                                          const bool rank_results) {
         if (rank_results && left.rank != right.rank)
@@ -170,7 +170,7 @@ inline QVector<search_entry> directory_entries(
                   [&](const auto &left, const auto &right) { return ordered(left, right, false); });
     if (limited)
         entries.append({search_entry::kind::open_folder,
-                        QCoreApplication::translate("XLibrary", "Results limited. Open folder"),
+                        QCoreApplication::translate("Fora.Deck", "Results limited. Open folder"),
                         directory.absolutePath(), 0});
     return entries;
 }

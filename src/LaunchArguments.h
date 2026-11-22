@@ -1,11 +1,11 @@
-#ifndef XLIBRARY_LAUNCH_ARGUMENTS_H
-#define XLIBRARY_LAUNCH_ARGUMENTS_H
+#ifndef FORADECK_LAUNCH_ARGUMENTS_H
+#define FORADECK_LAUNCH_ARGUMENTS_H
 
 #include <string>
 #include <string_view>
 #include <vector>
 
-namespace xlibrary {
+namespace foradeck {
 
 // Разбирает пользовательские аргументы Linux без запуска оболочки и подстановок.
 // Кавычки сохраняют пустые аргументы; обратная косая черта экранирует символы
@@ -13,6 +13,6 @@ namespace xlibrary {
 // Остальные байты (в том числе UTF-8) сохраняются без перекодирования.
 std::vector<std::string> split_launch_arguments(std::string_view arguments);
 
-} // namespace xlibrary
+} // namespace foradeck
 
-#endif // XLIBRARY_LAUNCH_ARGUMENTS_H
+#endif // FORADECK_LAUNCH_ARGUMENTS_H

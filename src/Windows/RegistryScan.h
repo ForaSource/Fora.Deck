@@ -1,5 +1,5 @@
-#ifndef XLIBRARY_REGISTRY_SCAN_H
-#define XLIBRARY_REGISTRY_SCAN_H
+#ifndef FORADECK_REGISTRY_SCAN_H
+#define FORADECK_REGISTRY_SCAN_H
 
 #include <cstddef>
 #include <cstdint>
@@ -9,7 +9,7 @@
 
 #include "Application.h"
 
-namespace xlibrary {
+namespace foradeck {
 
 class ComScope {
     std::int32_t result;
@@ -58,6 +58,6 @@ std::vector<::Application> scan_registry_applications(std::vector<scan_issue> *i
 std::vector<uninstall_entry> scan_uninstall_current_user(std::vector<scan_issue> *issues = nullptr);
 std::vector<uninstall_entry> scan_uninstall_local_machine(std::vector<scan_issue> *issues = nullptr);
 
-} // namespace xlibrary
+} // namespace foradeck
 
-#endif // XLIBRARY_REGISTRY_SCAN_H
+#endif // FORADECK_REGISTRY_SCAN_H

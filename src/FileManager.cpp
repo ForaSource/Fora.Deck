@@ -46,7 +46,7 @@ connection open_index(const QString &path) {
     return db;
 }
 QStringList saved_paths(sqlite3 *db) {
-    xlibrary::SqliteStatement rows(db, "SELECT path FROM saved ORDER BY path");
+    foradeck::SqliteStatement rows(db, "SELECT path FROM saved ORDER BY path");
     QStringList paths;
     while (rows.next())
         paths.append(rows.qtext(0));
@@ -230,14 +230,14 @@ FileManager::FileManager(const QString &directory, const QStringList &saved_path
     connect(&source_poll, &QTimer::timeout, this, &FileManager::check_sources);
     progress_timer.setInterval(1000);
     connect(&progress_timer, &QTimer::timeout, this, [this] {
-        state = QCoreApplication::translate("XLibrary", "Indexing files: %1").arg(indexed->load());
+        state = QCoreApplication::translate("Fora.Deck", "Indexing files: %1").arg(indexed->load());
         emit status_changed();
     });
     // Create the small schema before workers are started; all enumeration and queries run off the GUI thread.
     try {
         QDir().mkpath(directory);
         auto db = open_index(database_path);
-        xlibrary::sqlite_execute(
+        foradeck::sqlite_execute(
             db.get(),
             "PRAGMA journal_mode=WAL;"
             "CREATE TABLE IF NOT EXISTS files(path TEXT PRIMARY KEY,name TEXT NOT "
@@ -250,36 +250,36 @@ FileManager::FileManager(const QString &directory, const QStringList &saved_path
             "completed INTEGER NOT NULL,state TEXT NOT NULL,issues TEXT NOT NULL,PRIMARY KEY(scope,root));");
         bool has_added = false;
         {
-            xlibrary::SqliteStatement columns(db.get(), "PRAGMA table_info(files)");
+            foradeck::SqliteStatement columns(db.get(), "PRAGMA table_info(files)");
             while (columns.next())
                 has_added |= columns.qtext(1) == "added";
         }
         if (!has_added) {
             // Older indexes retained only their last scan time, the earliest available approximation.
-            xlibrary::sqlite_execute(db.get(), "BEGIN IMMEDIATE;"
+            foradeck::sqlite_execute(db.get(), "BEGIN IMMEDIATE;"
                                                "ALTER TABLE files ADD COLUMN added INTEGER NOT NULL DEFAULT 0;"
                                                "UPDATE files SET added=seen; COMMIT");
         }
         for (const auto *column : {"volume_root", "volume_device"}) {
             bool present = false;
-            xlibrary::SqliteStatement columns(db.get(), "PRAGMA table_info(files)");
+            foradeck::SqliteStatement columns(db.get(), "PRAGMA table_info(files)");
             while (columns.next())
                 present |= columns.qtext(1) == QLatin1String(column);
             if (!present)
-                xlibrary::sqlite_execute(
+                foradeck::sqlite_execute(
                     db.get(), (QStringLiteral("ALTER TABLE files ADD COLUMN ") + column + " TEXT NOT NULL DEFAULT ''")
                                   .toUtf8()
                                   .constData());
         }
-        xlibrary::sqlite_execute(db.get(), "BEGIN; DELETE FROM saved;");
+        foradeck::sqlite_execute(db.get(), "BEGIN; DELETE FROM saved;");
         for (const auto &path : saved_paths) {
             if (!QFileInfo(path).isAbsolute())
                 continue;
-            xlibrary::SqliteStatement insert(db.get(), "INSERT OR IGNORE INTO saved VALUES(?)");
+            foradeck::SqliteStatement insert(db.get(), "INSERT OR IGNORE INTO saved VALUES(?)");
             insert.bind(1, identity(path));
             insert.next();
         }
-        xlibrary::sqlite_execute(db.get(), "COMMIT");
+        foradeck::sqlite_execute(db.get(), "COMMIT");
     } catch (const std::exception &e) {
         state = QString::fromUtf8(e.what());
     }
@@ -315,7 +315,7 @@ file_search_mode FileManager::mode_from_setting(const QString &value) {
 void FileManager::load_source_states() {
     source_states.clear();
     auto db = open_index(database_path);
-    xlibrary::SqliteStatement rows(db.get(),
+    foradeck::SqliteStatement rows(db.get(),
                                    "SELECT root,depth,volume_root,volume_device,attempted,completed,state,issues "
                                    "FROM index_sources WHERE scope=? ORDER BY root");
     rows.bind(1, scope);
@@ -335,30 +335,30 @@ QString FileManager::diagnostics_text() const {
     if (!is_enabled())
         return lines.join('\n');
     if (source_states.isEmpty())
-        lines.append(QCoreApplication::translate("XLibrary", "No completed source scan. Refresh required."));
+        lines.append(QCoreApplication::translate("Fora.Deck", "No completed source scan. Refresh required."));
     const auto date = [](const qint64 value) {
         return value ? QLocale{}.toString(QDateTime::fromMSecsSinceEpoch(value), QLocale::ShortFormat)
-                     : QCoreApplication::translate("XLibrary", "Never");
+                     : QCoreApplication::translate("Fora.Deck", "Never");
     };
     for (const auto &source : source_states) {
         const bool stale =
             !source.completed || QDateTime::currentMSecsSinceEpoch() - source.completed >= refresh_interval_ms;
         const auto description =
             source.state == "unavailable"
-                ? QCoreApplication::translate("XLibrary", "Source unavailable; cached results retained")
+                ? QCoreApplication::translate("Fora.Deck", "Source unavailable; cached results retained")
             : source.state != "complete" || stale
-                ? QCoreApplication::translate("XLibrary", "Refresh required; search may be incomplete")
-                : QCoreApplication::translate("XLibrary", "Last scan complete");
+                ? QCoreApplication::translate("Fora.Deck", "Refresh required; search may be incomplete")
+                : QCoreApplication::translate("Fora.Deck", "Last scan complete");
         lines.append('\n' + QDir::toNativeSeparators(source.root) + " — " + description);
-        lines.append(QCoreApplication::translate("XLibrary", "Last attempt: %1. Last complete scan: %2.")
+        lines.append(QCoreApplication::translate("Fora.Deck", "Last attempt: %1. Last complete scan: %2.")
                          .arg(date(source.attempted), date(source.completed)));
         if (!source.unavailable_directories.isEmpty()) {
-            lines.append(QCoreApplication::translate("XLibrary", "Unavailable folders: %1")
+            lines.append(QCoreApplication::translate("Fora.Deck", "Unavailable folders: %1")
                              .arg(source.unavailable_directories.size()));
             for (const auto &directory : source.unavailable_directories.mid(0, 200))
                 lines.append("  " + QDir::toNativeSeparators(directory));
             if (source.unavailable_directories.size() > 200)
-                lines.append(QCoreApplication::translate("XLibrary", "Only the first 200 folders are shown."));
+                lines.append(QCoreApplication::translate("Fora.Deck", "Only the first 200 folders are shown."));
         }
     }
     return lines.join('\n');
@@ -395,7 +395,7 @@ void FileManager::configure(const file_search_mode selected_mode, const QStringL
     if (is_enabled()) {
         try {
             auto db = open_index(database_path);
-            xlibrary::SqliteStatement completed(db.get(), "SELECT completed FROM scan_state WHERE scope=?");
+            foradeck::SqliteStatement completed(db.get(), "SELECT completed FROM scan_state WHERE scope=?");
             completed.bind(1, scope);
             if (completed.next())
                 last_refresh = completed.number(0);
@@ -409,7 +409,7 @@ void FileManager::configure(const file_search_mode selected_mode, const QStringL
                                                   [](const auto &source) { return source.state != "complete"; }) ||
                                       QDateTime::currentMSecsSinceEpoch() - last_refresh >= refresh_interval_ms);
     if (!is_enabled()) {
-        state = QCoreApplication::translate("XLibrary", "File search is off");
+        state = QCoreApplication::translate("Fora.Deck", "File search is off");
         emit status_changed();
     }
     emit configuration_changed();
@@ -421,7 +421,7 @@ void FileManager::configure(const file_search_mode selected_mode, const QStringL
     if (rescan_pending && !scanning)
         start_scan();
     else if (is_enabled() && !scanning) {
-        state = QCoreApplication::translate("XLibrary", "File index is up to date");
+        state = QCoreApplication::translate("Fora.Deck", "File index is up to date");
         emit status_changed();
         schedule_refresh();
     }
@@ -463,7 +463,7 @@ void FileManager::check_sources() {
         if (expected != scan_generation->load() || !is_enabled())
             return;
         if (!result.error.isEmpty()) {
-            state = QCoreApplication::translate("XLibrary", "File index error: %1").arg(result.error);
+            state = QCoreApplication::translate("Fora.Deck", "File index error: %1").arg(result.error);
             emit status_changed();
             return;
         }
@@ -492,7 +492,7 @@ void FileManager::check_sources() {
                         result.returned.append(source.root);
                     else if (!available)
                         source.state = "unavailable";
-                    xlibrary::SqliteStatement update(db.get(),
+                    foradeck::SqliteStatement update(db.get(),
                                                      "UPDATE index_sources SET state=? WHERE scope=? AND root=?");
                     update.bind(1, source.state);
                     update.bind(2, scope);
@@ -518,7 +518,7 @@ void FileManager::start_scan(const QStringList &only_roots, const bool allow_vol
     rescan_pending = false;
     scanning = true;
     indexed->store(0);
-    state = QCoreApplication::translate("XLibrary", "Indexing files: %1").arg(0);
+    state = QCoreApplication::translate("Fora.Deck", "Indexing files: %1").arg(0);
     progress_timer.start();
     emit status_changed();
     using scan_result = QPair<QString, qint64>;
@@ -537,7 +537,7 @@ void FileManager::start_scan(const QStringList &only_roots, const bool allow_vol
                     try {
                         load_source_states();
                     } catch (const std::exception &error) {
-                        state = QCoreApplication::translate("XLibrary", "File index error: %1")
+                        state = QCoreApplication::translate("Fora.Deck", "File index error: %1")
                                     .arg(QString::fromUtf8(error.what()));
                     }
                     emit status_changed();
@@ -571,7 +571,7 @@ void FileManager::start_scan(const QStringList &only_roots, const bool allow_vol
             try {
                 auto db = open_index(path);
                 // Each batch rewrites scope ownership, so other scope timestamps become invalid immediately.
-                xlibrary::SqliteStatement invalidate(db.get(), "DELETE FROM scan_state WHERE scope<>?");
+                foradeck::SqliteStatement invalidate(db.get(), "DELETE FROM scan_state WHERE scope<>?");
                 invalidate.bind(1, scope);
                 invalidate.next();
                 const auto seen = QDateTime::currentMSecsSinceEpoch();
@@ -600,7 +600,7 @@ void FileManager::start_scan(const QStringList &only_roots, const bool allow_vol
                             source_roots.insert(root, 1);
                 QHash<QString, QStringList> known_volumes;
                 // A scope edit must not discard offline volumes that still belong to Basic/Full mode.
-                xlibrary::SqliteStatement previous_sources(
+                foradeck::SqliteStatement previous_sources(
                     db.get(),
                     "SELECT root,depth,volume_root,volume_device,scope FROM index_sources ORDER BY attempted DESC");
                 while (previous_sources.next()) {
@@ -617,7 +617,7 @@ void FileManager::start_scan(const QStringList &only_roots, const bool allow_vol
                     if (previous_sources.qtext(4) == scope && !source_roots.contains(root))
                         source_roots.insert(root, static_cast<int>(previous_sources.number(1)));
                 }
-                xlibrary::SqliteStatement cached_volumes(
+                foradeck::SqliteStatement cached_volumes(
                     db.get(), "SELECT volume_root,volume_device FROM files "
                               "WHERE volume_root<>'' GROUP BY volume_root,volume_device ORDER BY MAX(seen) DESC");
                 while (cached_volumes.next()) {
@@ -649,27 +649,27 @@ void FileManager::start_scan(const QStringList &only_roots, const bool allow_vol
                 if (only_roots.isEmpty()) {
                     QStringList retained;
                     QStringList excluded;
-                    xlibrary::SqliteStatement old_files(db.get(), "SELECT path FROM files WHERE scope<>?");
+                    foradeck::SqliteStatement old_files(db.get(), "SELECT path FROM files WHERE scope<>?");
                     old_files.bind(1, scope);
                     while (old_files.next() && !cancelled())
                         (in_scope(old_files.qtext(0)) ? retained : excluded).append(old_files.qtext(0));
-                    xlibrary::sqlite_execute(db.get(), "BEGIN IMMEDIATE");
+                    foradeck::sqlite_execute(db.get(), "BEGIN IMMEDIATE");
                     for (const auto &file_path : retained) {
-                        xlibrary::SqliteStatement move(db.get(), "UPDATE files SET scope=? WHERE path=?");
+                        foradeck::SqliteStatement move(db.get(), "UPDATE files SET scope=? WHERE path=?");
                         move.bind(1, scope);
                         move.bind(2, file_path);
                         move.next();
                     }
                     for (const auto &file_path : excluded) {
-                        xlibrary::SqliteStatement remove(db.get(),
+                        foradeck::SqliteStatement remove(db.get(),
                                                          "DELETE FROM files WHERE path=? AND NOT EXISTS(SELECT 1 FROM "
                                                          "saved WHERE saved.path=files.path)");
                         remove.bind(1, file_path);
                         remove.next();
                     }
-                    xlibrary::sqlite_execute(db.get(), cancelled() ? "ROLLBACK" : "COMMIT");
+                    foradeck::sqlite_execute(db.get(), cancelled() ? "ROLLBACK" : "COMMIT");
                     if (cancelled())
-                        return {QCoreApplication::translate("XLibrary", "File indexing cancelled"), 0};
+                        return {QCoreApplication::translate("Fora.Deck", "File indexing cancelled"), 0};
                 }
                 QSet<QString> changed_volumes;
                 if (!allow_volume_change)
@@ -677,7 +677,7 @@ void FileManager::start_scan(const QStringList &only_roots, const bool allow_vol
                         if (volume_identity(it.key()) != it.value())
                             changed_volumes.insert(it.key());
                 for (auto it = source_roots.cbegin(); it != source_roots.cend(); ++it) {
-                    xlibrary::SqliteStatement begin_source(
+                    foradeck::SqliteStatement begin_source(
                         db.get(),
                         "INSERT INTO index_sources VALUES(?,?,?,?,?,?,0,'needs_refresh','[]') "
                         "ON CONFLICT(scope,root) DO UPDATE SET state='needs_refresh',attempted=excluded.attempted");
@@ -711,9 +711,9 @@ void FileManager::start_scan(const QStringList &only_roots, const bool allow_vol
                 const auto flush = [&] {
                     if (batch.isEmpty())
                         return;
-                    xlibrary::sqlite_execute(db.get(), "BEGIN");
+                    foradeck::sqlite_execute(db.get(), "BEGIN");
                     for (const auto &entry : batch) {
-                        xlibrary::SqliteStatement insert(
+                        foradeck::SqliteStatement insert(
                             db.get(), "INSERT INTO files(path,name,scope,seen,added,volume_root,volume_device) "
                                       "VALUES(?,?,?,?,?,?,?) ON CONFLICT(path) "
                                       "DO UPDATE SET name=excluded.name,scope=excluded.scope,seen=excluded.seen,"
@@ -728,7 +728,7 @@ void FileManager::start_scan(const QStringList &only_roots, const bool allow_vol
                         insert.bind(7, entry.volume_device);
                         insert.next();
                     }
-                    xlibrary::sqlite_execute(db.get(), "COMMIT");
+                    foradeck::sqlite_execute(db.get(), "COMMIT");
                     count->fetch_add(batch.size());
                     batch.clear();
                     batch_age.restart();
@@ -808,13 +808,13 @@ void FileManager::start_scan(const QStringList &only_roots, const bool allow_vol
                 }
                 flush();
                 if (cancelled())
-                    return {QCoreApplication::translate("XLibrary", "File indexing cancelled"), 0};
-                xlibrary::sqlite_execute(db.get(), "BEGIN IMMEDIATE");
+                    return {QCoreApplication::translate("Fora.Deck", "File indexing cancelled"), 0};
+                foradeck::sqlite_execute(db.get(), "BEGIN IMMEDIATE");
                 // Only a complete enumeration on the original volume proves that a cached file disappeared.
                 QStringList obsolete;
                 QHash<QString, QStringList> current_volumes;
                 {
-                    xlibrary::SqliteStatement stale(
+                    foradeck::SqliteStatement stale(
                         db.get(),
                         "SELECT path,scope,volume_root,volume_device FROM files "
                         "WHERE (scope<>? OR seen<>?) AND NOT EXISTS(SELECT 1 FROM saved s WHERE s.path=files.path)");
@@ -844,11 +844,11 @@ void FileManager::start_scan(const QStringList &only_roots, const bool allow_vol
                     }
                 }
                 for (const auto &file_path : obsolete) {
-                    xlibrary::SqliteStatement prune(db.get(), "DELETE FROM files WHERE path=?");
+                    foradeck::SqliteStatement prune(db.get(), "DELETE FROM files WHERE path=?");
                     prune.bind(1, file_path);
                     prune.next();
                 }
-                xlibrary::SqliteStatement forget(db.get(), "DELETE FROM scan_state WHERE scope<>?");
+                foradeck::SqliteStatement forget(db.get(), "DELETE FROM scan_state WHERE scope<>?");
                 forget.bind(1, scope);
                 forget.next();
                 const auto completed = QDateTime::currentMSecsSinceEpoch();
@@ -869,7 +869,7 @@ void FileManager::start_scan(const QStringList &only_roots, const bool allow_vol
                     const bool available = volume.size() == 2 && completed_directories.contains(it.key()) &&
                                            completed_directories.value(it.key()) == volume;
                     const bool complete = available && paths.isEmpty();
-                    xlibrary::SqliteStatement finish_source(
+                    foradeck::SqliteStatement finish_source(
                         db.get(),
                         "UPDATE index_sources SET "
                         "volume_root=CASE WHEN ? THEN ? ELSE volume_root END,"
@@ -887,28 +887,28 @@ void FileManager::start_scan(const QStringList &only_roots, const bool allow_vol
                     finish_source.bind(10, it.key());
                     finish_source.next();
                 }
-                xlibrary::SqliteStatement source_health(db.get(), "SELECT MIN(completed),SUM(state<>'complete') "
+                foradeck::SqliteStatement source_health(db.get(), "SELECT MIN(completed),SUM(state<>'complete') "
                                                                   "FROM index_sources WHERE scope=?");
                 source_health.bind(1, scope);
                 source_health.next();
                 const auto full_completed = source_health.number(1) == 0 ? source_health.number(0) : 0;
-                xlibrary::SqliteStatement remember(db.get(), "INSERT INTO scan_state VALUES(?,?) ON CONFLICT(scope) "
+                foradeck::SqliteStatement remember(db.get(), "INSERT INTO scan_state VALUES(?,?) ON CONFLICT(scope) "
                                                              "DO UPDATE SET completed=excluded.completed");
                 remember.bind(1, scope);
                 remember.bind(2, full_completed);
                 remember.next();
                 if (cancelled()) {
-                    xlibrary::sqlite_execute(db.get(), "ROLLBACK");
-                    return {QCoreApplication::translate("XLibrary", "File indexing cancelled"), 0};
+                    foradeck::sqlite_execute(db.get(), "ROLLBACK");
+                    return {QCoreApplication::translate("Fora.Deck", "File indexing cancelled"), 0};
                 }
-                xlibrary::sqlite_execute(db.get(), "COMMIT");
-                return {QCoreApplication::translate("XLibrary", "Indexed %1 files; inaccessible folders: %2")
+                foradeck::sqlite_execute(db.get(), "COMMIT");
+                return {QCoreApplication::translate("Fora.Deck", "Indexed %1 files; inaccessible folders: %2")
                             .arg(count->load())
                             .arg(skipped),
                         completed};
             } catch (const std::exception &e) {
                 return {
-                    QCoreApplication::translate("XLibrary", "File index error: %1").arg(QString::fromUtf8(e.what())),
+                    QCoreApplication::translate("Fora.Deck", "File index error: %1").arg(QString::fromUtf8(e.what())),
                     0};
             }
         }));
@@ -991,7 +991,7 @@ void FileManager::search(const QString &text, const quint64 request, QObject *re
                     const auto capacity = limit - matches.size();
                     QVector<file_match> candidates;
                     candidates.reserve(capacity);
-                    xlibrary::SqliteStatement rows(
+                    foradeck::SqliteStatement rows(
                         db.get(), "SELECT f.path,f.name,EXISTS(SELECT 1 FROM saved s WHERE "
                                   "s.path=f.path),f.added,f.volume_root,f.volume_device "
                                   "FROM files f WHERE f.scope=? OR EXISTS(SELECT 1 FROM saved s WHERE s.path=f.path) "
@@ -1133,7 +1133,7 @@ void FileManager::directory_dates(const QString &request, QObject *const receive
         pattern += '%';
         try {
             auto db = open_index(database);
-            xlibrary::SqliteStatement rows(db.get(), "SELECT path,added FROM files WHERE path LIKE ? ESCAPE '\\' "
+            foradeck::SqliteStatement rows(db.get(), "SELECT path,added FROM files WHERE path LIKE ? ESCAPE '\\' "
                                                      "AND instr(substr(path,?),'/')=0");
             rows.bind(1, pattern);
             rows.bind(2, root.size() + 1);
@@ -1246,7 +1246,7 @@ void FileManager::saved_files(QObject *receiver, std::function<void(QVector<file
         QVector<file_match> entries;
         try {
             auto db = open_index(path);
-            xlibrary::SqliteStatement rows(db.get(), "SELECT path FROM saved ORDER BY path");
+            foradeck::SqliteStatement rows(db.get(), "SELECT path FROM saved ORDER BY path");
             while (rows.next()) {
                 const auto file = rows.qtext(0);
                 entries.append({file, QFileInfo(file).fileName(), 0, true, accepts_file(file)});
@@ -1268,13 +1268,13 @@ void inspect_saved_path(const QString &path, const QSet<QString> &existing, file
     else if (already_validated)
         result.added.append(path);
     else if (QFileInfo(path).isDir())
-        result.rejected.insert(path, QCoreApplication::translate("XLibrary", "Choose a file inside the folder."));
+        result.rejected.insert(path, QCoreApplication::translate("Fora.Deck", "Choose a file inside the folder."));
     else if (!QFileInfo::exists(path))
         result.rejected.insert(
-            path, QCoreApplication::translate("XLibrary", "The file no longer exists or is inaccessible."));
+            path, QCoreApplication::translate("Fora.Deck", "The file no longer exists or is inaccessible."));
     else if (!FileManager::accepts_file(path))
         result.rejected.insert(
-            path, QCoreApplication::translate("XLibrary", "The file is unavailable or its type is excluded."));
+            path, QCoreApplication::translate("Fora.Deck", "The file is unavailable or its type is excluded."));
     else
         result.added.append(path);
 }
@@ -1352,11 +1352,11 @@ void FileManager::update_saved_files(QStringList paths, const bool saved, QObjec
                 if (single && saved && !accepts_file(paths.value(0))) {
                     result.rejected.insert(
                         paths.value(0),
-                        QCoreApplication::translate("XLibrary", "The file is unavailable or its type is excluded."));
+                        QCoreApplication::translate("Fora.Deck", "The file is unavailable or its type is excluded."));
                     return {std::move(result), {}};
                 }
                 auto db = open_index(database);
-                xlibrary::sqlite_execute(db.get(), "BEGIN IMMEDIATE");
+                foradeck::sqlite_execute(db.get(), "BEGIN IMMEDIATE");
                 if (saved) {
                     const auto existing = saved_paths(db.get());
                     const QSet<QString> keys(existing.cbegin(), existing.cend());
@@ -1366,10 +1366,10 @@ void FileManager::update_saved_files(QStringList paths, const bool saved, QObjec
                         inspect_saved_path(path, keys, result, single);
                         if (result.added.size() == added_before)
                             continue;
-                        xlibrary::SqliteStatement insert(db.get(), "INSERT OR IGNORE INTO saved VALUES(?)");
+                        foradeck::SqliteStatement insert(db.get(), "INSERT OR IGNORE INTO saved VALUES(?)");
                         insert.bind(1, path);
                         insert.next();
-                        xlibrary::SqliteStatement remember(db.get(),
+                        foradeck::SqliteStatement remember(db.get(),
                                                            "INSERT OR IGNORE INTO files(path,name,scope,seen,added) "
                                                            "VALUES(?,?,?,?,?)");
                         remember.bind(1, path);
@@ -1381,12 +1381,12 @@ void FileManager::update_saved_files(QStringList paths, const bool saved, QObjec
                         remember.next();
                     }
                 } else {
-                    xlibrary::SqliteStatement remove(db.get(), "DELETE FROM saved WHERE path=?");
+                    foradeck::SqliteStatement remove(db.get(), "DELETE FROM saved WHERE path=?");
                     remove.bind(1, paths.value(0));
                     remove.next();
                 }
                 auto current = saved_paths(db.get());
-                xlibrary::sqlite_execute(db.get(), "COMMIT");
+                foradeck::sqlite_execute(db.get(), "COMMIT");
                 return {std::move(result), std::move(current)};
             } catch (const std::exception &error) {
                 // Closing the SQLite connection rolls back an uncommitted transaction.

@@ -189,13 +189,13 @@ QVariant LibraryModel::data(const QModelIndex &index, const int requested_role) 
             return record.tags.join(", ");
         switch (status_of(record)) {
         case application_status::running:
-            return QCoreApplication::translate("XLibrary", "Running");
+            return QCoreApplication::translate("Fora.Deck", "Running");
         case application_status::stopped:
-            return QCoreApplication::translate("XLibrary", "Not running");
+            return QCoreApplication::translate("Fora.Deck", "Not running");
         case application_status::drive_unavailable:
-            return QCoreApplication::translate("XLibrary", "Drive unavailable");
+            return QCoreApplication::translate("Fora.Deck", "Drive unavailable");
         case application_status::unavailable:
-            return QCoreApplication::translate("XLibrary", "Unavailable");
+            return QCoreApplication::translate("Fora.Deck", "Unavailable");
         }
         return {};
     case Qt::ToolTipRole:
@@ -227,13 +227,13 @@ QVariant LibraryModel::data(const QModelIndex &index, const int requested_role) 
 QVariant LibraryModel::headerData(const int section, const Qt::Orientation orientation,
                                   const int requested_role) const {
     if (orientation == Qt::Horizontal && requested_role == Qt::DisplayRole) {
-        return QStringList{QCoreApplication::translate("XLibrary", "Application"),
-                           QCoreApplication::translate("XLibrary", "Tags"),
-                           QCoreApplication::translate("XLibrary", "Status")}
+        return QStringList{QCoreApplication::translate("Fora.Deck", "Application"),
+                           QCoreApplication::translate("Fora.Deck", "Tags"),
+                           QCoreApplication::translate("Fora.Deck", "Status")}
             .value(section);
     }
     if (orientation == Qt::Horizontal && requested_role == Qt::ToolTipRole) {
-        return QCoreApplication::translate("XLibrary", "Click to sort. Click again to reverse the order.");
+        return QCoreApplication::translate("Fora.Deck", "Click to sort. Click again to reverse the order.");
     }
     return {};
 }
@@ -311,11 +311,11 @@ QString LibraryModel::process_usage(const app_record &record) const {
         return {};
     QStringList values;
     if (show_cpu)
-        values.append(QCoreApplication::translate("XLibrary", "CPU: %1")
+        values.append(QCoreApplication::translate("Fora.Deck", "CPU: %1")
                           .arg(record.cpu_percent < 0 ? QString::fromUtf8("—")
                                                       : QLocale{}.toString(record.cpu_percent, 'f', 1) + '%'));
     if (show_memory)
-        values.append(QCoreApplication::translate("XLibrary", "RAM: %1")
+        values.append(QCoreApplication::translate("Fora.Deck", "RAM: %1")
                           .arg(record.memory_bytes < 0 ? QString::fromUtf8("—")
                                                        : QLocale{}.formattedDataSize(record.memory_bytes, 1)));
     return values.join(QString::fromUtf8(" · "));

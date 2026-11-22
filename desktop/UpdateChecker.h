@@ -1,5 +1,5 @@
-#ifndef XLIBRARY_UPDATE_CHECKER_H
-#define XLIBRARY_UPDATE_CHECKER_H
+#ifndef FORADECK_UPDATE_CHECKER_H
+#define FORADECK_UPDATE_CHECKER_H
 
 #include <memory>
 #include <optional>

@@ -1,5 +1,5 @@
-#ifndef XLIBRARY_APPLICATION_H
-#define XLIBRARY_APPLICATION_H
+#ifndef FORADECK_APPLICATION_H
+#define FORADECK_APPLICATION_H
 
 #include <atomic>
 #include <cstdint>
@@ -94,4 +94,4 @@ public:
 
 std::ostream &operator<<(std::ostream &stream, const Application &application);
 
-#endif //XLIBRARY_APPLICATION_H
+#endif //FORADECK_APPLICATION_H

@@ -230,7 +230,7 @@ bool should_import_application(const app_record &record) {
 
 QString Application::new_instance_error(const app_record &record) {
     return file_target(record) ? QString{}
-                               : QCoreApplication::translate("XLibrary", "This target supports activation only.");
+                               : QCoreApplication::translate("Fora.Deck", "This target supports activation only.");
 }
 
 QString Application::configured_arguments(const app_record &record) {
@@ -239,28 +239,28 @@ QString Application::configured_arguments(const app_record &record) {
 
 qint64 Application::launch_application(const app_record &record, const launch_mode mode) {
     validate_launch_target(record);
-    const xlibrary::ComScope com;
+    const foradeck::ComScope com;
     const auto kind = target_kind(record);
     if (file_target(record)) {
         const auto suffix = QFileInfo(record.path).suffix().toLower();
         if (kind != "executable" || (suffix != "exe" && suffix != "bat" && suffix != "cmd"))
             throw std::invalid_argument(
-                QCoreApplication::translate("XLibrary", "Unsupported Windows executable target").toStdString());
+                QCoreApplication::translate("Fora.Deck", "Unsupported Windows executable target").toStdString());
     }
     if (!file_target(record)) {
         if (mode == launch_mode::new_instance || mode == launch_mode::elevated)
             throw std::invalid_argument(
-                QCoreApplication::translate("XLibrary", "This target supports activation only").toStdString());
+                QCoreApplication::translate("Fora.Deck", "This target supports activation only").toStdString());
         if (!target_available(record))
             throw std::runtime_error(
-                QCoreApplication::translate("XLibrary", "Launch target is unavailable").toStdString());
+                QCoreApplication::translate("Fora.Deck", "Launch target is unavailable").toStdString());
         if (kind == "aumid") {
             IApplicationActivationManager *raw_manager = nullptr;
             const auto created = CoCreateInstance(CLSID_ApplicationActivationManager, nullptr, CLSCTX_INPROC_SERVER,
                                                   IID_PPV_ARGS(&raw_manager));
             if (FAILED(created))
                 throw std::runtime_error(
-                    QCoreApplication::translate("XLibrary", "Cannot create application activation manager")
+                    QCoreApplication::translate("Fora.Deck", "Cannot create application activation manager")
                         .toStdString());
             const auto release = [](IApplicationActivationManager *value) { value->Release(); };
             const std::unique_ptr<IApplicationActivationManager, decltype(release)> manager(raw_manager, release);
@@ -269,7 +269,7 @@ qint64 Application::launch_application(const app_record &record, const launch_mo
                 manager->ActivateApplication(record.path.toStdWString().c_str(), nullptr, AO_NONE, &process_id);
             if (FAILED(activated))
                 throw std::runtime_error(
-                    QCoreApplication::translate("XLibrary", "Application activation failed (Windows error %1).")
+                    QCoreApplication::translate("Fora.Deck", "Application activation failed (Windows error %1).")
                         .arg(activated)
                         .toStdString());
             return process_id;
@@ -283,7 +283,7 @@ qint64 Application::launch_application(const app_record &record, const launch_mo
         info.nShow = SW_SHOWNORMAL;
         if (!ShellExecuteExW(&info))
             throw std::runtime_error(
-                QCoreApplication::translate("XLibrary", "Target activation failed (Windows error %1).")
+                QCoreApplication::translate("Fora.Deck", "Target activation failed (Windows error %1).")
                     .arg(GetLastError())
                     .toStdString());
         return 0;
@@ -292,7 +292,7 @@ qint64 Application::launch_application(const app_record &record, const launch_mo
         if (kind != "executable" || QFileInfo(record.path).suffix().compare("exe", Qt::CaseInsensitive) != 0 ||
             !QFileInfo(record.path).isAbsolute() || !QFileInfo(record.path).isFile())
             throw std::invalid_argument(
-                QCoreApplication::translate("XLibrary", "Elevation requires an available Windows executable")
+                QCoreApplication::translate("Fora.Deck", "Elevation requires an available Windows executable")
                     .toStdString());
         const auto path = QDir::toNativeSeparators(record.path).toStdWString();
         const auto arguments = record.arguments.toStdWString();
@@ -308,7 +308,7 @@ qint64 Application::launch_application(const app_record &record, const launch_mo
         info.nShow = SW_SHOWNORMAL;
         if (!ShellExecuteExW(&info))
             throw std::runtime_error(
-                QCoreApplication::translate("XLibrary", "Elevated launch failed (Windows error %1).")
+                QCoreApplication::translate("Fora.Deck", "Elevated launch failed (Windows error %1).")
                     .arg(GetLastError())
                     .toStdString());
         return 0;
@@ -328,13 +328,13 @@ app_record Application::resolve_application(const QString &path) {
         const QFileInfo info(value);
         if (!is_application_file_candidate(info))
             throw std::invalid_argument(
-                QCoreApplication::translate("XLibrary", "Supported files: .exe, .lnk, .bat, .cmd.").toStdString());
+                QCoreApplication::translate("Fora.Deck", "Supported files: .exe, .lnk, .bat, .cmd.").toStdString());
         if (!info.isFile())
             throw std::invalid_argument(
-                QCoreApplication::translate("XLibrary", "The application file is unavailable.").toStdString());
+                QCoreApplication::translate("Fora.Deck", "The application file is unavailable.").toStdString());
     };
     supported_target(path);
-    const xlibrary::ComScope com;
+    const foradeck::ComScope com;
     app_record result;
     result.discovery_source = path;
     result.path = QFileInfo(path).absoluteFilePath();
@@ -343,43 +343,43 @@ app_record Application::resolve_application(const QString &path) {
         if (FAILED(CoCreateInstance(CLSID_ShellLink, nullptr, CLSCTX_INPROC_SERVER, IID_IShellLinkW,
                                     reinterpret_cast<void **>(&raw_link)))) {
             throw std::runtime_error(
-                QCoreApplication::translate("XLibrary", "Could not read the shortcut.").toStdString());
+                QCoreApplication::translate("Fora.Deck", "Could not read the shortcut.").toStdString());
         }
         const auto release_link = [](IShellLinkW *const value) { value->Release(); };
         const std::unique_ptr<IShellLinkW, decltype(release_link)> link(raw_link, release_link);
         IPersistFile *raw_file = nullptr;
         if (FAILED(link->QueryInterface(IID_IPersistFile, reinterpret_cast<void **>(&raw_file)))) {
             throw std::runtime_error(
-                QCoreApplication::translate("XLibrary", "Could not open the shortcut.").toStdString());
+                QCoreApplication::translate("Fora.Deck", "Could not open the shortcut.").toStdString());
         }
         const auto release_file = [](IPersistFile *const value) { value->Release(); };
         const std::unique_ptr<IPersistFile, decltype(release_file)> file(raw_file, release_file);
         if (FAILED(file->Load(path.toStdWString().c_str(), STGM_READ))) {
             throw std::runtime_error(
-                QCoreApplication::translate("XLibrary", "Could not load the shortcut.").toStdString());
+                QCoreApplication::translate("Fora.Deck", "Could not load the shortcut.").toStdString());
         }
         wchar_t buffer[32768]{};
         if (FAILED(link->GetPath(buffer, static_cast<int>(std::size(buffer)), nullptr, 0)) || buffer[0] == L'\0') {
             throw std::runtime_error(
-                QCoreApplication::translate("XLibrary", "The shortcut has no path to a regular application.")
+                QCoreApplication::translate("Fora.Deck", "The shortcut has no path to a regular application.")
                     .toStdString());
         }
         result.path = QString::fromWCharArray(buffer);
         buffer[0] = L'\0';
         if (FAILED(link->GetArguments(buffer, static_cast<int>(std::size(buffer)))))
             throw std::runtime_error(
-                QCoreApplication::translate("XLibrary", "Could not read the shortcut arguments.").toStdString());
+                QCoreApplication::translate("Fora.Deck", "Could not read the shortcut arguments.").toStdString());
         result.arguments = QString::fromWCharArray(buffer);
         buffer[0] = L'\0';
         if (FAILED(link->GetWorkingDirectory(buffer, static_cast<int>(std::size(buffer)))))
             throw std::runtime_error(
-                QCoreApplication::translate("XLibrary", "Could not read the shortcut working directory.")
+                QCoreApplication::translate("Fora.Deck", "Could not read the shortcut working directory.")
                     .toStdString());
         result.working_directory = QString::fromWCharArray(buffer);
         // Skip unusable shortcuts during discovery, before the shared import transaction.
         if (!result.working_directory.isEmpty() && !QFileInfo(result.working_directory).isAbsolute()) {
             throw std::invalid_argument(
-                QCoreApplication::translate("XLibrary", "The working directory must be an absolute path.")
+                QCoreApplication::translate("Fora.Deck", "The working directory must be an absolute path.")
                     .toStdString());
         }
         if (!result.working_directory.isEmpty())
@@ -402,7 +402,7 @@ QVector<app_record> Application::discover(const bool registry, const bool start_
     QStringList shortcuts;
     // Build the queue first so its size stays fixed while reading shortcuts and EXE metadata.
     if (progress)
-        progress({-1, 0, 0, QCoreApplication::translate("XLibrary", "Preparing the application list…")});
+        progress({-1, 0, 0, QCoreApplication::translate("Fora.Deck", "Preparing the application list…")});
     if (start_menu) {
         for (const auto *folder : {&FOLDERID_Programs, &FOLDERID_CommonPrograms}) {
             if (cancelled.load())
@@ -410,7 +410,7 @@ QVector<app_record> Application::discover(const bool registry, const bool start_
             PWSTR raw_path = nullptr;
             if (FAILED(SHGetKnownFolderPath(*folder, 0, nullptr, &raw_path))) {
                 issues.append(discovery_issue{
-                    "Start Menu", QCoreApplication::translate("XLibrary", "The Start menu folder is unavailable.")});
+                    "Start Menu", QCoreApplication::translate("Fora.Deck", "The Start menu folder is unavailable.")});
                 continue;
             }
             const QString directory = QString::fromWCharArray(raw_path);
@@ -429,12 +429,12 @@ QVector<app_record> Application::discover(const bool registry, const bool start_
             progress({total > 0 ? static_cast<int>(90.0 * processed / total) : 90, processed, total, stage});
     };
     if (registry && !cancelled.load()) {
-        std::vector<xlibrary::scan_issue> registry_issues;
-        const auto applications = xlibrary::scan_registry_applications(
+        std::vector<foradeck::scan_issue> registry_issues;
+        const auto applications = foradeck::scan_registry_applications(
             &registry_issues, [&](const std::size_t processed, const std::size_t total) {
                 registry_count = static_cast<qsizetype>(total);
                 report(static_cast<qsizetype>(processed), registry_count + shortcuts.size(),
-                       QCoreApplication::translate("XLibrary", "Checking the Windows registry"));
+                       QCoreApplication::translate("Fora.Deck", "Checking the Windows registry"));
                 return !cancelled.load();
             });
         for (const auto &application : applications) {
@@ -447,11 +447,11 @@ QVector<app_record> Application::discover(const bool registry, const bool start_
                 result.append(std::move(record));
             else
                 issues.append(discovery_issue{
-                    record.path, QCoreApplication::translate("XLibrary", "System component or uninstaller."),
+                    record.path, QCoreApplication::translate("Fora.Deck", "System component or uninstaller."),
                     discovery_issue_kind::skipped});
         }
         for (const auto &issue : registry_issues) {
-            const auto root = issue.source.scope == xlibrary::registry_scope::current_user ? "HKCU" : "HKLM";
+            const auto root = issue.source.scope == foradeck::registry_scope::current_user ? "HKCU" : "HKLM";
             issues.append(discovery_issue{
                 QString("%1\\%2 [%3]")
                     .arg(root, QString::fromStdWString(issue.source.key))
@@ -463,7 +463,8 @@ QVector<app_record> Application::discover(const bool registry, const bool start_
     for (qsizetype index = 0; index < shortcuts.size(); ++index) {
         if (cancelled.load())
             return {};
-        report(registry_count + index, total, QCoreApplication::translate("XLibrary", "Checking Start menu shortcuts"));
+        report(registry_count + index, total,
+               QCoreApplication::translate("Fora.Deck", "Checking Start menu shortcuts"));
         const auto &path = shortcuts[index];
         try {
             const auto record = resolve_application(path);
@@ -473,10 +474,10 @@ QVector<app_record> Application::discover(const bool registry, const bool start_
             else
                 issues.append(discovery_issue{
                     path,
-                    !record.available ? QCoreApplication::translate("XLibrary", "The target file is missing.")
+                    !record.available ? QCoreApplication::translate("Fora.Deck", "The target file is missing.")
                     : QFileInfo(record.path).suffix().compare("exe", Qt::CaseInsensitive) != 0
-                        ? QCoreApplication::translate("XLibrary", "The shortcut target is not an EXE.")
-                        : QCoreApplication::translate("XLibrary", "System component or uninstaller."),
+                        ? QCoreApplication::translate("Fora.Deck", "The shortcut target is not an EXE.")
+                        : QCoreApplication::translate("Fora.Deck", "System component or uninstaller."),
                     discovery_issue_kind::skipped});
         } catch (const std::exception &error) {
             issues.append(discovery_issue{path, QString::fromUtf8(error.what())});
@@ -504,7 +505,7 @@ QVector<app_record> Application::discover(const bool registry, const bool start_
         if (duplicate) {
             issues.append(
                 {record.discovery_source.isEmpty() ? record.path : record.discovery_source,
-                 QCoreApplication::translate("XLibrary", "This launch configuration is already in the library."),
+                 QCoreApplication::translate("Fora.Deck", "This launch configuration is already in the library."),
                  discovery_issue_kind::duplicate});
             if (existing != configurations.cend() && !record.discovery_source.isEmpty())
                 unique[*existing].discovery_sources.append(record.discovery_source);
@@ -528,19 +529,19 @@ QVector<app_record> Application::discover(const bool registry, const bool start_
             combined.append(std::move(record));
         }
     }
-    report(total, total, QCoreApplication::translate("XLibrary", "Application checks complete"));
+    report(total, total, QCoreApplication::translate("Fora.Deck", "Application checks complete"));
     return combined;
 }
 
-xlibrary::ComScope::ComScope() : result(CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED)) {
+foradeck::ComScope::ComScope() : result(CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED)) {
 }
-xlibrary::ComScope::~ComScope() {
+foradeck::ComScope::~ComScope() {
     if (SUCCEEDED(result))
         CoUninitialize();
 }
 
 bool Application::windows_aumid_available(const QString &aumid) {
-    const xlibrary::ComScope com;
+    const foradeck::ComScope com;
     IShellItem *item = nullptr;
     const auto result =
         SHCreateItemInKnownFolder(FOLDERID_AppsFolder, 0, aumid.toStdWString().c_str(), IID_PPV_ARGS(&item));
@@ -577,7 +578,7 @@ QVector<app_record> Application::discover_system(QVector<discovery_issue> &issue
         if (cancelled.load())
             return;
         app_record record;
-        record.name = QCoreApplication::translate("XLibrary", name.toUtf8().constData());
+        record.name = QCoreApplication::translate("Fora.Deck", name.toUtf8().constData());
         record.target_kind = kind;
         record.path = value;
         record.discovery_source =
@@ -586,29 +587,29 @@ QVector<app_record> Application::discover_system(QVector<discovery_issue> &issue
             result.append(std::move(record));
         else
             issues.append({record.discovery_source,
-                           QCoreApplication::translate("XLibrary", "The target is not installed or is unavailable."),
+                           QCoreApplication::translate("Fora.Deck", "The target is not installed or is unavailable."),
                            discovery_issue_kind::skipped});
     };
     if (progress)
-        progress({-1, 0, 0, QCoreApplication::translate("XLibrary", "Checking Windows system applications")});
+        progress({-1, 0, 0, QCoreApplication::translate("Fora.Deck", "Checking Windows system applications")});
     const auto windows = qEnvironmentVariable("WINDIR");
     if (!windows.isEmpty()) {
-        add(QT_TRANSLATE_NOOP("XLibrary", "File Explorer"), "executable", windows + "/explorer.exe");
-        add(QT_TRANSLATE_NOOP("XLibrary", "Task Manager"), "executable", windows + "/System32/Taskmgr.exe");
-        add(QT_TRANSLATE_NOOP("XLibrary", "Control Panel"), "executable", windows + "/System32/control.exe");
+        add(QT_TRANSLATE_NOOP("Fora.Deck", "File Explorer"), "executable", windows + "/explorer.exe");
+        add(QT_TRANSLATE_NOOP("Fora.Deck", "Task Manager"), "executable", windows + "/System32/Taskmgr.exe");
+        add(QT_TRANSLATE_NOOP("Fora.Deck", "Control Panel"), "executable", windows + "/System32/control.exe");
     }
-    add(QT_TRANSLATE_NOOP("XLibrary", "Settings"), "system_uri", "ms-settings:");
-    add(QT_TRANSLATE_NOOP("XLibrary", "Bluetooth"), "system_uri", "ms-settings:bluetooth");
-    add(QT_TRANSLATE_NOOP("XLibrary", "Display"), "system_uri", "ms-settings:display");
-    add(QT_TRANSLATE_NOOP("XLibrary", "Sound"), "system_uri", "ms-settings:sound");
-    add(QT_TRANSLATE_NOOP("XLibrary", "Network"), "system_uri", "ms-settings:network");
-    add(QT_TRANSLATE_NOOP("XLibrary", "Installed apps"), "system_uri", "ms-settings:appsfeatures");
-    add(QT_TRANSLATE_NOOP("XLibrary", "Windows Update"), "system_uri", "ms-settings:windowsupdate");
-    add(QT_TRANSLATE_NOOP("XLibrary", "Calculator"), "aumid", "Microsoft.WindowsCalculator_8wekyb3d8bbwe!App");
-    add(QT_TRANSLATE_NOOP("XLibrary", "Microsoft Store"), "aumid", "Microsoft.WindowsStore_8wekyb3d8bbwe!App");
-    add(QT_TRANSLATE_NOOP("XLibrary", "Windows Terminal"), "aumid", "Microsoft.WindowsTerminal_8wekyb3d8bbwe!App");
+    add(QT_TRANSLATE_NOOP("Fora.Deck", "Settings"), "system_uri", "ms-settings:");
+    add(QT_TRANSLATE_NOOP("Fora.Deck", "Bluetooth"), "system_uri", "ms-settings:bluetooth");
+    add(QT_TRANSLATE_NOOP("Fora.Deck", "Display"), "system_uri", "ms-settings:display");
+    add(QT_TRANSLATE_NOOP("Fora.Deck", "Sound"), "system_uri", "ms-settings:sound");
+    add(QT_TRANSLATE_NOOP("Fora.Deck", "Network"), "system_uri", "ms-settings:network");
+    add(QT_TRANSLATE_NOOP("Fora.Deck", "Installed apps"), "system_uri", "ms-settings:appsfeatures");
+    add(QT_TRANSLATE_NOOP("Fora.Deck", "Windows Update"), "system_uri", "ms-settings:windowsupdate");
+    add(QT_TRANSLATE_NOOP("Fora.Deck", "Calculator"), "aumid", "Microsoft.WindowsCalculator_8wekyb3d8bbwe!App");
+    add(QT_TRANSLATE_NOOP("Fora.Deck", "Microsoft Store"), "aumid", "Microsoft.WindowsStore_8wekyb3d8bbwe!App");
+    add(QT_TRANSLATE_NOOP("Fora.Deck", "Windows Terminal"), "aumid", "Microsoft.WindowsTerminal_8wekyb3d8bbwe!App");
     if (progress)
         progress({90, result.size(), result.size(),
-                  QCoreApplication::translate("XLibrary", "System application checks complete")});
+                  QCoreApplication::translate("Fora.Deck", "System application checks complete")});
     return cancelled.load() ? QVector<app_record>{} : result;
 }

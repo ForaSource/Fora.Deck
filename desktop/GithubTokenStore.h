@@ -1,5 +1,5 @@
-#ifndef XLIBRARY_GITHUB_TOKEN_STORE_H
-#define XLIBRARY_GITHUB_TOKEN_STORE_H
+#ifndef FORADECK_GITHUB_TOKEN_STORE_H
+#define FORADECK_GITHUB_TOKEN_STORE_H
 
 #include <QObject>
 #include <QSettings>
@@ -13,8 +13,8 @@ class GithubTokenStore : public QObject {
 private:
     enum class operation { read, write, remove };
     QSettings &settings;
-    QString key;
     bool busy = false;
+    QString service_name() const;
     void start_job(QKeychain::Job *job, operation action);
 
 public:

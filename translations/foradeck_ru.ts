@@ -2,7 +2,7 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="ru_RU" sourcelanguage="en">
 <context>
-    <name>XLibrary</name>
+    <name>Fora.Deck</name>
     <message>
         <source>Drop files or applications here</source>
         <translation>Перетащите сюда файлы или приложения</translation>
@@ -270,10 +270,6 @@
     <message>
         <source>Application file is missing on the verified local drive: %1</source>
         <translation>На проверенном локальном диске отсутствует файл приложения: %1</translation>
-    </message>
-    <message>
-        <source>XLibrary is now Fora.Deck. Your library and settings have been preserved.</source>
-        <translation>XLibrary теперь Fora.Deck. Ваша библиотека и настройки сохранены.</translation>
     </message>
     <message>
         <source>Search applications and files, calculate or enter a path</source>
@@ -2248,8 +2244,12 @@ Technical reason: %3</source>
         <translation>Выберите резервную копию профиля</translation>
     </message>
     <message>
-        <source>Fora.Deck profile (*.xlprofile)</source>
-        <translation>Профиль Fora.Deck (*.xlprofile)</translation>
+        <source>Fora.Deck profile (*.foradeckprofile)</source>
+        <translation>Профиль Fora.Deck (*.foradeckprofile)</translation>
+    </message>
+    <message>
+        <source>Fora.Deck profile (%1)</source>
+        <translation>Профиль Fora.Deck (%1)</translation>
     </message>
     <message>
         <source>Restore complete profile</source>
@@ -2680,8 +2680,8 @@ Technical reason: %3</source>
         <translation>Профиль запуска по умолчанию</translation>
     </message>
     <message>
-        <source>Wayland did not activate quick search. Click the search field or assign XLibrary --overlay in the system keyboard settings.</source>
-        <translation>Wayland не передал фокус быстрому поиску. Нажмите на поле поиска или назначьте сочетание для команды XLibrary --overlay в системных настройках клавиатуры.</translation>
+        <source>Wayland did not activate quick search. Click the search field or assign foradeck --overlay in the system keyboard settings.</source>
+        <translation>Wayland не передал фокус быстрому поиску. Нажмите на поле поиска или назначьте сочетание для команды foradeck --overlay в системных настройках клавиатуры.</translation>
     </message>
     <message>
         <source>Private mode</source>
@@ -2728,8 +2728,8 @@ Technical reason: %3</source>
         <translation>Не назначено</translation>
     </message>
     <message>
-        <source>On Wayland, configure a desktop shortcut for XLibrary --launch-id &lt;id&gt; or XLibrary --scenario-id &lt;id&gt;.</source>
-        <translation>В Wayland назначьте системное сочетание клавиш для команды XLibrary --launch-id &lt;id&gt; или XLibrary --scenario-id &lt;id&gt;.</translation>
+        <source>On Wayland, configure a desktop shortcut for foradeck --launch-id &lt;id&gt; or foradeck --scenario-id &lt;id&gt;.</source>
+        <translation>В Wayland назначьте системное сочетание клавиш для команды foradeck --launch-id &lt;id&gt; или foradeck --scenario-id &lt;id&gt;.</translation>
     </message>
     <message>
         <source>Checking Steam libraries</source>
@@ -3120,8 +3120,8 @@ Technical reason: %3</source>
         <translation>Доступна новая версия: %1 (канал: %2)</translation>
     </message>
     <message>
-        <source>The GlobalShortcuts portal did not register the shortcut. Use system keyboard settings: KDE: Keyboard → Shortcuts; GNOME: Keyboard → Custom Shortcuts; Xfce: Keyboard → Application Shortcuts. Command: XLibrary --overlay (quick search) or XLibrary (library). For applications/scenarios use the command in their editor.</source>
-        <translation>Портал GlobalShortcuts не зарегистрировал сочетание. Используйте системные настройки клавиатуры: KDE: Клавиатура → Комбинации клавиш; GNOME: Клавиатура → Пользовательские комбинации; Xfce: Клавиатура → Комбинации клавиш приложений. Команда: XLibrary --overlay (быстрый поиск) или XLibrary (библиотека). Для приложений и сценариев используйте команду из их редактора.</translation>
+        <source>The GlobalShortcuts portal did not register the shortcut. Use system keyboard settings: KDE: Keyboard → Shortcuts; GNOME: Keyboard → Custom Shortcuts; Xfce: Keyboard → Application Shortcuts. Command: foradeck --overlay (quick search) or foradeck (library). For applications/scenarios use the command in their editor.</source>
+        <translation>Портал GlobalShortcuts не зарегистрировал сочетание. Используйте системные настройки клавиатуры: KDE: Клавиатура → Комбинации клавиш; GNOME: Клавиатура → Пользовательские комбинации; Xfce: Клавиатура → Комбинации клавиш приложений. Команда: foradeck --overlay (быстрый поиск) или foradeck (библиотека). Для приложений и сценариев используйте команду из их редактора.</translation>
     </message>
     <message>
         <source>Fora.Deck shortcut</source>
@@ -3144,8 +3144,8 @@ Technical reason: %3</source>
         <translation>Выдача ограничена. Открыть папку</translation>
     </message>
     <message>
-        <source>Wayland shortcuts request permission through the GlobalShortcuts portal when supported. If refused or unavailable, bind XLibrary --overlay in system keyboard settings: KDE: Keyboard → Shortcuts; GNOME: Keyboard → Custom Shortcuts; Xfce: Keyboard → Application Shortcuts. Use XLibrary for the library.</source>
-        <translation>При поддержке Wayland горячие клавиши запрашивают разрешение через портал GlobalShortcuts. При отказе или недоступности задайте XLibrary --overlay в системных настройках: KDE: Клавиатура → Комбинации клавиш; GNOME: Клавиатура → Пользовательские комбинации; Xfce: Клавиатура → Комбинации клавиш приложений. Для библиотеки используйте XLibrary.</translation>
+        <source>Wayland shortcuts request permission through the GlobalShortcuts portal when supported. If refused or unavailable, bind foradeck --overlay in system keyboard settings: KDE: Keyboard → Shortcuts; GNOME: Keyboard → Custom Shortcuts; Xfce: Keyboard → Application Shortcuts. Use foradeck for the library.</source>
+        <translation>При поддержке Wayland горячие клавиши запрашивают разрешение через портал GlobalShortcuts. При отказе или недоступности задайте foradeck --overlay в системных настройках: KDE: Клавиатура → Комбинации клавиш; GNOME: Клавиатура → Пользовательские комбинации; Xfce: Клавиатура → Комбинации клавиш приложений. Для библиотеки используйте foradeck.</translation>
     </message>
     <message>
         <source>Unsupported UI plugin interface (requires IID 1.0).</source>
@@ -3196,8 +3196,8 @@ Technical reason: %3</source>
         <translation>Открыть экран приветствия</translation>
     </message>
     <message>
-        <source>Preview and restore a complete .xlprofile backup.</source>
-        <translation>Проверьте и восстановите полную резервную копию .xlprofile.</translation>
+        <source>Preview and restore a complete .foradeckprofile backup.</source>
+        <translation>Проверьте и восстановите полную резервную копию .foradeckprofile.</translation>
     </message>
     <message>
         <source>Restore my library</source>

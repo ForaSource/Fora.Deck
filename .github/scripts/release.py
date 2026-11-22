@@ -51,13 +51,13 @@ def digest(path):
 
 def read_debian_version():
     # Reuse the project's encoding, including mixed prerelease identifiers and build metadata.
-    with tempfile.TemporaryDirectory(prefix="xlibrary-version-") as temporary:
+    with tempfile.TemporaryDirectory(prefix="foradeck-version-") as temporary:
         directory = Path(temporary)
         result = directory / "version.txt"
         script = directory / "version.cmake"
         source = Path("cmake/version.cmake").resolve().as_posix()
         script.write_text(f'include([==[{source}]==])\n'
-                          f'file(WRITE [==[{result.as_posix()}]==] "${{XLIBRARY_DEBIAN_VERSION}}")\n',
+                          f'file(WRITE [==[{result.as_posix()}]==] "${{FORADECK_DEBIAN_VERSION}}")\n',
                           encoding="utf-8")
         subprocess.run(["cmake", "-P", str(script)], check=True)
         return result.read_text(encoding="utf-8")
@@ -91,9 +91,9 @@ def assemble(artifacts, output, version, commit):
     # The encoded Debian version comes from cmake/version.cmake, not a second SemVer mapping.
     if info["linux"]["debian_version"] != debian_version:
         raise ValueError("Linux metadata Debian version differs from VERSION/CMake")
-    windows_names = [f"XLibrary-{version}-windows-x64-mingw-{suffix}"
+    windows_names = [f"Fora.Deck-{version}-windows-x64-mingw-{suffix}"
                      for suffix in ("portable.zip", "setup.exe")]
-    linux_names = [f"XLibrary-{version}-linux-x86_64.AppImage", f"xlibrary_{debian_version}_amd64.deb"]
+    linux_names = [f"Fora.Deck-{version}-linux-x86_64.AppImage", f"foradeck_{debian_version}_amd64.deb"]
     check_sums(windows, windows_names)
     check_sums(linux, linux_names)
     root = windows_names[0].removesuffix(".zip")
@@ -104,7 +104,7 @@ def assemble(artifacts, output, version, commit):
         if embedded != info["windows"]:
             raise ValueError("Portable metadata differs from the verified installer metadata")
     deb = linux / linux_names[1]
-    for field, expected in (("Package", "xlibrary"), ("Version", debian_version), ("Architecture", "amd64")):
+    for field, expected in (("Package", "foradeck"), ("Version", debian_version), ("Architecture", "amd64")):
         actual = subprocess.check_output(["dpkg-deb", "--field", str(deb), field], text=True).strip()
         if actual != expected:
             raise ValueError(f"DEB {field} mismatch: {actual!r}")
