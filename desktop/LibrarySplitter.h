@@ -12,6 +12,7 @@ class LibrarySplitter : public QSplitter {
     std::function<bool()> can_save_layout;
 
 protected:
+    QSplitterHandle *createHandle() override;
     void resizeEvent(QResizeEvent *event) override;
 
 public:

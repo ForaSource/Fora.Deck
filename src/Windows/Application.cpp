@@ -237,7 +237,7 @@ QString Application::configured_arguments(const app_record &record) {
     return record.arguments;
 }
 
-void Application::launch_application(const app_record &record, const launch_mode mode) {
+qint64 Application::launch_application(const app_record &record, const launch_mode mode) {
     validate_launch_target(record);
     const xlibrary::ComScope com;
     const auto kind = target_kind(record);
@@ -272,7 +272,7 @@ void Application::launch_application(const app_record &record, const launch_mode
                     QCoreApplication::translate("XLibrary", "Application activation failed (Windows error %1).")
                         .arg(activated)
                         .toStdString());
-            return;
+            return process_id;
         }
         const auto target = (kind == "steam" ? "steam://run/" + record.path : record.path).toStdWString();
         SHELLEXECUTEINFOW info{};
@@ -286,7 +286,7 @@ void Application::launch_application(const app_record &record, const launch_mode
                 QCoreApplication::translate("XLibrary", "Target activation failed (Windows error %1).")
                     .arg(GetLastError())
                     .toStdString());
-        return;
+        return 0;
     }
     if (mode == launch_mode::elevated) {
         if (kind != "executable" || QFileInfo(record.path).suffix().compare("exe", Qt::CaseInsensitive) != 0 ||
@@ -311,20 +311,25 @@ void Application::launch_application(const app_record &record, const launch_mode
                 QCoreApplication::translate("XLibrary", "Elevated launch failed (Windows error %1).")
                     .arg(GetLastError())
                     .toStdString());
-        return;
+        return 0;
     }
     Application application(record.name.toStdString(), std::filesystem::path(record.path.toStdWString()));
     const auto directory = effective_working_directory(record.path, record.working_directory);
-    application.launch(record.arguments.toStdWString(), std::filesystem::path(directory.toStdWString()));
+    return application.launch(record.arguments.toStdWString(), std::filesystem::path(directory.toStdWString()));
+}
+
+bool Application::is_application_file_candidate(const QFileInfo &info) {
+    const auto suffix = info.suffix().toLower();
+    return suffix == "exe" || suffix == "bat" || suffix == "cmd" || suffix == "lnk";
 }
 
 app_record Application::resolve_application(const QString &path) {
     const auto supported_target = [](const QString &value) {
-        const auto suffix = QFileInfo(value).suffix().toLower();
-        if (suffix != "exe" && suffix != "bat" && suffix != "cmd" && suffix != "lnk")
+        const QFileInfo info(value);
+        if (!is_application_file_candidate(info))
             throw std::invalid_argument(
                 QCoreApplication::translate("XLibrary", "Supported files: .exe, .lnk, .bat, .cmd.").toStdString());
-        if (!QFileInfo(value).isFile())
+        if (!info.isFile())
             throw std::invalid_argument(
                 QCoreApplication::translate("XLibrary", "The application file is unavailable.").toStdString());
     };

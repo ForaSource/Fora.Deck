@@ -235,6 +235,8 @@ try {
     $source_cache = Resolve-RepositoryPath $QtSourceCache
     New-Item -ItemType Directory -Path $source_cache -Force | Out-Null
     $notices = [Collections.Generic.List[string]]::new()
+    $notices.Add('Fora.Deck by ForaSource is distributed under the MIT license; see LICENSE.')
+    $notices.Add('Inter is distributed under SIL OFL 1.1; see licenses/inter/OFL.txt.')
     $notices.Add("Qt $qt_version is dynamically linked under LGPLv3; see licenses/qtbase and sources/.")
     $notices.Add('You may replace the Qt DLLs/plugins with compatible modified builds. Reverse engineering for debugging those modifications is permitted.')
     $notices.Add('Qt licensing: https://www.qt.io/licensing/open-source-lgpl-obligations')
@@ -319,7 +321,7 @@ try {
 
     New-Item -ItemType File -Path "$package/portable.flag" | Out-Null
     @"
-XLibrary $version - Windows x64 ($compiler)
+Fora.Deck $version by ForaSource - Windows x64 ($compiler)
 
 Run XLibrary.exe. Keep the DLLs and plugins beside it.
 No Qt installation or administrator rights are required.

@@ -23,7 +23,7 @@ inline bool bundled_runtime() {
     if (!QFileInfo(app_dir).isAbsolute() || !QFileInfo(app_dir).isDir() || current_binary.isEmpty() ||
         bundled_binary.canonicalFilePath() != current_binary)
         throw std::runtime_error(
-            QCoreApplication::translate("XLibrary", "Invalid XLibrary AppImage launch paths.").toStdString());
+            QCoreApplication::translate("XLibrary", "Invalid Fora.Deck AppImage launch paths.").toStdString());
     return true;
 #else
     return false;
@@ -40,7 +40,7 @@ inline QString appimage_file() {
     const QFileInfo image_info(image);
     if (!image_info.isAbsolute() || !image_info.isFile() || !image_info.isExecutable())
         throw std::runtime_error(
-            QCoreApplication::translate("XLibrary", "Invalid XLibrary AppImage file path.").toStdString());
+            QCoreApplication::translate("XLibrary", "Invalid Fora.Deck AppImage file path.").toStdString());
     return QDir::cleanPath(image);
 }
 }

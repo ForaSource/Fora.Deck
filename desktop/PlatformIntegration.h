@@ -24,13 +24,20 @@ QString default_global_shortcut();
 QString default_overlay_shortcut();
 void activate_overlay(QWidget *window);
 using launch_mode = Application::launch_mode;
-void launch_application(const app_record &record, launch_mode mode);
+qint64 launch_application(const app_record &record, launch_mode mode);
 
 void open_folder(const QString &path);
 bool open_url(const QUrl &url);
 bool installed_for_updates();
 bool start_update_installer(const QString &path, QString &error);
 QImage application_icon(const QString &path);
+struct file_association {
+    QString name;
+    QImage icon;
+    QString icon_name;
+};
+// Resolve associations on a worker; convert icon_name through QIcon on the GUI thread.
+file_association default_file_application(const QString &path);
 
 bool set_autostart(bool enabled, QString &error);
 bool animations_enabled();

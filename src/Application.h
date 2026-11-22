@@ -14,6 +14,8 @@
 
 #include "CatalogTypes.h"
 
+class QFileInfo;
+
 class Application {
 private:
     std::uint32_t pid = 0;
@@ -39,6 +41,8 @@ public:
     static bool target_available(const app_record &record);
     static bool definitely_removed(const app_record &record, const QStringList &known_volume_roots,
                                    const QVariantMap &verified_locations);
+    static QString removal_reason(const app_record &record, const QStringList &known_volume_roots,
+                                  const QVariantMap &verified_locations);
     static bool requires_fresh_launch(const app_record &record);
     static QString configured_arguments(const app_record &record);
     static bool valid_launch_profile_id(const QString &profile);
@@ -57,8 +61,9 @@ public:
     static QVector<app_record> discover_steam(const QStringList &roots, QVector<discovery_issue> &issues,
                                               const std::atomic_bool &cancelled,
                                               const std::function<void(const discovery_progress &)> &progress = {});
-    static void launch_application(const app_record &record, launch_mode mode);
+    static qint64 launch_application(const app_record &record, launch_mode mode);
     static QString new_instance_error(const app_record &record);
+    static bool is_application_file_candidate(const QFileInfo &info);
     static app_record resolve_application(const QString &path);
     static QVector<app_record> discover(bool system, bool user, QVector<discovery_issue> &issues,
                                         const std::atomic_bool &cancelled,

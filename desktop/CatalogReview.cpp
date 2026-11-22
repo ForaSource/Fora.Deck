@@ -7,6 +7,8 @@
 #include <QScreen>
 #include <QScrollBar>
 #include <QTableWidget>
+#include <QTimer>
+#include <QWindow>
 
 #include "CatalogReview.h"
 #include "DesktopService.h"
@@ -60,10 +62,12 @@ void show_catalog_review(const ui_context &context) {
     layout->addLayout(tools);
     auto *table = new QTableWidget(static_cast<int>(records.size()), 5);
     table->setObjectName("catalog_review_table");
-    table->setHorizontalHeaderLabels(
-        {QCoreApplication::translate("XLibrary", "Name"), QCoreApplication::translate("XLibrary", "Source"),
-         QCoreApplication::translate("XLibrary", "Target"), QCoreApplication::translate("XLibrary", "Launch arguments"),
-         QCoreApplication::translate("XLibrary", "Working directory")});
+    table->setHorizontalHeaderLabels({QCoreApplication::translate("XLibrary", "Name"),
+                                      removal ? QCoreApplication::translate("XLibrary", "Reason for removal")
+                                              : QCoreApplication::translate("XLibrary", "Source"),
+                                      QCoreApplication::translate("XLibrary", "Target"),
+                                      QCoreApplication::translate("XLibrary", "Launch arguments"),
+                                      QCoreApplication::translate("XLibrary", "Working directory")});
     table->setEditTriggers(QAbstractItemView::NoEditTriggers);
     table->setSelectionBehavior(QAbstractItemView::SelectRows);
     table->verticalHeader()->hide();
@@ -72,11 +76,15 @@ void show_catalog_review(const ui_context &context) {
     table->setColumnWidth(0, appearance::scaled(*context.settings, 220));
     table->setColumnWidth(1, appearance::scaled(*context.settings, 160));
     table->setColumnWidth(2, appearance::scaled(*context.settings, 250));
-    if (scan) {
+    if (scan || removal) {
         table->setColumnHidden(1, true);
         table->setColumnHidden(3, true);
         table->setColumnHidden(4, true);
         table->horizontalHeader()->setSectionResizeMode(2, QHeaderView::Stretch);
+    }
+    if (removal) {
+        table->setColumnHidden(1, false);
+        table->setColumnWidth(1, appearance::scaled(*context.settings, 300));
     }
     QSet<QString> known;
     for (const auto &record : service->catalog().applications)
@@ -88,11 +96,12 @@ void show_catalog_review(const ui_context &context) {
         auto *name = new QTableWidgetItem(record.name);
         name->setFlags(name->flags() | Qt::ItemIsUserCheckable);
         name->setCheckState(Qt::Checked);
-        if (duplicate)
+        if (duplicate && !removal)
             name->setToolTip(
                 QCoreApplication::translate("XLibrary", "This launch configuration is already in the library."));
         table->setItem(row, 0, name);
-        const QStringList values{record.discovery_source.isEmpty()
+        const QStringList values{removal ? record.removal_reason
+                                 : record.discovery_source.isEmpty()
                                      ? QCoreApplication::translate("XLibrary", "JSON catalog")
                                      : record.discovery_source,
                                  QDir::toNativeSeparators(Application::application_path(record)), record.arguments,
@@ -200,66 +209,201 @@ void show_catalog_review(const ui_context &context) {
     dialog->show();
 }
 
-void show_bulk_editor(const ui_context &context) {
+void show_application_tags(const ui_context &context) {
     auto *service = static_cast<DesktopService *>(context.service);
     const auto ids = service->selections();
     if (ids.isEmpty())
         return;
-    auto *dialog = make_dialog(context, QCoreApplication::translate("XLibrary", "Edit selected applications"));
-    auto *layout = new QVBoxLayout(dialog);
-    layout->addWidget(label(QCoreApplication::translate("XLibrary", "Selected applications: %1").arg(ids.size())));
-    auto *favorite = new QCheckBox(QCoreApplication::translate("XLibrary", "Favorite"));
-    favorite->setTristate(true);
-    qsizetype favorites = 0;
+    const auto *settings = context.settings;
+    const auto title = QCoreApplication::translate("XLibrary", "Tags");
+    auto *dialog = new QDialog(context.window);
+    dialog->setObjectName("application_tags_dialog");
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->setWindowTitle(title);
+    auto *root = new QVBoxLayout(dialog);
+    const auto margin = appearance::scaled(*settings, 18);
+    root->setContentsMargins(margin, margin, margin, margin);
+    root->setSpacing(appearance::scaled(*settings, 10));
+    auto *contents = new QWidget;
+    contents->setBackgroundRole(QPalette::Base);
+    auto *layout = new QVBoxLayout(contents);
+    layout->setContentsMargins(0, 0, 0, 2);
+    layout->setSpacing(appearance::scaled(*settings, 8));
+    auto *heading = new QHBoxLayout;
+    auto *icon = new QLabel;
+    const auto icon_size = appearance::scaled(*settings, 24);
+    icon->setPixmap(appearance::icon("tag", dialog->palette().color(QPalette::Link)).pixmap(icon_size, icon_size));
+    heading->addWidget(icon);
+    heading->addWidget(label(title, "heading"), 1);
+    layout->addLayout(heading);
+
+    const auto *single = ids.size() == 1 ? service->model.find(ids.front()) : nullptr;
+    layout->addWidget(label(
+        single ? single->name : QCoreApplication::translate("XLibrary", "Selected applications: %1").arg(ids.size()),
+        "muted"));
+    QHash<QString, qsizetype> assignments;
     for (const auto id : ids)
-        if (const auto *record = service->model.find(id); record && record->favorite)
-            ++favorites;
-    const auto favorite_state = favorites == 0            ? Qt::Unchecked
-                                : favorites == ids.size() ? Qt::Checked
-                                                          : Qt::PartiallyChecked;
-    favorite->setCheckState(favorite_state);
-    favorite->setToolTip(QCoreApplication::translate("XLibrary", "Mixed means keep each application's current value."));
-    layout->addWidget(favorite);
+        if (const auto *record = service->model.find(id))
+            for (const auto &tag : record->tags)
+                ++assignments[tag_name_key(tag)];
+
     auto *search = new QLineEdit;
     search->setPlaceholderText(QCoreApplication::translate("XLibrary", "Search tags"));
     search->setAccessibleName(search->placeholderText());
+    search->setClearButtonEnabled(true);
     layout->addWidget(search);
     auto *tags = new QListWidget;
-    for (const auto &tag : service->catalog().tags) {
-        qsizetype assigned = 0;
-        qsizetype usage = 0;
-        for (const auto &record : service->catalog().applications) {
-            if (has_tag(record.tags, tag)) {
-                ++usage;
-                if (ids.contains(record.id))
-                    ++assigned;
-            }
-        }
-        auto *item = new QListWidgetItem(QString("#%1 (%2)").arg(tag, QString::number(usage)), tags);
+    tags->setProperty("tag_selector", true);
+    tags->setAccessibleName(title);
+    tags->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    layout->addWidget(tags);
+    const auto add_row = [tags](const QString &tag, const Qt::CheckState state) {
+        auto *item = new QListWidgetItem('#' + tag, tags);
         item->setData(Qt::UserRole, tag);
-        item->setFlags(item->flags() | Qt::ItemIsUserCheckable | Qt::ItemIsUserTristate);
-        const auto state = assigned == 0 ? Qt::Unchecked : assigned == ids.size() ? Qt::Checked : Qt::PartiallyChecked;
         item->setData(Qt::UserRole + 1, static_cast<int>(state));
+        item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
+        if (state == Qt::PartiallyChecked)
+            item->setFlags(item->flags() | Qt::ItemIsUserTristate);
         item->setCheckState(state);
-        item->setToolTip(QCoreApplication::translate("XLibrary", "Mixed means keep each application's current value."));
+        return item;
+    };
+    bool mixed = false;
+    for (const auto &tag : service->catalog().tags) {
+        const auto assigned = assignments.value(tag_name_key(tag));
+        const auto state = assigned == 0 ? Qt::Unchecked : assigned == ids.size() ? Qt::Checked : Qt::PartiallyChecked;
+        add_row(tag, state);
+        mixed |= state == Qt::PartiallyChecked;
     }
-    layout->addWidget(tags, 1);
-    QObject::connect(search, &QLineEdit::textChanged, tags, [=](const QString &text) {
-        for (int row = 0; row < tags->count(); ++row)
-            tags->item(row)->setHidden(!tags->item(row)->text().contains(text.trimmed(), Qt::CaseInsensitive));
-    });
+    auto *empty = label({}, "muted");
+    layout->addWidget(empty);
+    if (mixed)
+        layout->addWidget(label(
+            QCoreApplication::translate("XLibrary", "A dash means the tag is assigned to some selected applications."),
+            "caption"));
     auto *new_tags = new QLineEdit;
     new_tags->setPlaceholderText(QCoreApplication::translate("XLibrary", "Add tags separated by commas"));
     new_tags->setAccessibleName(new_tags->placeholderText());
-    layout->addWidget(new_tags);
+    auto *add = button(QCoreApplication::translate("XLibrary", "Add"), nullptr, "add");
+    add->setAutoDefault(false);
+    add->setEnabled(false);
+    auto *new_tag_row = new QHBoxLayout;
+    new_tag_row->addWidget(new_tags, 1);
+    new_tag_row->addWidget(add);
+    layout->addLayout(new_tag_row);
     auto *error = label({}, "error");
     layout->addWidget(error);
+    error->hide();
+    auto *body = scroll(contents);
+    root->addWidget(body, 1);
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Cancel);
-    buttons->button(QDialogButtonBox::Save)->setText(QCoreApplication::translate("XLibrary", "Save"));
+    auto *save = buttons->button(QDialogButtonBox::Save);
+    save->setText(QCoreApplication::translate("XLibrary", "Save"));
+    save->setProperty("primary", true);
+    save->setDefault(true);
     buttons->button(QDialogButtonBox::Cancel)->setText(QCoreApplication::translate("XLibrary", "Cancel"));
-    layout->addWidget(buttons);
+    root->addWidget(buttons);
+
+    auto *fit_timer = new QTimer(dialog);
+    fit_timer->setSingleShot(true);
+    const auto request_fit = [fit_timer] { fit_timer->start(0); };
+    const auto fit = [=] {
+        const auto available = dialog->screen()->availableGeometry().marginsRemoved({12, 12, 12, 12});
+        const auto frame_size = dialog->frameGeometry().size() - dialog->size();
+        const auto limit = available.size() - frame_size;
+        if (limit.isEmpty())
+            return;
+        const int width = qMin(appearance::scaled(*settings, 468), limit.width());
+        const int content_width = qMax(width - 2 * margin, contents->minimumSizeHint().width());
+        const auto content_height =
+            layout->hasHeightForWidth() ? layout->totalHeightForWidth(content_width) : layout->sizeHint().height();
+        const int height = 2 * margin + root->spacing() + content_height + buttons->sizeHint().height();
+        dialog->setFixedSize(width, qMin(height, limit.height()));
+        if (dialog->isVisible()) {
+            const auto frame = dialog->frameGeometry();
+            const auto position = QPoint(
+                qBound(available.left(), frame.x(), qMax(available.left(), available.right() - frame.width() + 1)),
+                qBound(available.top(), frame.y(), qMax(available.top(), available.bottom() - frame.height() + 1)));
+            if (position != frame.topLeft())
+                dialog->move(dialog->pos() + position - frame.topLeft());
+        }
+    };
+    const auto update_list = [=] {
+        const auto query = search->text().trimmed();
+        int rows = 0;
+        int height = 2 * tags->frameWidth();
+        for (int row = 0; row < tags->count(); ++row) {
+            const bool visible = tags->item(row)->text().contains(query, Qt::CaseInsensitive);
+            tags->item(row)->setHidden(!visible);
+            if (!visible)
+                continue;
+            if (rows < 6)
+                height += tags->sizeHintForRow(row);
+            ++rows;
+        }
+        search->setVisible(tags->count() > 5);
+        tags->setVisible(rows > 0);
+        tags->setFixedHeight(height);
+        empty->setText(tags->count() == 0 ? QCoreApplication::translate("XLibrary", "No tags")
+                                          : QCoreApplication::translate("XLibrary", "No matching tags"));
+        empty->setVisible(rows == 0);
+        request_fit();
+    };
+    const auto set_error = [=](const QString &text) {
+        error->setText(text);
+        error->setVisible(!text.isEmpty());
+        request_fit();
+    };
+    const auto stage_tags = [=] {
+        if (new_tags->text().trimmed().isEmpty())
+            return true;
+        QStringList names;
+        for (auto tag : new_tags->text().split(',', Qt::SkipEmptyParts)) {
+            tag = tag.trimmed();
+            if (tag.startsWith('#'))
+                tag.remove(0, 1);
+            if (!valid_tag_name(tag)) {
+                set_error(
+                    QCoreApplication::translate("XLibrary", "Tag: up to 64 characters, without spaces, commas, or #."));
+                new_tags->setFocus();
+                return false;
+            }
+            if (!has_tag(names, tag))
+                names.append(tag);
+        }
+        QListWidgetItem *last = nullptr;
+        for (const auto &name : names) {
+            const auto key = tag_name_key(name);
+            QListWidgetItem *existing = nullptr;
+            for (int row = 0; row < tags->count(); ++row) {
+                auto *item = tags->item(row);
+                if (tag_name_key(item->data(Qt::UserRole).toString()) == key) {
+                    existing = item;
+                    break;
+                }
+            }
+            last = existing ? existing : add_row(name, Qt::Unchecked);
+            last->setCheckState(Qt::Checked);
+        }
+        new_tags->clear();
+        search->clear();
+        update_list();
+        if (last)
+            tags->scrollToItem(last);
+        return true;
+    };
+    QObject::connect(search, &QLineEdit::textChanged, dialog, update_list);
+    QObject::connect(new_tags, &QLineEdit::textChanged, dialog, [=](const QString &text) {
+        add->setEnabled(!text.trimmed().isEmpty());
+        set_error({});
+    });
+    QObject::connect(add, &QPushButton::clicked, dialog, [=] {
+        if (stage_tags())
+            new_tags->setFocus();
+    });
     QObject::connect(buttons, &QDialogButtonBox::rejected, dialog, &QDialog::reject);
     QObject::connect(buttons, &QDialogButtonBox::accepted, dialog, [=] {
+        if (!stage_tags())
+            return;
         QStringList add_tags;
         QStringList remove_tags;
         for (int row = 0; row < tags->count(); ++row) {
@@ -269,25 +413,15 @@ void show_bulk_editor(const ui_context &context) {
                 continue;
             (item->checkState() == Qt::Checked ? add_tags : remove_tags).append(item->data(Qt::UserRole).toString());
         }
-        for (auto tag : new_tags->text().split(',', Qt::SkipEmptyParts)) {
-            tag = tag.trimmed();
-            if (tag.startsWith('#'))
-                tag.remove(0, 1);
-            if (!valid_tag_name(tag)) {
-                error->setText(
-                    QCoreApplication::translate("XLibrary", "Tag: up to 64 characters, without spaces, commas, or #."));
-                return;
-            }
-            if (!has_tag(add_tags, tag))
-                add_tags.append(tag);
+        if (add_tags.isEmpty() && remove_tags.isEmpty()) {
+            dialog->accept();
+            return;
         }
-        buttons->button(QDialogButtonBox::Save)->setEnabled(false);
-        const auto state = favorite->checkState();
-        const int favorite_value = state == favorite_state || state == Qt::PartiallyChecked ? -1
-                                   : state == Qt::Checked                                   ? 1
-                                                                                            : 0;
+        contents->setEnabled(false);
+        save->setEnabled(false);
+        set_error({});
         dialog->setProperty("save_request_id",
-                            QVariant::fromValue(service->update_metadata(ids, add_tags, remove_tags, favorite_value)));
+                            QVariant::fromValue(service->update_metadata(ids, add_tags, remove_tags, -1)));
     });
     QObject::connect(service, &DesktopService::operation_changed, dialog, [=](const operation_result &result) {
         if (result.id != dialog->property("save_request_id").toULongLong() || result.state == operation_state::loading)
@@ -295,9 +429,19 @@ void show_bulk_editor(const ui_context &context) {
         if (result.state == operation_state::completed)
             dialog->accept();
         else {
-            buttons->button(QDialogButtonBox::Save)->setEnabled(true);
-            error->setText(result.error.user_message);
+            contents->setEnabled(true);
+            save->setEnabled(true);
+            set_error(result.error.user_message);
         }
     });
-    dialog->show();
+    QObject::connect(fit_timer, &QTimer::timeout, dialog, fit);
+    dialog->ensurePolished();
+    tags->ensurePolished();
+    update_list();
+    fit();
+    (tags->count() ? static_cast<QWidget *>(tags) : new_tags)->setFocus();
+    dialog->open();
+    if (auto *window = dialog->windowHandle())
+        QObject::connect(window, &QWindow::screenChanged, dialog, request_fit);
+    request_fit();
 }

@@ -8,6 +8,8 @@
 #include <QVector>
 #include <stdexcept>
 
+#include "WorkspaceTypes.h"
+
 namespace catalog_limits {
 inline constexpr qint64 json_bytes = 32 * 1024 * 1024;
 inline constexpr qsizetype applications = 50000;
@@ -55,11 +57,16 @@ struct app_record {
     bool available = true;
     bool volume_unavailable = false;
     bool running = false;
+    // Transient process measurements; negative values mean unavailable or disabled.
+    double cpu_percent = -1;
+    qint64 memory_bytes = -1;
     QString new_instance_error;
     QString discovery_source;
     QStringList discovery_sources;
     qint64 last_launch = 0;
     qint64 launch_count = 0;
+    // Transient inventory evidence; never persisted as application metadata.
+    QString removal_reason;
 };
 
 struct usage_record {
@@ -143,6 +150,7 @@ struct catalog_snapshot {
     QHash<QString, usage_record> file_usage;
     QStringList tags;
     QVector<scenario_record> scenarios;
+    QVector<workspace_record> workspaces;
     QVector<saved_filter> filters;
     QVector<target_shortcut> target_shortcuts;
 };

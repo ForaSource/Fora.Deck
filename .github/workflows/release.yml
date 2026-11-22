@@ -130,7 +130,7 @@ jobs:
           sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/debian.sources
           apt-get update
           apt-get install -y --no-install-recommends ca-certificates git build-essential cmake ninja-build python3 curl file dpkg-dev pkg-config \
-            qt6-base-dev qt6-wayland qt6-tools-dev qt6-l10n-tools libx11-dev libsecret-1-dev desktop-file-utils xvfb xauth dbus-x11
+            qt6-base-dev qt6-wayland qt6-tools-dev qt6-l10n-tools libx11-dev libxcb-randr0-dev libxcb-res0-dev libsecret-1-dev desktop-file-utils xvfb xauth dbus-x11
 
       - name: Checkout exact source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7

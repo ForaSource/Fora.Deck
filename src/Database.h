@@ -69,6 +69,8 @@ public:
     void remove_tag(const QString &name);
     qint64 save_scenario(const scenario_record &record);
     void remove_scenario(qint64 id);
+    qint64 save_workspace(const workspace_record &record);
+    void remove_workspace(qint64 id);
     void save_target_shortcut(bool scenario, qint64 id, const QString &sequence);
     void record_launch(qint64 id);
     void record_file_use(const QString &path);

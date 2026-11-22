@@ -6,14 +6,20 @@
 #include <memory>
 #include <QApplication>
 #include <QDesktopServices>
+#include <QDialog>
 #include <QDirIterator>
+#include <QEvent>
 #include <QFileInfo>
+#include <QMimeDatabase>
 #include <QRegularExpression>
+#include <QScopeGuard>
 #include <QSettings>
 #include <QUrl>
 #include <QWidget>
 #include <shlobj.h>
+#include <shlwapi.h>
 #include <stdexcept>
+#include <vector>
 
 #include "ApplicationPaths.h"
 #include "Heartbeat.h"
@@ -42,6 +48,62 @@ BOOL CALLBACK find_window(const HWND window, const LPARAM parameter) {
     }
     return TRUE;
 }
+
+void apply_native_frame(QWidget *const window, const bool dark, const bool glass) {
+    if (!window->isWindow() || (window->windowFlags() & Qt::FramelessWindowHint) || !window->internalWinId() ||
+        QGuiApplication::platformName() != "windows")
+        return;
+    const auto handle = reinterpret_cast<HWND>(window->internalWinId());
+    // Windows 11 attributes are numeric for compatibility with older MinGW headers.
+    constexpr DWORD immersive_dark_mode_attribute = 20;
+    constexpr DWORD corner_preference_attribute = 33;
+    constexpr DWORD border_color_attribute = 34;
+    constexpr DWORD caption_color_attribute = 35;
+    constexpr DWORD text_color_attribute = 36;
+    const BOOL dark_value = dark;
+    DwmSetWindowAttribute(handle, immersive_dark_mode_attribute, &dark_value, sizeof(dark_value));
+    const auto palette = window->palette();
+    const auto native_color = [](const QColor &color) { return RGB(color.red(), color.green(), color.blue()); };
+    const auto surface_role = qobject_cast<QDialog *>(window) ? QPalette::Base : QPalette::Window;
+    const COLORREF caption_color = native_color(palette.color(surface_role));
+    const COLORREF text_color = native_color(palette.color(QPalette::WindowText));
+    // Older Windows versions retain their native frame when an attribute is unsupported.
+    DwmSetWindowAttribute(handle, caption_color_attribute, &caption_color, sizeof(caption_color));
+    DwmSetWindowAttribute(handle, text_color_attribute, &text_color, sizeof(text_color));
+    DwmSetWindowAttribute(handle, border_color_attribute, &caption_color, sizeof(caption_color));
+    const int round_corners = 2; // DWMWCP_ROUND
+    DwmSetWindowAttribute(handle, corner_preference_attribute, &round_corners, sizeof(round_corners));
+    const int backdrop = glass ? 2 : 1;
+    DwmSetWindowAttribute(handle, 38, &backdrop, sizeof(backdrop));
+}
+
+class WindowAppearanceFilter final : public QObject {
+    bool dark = false;
+    bool glass = false;
+
+public:
+    using QObject::QObject;
+
+    void refresh(const bool dark_value, const bool glass_value) {
+        dark = dark_value;
+        glass = glass_value;
+        for (auto *window : QApplication::topLevelWidgets())
+            if (window->isVisible())
+                apply(window);
+    }
+
+    void apply(QWidget *const window) const { apply_native_frame(window, dark, glass); }
+
+protected:
+    bool eventFilter(QObject *const object, QEvent *const event) override {
+        if (event->type() == QEvent::Show || event->type() == QEvent::WinIdChange ||
+            event->type() == QEvent::PaletteChange) {
+            if (auto *window = qobject_cast<QWidget *>(object); window && window->isWindow())
+                apply(window);
+        }
+        return QObject::eventFilter(object, event);
+    }
+};
 
 }
 
@@ -104,7 +166,7 @@ bool desktop_platform::installed_for_updates() {
 
 bool desktop_platform::start_update_installer(const QString &path, QString &error) {
     if (!installed_for_updates()) {
-        error = QCoreApplication::translate("XLibrary", "This copy of XLibrary was not installed by the installer.");
+        error = QCoreApplication::translate("XLibrary", "This copy of Fora.Deck was not installed by the installer.");
         return false;
     }
     const auto native_path = QDir::toNativeSeparators(path).toStdWString();
@@ -128,16 +190,105 @@ bool desktop_platform::start_update_installer(const QString &path, QString &erro
     return true;
 }
 
+desktop_platform::file_association desktop_platform::default_file_application(const QString &path) {
+    const auto initialized = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    const auto cleanup_com = qScopeGuard([initialized] {
+        if (SUCCEEDED(initialized))
+            CoUninitialize();
+    });
+    if (FAILED(initialized) && initialized != RPC_E_CHANGED_MODE)
+        return {};
+    const auto suffix = QFileInfo(path).suffix();
+    if (suffix.isEmpty())
+        return {};
+    const auto association = ('.' + suffix).toStdWString();
+    const auto query = [&](const ASSOCSTR kind) {
+        DWORD length = 0;
+        AssocQueryStringW(ASSOCF_NONE, kind, association.c_str(), L"open", nullptr, &length);
+        if (!length || length > 32768)
+            return QString{};
+        std::vector<wchar_t> buffer(length);
+        return SUCCEEDED(AssocQueryStringW(ASSOCF_NONE, kind, association.c_str(), L"open", buffer.data(), &length))
+                   ? QString::fromWCharArray(buffer.data())
+                   : QString{};
+    };
+    file_association result;
+    result.name = query(ASSOCSTR_FRIENDLYAPPNAME);
+    const auto executable = query(ASSOCSTR_EXECUTABLE);
+    if (result.name.isEmpty() && !executable.isEmpty())
+        result.name = QFileInfo(executable).completeBaseName();
+    if (!executable.isEmpty()) {
+        HICON icon = nullptr;
+        const auto cleanup_icon = qScopeGuard([&icon] {
+            if (icon)
+                DestroyIcon(icon);
+        });
+        ExtractIconExW(executable.toStdWString().c_str(), 0, &icon, nullptr, 1);
+        if (icon)
+            result.icon = QImage::fromHICON(icon);
+    }
+    return result;
+}
+
 QImage desktop_platform::application_icon(const QString &path) {
     HICON large = nullptr;
+    const auto cleanup_large = qScopeGuard([&large] {
+        if (large)
+            DestroyIcon(large);
+    });
     const auto native_path = QDir::toNativeSeparators(path).toStdWString();
     ExtractIconExW(native_path.c_str(), 0, &large, nullptr, 1);
-    if (!large) {
-        return {};
+    if (large) {
+        return QImage::fromHICON(large);
     }
-    const auto result = QImage::fromHICON(large);
-    DestroyIcon(large);
-    return result;
+    // Shell providers and file associations are resolved on LibraryModel's icon worker.
+    const auto initialized = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    const auto cleanup_com = qScopeGuard([initialized] {
+        if (SUCCEEDED(initialized))
+            CoUninitialize();
+    });
+    if (FAILED(initialized) && initialized != RPC_E_CHANGED_MODE)
+        return {};
+    if (QMimeDatabase{}.mimeTypeForFile(path, QMimeDatabase::MatchExtension).name().startsWith("image/")) {
+        IShellItemImageFactory *raw_factory = nullptr;
+        if (SUCCEEDED(SHCreateItemFromParsingName(native_path.c_str(), nullptr, IID_PPV_ARGS(&raw_factory)))) {
+            const auto release_factory = [](IShellItemImageFactory *factory) { factory->Release(); };
+            const std::unique_ptr<IShellItemImageFactory, decltype(release_factory)> factory(raw_factory,
+                                                                                             release_factory);
+            HBITMAP bitmap = nullptr;
+            const auto cleanup_bitmap = qScopeGuard([&bitmap] {
+                if (bitmap)
+                    DeleteObject(bitmap);
+            });
+            if (SUCCEEDED(factory->GetImage({128, 128}, SIIGBF_THUMBNAILONLY, &bitmap)) && bitmap) {
+                const auto image = QImage::fromHBITMAP(bitmap);
+                if (!image.isNull())
+                    return image;
+            }
+        }
+    }
+    DWORD length = 0;
+    const auto association = ('.' + QFileInfo(path).suffix()).toStdWString();
+    AssocQueryStringW(ASSOCF_NONE, ASSOCSTR_EXECUTABLE, association.c_str(), L"open", nullptr, &length);
+    if (length > 0 && length <= 32768) {
+        std::vector<wchar_t> executable(length);
+        if (SUCCEEDED(AssocQueryStringW(ASSOCF_NONE, ASSOCSTR_EXECUTABLE, association.c_str(), L"open",
+                                        executable.data(), &length))) {
+            ExtractIconExW(executable.data(), 0, &large, nullptr, 1);
+            if (large) {
+                return QImage::fromHICON(large);
+            }
+        }
+    }
+    // Packaged applications may not expose an executable; their Shell file icon still follows the association.
+    SHFILEINFOW info{};
+    const auto cleanup_icon = qScopeGuard([&info] {
+        if (info.hIcon)
+            DestroyIcon(info.hIcon);
+    });
+    if (SHGetFileInfoW(native_path.c_str(), 0, &info, sizeof(info), SHGFI_ICON | SHGFI_LARGEICON) && info.hIcon)
+        return QImage::fromHICON(info.hIcon);
+    return {};
 }
 
 bool desktop_platform::set_autostart(const bool enabled, QString &error) {
@@ -170,28 +321,14 @@ bool desktop_platform::animations_enabled() {
 }
 
 void desktop_platform::apply_backdrop(QWidget *const window, const bool dark, const bool glass) {
-    const auto handle = reinterpret_cast<HWND>(window->winId());
-    // Keep compatibility with MinGW headers predating the Windows 11 DWM attributes.
-    constexpr DWORD immersive_dark_mode_attribute = 20;
-    constexpr DWORD corner_preference_attribute = 33;
-    constexpr DWORD border_color_attribute = 34;
-    constexpr DWORD caption_color_attribute = 35;
-    constexpr DWORD text_color_attribute = 36;
-    const BOOL dark_value = dark;
-    DwmSetWindowAttribute(handle, immersive_dark_mode_attribute, &dark_value, sizeof(dark_value));
-    const auto palette = window->palette();
-    const auto native_color = [](const QColor &color) { return RGB(color.red(), color.green(), color.blue()); };
-    const COLORREF caption_color = native_color(palette.color(QPalette::AlternateBase));
-    const COLORREF text_color = native_color(palette.color(QPalette::WindowText));
-    const COLORREF border_color = native_color(palette.color(QPalette::Mid));
-    // Windows 11 honors these attributes; older Windows keeps its native frame.
-    DwmSetWindowAttribute(handle, caption_color_attribute, &caption_color, sizeof(caption_color));
-    DwmSetWindowAttribute(handle, text_color_attribute, &text_color, sizeof(text_color));
-    DwmSetWindowAttribute(handle, border_color_attribute, &border_color, sizeof(border_color));
-    const int round_corners = 2; // DWMWCP_ROUND
-    DwmSetWindowAttribute(handle, corner_preference_attribute, &round_corners, sizeof(round_corners));
-    const int backdrop = glass ? 2 : 1;
-    DwmSetWindowAttribute(handle, 38, &backdrop, sizeof(backdrop));
+    static auto *const filter = [] {
+        auto *result = new WindowAppearanceFilter(qApp);
+        qApp->installEventFilter(result);
+        return result;
+    }();
+    filter->refresh(dark, glass);
+    window->winId();
+    filter->apply(window);
 }
 
 GlobalHotkey::GlobalHotkey(QObject *const parent) : QObject(parent) {
@@ -255,7 +392,7 @@ bool GlobalHotkey::set_sequence(const QKeySequence &value, QString &error) {
     if (modifiers & Qt::MetaModifier)
         flags |= MOD_WIN;
     if (next_id > 0xbfff) {
-        error = QCoreApplication::translate("XLibrary", "Restart XLibrary before changing the shortcut again.");
+        error = QCoreApplication::translate("XLibrary", "Restart Fora.Deck before changing the shortcut again.");
         return false;
     }
     const auto new_id = next_id++;
@@ -283,8 +420,8 @@ bool GlobalHotkey::nativeEventFilter(const QByteArray &, void *const message, qi
     return false;
 }
 
-void desktop_platform::launch_application(const app_record &record, const launch_mode mode) {
+qint64 desktop_platform::launch_application(const app_record &record, const launch_mode mode) {
     if (mode == launch_mode::activate && WindowManager::activate_window(record))
-        return;
-    Application::launch_application(record, mode);
+        return 0;
+    return Application::launch_application(record, mode);
 }

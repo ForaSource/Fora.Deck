@@ -12,9 +12,13 @@
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMenu>
+#include <QPlainTextEdit>
 #include <QProgressBar>
 #include <QRegularExpressionValidator>
+#include <QSlider>
+#include <QSpinBox>
 #include <QStackedWidget>
+#include <QStylePainter>
 #include <QSysInfo>
 #include <QTabBar>
 #include <QTreeWidget>
@@ -63,6 +67,46 @@ void choices(QWidget *const page, QSettings &settings, const QString &key, const
     field(static_cast<QVBoxLayout *>(page->layout()), text, control);
 }
 
+class OverlayRowsSlider final : public QSlider {
+    WidgetMotion squeeze{this, 120};
+
+protected:
+    void paintEvent(QPaintEvent *event) override {
+        const auto scale = squeeze.currentValue().isValid() ? squeeze.currentValue().toReal() : 1.0;
+        if (qFuzzyCompare(scale, 1.0)) {
+            QSlider::paintEvent(event);
+            return;
+        }
+        QStylePainter painter(this);
+        QStyleOptionSlider option;
+        initStyleOption(&option);
+        const auto handle = style()->subControlRect(QStyle::CC_Slider, &option, QStyle::SC_SliderHandle, this);
+        option.subControls = QStyle::SC_SliderGroove | QStyle::SC_SliderTickmarks;
+        painter.drawComplexControl(QStyle::CC_Slider, option);
+        option.subControls = QStyle::SC_SliderHandle;
+        const auto center = QRectF(handle).center();
+        painter.translate(center);
+        painter.scale(1.0, scale);
+        painter.translate(-center);
+        painter.drawComplexControl(QStyle::CC_Slider, option);
+    }
+
+public:
+    OverlayRowsSlider() : QSlider(Qt::Horizontal) {
+        setRange(3, 10);
+        setSingleStep(1);
+        setPageStep(1);
+        setTickInterval(maximum() - minimum());
+        setTickPosition(QSlider::TicksBelow);
+        connect(&squeeze, &QVariantAnimation::valueChanged, this, qOverload<>(&QWidget::update));
+        const auto animate = [this](qreal target) {
+            squeeze.move(squeeze.currentValue().isValid() ? squeeze.currentValue().toReal() : 1.0, target);
+        };
+        connect(this, &QSlider::sliderPressed, this, [animate] { animate(0.9); });
+        connect(this, &QSlider::sliderReleased, this, [animate] { animate(1.0); });
+    }
+};
+
 QWidget *general(const ui_context &context, QWidget *) {
     auto *widget = page(QCoreApplication::translate("XLibrary", "Application behavior"));
     auto &settings = *context.settings;
@@ -72,7 +116,7 @@ QWidget *general(const ui_context &context, QWidget *) {
         {{QCoreApplication::translate("XLibrary", "System language"), "system"}, {"English", "en"}, {"Русский", "ru"}},
         "system");
     widget->layout()->addWidget(label(
-        QCoreApplication::translate("XLibrary", "Language changes take effect after restarting XLibrary."), "muted"));
+        QCoreApplication::translate("XLibrary", "Language changes take effect after restarting Fora.Deck."), "muted"));
     checkbox(widget, settings, "behavior/autostart", QCoreApplication::translate("XLibrary", "Start at login"), false);
     checkbox(widget, settings, "behavior/close_to_tray",
              QCoreApplication::translate("XLibrary", "Minimize to tray on close"), true);
@@ -89,6 +133,9 @@ QWidget *general(const ui_context &context, QWidget *) {
             {{QCoreApplication::translate("XLibrary", "Show the library"), "show"},
              {QCoreApplication::translate("XLibrary", "Start in the tray"), "tray"}},
             "show");
+    widget->layout()->addWidget(label(QCoreApplication::translate("XLibrary", "Running applications"), "subheading"));
+    checkbox(widget, settings, "monitoring/memory", QCoreApplication::translate("XLibrary", "Show memory usage"), true);
+    checkbox(widget, settings, "monitoring/cpu", QCoreApplication::translate("XLibrary", "Show CPU usage"), true);
     auto *reset = button(QCoreApplication::translate("XLibrary", "Reset settings…"), "danger");
     widget->layout()->addWidget(reset);
     QObject::connect(reset, &QPushButton::clicked, widget, [=] {
@@ -97,13 +144,13 @@ QWidget *general(const ui_context &context, QWidget *) {
                      QCoreApplication::translate("XLibrary",
                                                  "Restore default interface, shortcuts, sources and behavior settings? "
                                                  "Applications, tags, scenarios, history and saved credentials will be "
-                                                 "kept. XLibrary will need a restart."),
+                                                 "kept. Fora.Deck will need a restart."),
                      QCoreApplication::translate("XLibrary", "Reset")))
             return;
         if (!service->reset_settings())
             return;
-        if (confirm(widget, QCoreApplication::translate("XLibrary", "Restart XLibrary"),
-                    QCoreApplication::translate("XLibrary", "Settings were reset. Restart XLibrary now?"),
+        if (confirm(widget, QCoreApplication::translate("XLibrary", "Restart Fora.Deck"),
+                    QCoreApplication::translate("XLibrary", "Settings were reset. Restart Fora.Deck now?"),
                     QCoreApplication::translate("XLibrary", "Restart")))
             service->restart_application();
         if (auto *dialog = qobject_cast<QDialog *>(widget->window()))
@@ -131,6 +178,31 @@ QWidget *appearance_page(const ui_context &context, QWidget *) {
 #endif
     choices(widget, settings, "appearance/text_scale", QCoreApplication::translate("XLibrary", "Text size"),
             {{"100%", 100}, {"125%", 125}, {"150%", 150}, {"200%", 200}}, 100);
+    auto *slider = new OverlayRowsSlider;
+    slider->setObjectName("overlay_rows");
+    slider->setProperty("setting_key", "search/overlay_rows");
+    slider->setValue(qBound(slider->minimum(), settings.value("search/overlay_rows", 5).toInt(), slider->maximum()));
+    auto *number = label(QString::number(slider->value()));
+    number->setAlignment(Qt::AlignCenter);
+    number->setWordWrap(false);
+    number->setMinimumWidth(number->fontMetrics().horizontalAdvance("10") + appearance::scaled(settings, 12));
+    auto *row = new QWidget;
+    auto *row_layout = new QHBoxLayout(row);
+    row_layout->setContentsMargins(0, 0, 0, 0);
+    row_layout->addWidget(slider, 1);
+    row_layout->addWidget(number);
+    QObject::connect(slider, &QSlider::valueChanged, number,
+                     [number](int value) { number->setText(QString::number(value)); });
+    const auto caption = QCoreApplication::translate("XLibrary", "Visible results in quick search");
+    auto *buddy = label(caption, "muted");
+    buddy->setBuddy(slider);
+    slider->setAccessibleName(caption);
+    widget->layout()->addWidget(buddy);
+    widget->layout()->addWidget(row);
+    widget->layout()->addWidget(
+        label(QCoreApplication::translate("XLibrary",
+                                          "Scroll to see more results. The height is limited by the screen size."),
+              "muted"));
     checkbox(widget, settings, "appearance/animations",
              QCoreApplication::translate("XLibrary", "Enable interface animations"), true);
     widget->layout()->addWidget(
@@ -168,7 +240,7 @@ QWidget *hotkeys(const ui_context &context, QWidget *) {
          {{"shortcuts/search", QCoreApplication::translate("XLibrary", "Search the library"), "Ctrl+K"},
           {"shortcuts/settings", QCoreApplication::translate("XLibrary", "Open settings"), "Ctrl+,"}}},
         {QCoreApplication::translate("XLibrary", "Application actions"),
-         {{"shortcuts/add", QCoreApplication::translate("XLibrary", "Add application"), "Ctrl+N"},
+         {{"shortcuts/add", QCoreApplication::translate("XLibrary", "Add"), "Ctrl+N"},
           {"shortcuts/launch", QCoreApplication::translate("XLibrary", "Launch application"), "Return"},
           {"shortcuts/new_instance", QCoreApplication::translate("XLibrary", "New instance"), "Ctrl+Return"},
           {"shortcuts/open_folder", QCoreApplication::translate("XLibrary", "Open application folder"), "Alt+Return"},
@@ -300,6 +372,7 @@ QWidget *hotkeys(const ui_context &context, QWidget *) {
 QWidget *library_settings(const ui_context &context, QWidget *) {
     auto *service = static_cast<DesktopService *>(context.service);
     auto *widget = page(QCoreApplication::translate("XLibrary", "Application sources"));
+    widget->layout()->addWidget(action_button(context.actions.value("library_health")));
 #ifdef Q_OS_WIN
     checkbox(widget, *context.settings, "sources/registry",
              QCoreApplication::translate("XLibrary", "Registered Windows applications"), true);
@@ -325,6 +398,11 @@ QWidget *library_settings(const ui_context &context, QWidget *) {
                                           "When disabled, confirmed missing applications are removed automatically. "
                                           "Unavailable drives and uncertain targets are kept."),
               "muted"));
+    checkbox(widget, *context.settings, "sources/remove_unavailable_without_icons",
+             QCoreApplication::translate("XLibrary", "Automatically remove unavailable applications without icons"),
+             true);
+    widget->layout()->addWidget(
+        label(QCoreApplication::translate("XLibrary", "Runs at startup and during application scans."), "muted"));
     widget->layout()->addWidget(action_button(context.actions.value("discover")));
     auto *clear_exclusions = button(QCoreApplication::translate("XLibrary", "Reset discovery exclusions"));
     widget->layout()->addWidget(clear_exclusions);
@@ -339,21 +417,21 @@ QWidget *library_settings(const ui_context &context, QWidget *) {
                   "before importing. Matching configurations are skipped by default. Applications are never launched "
                   "automatically."),
               "muted"));
-    auto *import = button(QCoreApplication::translate("XLibrary", "Import…"));
-    auto *export_button = button(QCoreApplication::translate("XLibrary", "Export…"));
+    auto *import = button(QCoreApplication::translate("XLibrary", "Import…"), nullptr, "import");
+    auto *export_button = button(QCoreApplication::translate("XLibrary", "Export…"), nullptr, "export");
     widget->layout()->addWidget(import);
     widget->layout()->addWidget(export_button);
     QObject::connect(import, &QPushButton::clicked, widget, [=] {
         const auto path =
             QFileDialog::getOpenFileName(widget, QCoreApplication::translate("XLibrary", "Import library"), {},
-                                         QCoreApplication::translate("XLibrary", "XLibrary catalog (*.json)"));
+                                         QCoreApplication::translate("XLibrary", "Fora.Deck catalog (*.json)"));
         if (!path.isEmpty())
             service->import_catalog(path);
     });
     QObject::connect(export_button, &QPushButton::clicked, widget, [=] {
         const auto path = QFileDialog::getSaveFileName(
             widget, QCoreApplication::translate("XLibrary", "Export library"), "xlibrary.json",
-            QCoreApplication::translate("XLibrary", "XLibrary catalog (*.json)"));
+            QCoreApplication::translate("XLibrary", "Fora.Deck catalog (*.json)"));
         if (!path.isEmpty())
             service->export_catalog(path);
     });
@@ -376,7 +454,7 @@ QWidget *storage_page(const ui_context &context, QWidget *) {
     widget->layout()->addWidget(
         label(QCoreApplication::translate(
                   "XLibrary",
-                  "Your library, tags, scenarios and settings are stored on this computer. XLibrary does not upload "
+                  "Your library, tags, scenarios and settings are stored on this computer. Fora.Deck does not upload "
                   "your catalog. Update checks contact GitHub; your saved access token is kept in the system "
                   "credential store."),
               "muted"));
@@ -431,6 +509,37 @@ QWidget *file_settings(const ui_context &context, QWidget *) {
                   "other local drives are checked only at the root and one folder level below it (max-depth=1). "
                   "Full: all accessible local drives recursively. Not recommended: indexing can take a long time."),
               "muted"));
+    auto *limit_preset = new QComboBox;
+    limit_preset->setObjectName("file_result_limit_preset");
+    for (const int limit : {50, 100, FileManager::default_result_limit, 500, 1000})
+        limit_preset->addItem(QString::number(limit), limit);
+    limit_preset->addItem(QCoreApplication::translate("XLibrary", "Custom"), 0);
+    auto *result_limit = new QSpinBox;
+    result_limit->setObjectName("file_result_limit");
+    result_limit->setProperty("setting_key", "files/result_limit");
+    result_limit->setRange(1, FileManager::max_result_limit);
+    result_limit->setValue(context.settings->value("files/result_limit", FileManager::default_result_limit).toInt());
+    const auto preset = limit_preset->findData(result_limit->value());
+    limit_preset->setCurrentIndex(preset >= 0 ? preset : limit_preset->count() - 1);
+    auto *limit_control = new QWidget;
+    limit_control->setFocusProxy(limit_preset);
+    auto *limit_layout = new QHBoxLayout(limit_control);
+    limit_layout->setContentsMargins(0, 0, 0, 0);
+    limit_layout->addWidget(limit_preset);
+    limit_layout->addWidget(result_limit);
+    result_limit->setAccessibleName(QCoreApplication::translate("XLibrary", "Custom file result limit"));
+    result_limit->setVisible(preset < 0);
+    QObject::connect(limit_preset, &QComboBox::currentIndexChanged, result_limit, [=] {
+        const auto value = limit_preset->currentData().toInt();
+        result_limit->setVisible(value == 0);
+        if (value)
+            result_limit->setValue(value);
+        else
+            result_limit->setFocus();
+    });
+    const auto limit_label = QCoreApplication::translate("XLibrary", "Maximum results in the Files tab");
+    limit_preset->setAccessibleName(limit_label);
+    field(static_cast<QVBoxLayout *>(widget->layout()), limit_label, limit_control);
     const auto path_list = [=](const QString &title, const QString &key, const bool allow_files) {
         widget->layout()->addWidget(label(title, "subheading"));
         auto *paths = new QListWidget;
@@ -480,6 +589,18 @@ QWidget *file_settings(const ui_context &context, QWidget *) {
     widget->layout()->addWidget(status);
     QObject::connect(service->files, &FileManager::status_changed, widget,
                      [=] { status->setText(service->files->status()); });
+    auto *diagnostics = new QPlainTextEdit(service->files->diagnostics_text());
+    diagnostics->setObjectName("file_index_diagnostics");
+    diagnostics->setReadOnly(true);
+    diagnostics->setAccessibleName(QCoreApplication::translate("XLibrary", "File index diagnostics"));
+    diagnostics->setMinimumHeight(appearance::scaled(*context.settings, 180));
+    widget->layout()->addWidget(diagnostics);
+    QObject::connect(service->files, &FileManager::status_changed, diagnostics,
+                     [=] { diagnostics->setPlainText(service->files->diagnostics_text()); });
+    widget->layout()->addWidget(label(
+        QCoreApplication::translate("XLibrary", "Unavailable sources are checked about every 30 seconds. Returning "
+                                                "sources refresh separately from the regular index refresh."),
+        "muted"));
     auto *scan = button(QCoreApplication::translate("XLibrary", "Refresh file index"));
     scan->setEnabled(service->files->is_enabled());
     widget->layout()->addWidget(scan);
@@ -509,7 +630,7 @@ QWidget *plugins(const ui_context &context, QWidget *) {
         label(QCoreApplication::translate(
                   "XLibrary",
                   "Native plugins can change interface areas and appearance. Enable only trusted modules; they run "
-                  "inside XLibrary. Changes take effect after restart."),
+                  "inside Fora.Deck. Changes take effect after restart."),
               "muted"));
     auto available = context.parameters.value("available_plugins").toStringList();
     const auto enabled = context.settings->value("plugins/enabled").toStringList();
@@ -560,8 +681,8 @@ QWidget *plugins(const ui_context &context, QWidget *) {
     }
     if (available.isEmpty() && !service->safe_mode())
         widget->layout()->addWidget(
-            label(QCoreApplication::translate("XLibrary",
-                                              "No modules installed. Folder: plugins next to the XLibrary executable."),
+            label(QCoreApplication::translate(
+                      "XLibrary", "No modules installed. Folder: plugins next to the Fora.Deck executable."),
                   "muted"));
     static_cast<QVBoxLayout *>(widget->layout())->addStretch();
     return widget;
@@ -593,7 +714,7 @@ QWidget *help_page(const ui_context &context, QWidget *) {
          QCoreApplication::translate(
              "XLibrary",
              "Open Settings → Keyboard shortcuts to see or change the current bindings. Clear a binding to disable it. "
-             "Assign application and scenario shortcuts in their editors. A shortcut already used by XLibrary or "
+             "Assign application and scenario shortcuts in their editors. A shortcut already used by Fora.Deck or "
              "another application "
              "may be refused. On Wayland, system permission or a desktop shortcut may be required.")}};
     for (const auto &topic : topics) {
@@ -618,11 +739,12 @@ QWidget *about(const ui_context &context, QWidget *) {
     logo->setPixmap(appearance::logo().pixmap(logo_size, logo_size));
     identity->addWidget(logo, 0, Qt::AlignTop);
     auto *title = new QVBoxLayout;
-    title->addWidget(label("XLibrary", "heading"));
+    title->addWidget(label(QGuiApplication::applicationDisplayName(), "heading"));
     auto *version =
         label(QCoreApplication::translate("XLibrary", "Version ") + QCoreApplication::applicationVersion(), "muted");
     version->setTextInteractionFlags(Qt::TextSelectableByMouse | Qt::TextSelectableByKeyboard);
     title->addWidget(version);
+    title->addWidget(label(QCoreApplication::translate("XLibrary", "By ForaSource"), "muted"));
     identity->addLayout(title, 1);
     card_layout->addLayout(identity);
     card_layout->addWidget(
@@ -649,7 +771,7 @@ QWidget *about(const ui_context &context, QWidget *) {
     QObject::connect(copy, &QPushButton::clicked, widget, [=] {
         const auto text =
             QCoreApplication::translate("XLibrary",
-                                        "XLibrary %1\nOS: %2\nArchitecture: %3\nQt: %4\nSession: %5\nMode: %6")
+                                        "Fora.Deck %1\nOS: %2\nArchitecture: %3\nQt: %4\nSession: %5\nMode: %6")
                 .arg(QCoreApplication::applicationVersion(), QSysInfo::prettyProductName(),
                      QSysInfo::currentCpuArchitecture(), QString::fromLatin1(qVersion()),
                      QGuiApplication::platformName(),
@@ -661,11 +783,12 @@ QWidget *about(const ui_context &context, QWidget *) {
     widget->layout()->addWidget(card);
     widget->layout()->addWidget(
         label(QCoreApplication::translate("XLibrary", "Technologies and licenses"), "subheading"));
-    widget->layout()->addWidget(label(
-        QString(QCoreApplication::translate("XLibrary", "Qt %1 · C++23 · SQLite · QtKeychain\nXLibrary — "
-                                                        "MIT\nThird-party licenses are included with the application."))
-            .arg(QString::fromLatin1(qVersion())),
-        "muted"));
+    widget->layout()->addWidget(
+        label(QString(QCoreApplication::translate(
+                          "XLibrary", "Qt %1 · C++23 · SQLite · QtKeychain · Inter\nFora.Deck — "
+                                      "MIT; Inter — OFL 1.1\nThird-party licenses are included with the application."))
+                  .arg(QString::fromLatin1(qVersion())),
+              "muted"));
     static_cast<QVBoxLayout *>(widget->layout())->addStretch();
     return widget;
 }
@@ -748,9 +871,10 @@ QWidget *update_page(const ui_context &context, QWidget *) {
     update_progress->hide();
     auto *cancel_update = button(QCoreApplication::translate("XLibrary", "Cancel"));
     cancel_update->hide();
-    auto *release_button = button(QCoreApplication::translate("XLibrary", "Open release on GitHub ↗"));
+    auto *release_button =
+        button(QCoreApplication::translate("XLibrary", "Open release on GitHub ↗"), nullptr, "external");
     release_button->hide();
-    auto *install_update = button(QCoreApplication::translate("XLibrary", "Update now"));
+    auto *install_update = button(QCoreApplication::translate("XLibrary", "Update now"), "primary", "download");
     install_update->setAutoDefault(false);
     install_update->hide();
     card_layout->addWidget(check_update);
@@ -863,6 +987,9 @@ QWidget *update_page(const ui_context &context, QWidget *) {
         release_button->show();
         install_update->setText(
             QCoreApplication::translate("XLibrary", updates->can_install() ? "Update now" : "Open release"));
+        const auto icon_name = updates->can_install() ? "download" : "external";
+        install_update->setProperty("appearance_icon", icon_name);
+        install_update->setIcon(appearance::icon(icon_name, QColor("#181A1D")));
         install_update->show();
         update_status->setText(QCoreApplication::translate("XLibrary", "New version available: %1 (%2 channel)")
                                    .arg(updates->available_version(), channel->currentText()));
@@ -881,10 +1008,10 @@ QWidget *update_page(const ui_context &context, QWidget *) {
         if (updates->is_busy() || tokens->is_busy() || updates->available_version().isEmpty())
             return;
         if (updates->can_install()) {
-            if (confirm(widget, QCoreApplication::translate("XLibrary", "XLibrary update"),
+            if (confirm(widget, QCoreApplication::translate("XLibrary", "Fora.Deck update"),
                         QCoreApplication::translate(
                             "XLibrary", "A new version is available: %1 (current: %2). Update now?\n\n"
-                                        "XLibrary will download and verify the installer, then close. "
+                                        "Fora.Deck will download and verify the installer, then close. "
                                         "Complete the update in the installation wizard. Your library and settings "
                                         "will be kept. Save any unsaved edits before continuing.")
                             .arg(updates->available_version(), QCoreApplication::applicationVersion()),
@@ -892,7 +1019,7 @@ QWidget *update_page(const ui_context &context, QWidget *) {
                 *request_started = true;
                 updates->download();
             }
-        } else if (confirm(widget, QCoreApplication::translate("XLibrary", "XLibrary update"),
+        } else if (confirm(widget, QCoreApplication::translate("XLibrary", "Fora.Deck update"),
                            QCoreApplication::translate(
                                "XLibrary",
                                "A new version is available: %1 (current: %2). Open the release on GitHub?\n\n"
@@ -922,14 +1049,14 @@ QDialog *settings_dialog(const ui_context &context, QWidget *const parent) {
     auto *hotkey = static_cast<GlobalHotkey *>(context.parameters.value("hotkey").value<QObject *>());
     auto *overlay_hotkey = static_cast<GlobalHotkey *>(context.parameters.value("overlay_hotkey").value<QObject *>());
     auto *dialog = new QDialog(parent);
-    dialog->setWindowTitle(QCoreApplication::translate("XLibrary", "XLibrary settings"));
+    dialog->setWindowTitle(QCoreApplication::translate("XLibrary", "Fora.Deck settings"));
     prepare_dialog(dialog, context, {960, 700}, {640, 420});
     auto *root = new QVBoxLayout(dialog);
     root->setContentsMargins(24, 20, 24, 20);
     root->setSpacing(16);
     root->addWidget(label(QCoreApplication::translate("XLibrary", "Settings"), "heading"));
     root->addWidget(
-        label(QCoreApplication::translate("XLibrary", "XLibrary appearance, behavior, and features"), "muted"));
+        label(QCoreApplication::translate("XLibrary", "Fora.Deck appearance, behavior, and features"), "muted"));
     auto *body = new QHBoxLayout;
     body->setSpacing(16);
     auto *categories = new QButtonGroup(dialog);
@@ -960,6 +1087,7 @@ QDialog *settings_dialog(const ui_context &context, QWidget *const parent) {
             {"settings_files", "file"},       {"settings_plugins", "plugin"},     {"settings_update", "refresh"},
             {"settings_help", "help"},        {"settings_about", "info"}};
         item->setIcon(appearance::icon(icons.value(section.second), item->palette().color(QPalette::ButtonText)));
+        item->setProperty("appearance_icon", icons.value(section.second));
         const auto icon_size = appearance::scaled(*context.settings, 20);
         item->setIconSize({icon_size, icon_size});
         item->setObjectName(section.second + "_category");
@@ -969,11 +1097,14 @@ QDialog *settings_dialog(const ui_context &context, QWidget *const parent) {
         auto *page_layout = new QHBoxLayout(holder);
         page_layout->setContentsMargins(0, 0, 0, 0);
         auto *contents = context.registry->create(section.second, context, holder);
+        contents->setMaximumWidth(appearance::scaled(*context.settings, 760));
         page_layout->addWidget(contents, 1);
+        page_layout->addStretch();
         pages->addWidget(scroll(holder));
     }
     navigation_layout->addStretch();
     auto *navigation_scroll = scroll(navigation);
+    navigation_scroll->setObjectName("settings_navigation");
     navigation_scroll->setMinimumWidth(appearance::scaled(*context.settings, 184));
     navigation_scroll->setMaximumWidth(appearance::scaled(*context.settings, 220));
     auto *transition = new PageTransition(pages);
@@ -1030,6 +1161,12 @@ QDialog *settings_dialog(const ui_context &context, QWidget *const parent) {
                 values.insert(key, box->isChecked());
             if (auto *combo = qobject_cast<QComboBox *>(control))
                 values.insert(key, combo->currentData());
+            if (auto *slider = qobject_cast<QSlider *>(control))
+                values.insert(key, slider->value());
+            if (auto *spin = qobject_cast<QSpinBox *>(control)) {
+                spin->interpretText();
+                values.insert(key, spin->value());
+            }
             if (auto *list = qobject_cast<QListWidget *>(control)) {
                 QStringList paths;
                 for (int i = 0; i < list->count(); ++i) {

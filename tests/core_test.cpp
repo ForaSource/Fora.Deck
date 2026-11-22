@@ -173,6 +173,112 @@ private slots:
         QCOMPARE(apps.front().tags, QStringList{"legacy"});
         xlibrary::validate_profile(migrated.get_connection());
     }
+    void workspace_schema_upgrade() {
+        QTemporaryDir temporary;
+        const auto path = temporary.filePath("v9.db");
+        {
+            Database previous(path);
+            xlibrary::sqlite_execute(previous.get_connection(), R"(
+                DROP TABLE IF EXISTS workspace_window;
+                DROP TABLE IF EXISTS workspace_item;
+                DROP TABLE IF EXISTS workspace;
+                PRAGMA user_version=9;
+            )");
+            const auto id = previous.save_application(record());
+            previous.save_scenario({0, "Existing scenario", {{id, 0, true, {}}}});
+        }
+        Database current(path);
+        QCOMPARE(current.schema_version(), 10);
+        QCOMPARE(current.read().scenarios.size(), 1);
+        QCOMPARE(current.read().applications.size(), 1);
+        const auto backups = QDir(temporary.path()).entryList({"v9.db.before-schema-v10.*.bak"}, QDir::Files);
+        QCOMPARE(backups.size(), 1);
+        sqlite3 *raw = nullptr;
+        QCOMPARE(sqlite3_open_v2(temporary.filePath(backups.front()).toUtf8().constData(), &raw, SQLITE_OPEN_READONLY,
+                                 nullptr),
+                 SQLITE_OK);
+        const std::unique_ptr<sqlite3, decltype(&sqlite3_close_v2)> backup(raw, sqlite3_close_v2);
+        QCOMPARE(xlibrary::read_schema_version(raw), 9);
+    }
+    void workspace_migration_rolls_back_on_table_collision() {
+        QTemporaryDir temporary;
+        const auto path = temporary.filePath("v9.db");
+        {
+            Database previous(path);
+            xlibrary::sqlite_execute(previous.get_connection(), R"(
+                DROP TABLE workspace_window;
+                DROP TABLE workspace_item;
+                DROP TABLE workspace;
+                CREATE TABLE workspace_item(legacy_marker TEXT);
+                INSERT INTO workspace_item VALUES('original');
+                PRAGMA user_version=9;
+            )");
+        }
+        QVERIFY_THROWS_EXCEPTION(std::runtime_error, Database{path});
+        sqlite3 *raw = nullptr;
+        QCOMPARE(sqlite3_open_v2(path.toUtf8().constData(), &raw, SQLITE_OPEN_READONLY, nullptr), SQLITE_OK);
+        const std::unique_ptr<sqlite3, decltype(&sqlite3_close_v2)> connection(raw, sqlite3_close_v2);
+        QCOMPARE(xlibrary::read_schema_version(raw), 9);
+        xlibrary::SqliteStatement marker(raw, "SELECT legacy_marker FROM workspace_item;");
+        QVERIFY(marker.next());
+        QCOMPARE(marker.qtext(0), QString("original"));
+        xlibrary::SqliteStatement rolled_back(raw, "SELECT 1 FROM sqlite_master WHERE name='workspace';");
+        QVERIFY(!rolled_back.next());
+        QCOMPARE(QDir(temporary.path()).entryList({"v9.db.before-schema-v10.*.bak"}, QDir::Files).size(), 1);
+    }
+
+    void workspace_persistence() {
+        QTemporaryDir temporary;
+        const auto path = temporary.filePath("profile.db");
+        const auto archive = temporary.filePath("backup.xlprofile");
+        const auto settings = temporary.filePath("settings.ini");
+        workspace_record stored;
+        {
+            Database db(path);
+            workspace_item app;
+            app.application_id = db.save_application(record());
+            app.placement = workspace_placement{"primary", {0.1, 0.2, 0.5, 0.7}, true};
+            workspace_item url;
+            url.kind = workspace_item_kind::url;
+            url.target = "https://example.org/";
+            const auto id = db.save_workspace({0, "Development", {app, url}});
+            stored = db.read().workspaces.front();
+            QCOMPARE(stored.id, id);
+            const auto first = stored.items.front().id;
+            std::swap(stored.items[0], stored.items[1]);
+            QCOMPARE(db.save_workspace(stored), id);
+            QCOMPARE(db.read().workspaces.front().items.back().id, first);
+
+            auto broken = stored;
+            broken.items.back().application_id = 999999;
+            QVERIFY_THROWS_EXCEPTION(std::exception, db.save_workspace(broken));
+            QCOMPARE(db.read().workspaces.front(), stored);
+            QVERIFY_THROWS_EXCEPTION(std::exception, db.save_workspace({0, "development", {url}}));
+            QVERIFY_THROWS_EXCEPTION(std::exception, db.save_workspace({0, "Empty", {}}));
+            QVERIFY_THROWS_EXCEPTION(std::exception,
+                                     db.save_workspace({0, "Too many", QVector<workspace_item>(33, url)}));
+            url.target = "file:///etc/passwd";
+            QVERIFY_THROWS_EXCEPTION(std::exception, db.save_workspace({0, "Bad URL", {url}}));
+        }
+        ProfileBackup::create(archive, path, settings);
+        const auto manifest = ProfileBackup::inspect(archive);
+        QCOMPARE(manifest.counts.value("workspace"), 1);
+        QCOMPARE(manifest.counts.value("workspace_item"), 2);
+        QCOMPARE(manifest.counts.value("workspace_window"), 1);
+        {
+            Database db(path);
+            QCOMPARE(db.read().workspaces.front(), stored);
+            db.remove_application(stored.items.back().application_id);
+            const auto missing = db.read().workspaces.front().items.back();
+            QCOMPARE(missing.application_id, 0);
+            QCOMPARE(missing.display_name, record().name);
+            QCOMPARE(missing.placement, stored.items.back().placement);
+            db.remove_workspace(stored.id);
+            QVERIFY(db.read().workspaces.isEmpty());
+        }
+        ProfileBackup::restore(archive, path, settings, manifest.fingerprint);
+        QCOMPARE(Database(path).read().workspaces.front(), stored);
+    }
     void reject_future_and_corrupt() {
         QTemporaryDir temporary;
         const auto path = temporary.filePath("future.db");

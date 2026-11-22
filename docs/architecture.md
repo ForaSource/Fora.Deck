@@ -1,9 +1,14 @@
 # Architecture
 
-XLibrary is a C++23 desktop application built with Qt Widgets and SQLite. It has
+Fora.Deck is a C++23 desktop application built with Qt Widgets and SQLite. It has
 two primary application targets: `xlibrary_core` for the backend and `XLibrary` for the desktop
 application. The backend uses Qt Core, Gui and Concurrent; on Linux it also uses
 Qt DBus. It does not depend on widgets or headers in `desktop/`.
+
+The public product name is Fora.Deck and the author name is ForaSource. Startup sets
+`applicationDisplayName` separately from the retained technical `applicationName` and
+`organizationName` (`XLibrary`). Executables, CMake targets, profile paths, IPC, backup
+identifiers, translation contexts and plugin IID keep their existing names.
 
 ## Component ownership
 
@@ -14,11 +19,12 @@ Qt DBus. It does not depend on widgets or headers in `desktop/`.
 | [`Database`](../src/Database.h) | SQLite connection, catalog reads/writes, transactions, metadata, removal undo and path relocation. |
 | [`Application`](../src/Application.h) | Target resolution, discovery, launch identities, launch modes and platform-specific application behavior. |
 | [`Heartbeat`](../src/Heartbeat.h), [`WindowManager`](../src/WindowManager.h) | Process identity/monitoring and native window operations. |
-| [`FileManager`](../src/FileManager.h) | File indexing and queries, saved files and asynchronous file work. |
+| [`FileManager`](../src/FileManager.h) | File indexing and queries, saved files, file favorites/tags and asynchronous file work. |
 | [`ProfileSchema`](../src/ProfileSchema.h), [`ProfileBackup`](../src/ProfileBackup.h), [`ProfileSettings`](../src/ProfileSettings.h) | Schema validation/migration and profile backup, recovery and settings handling. |
 | [`SearchQuery`](../src/SearchQuery.h), [`LaunchIdentity`](../src/LaunchIdentity.h), [`LaunchArguments`](../src/LaunchArguments.h) | Shared search matching and launch identity/argument rules. |
 | [`DesktopService`](../desktop/DesktopService.h) | Qt-facing coordination, operation state, settings, selection, scenarios and signals consumed by the UI. |
-| [`LibraryModel`](../desktop/LibraryModel.h) | Application model and filtered/sorted views. |
+| [`WorkspaceCoordinator`](../desktop/WorkspaceCoordinator.h) | Preflight, confirmation, serial execution, and cancellation. A dedicated executor queries the native window backend and verifies placement. |
+| [`LibraryModel`](../desktop/LibraryModel.h) | Application model, filtered/sorted views and the shared asynchronous application/file icon cache. |
 | [`MainWindow`](../desktop/MainWindow.h), [`LibraryViews`](../desktop/LibraryViews.h), [`SettingsView`](../desktop/SettingsView.h), [`editors`](../desktop/editors.h) | Windows, navigation, library views, settings and editing forms. |
 | [`SearchResults`](../desktop/SearchResults.h), [`SearchOverlay`](../desktop/SearchOverlay.h), [`SearchTools`](../desktop/SearchTools.h) | Search presentation shared by the library and compact launcher. |
 | [`PlatformIntegration`](../desktop/PlatformIntegration.h) | Desktop integration, including global shortcuts and appearance-related platform behavior. |
@@ -70,8 +76,9 @@ for startup checks.
 
 The file index is managed by `FileManager` separately from the application
 catalog. It owns traversal scope, exclusions, cached rows and completed-scan
-timestamps, with separate scan and query workers. Scan progress updates status
-without republishing the visible query. Saved-file state is synchronized with profile settings. Shared types and
+timestamps and first-indexed file dates, with separate scan and query workers. Scan progress updates status
+without republishing the visible query. Saved-file state and file favorites/tags are synchronized with profile settings
+through `DesktopService`; queries receive metadata snapshots and apply tag/favorite filters before limiting results. Shared types and
 limits live in [`CatalogTypes.h`](../src/CatalogTypes.h) and
 [`OperationTypes.h`](../src/OperationTypes.h).
 

@@ -40,6 +40,11 @@ public:
         const auto bytes = value.toUtf8();
         bind(index, std::string_view(bytes.constData(), static_cast<std::size_t>(bytes.size())));
     }
+    void bind_real(const int index, const double value) {
+        if (sqlite3_bind_double(statement.get(), index, value) != SQLITE_OK)
+            throw std::runtime_error(sqlite3_errmsg(connection));
+    }
+    double real(const int column) const { return sqlite3_column_double(statement.get(), column); }
     QString qtext(const int column) const {
         const auto *value = sqlite3_column_text(statement.get(), column);
         return value ? QString::fromUtf8(reinterpret_cast<const char *>(value),

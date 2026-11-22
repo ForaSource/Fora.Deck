@@ -3,7 +3,7 @@ FROM debian:13 AS linux-packaging
 RUN sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/debian.sources \
     && apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates git build-essential cmake ninja-build python3 curl file dpkg-dev pkg-config \
-    qt6-base-dev qt6-wayland qt6-tools-dev qt6-l10n-tools libx11-dev libsecret-1-dev \
+    qt6-base-dev qt6-wayland qt6-tools-dev qt6-l10n-tools libx11-dev libxcb-randr0-dev libxcb-res0-dev libsecret-1-dev \
     xvfb xauth dbus-x11 desktop-file-utils \
     && test "$(qmake6 -query QT_VERSION)" = '6.8.2' \
     && test "$(getconf GNU_LIBC_VERSION)" = 'glibc 2.41' \

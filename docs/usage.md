@@ -12,7 +12,22 @@ with English as the fallback. Appearance settings control the theme, text size, 
 
 ## Application search
 
-Search by application name, executable filename, or aliases added in **Edit application**.
+The library offers **List** and **Cards** views of the same filtered and sorted applications.
+Switching views keeps the selected applications. Use Ctrl/Shift for multiple selection;
+the footer then offers tag assignment, removal and clearing the selection.
+Right-click an application or use its actions menu for launch options and editing.
+**Library actions** contains availability refresh, discovery, the last scan report and undo removal.
+Use **Add** or press **Ctrl+N** to choose or drop local files. Fora.Deck opens an application editor, a batch import,
+or a **My files** draft based on the selection. You can also drop files onto the main window.
+Use **Add application manually…** to paste a path or enter a Steam AppID, Windows settings URI or AUMID.
+Review the suggested name and target in the editor, then click **Add**.
+Open **More options** for **Launch settings**, including launch arguments and a shortcut key, or choose a target such as a Steam game.
+Use **In the library** to set tags, favorites, or search aliases.
+The scan button beside **Add** starts discovery for installed applications.
+Settings and quick help are at the bottom of navigation.
+On narrower windows the inspector is hidden; **Details** opens the selected application's dialog.
+
+Search by application name, executable filename, or aliases from **Edit application → More options → In the library**.
 Search handles case, repeated spaces, Unicode normalization, initials such as `vsc`, word prefixes,
 limited typo correction, and English/Russian keyboard layout mistakes: `пщщпду` can find `google`.
 
@@ -29,12 +44,39 @@ The selected sort mode breaks remaining ties in the library.
 | `#work -#games` | Apps tagged `work`, excluding those tagged `games`. |
 | `#dev code` | Apps tagged `dev` that also match “code”. |
 
+In **My tags**, click a tag to filter by it. Click a selected tag again to remove that filter;
+click another tag to switch to it. Hold **Ctrl** while clicking to add or remove individual tags.
+When several sidebar tags are selected, applications must have all of them.
+
 Tag conditions are exact and all must match. An unknown required tag gives no matches;
 an unknown exclusion hides nothing. If an app is missing from results, clear the query and check the selected section and sidebar tag.
 
+## Running applications
+
+The **Running applications** section lists monitored catalog entries. Running entries show current CPU and RAM
+usage in cards, details and tooltips. Values refresh about every 2.5 seconds. CPU is a percentage of total logical
+processor capacity measured between samples; the first reading needs two samples. RAM is the sum of resident
+memory (Windows working sets or Linux RSS) of matching processes; shared pages can be counted more than once.
+An em dash means a measurement is unavailable. Monitoring covers processes matched by the existing application
+identity, rather than every descendant or helper executable.
+
+**Settings → General → Running applications** has independent **Show memory usage** and **Show CPU usage**
+switches, both enabled by default. Save settings to apply them without restarting; disabling a metric also stops
+collecting it. Process detection continues so the running section and window switching still work.
+
+Use **Terminate** in details, quick search or the application's context menu to force terminate its currently matching
+processes. A confirmation warns about unsaved work. All matching instances are affected, including those opened
+outside Fora.Deck; entries sharing the same executable can refer to the same processes. The catalog entry is kept.
+Access failures appear in the notification banner. Fora.Deck refuses to terminate itself through this action.
+On Linux, safe termination requires kernel support for `pidfd_open` and `pidfd_send_signal` (Linux 5.3+).
+
 ## Quick search and keyboard shortcuts
 
-The compact launcher shows up to five matching applications. Use ↑/↓ and Enter to select and launch.
+Set the **Visible results in quick search** slider in **Settings → Appearance** to 3–10 rows (default: 5).
+The compact launcher keeps matching applications available beyond these visible rows; scroll with the mouse wheel
+or use ↑/↓ to reach them, and Enter to launch. The panel height is limited by the available screen space.
+Quick-search rows show the name and a shortcut on the right: Alt+1–Alt+9 opens the first nine results,
+and Alt+0 opens the tenth. Paths are available in tooltips and result actions.
 Tab or Shift+F10 opens the selected result's actions; use ↑/↓ and Enter inside that menu, and Escape to return.
 Actions include browser profiles, new instances, window switching, folder/path operations, favorites, editing, and removal where applicable.
 Windows executable entries also offer an explicit administrator launch.
@@ -54,27 +96,52 @@ Escape or the global shortcut dismisses quick search. The button on the right op
 
 Change or clear bindings in **Settings → Keyboard shortcuts**. Both Enter keys are supported; text editing keys keep their usual meaning
 inside text fields. Escape clears library search and cannot be reassigned. Duplicate bindings are rejected when saving.
-Built-in global shortcuts require XLibrary to be running; Wayland starts with unassigned global bindings.
+Built-in global shortcuts require Fora.Deck to be running; Wayland starts with unassigned global bindings.
 
 Application and scenario editors also accept a global hotkey. Their assignments appear in the corresponding keyboard settings tabs.
-The editor shows a persistent-ID command for use with a system shortcut: `XLibrary --launch-id ID` or `XLibrary --scenario-id ID`.
+For a system shortcut, copy the persistent-ID command `XLibrary --launch-id ID` from **Edit application → More options →
+Launch settings** or use `XLibrary --scenario-id ID` from the scenario editor.
 Deleting an application or scenario removes its assignment. Complete profile backups retain assignments.
 
 ## File search and My files
 
-File search is **Off** by default. Enable it in **Settings → File search** to reveal the **Files** switch beside
-the search field in the main window and quick search. The switch selects either applications (off) or files (on);
+File search is **Off** by default. Enable it in **Settings → File search** to reveal the **Applications / Files** choice
+in the main window and quick search. Select **Applications** or **Files**;
 the two result types are never mixed. Both windows share the selection, starting with applications.
 Selecting files opens the main **Files** workspace instead of the application list.
-The details pane keeps its width and shows “Nothing to display here :(” in file mode or when no application is selected.
-Favorites, running applications, tags, scenarios and My files remain available as separate sections.
-Opening one of these sections returns search to applications. Disabling file search hides the switch and shows applications.
-An empty query prompts for a filename. The file workspace uses the full available height.
+Selecting a file in the list, cards or **My files** shows its type, size, modification date, tags and path in the details pane.
+**Opens with** identifies the system's default application, with its icon when available; an unresolved association is shown explicitly.
+Use **Open**, **Open folder** or **Copy path** in the pane. On narrower windows, **Details** opens the same information in a dialog.
+The pane keeps its width when switching between applications and files and prompts for a selection when empty.
+Favorites and sidebar tags filter the selected result type. Running applications, scenarios and My files return
+search to applications. Disabling file search hides this choice and shows applications.
+An empty file query shows indexed files. The main workspace shows a count, sorting, list/cards views and file actions.
+In **Settings → File search**, choose how many indexed results to show in the **Files** tab. The default is 200.
+Choose 50, 100, 200, 500 or 1000, or enter a custom limit from 1 to 5000.
+Switching between applications and files uses a brief fade and slide, respecting disabled interface/system animations.
+The file list, cards and quick search load icons in the background. Images show small previews when their format
+is supported by Qt or the Windows thumbnail provider. Other files use their associated application's icon on Windows
+(or its Shell file icon for packaged applications), and the system file-type icon on Linux. Unavailable icons/previews
+use the generic file symbol.
+
+The default **Recommended** file order groups extensions alphabetically (ignoring case), with the newest additions
+first inside each group. This also applies to quick search and to the presentation of matching search results.
+Choose **By extension** or **By date added** in the sort menu, or click the corresponding list header;
+name, recent opens, favorites and tag sorting remain available. An explicit saved sort choice is retained.
+The added date records first discovery in the index, or the first save to My files. Refreshing the index preserves it.
+For an older index, the last recorded scan date is used because its original discovery date was not stored.
+Unindexed files have no added date; rebuilding the index starts these dates again.
+
+Click a file's star or use its context menu to change its favorite status. **Edit tags** accepts comma-separated tags;
+`#tag` includes a tag and `-#tag` excludes it, including alongside filename masks and extension filters.
+File favorites and tags are saved in the profile and included in complete profile backups.
+**Save to My files** remains a separate action; removing a favorite does not remove a saved file.
 
 Search supports filenames, layout correction, typo suggestions, and extension filters such as `.pdf` or `report.pdf`.
 Filename masks use `*` for any number of characters and `?` for one: `*.pdf`, `report-??.txt`.
 Other mask characters are literal. Matching files show their folder to distinguish identical names.
-Saved files and frequently opened files receive priority within comparable search matches.
+Relevance selects the bounded set of matches before the chosen display order is applied. Favorites, saved files
+and opening history break ties in the default order; their dedicated sort modes can give them higher priority.
 
 In **Settings → File search**, select a mode and choose **Save**:
 
@@ -90,6 +157,17 @@ In **Settings → File search**, select a mode and choose **Save**:
 The index stores paths and metadata locally and survives restart. A completed index refreshes automatically no sooner than
 six hours later; restarting the application does not reset that age. Changing scope builds the newly selected index.
 **Refresh file index** bypasses the interval manually. Apply settings before using it.
+The diagnostics below the status show each source's last attempt, last complete scan and unavailable folders
+(up to 200 paths displayed per source). These records survive restart. A partial or interrupted scan does not
+advance the last complete scan time; a refresh warning means an empty result is not proof that a file is absent.
+While file search is enabled, a background check runs about every 30 seconds when no scan is active.
+When an unavailable source returns on the recorded local volume, only that source is scanned; newly mounted
+local drives are scanned to the depth selected by Basic/Full mode. Other sources and their timestamps are retained.
+This recovery can run before the regular six-hour refresh. It does not monitor every file change.
+An unrelated volume at the same mount path remains unavailable until a manual refresh explicitly indexes it.
+On Linux, source identity uses the filesystem UUID and subvolume where exposed by the system.
+Without an exposed UUID, cached deletions are kept conservatively and source identity is limited to the current boot;
+use a manual refresh after reboot if the source is reported unavailable.
 Indexing and querying use separate background workers: the rest of the application and searches remain available.
 Index progress does not replace the visible results; discovered files appear on the next query.
 
@@ -98,8 +176,16 @@ files remain excluded. Directory traversal does not follow symbolic links or Win
 virtual/network filesystems are skipped. Search is by filename; document contents are not indexed or uploaded.
 
 Right-click a result, or use Shift+F10, to open it, open its folder, copy its path, or **Save to My files**.
+Use **Add** to choose or drop documents. Review the list in the **My files** draft, remove unwanted selections
+and confirm with **Add**. The form reports duplicates and unavailable or excluded files.
+The collection stores links to the original files, including files outside the indexed folders.
 The **My files** section retains saved paths after restart, independently of the index's folder scope.
 Removing a saved entry keeps the file on disk. Unavailable saved files are marked accordingly.
+Indexed matches from unavailable sources are also retained and marked **Source or file unavailable**;
+they cannot be opened until a subsequent query finds them available again. A scan only removes missing
+cached files after completely reading their parent directory on the recorded local volume. Unreadable
+or disconnected locations retain their cached matches. Changing indexing scope still removes ordinary
+cached entries outside that scope; saved paths are retained.
 Use **Settings → Library → Clear usage history** to clear application and file usage counts and recent launch history.
 
 ## Calculator and folder browsing
@@ -108,7 +194,7 @@ Enter arithmetic such as `2+3*4`, `sqrt(81)`, `√(16)`, `2^8`, `2**8`, or `(12+
 Enter copies the result. Operators include `+ - * / % ^`; powers associate to the right.
 Division by zero, non-real results, and incomplete expressions do not produce a number.
 
-With the **Files** switch on, both search surfaces accept absolute folder paths, `~/`, `%USERPROFILE%`, and `$HOME/`.
+With **Files** selected, both search surfaces accept absolute folder paths, `~/`, `%USERPROFILE%`, and `$HOME/`.
 Folder browsing requires an enabled file-search mode. Results show direct children, including hidden entries;
 a partial final filename filters that folder. Enter on a folder browses it; Enter on a file opens its system handler.
 Folder results include working files and folders; applications remain in application search.
@@ -123,6 +209,37 @@ Review missing targets and invalid options before running. Each scenario step sh
 Success means the launch command was accepted; it does not mean the application's window is ready.
 Stopping skips remaining steps and leaves already opened applications running.
 
+## Workspaces
+
+Open **Workspaces** next to **Scenarios**. Choose **New workspace**, enter a name and use the resource buttons
+to add up to 32 library applications, files, folders or HTTP(S) links. Use **Application** to search the library.
+Drag items or use **Move up** and **Move down** to set launch order. Clear an item's checkbox to skip it during
+runs. Use **Launch and window options** to choose a supported browser profile or set a window position.
+
+On Windows or a compatible local X11 session, choose **Capture open windows**. Fora.Deck preselects one window per
+unambiguously matched library application. If several launch entries share that executable, choose the one to use.
+For windows without a match, **Add file to library** opens the application editor with the detected executable path.
+The saved application is selected in the workspace preview. **Choose application** selects an existing library entry
+without copying the position of the detected window.
+
+Select **Review workspace** to name the workspace and add other resources before saving. **Back to windows** keeps
+your selection. If no windows are selected, **Create manually** opens an empty editor. Window placement is saved
+relative to the monitor's usable area. When a saved monitor is disconnected, Fora.Deck tries the primary monitor.
+
+Select a saved workspace and choose **Run workspace**. Review any preflight warnings and confirm. **Last run** shows each
+resource's outcome, including a missing target, an accepted open request, a reused window or verified positioning.
+When multiple windows match the same launch configuration, Fora.Deck skips the item while reuse is enabled.
+Clear the reuse option to request a fresh launch. Browsers and some application launchers can still forward the
+request to a running process. **Cancel run** stops pending work and leaves opened applications running.
+
+Wayland supports manual workspaces and launching resources. Windows and X11 support capture, reuse and placement
+when the window owner and geometry can be verified. Browser URLs and profiles are explicit launch inputs.
+The operating system and each application manage the contents of opened windows.
+
+**Duplicate** opens an editable copy. **Delete** removes the workspace and its layout from the profile.
+Complete backups include workspaces. **Export run diagnostics** writes the last run's status, counts and timing to a
+JSON file you choose. See the [support and pilot matrix](workspaces.md).
+
 ## Linux setup
 
 The DEB targets Debian 13 x86_64 and installs system dependencies. Install the downloaded package with `sudo apt install ./<package>.deb`,
@@ -130,7 +247,7 @@ replacing the placeholder with its filename. The AppImage includes Qt but still 
 the public baseline is Debian 13, Qt 6.8.2, and glibc 2.41. Mark it executable with `chmod +x <package>.AppImage`, then run it.
 See [profile storage](profile.md#storage-modes) before moving or replacing an AppImage.
 
-On Wayland, configure a binding in XLibrary to request permission through the GlobalShortcuts portal,
+On Wayland, configure a binding in Fora.Deck to request permission through the GlobalShortcuts portal,
 or add a system shortcut running `XLibrary --overlay`. Use the full executable or AppImage path when it is not on PATH.
 `XLibrary` opens the full library; both commands also address an already running instance using the same profile.
 

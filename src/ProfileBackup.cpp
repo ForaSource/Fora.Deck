@@ -197,7 +197,7 @@ void remove_file(const QString &path) {
 void require_self_contained(const QString &path) {
     for (const auto *suffix : {"-wal", "-shm", "-journal"}) {
         if (QFileInfo(path + QLatin1String(suffix)).size() > 0)
-            fail("An XLibrary profile backup must be a self-contained SQLite file");
+            fail("A Fora.Deck profile backup must be a self-contained SQLite file");
     }
 }
 
@@ -293,7 +293,7 @@ void validate_staged_database(const QString &path) {
         integrity_check(connection.get());
         const auto version = schema_version(connection.get());
         if (version < 0 || version > xlibrary::profile_schema_version)
-            throw InvalidDatabase("This profile database requires a newer XLibrary version");
+            throw InvalidDatabase("This profile database requires a newer Fora.Deck version");
     }
     try {
         Database store(path);
@@ -312,10 +312,10 @@ profile_manifest read_manifest(sqlite3 *const connection) {
     Statement row(connection, "SELECT format_id, format_version, application_version, created_utc, schema_version "
                               "FROM _xlibrary_profile_manifest;");
     if (!row.next() || row.text(0) != QLatin1String(format_id))
-        fail("This file is not an XLibrary profile backup");
+        fail("This file is not a Fora.Deck profile backup");
     const auto version = row.number(1);
     if (version != format_version)
-        fail("Unsupported XLibrary profile backup format");
+        fail("Unsupported Fora.Deck profile backup format");
     profile_manifest result;
     result.format_version = static_cast<int>(version);
     result.application_version = row.text(2);
@@ -327,7 +327,7 @@ profile_manifest read_manifest(sqlite3 *const connection) {
     const auto date = QDateTime::fromString(result.created_utc, Qt::ISODateWithMs);
     if (result.application_version.isEmpty() || result.application_version.size() > 256 || !date.isValid() ||
         !result.created_utc.endsWith('Z') || row.next())
-        fail("Malformed XLibrary profile manifest");
+        fail("Malformed Fora.Deck profile manifest");
     if (schema_version(connection) != result.schema_version)
         fail("The profile manifest and database schema do not match");
     Statement counts(connection, "SELECT name, row_count FROM _xlibrary_profile_counts;");
@@ -369,7 +369,7 @@ struct staged_profile {
 
 staged_profile prepare_backup(const QString &source, const QString &staged_database) {
     if (!QFileInfo(source).isFile())
-        fail("Select an existing XLibrary profile backup");
+        fail("Select an existing Fora.Deck profile backup");
     require_self_contained(source);
     const auto before = fingerprint(source);
     copy_file(source, staged_database);

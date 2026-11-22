@@ -29,6 +29,10 @@ class Manager : public QObject {
     static constexpr qint64 availability_interval_ms = 10000;
     static constexpr qsizetype availability_watch_limit = 128;
     std::shared_ptr<std::atomic<quint64>> request_sequence = std::make_shared<std::atomic<quint64>>(0);
+    bool monitor_memory = true;
+    bool monitor_cpu = true;
+    Heartbeat::process_snapshot previous_processes;
+    QElapsedTimer process_age;
 
 public:
     Manager(const QString &database_path, std::shared_ptr<std::atomic<quint64>> request_sequence)
@@ -54,6 +58,8 @@ public:
     void restore(quint64 id, const QString &path);
     void refresh();
     void poll(bool force = false);
+    void set_process_monitoring(bool memory, bool cpu);
+    void terminate_application(qint64 id);
 
 signals:
     void loaded(const catalog_snapshot &catalog);
@@ -72,9 +78,10 @@ signals:
     void result(const operation_result &result);
     void resolved(quint64 request_id, const QString &requested_path, const app_record &record);
     void application_saved(quint64 request_id, qint64 id);
+    void workspace_saved(quint64 request_id, qint64 id);
     void scenario_saved(quint64 request_id, qint64 id);
     void tag_renamed(const QString &old_name, const QString &new_name);
-    void launched(qint64 id, const operation_result &result, quint64 scenario);
+    void launched(qint64 id, const operation_result &result, launch_context context, qint64 process_id = 0);
     void notification(const QString &message);
     void discovery_report_ready(const QString &report);
     void discovery_dismissed(const QStringList &targets);
@@ -95,6 +102,8 @@ public:
     void remove_filter(qint64 id);
     void save_tag(const QString &old_name, const QString &new_name);
     void remove_tag(const QString &name);
+    void save_workspace(const workspace_record &record);
+    void remove_workspace(qint64 id);
     void save_scenario(const scenario_record &record);
     static QStringList scenario_issues(const scenario_record &record, const QVector<app_record> &applications);
     void remove_scenario(qint64 id);
@@ -104,15 +113,15 @@ public:
     void preview_profile(const QString &path);
     void preview_paths(const QString &old_root, const QString &new_root);
     void recover_paths(const QVector<path_relocation> &changes);
-    void launch_record(qint64 id, Application::launch_mode mode, quint64 generation,
+    void launch_record(qint64 id, Application::launch_mode mode, launch_context context,
                        const std::shared_ptr<std::atomic<quint64>> &token,
-                       const std::function<void(const app_record &, Application::launch_mode)> &launch_action,
+                       const std::function<qint64(const app_record &, Application::launch_mode)> &launch_action,
                        const QString &profile = {});
     void execute(quint64 id, const QString &operation, const std::function<void(Manager &)> &task,
                  operation_error_source source);
     void preview_files(const QStringList &paths, const std::shared_ptr<discovery_control> &cancelled);
     void review_inventory(const QVector<app_record> &records, const QVector<discovery_issue> &issues,
-                          const std::shared_ptr<discovery_control> &cancelled);
+                          const std::shared_ptr<discovery_control> &cancelled, bool remove_without_icons = false);
     void remove_missing_applications(const QVector<app_record> &records,
                                      const std::shared_ptr<discovery_control> &cancelled);
     void apply_catalog_preview(const QVector<app_record> &applications, QVector<discovery_issue> issues,

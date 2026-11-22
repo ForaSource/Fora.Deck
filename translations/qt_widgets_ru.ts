@@ -1,6 +1,13 @@
 <?xml version='1.0' encoding='utf-8'?>
 <TS version="2.1" language="ru_RU" sourcelanguage="en">
     <context>
+        <name>QKeySequenceEdit</name>
+        <message>
+            <source>Press shortcut</source>
+            <translation>Нажмите сочетание клавиш</translation>
+        </message>
+    </context>
+    <context>
         <name>QLineEdit</name>
         <message>
             <source>Cu&amp;t</source>

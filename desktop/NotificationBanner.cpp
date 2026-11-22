@@ -34,8 +34,8 @@ NotificationBanner::NotificationBanner(QSettings &settings, const int spacing, c
     progress->setTextVisible(false);
     layout->addWidget(progress);
     countdown->setDuration(duration_ms);
-    countdown->setStartValue(0);
-    countdown->setEndValue(duration_ms);
+    countdown->setStartValue(duration_ms);
+    countdown->setEndValue(0);
     countdown->setEasingCurve(QEasingCurve::Linear);
     connect(countdown, &QPropertyAnimation::finished, this, &NotificationBanner::dismiss);
     connect(dismiss_button, &QToolButton::clicked, this, &NotificationBanner::dismiss);
@@ -48,7 +48,7 @@ NotificationBanner::NotificationBanner(QSettings &settings, const int spacing, c
 
 void NotificationBanner::refresh_appearance() {
     const bool dark = appearance::is_dark(settings);
-    const QColor color(dark ? "#A8A9AF" : "#555B64");
+    const QColor color(dark ? "#AEB7C4" : "#566170");
     const auto icon_size = appearance::scaled(settings, 20);
     message_icon->setPixmap(appearance::icon("info", color).pixmap(icon_size, icon_size));
     message_icon->setFixedSize(icon_size, icon_size);
@@ -57,6 +57,8 @@ void NotificationBanner::refresh_appearance() {
     const auto close_size = appearance::scaled(settings, 28);
     dismiss_button->setFixedSize(close_size, close_size);
     progress->setFixedHeight(appearance::scaled(settings, 4));
+    // Keep the countdown as the lifetime clock without visible motion when disabled.
+    progress->setVisible(desktop_platform::animations_enabled());
     if (description.isEmpty() && link_text.isEmpty()) {
         message_label->setTextFormat(Qt::PlainText);
         message_label->setText(message);
@@ -71,7 +73,7 @@ void NotificationBanner::refresh_appearance() {
     if (!link_text.isEmpty())
         text += QString("<p style=\"margin-top: 6px; margin-bottom: 0;\"><a href=\"report\" "
                         "style=\"color: %1;\">%2</a></p>")
-                    .arg(dark ? "#EBEBED" : "#22252A", link_text.toHtmlEscaped());
+                    .arg(dark ? "#F16647" : "#B63F2B", link_text.toHtmlEscaped());
     message_label->setTextFormat(Qt::RichText);
     message_label->setText(text);
 }
@@ -84,7 +86,7 @@ void NotificationBanner::show_message(const QString &text, const QString &descri
     this->link_text = link_text;
     progress->setRange(0, auto_dismiss ? countdown->duration() : 0);
     if (auto_dismiss)
-        progress->setValue(0);
+        progress->setValue(countdown->duration());
     refresh_appearance();
     set_expanded(true);
     if (auto_dismiss) {

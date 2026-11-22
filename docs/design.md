@@ -1,29 +1,59 @@
 # Interface design
 
-XLibrary uses a quiet desktop interface with neutral graphite or soft light
-surfaces, slate accents and original application icons. This guide records the
+Fora.Deck uses a quiet desktop interface with neutral graphite or soft light
+surfaces, restrained coral accents and original application icons. This guide records the
 design direction and its current implementation boundaries. It is not a claim
 that every screen has passed visual acceptance on every desktop environment.
 
 ## Layout and hierarchy
 
 The full library places navigation and tags on the left, search above the main
-list, and details for the selected application on the right. Related rows share
+list or compact cards, and details for the selected application on the right. Both views share the same
+model, filtering, sorting and selection. Related rows share
 a surface; spacing and thin dividers separate groups. Primary launch actions use
-tone and placement for emphasis. Status color belongs to a small indicator or
+coral and placement for emphasis. In the inspector, launch precedes tags and technical details;
+browser launch-profile controls stay next to it. Removal is separated from the other actions.
+The toolbar keeps the add command and its adjacent menu grouped, with a neutral surface.
+The current workspace determines whether the command opens the application editor or the My files form.
+The inspector gives the full launch target its own width, with path actions below.
+Status color belongs to a small indicator or
 message, with text describing the state.
 
 When file search is enabled and selected, the main Files workspace replaces the application
-list with a file-only result list that fills the available height.
-The details pane keeps its width and shows “Nothing to display here :(” in file mode or when no application is selected,
-so switching between applications and files does not move the search controls.
-Application-specific sections, including tags, remain available separately.
-Both search fields show the shared Files switch only while indexing mode is Basic or Full.
-The switch selects applications or files exclusively; indexing mode belongs to Settings.
+list with a file-only workspace that fills the available height. Files reuse the application row/card delegate,
+header spacing, tag chips and selection treatment. A count, sorting and list/cards controls sit above the results;
+keyboard hints and file actions sit below. The last column identifies the containing folder.
+The details pane keeps its width when switching between applications and files, preserving the search layout.
+Selected files show their type, size, modification date, tags, path and default opening application, with a small
+application icon when available. The same inspector covers saved files; **Details** opens it in a dialog on narrow windows.
+An empty selection shows a prompt.
+Favorites and sidebar tags apply to the selected result type; running applications, scenarios and saved files
+remain separate sections. An empty file query shows ranked indexed files. File metadata remains separate from
+application metadata and from the saved-file collection.
+Both search surfaces show the shared **Applications / Files** segments only while indexing mode is Basic or Full.
+The segments select applications or files exclusively. Each surface moves a single selection background
+between the segments over 160 ms while keyboard focus has a separate outline. Indexing mode belongs to Settings.
+Changing result type fades between snapshots with a small directional slide over 220 ms. Rapid reversals capture
+the displayed frame; resizing cancels the transition. Disabled interface or system animations switch immediately.
+
+Navigation groups library, favorites and running applications above scenarios and saved files;
+tags have their own searchable group. Settings and help sit at the bottom.
+The library header contains sorting, the list/cards choice and a menu for library operations.
+Removal appears in the inspector, application menu and bulk footer instead of the permanent header.
+The ordinary footer shows keyboard hints and details; selecting several applications replaces it with bulk actions.
+Toolbars wrap controls when the available width or text scale no longer permits one row.
+The central workspace and inspector have rounded corners without a surrounding decorative border.
+Their transition surfaces use the content background so headers and footers do not form dark rectangular blocks.
+On Windows 11, native title bars follow the selected theme in the main window and child dialogs.
+Dialog captions match their content surface; the main caption matches the shell.
+Native window buttons and window-management behavior are retained. Native frames are refreshed when
+windows open, native handles change or the palette changes.
 
 The compact launcher has a search field, a button to open the full library and
-the results relevant to the query. Its height follows its contents. Application
-search shows up to five application results; file/path and calculator results
+the results relevant to the query on an opaque theme-colored surface. Its height follows its contents and the
+available screen space. Settings selects 3–10 visible results (default: 5); additional matching applications
+remain accessible by scrolling or keyboard navigation. Compact rows omit paths and show right-aligned
+Alt+1–Alt+9 / Alt+0 hints for the first ten actionable results. File/path and calculator results
 use the shared search presentation. In application mode, an empty query can show favorite or previously
 launched applications; file mode prompts for a filename. Opening the library carries the query into the full window.
 
@@ -32,6 +62,12 @@ typography, icons and control styles as the library. Their headings and spacing
 provide hierarchy without introducing large decorative cards. Scenario state
 belongs next to the step it describes; confirmations and detailed reports use
 dialogs.
+
+The empty library search field shows the configured focus shortcut when there is room.
+The **Add** dialog, application editor and document draft share a drop surface that highlights local file drags.
+The application editor uses a turning chevron for its additional options, and the quick-search
+row-count slider keeps its value visible while dragging. A successful addition to favorites from
+the inspector briefly highlights the star. Each control reflects its state with animations disabled.
 
 ## Shared implementation
 
@@ -45,30 +81,57 @@ dialogs.
 | [`SearchOverlay`](../desktop/SearchOverlay.h) | Compact search surface, placement and reveal/height animation. |
 | [`PlatformIntegration`](../desktop/PlatformIntegration.h) | Platform appearance, composition and system animation preferences. |
 
-The current dark palette starts with base `#242528`, panels `#2A2B2E`, fields
-`#303135`, text `#EBEBED` and slate primary buttons `#68717C`. The light palette
-uses base `#F3F3F4`, panels `#EBECEE`, white fields and text `#22252A`. Selection,
-border and secondary-text colors are defined alongside these in
-[`appearance.cpp`](../desktop/appearance.cpp); that code is the source of truth.
-These colors are starting points for contrast, not a reason to duplicate theme
-constants in individual views.
+[`appearance.cpp`](../desktop/appearance.cpp) owns the shared palette and styles;
+that code is the source of truth. The current values include:
 
-The application requests Segoe UI with Qt's sans-serif fallback and applies a
-shared scaled font size. Use `appearance::scaled` for dimensions affected by the
-text-scale preference. Preserve original application icon colors and use the
-existing vector icon system for XLibrary controls.
+| Role | Dark | Light |
+| --- | --- | --- |
+| Shell and navigation | `#191B20` | `#F4F5F7` |
+| Main work surface and dialogs | `#22262D` | `#FFFFFF` |
+| Inspector | `#242930` | `#F7F8FA` |
+| Fields | `#2C323B` | `#E9EDF2` |
+| Neutral hover | `#2B313A` | `#E7EBF0` |
+| Selection | `#3B2B28` | `#FBE8E2` |
+| Decorative separators | `#353D48` | `#DCE2E9` |
+| Field borders | `#768190` | `#7A8595` |
+| Main text | `#F2F4F7` | `#1E242C` |
+| Secondary text | `#AEB7C4` | `#566170` |
+| Small accent text and focus | `#F16647` | `#B63F2B` |
+
+Primary buttons use coral `#F16647` with dark `#181A1D` text and icons;
+hover uses `#FF795C`, press uses `#E45E40`, and unavailable controls use neutral colors.
+Selection is flat, with a short accent marker and a separate two-pixel keyboard focus border. Borders reserve
+space so receiving focus does not move the control. Green, amber and red describe
+status alongside text, rather than identifying ordinary navigation sections.
+
+The application loads local Inter Regular/Medium/SemiBold (400/500/600), including
+Cyrillic, from embedded resources. If loading fails, Qt's sans-serif fallback is used.
+The base text is 14 logical pixels, captions 12, page headings 24 and group headings 16.
+Application rows retain their 52-pixel base height. Use `appearance::scaled` for dimensions
+affected by the text-scale preference; larger fonts and stored pane widths must remain usable.
+Preserve original application icon colors and use the existing 24×24 vector icon system,
+with rounded 1.75-pixel strokes, for Fora.Deck controls.
+
+The product mark is a geometric D with a displaced panel; the wordmark keeps `Fora` and
+`Deck` in the same color and weight, with a coral dot. Ordinary titles and accessible
+names use the exact text `Fora.Deck`. [Brand assets](../assets/README.md) document the
+vector originals, raster exports and unchanged technical filenames. The public author
+name is ForaSource; this does not rename the executable, profile, IPC or plugin identifiers.
 
 ## Interaction and feedback
 
 - Keep keyboard focus distinguishable from hover and selection. A selected row
   should retain its appearance when it receives focus.
+- Button hover changes the background without adding an outline. The selected search segment has a border;
+  a separate focus outline appears when navigating buttons by keyboard, rather than after a mouse click.
 - Preserve readable names and paths. Use wrapping or elision with access to the
   complete value; do not shrink individual long labels below the common scale.
 - Keep loading, unavailable, empty and error states explicit. A filtered-out
   selection must not leave unrelated details visible.
 - Use the common `NotificationBanner` for new in-window notifications. Its
   default duration is seven seconds, with a text action when needed, a close
-  control and a time bar. Longer intervals need a specific reason.
+  control and a time bar. Its surface is quiet, with an information icon, accent link
+  and thin coral countdown. Longer intervals need a specific reason.
 - Reserve dialogs for confirmation, input and details. Field errors should stay
   near the field and remain understandable without relying on color alone.
 - Keep motion brief and tied to a state change. Both the application animation

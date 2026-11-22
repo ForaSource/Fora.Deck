@@ -45,6 +45,14 @@ Heartbeat::Heartbeat(const std::uint32_t process_id, const std::filesystem::path
         });
 }
 
+QSet<QString> Heartbeat::running_paths(const QVector<app_record> &applications) {
+    const auto processes = sample_processes(applications, false, false);
+    QSet<QString> paths;
+    for (auto it = processes.cbegin(); it != processes.cend(); ++it)
+        paths.insert(it.key());
+    return paths;
+}
+
 bool Heartbeat::is_alive() const noexcept {
     return state && state->alive.load();
 }

@@ -1,6 +1,11 @@
+#include <algorithm>
+#include <QApplication>
 #include <QDir>
 #include <QFileInfo>
 #include <QFutureWatcher>
+#include <QImageReader>
+#include <QLocale>
+#include <QMimeDatabase>
 #include <QtConcurrent/QtConcurrentRun>
 #include <QTimer>
 
@@ -11,12 +16,39 @@
 #include "PlatformIntegration.h"
 
 namespace {
+enum class application_status { running, stopped, drive_unavailable, unavailable };
+
+application_status status_of(const app_record &record) {
+    if (record.running)
+        return application_status::running;
+    if (record.available)
+        return application_status::stopped;
+    return record.volume_unavailable ? application_status::drive_unavailable : application_status::unavailable;
+}
+
 QString icon_cache_key(const app_record &record) {
     if (!record.icon_path.isEmpty() && QFileInfo(record.icon_path).isAbsolute())
         return "image:" + Application::target_kind(record) + ':' + record.icon_path;
     if (const auto path = Application::process_path(record); QFileInfo(path).isAbsolute())
         return "file:" + path;
     return "kind:" + Application::target_kind(record);
+}
+
+QImage file_thumbnail(const QString &path) {
+    if (!QMimeDatabase{}.mimeTypeForFile(path, QMimeDatabase::MatchExtension).name().startsWith("image/"))
+        return {};
+    QImageReader reader(path);
+    reader.setAutoTransform(true);
+    const QSize target(128, 128);
+    const auto size = reader.size();
+    if (!size.isValid())
+        return {};
+    if (size.width() > target.width() || size.height() > target.height())
+        reader.setScaledSize(size.scaled(target, Qt::KeepAspectRatio));
+    auto image = reader.read();
+    if (image.width() > target.width() || image.height() > target.height())
+        image = image.scaled(target, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+    return image;
 }
 }
 
@@ -39,55 +71,108 @@ int LibraryModel::columnCount(const QModelIndex &parent) const {
 }
 
 QIcon LibraryModel::fallback_icon(const QString &kind) const {
-    const auto cached = fallback_icons.constFind(kind);
+    const auto cache_key = kind + ':' + qApp->palette().color(QPalette::PlaceholderText).name();
+    const auto cached = fallback_icons.constFind(cache_key);
     if (cached != fallback_icons.cend())
         return *cached;
     const auto icon = kind == "steam"        ? QIcon::fromTheme("steam", appearance::icon("library"))
                       : kind == "system_uri" ? QIcon::fromTheme("preferences-system", appearance::icon("settings"))
                       : kind == "aumid" || kind == "executable" || kind == "desktop" ? appearance::icon("app")
+                      : kind == "file"                                               ? appearance::icon("file")
                                                                                      : appearance::icon("external");
-    fallback_icons.insert(kind, icon);
+    fallback_icons.insert(cache_key, icon);
     return icon;
 }
 
-void LibraryModel::request_icon(const app_record &record, const QString &key, const QString &kind) const {
+QIcon LibraryModel::application_icon(const app_record &record) const {
+    return application_icon(record, icon_cache_key(record), Application::target_kind(record));
+}
+
+QIcon LibraryModel::application_icon(const app_record &record, const QString &key, const QString &kind) const {
+    if (const auto *icon = icons.object(key))
+        return icon->isNull() ? fallback_icon(kind) : *icon;
+    request_icon(record, key);
+    return fallback_icon(kind);
+}
+
+QIcon LibraryModel::file_icon(const QString &path, const qint64 modified, const qint64 size) const {
+    const auto normalized = normalized_path(path);
+    // File metadata is collected by the query worker, never by the paint/data path.
+    const auto key = "document:" + QString::number(normalized.size()) + ':' + normalized + ':' +
+                     QString::number(modified) + ':' + QString::number(size);
+    if (const auto *icon = icons.object(key))
+        return icon->isNull() ? fallback_icon("file") : *icon;
+    app_record record;
+    record.path = path;
+    request_icon(record, key);
+    return fallback_icon("file");
+}
+
+void LibraryModel::retry_file_icons() {
+    for (const auto &key : icons.keys())
+        if (key.startsWith("document:") && icons.object(key)->isNull())
+            icons.remove(key);
+}
+
+void LibraryModel::store_icon(const QString &key, const QImage &image) {
+    pending_icons.remove(key);
+    // Cache failed reads without capturing a theme-dependent fallback icon.
+    icons.insert(key, new QIcon(image.isNull() ? QIcon{} : QIcon(QPixmap::fromImage(image))));
+    if (key.startsWith("document:")) {
+        // Application requests may have been deferred while document thumbnails filled the queue.
+        if (!records.isEmpty())
+            emit dataChanged(index(0, 0), index(rowCount() - 1, 0), {Qt::DecorationRole});
+    } else
+        for (int row = 0; row < records.size(); ++row)
+            if (icon_keys[row] == key)
+                emit dataChanged(index(row, 0), index(row, 0), {Qt::DecorationRole});
+    emit icon_ready();
+}
+
+void LibraryModel::request_icon(const app_record &record, const QString &key) const {
     if (key.startsWith("kind:") || pending_icons.contains(key) || pending_icons.size() >= 32) {
         return;
     }
     const auto image_file = key.startsWith("image:");
-    const auto path = image_file ? record.icon_path : key.mid(5);
-    const auto fallback = fallback_icon(kind);
+    const auto document_file = key.startsWith("document:");
+    const auto path = image_file ? record.icon_path : document_file ? record.path : key.mid(5);
     pending_icons.insert(key);
     auto *self = const_cast<LibraryModel *>(this);
 #ifdef Q_OS_LINUX
     // System icon engines use QPixmap and must run on the GUI thread.
-    if (!image_file) {
-        QTimer::singleShot(0, self, [self, key, path, fallback] {
-            const auto image = desktop_platform::application_icon(path);
-            self->pending_icons.remove(key);
-            self->icons.insert(key, new QIcon(image.isNull() ? fallback : QIcon(QPixmap::fromImage(image))));
-            for (int row = 0; row < self->records.size(); ++row) {
-                if (self->icon_keys[row] == key)
-                    emit self->dataChanged(self->index(row, 0), self->index(row, 0), {Qt::DecorationRole});
-            }
+    if (!image_file && !document_file) {
+        QTimer::singleShot(0, self, [self, key, path] {
+            const auto image = QFileInfo(path).isFile() ? desktop_platform::application_icon(path) : QImage{};
+            self->store_icon(key, image);
         });
         return;
     }
 #endif
     auto *watcher = new QFutureWatcher<QImage>(self);
-    connect(watcher, &QFutureWatcher<QImage>::finished, self, [self, watcher, key, fallback] {
-        const auto image = watcher->result();
-        self->pending_icons.remove(key);
-        self->icons.insert(key, new QIcon(image.isNull() ? fallback : QIcon(QPixmap::fromImage(image))));
+    connect(watcher, &QFutureWatcher<QImage>::finished, self, [self, watcher, key, path, document_file] {
+        auto image = watcher->result();
+#ifdef Q_OS_LINUX
+        if (document_file && image.isNull())
+            image = desktop_platform::application_icon(path);
+#else
+        Q_UNUSED(path)
+        Q_UNUSED(document_file)
+#endif
+        self->store_icon(key, image);
         watcher->deleteLater();
-        for (int row = 0; row < self->records.size(); ++row) {
-            if (self->icon_keys[row] == key) {
-                emit self->dataChanged(self->index(row, 0), self->index(row, 0), {Qt::DecorationRole});
-            }
-        }
     });
-    watcher->setFuture(QtConcurrent::run(&self->icon_pool, [path, image_file] {
-        return image_file ? QImage(path) : desktop_platform::application_icon(path);
+    watcher->setFuture(QtConcurrent::run(&self->icon_pool, [path, image_file, document_file] {
+        if (document_file) {
+            auto image = file_thumbnail(path);
+#ifdef Q_OS_WIN
+            if (image.isNull())
+                image = desktop_platform::application_icon(path);
+#endif
+            return image;
+        }
+        if (image_file)
+            return QImage(path);
+        return QFileInfo(path).isFile() ? desktop_platform::application_icon(path) : QImage{};
     }));
 }
 
@@ -102,19 +187,23 @@ QVariant LibraryModel::data(const QModelIndex &index, const int requested_role) 
             return record.name;
         if (index.column() == 1)
             return record.tags.join(", ");
-        return record.running              ? QCoreApplication::translate("XLibrary", "Running")
-               : record.available          ? QCoreApplication::translate("XLibrary", "Not running")
-               : record.volume_unavailable ? QCoreApplication::translate("XLibrary", "Drive unavailable")
-                                           : QCoreApplication::translate("XLibrary", "Unavailable");
-    case Qt::ToolTipRole:
-        return record.name + '\n' + QDir::toNativeSeparators(Application::application_path(record));
-    case Qt::DecorationRole:
-        if (index.column() == 0) {
-            if (const auto *icon = icons.object(icon_keys[index.row()]))
-                return *icon;
-            request_icon(record, icon_keys[index.row()], icon_kinds[index.row()]);
-            return fallback_icon(icon_kinds[index.row()]);
+        switch (status_of(record)) {
+        case application_status::running:
+            return QCoreApplication::translate("XLibrary", "Running");
+        case application_status::stopped:
+            return QCoreApplication::translate("XLibrary", "Not running");
+        case application_status::drive_unavailable:
+            return QCoreApplication::translate("XLibrary", "Drive unavailable");
+        case application_status::unavailable:
+            return QCoreApplication::translate("XLibrary", "Unavailable");
         }
+        return {};
+    case Qt::ToolTipRole:
+        return record.name + '\n' + QDir::toNativeSeparators(Application::application_path(record)) +
+               (process_usage(record).isEmpty() ? QString{} : '\n' + process_usage(record));
+    case Qt::DecorationRole:
+        if (index.column() == 0)
+            return application_icon(record, icon_keys[index.row()], icon_kinds[index.row()]);
         return {};
     case id_role:
         return record.id;
@@ -128,6 +217,8 @@ QVariant LibraryModel::data(const QModelIndex &index, const int requested_role) 
         return record.favorite;
     case available_role:
         return record.available;
+    case process_usage_role:
+        return process_usage(record);
     default:
         return {};
     }
@@ -158,15 +249,19 @@ void LibraryModel::replace(QVector<app_record> applications) {
     icon_keys.clear();
     icon_kinds.clear();
     search_tags.clear();
-    name_sort_keys.clear();
-    tag_sort_keys.clear();
     searchable_records.reserve(records.size());
     icon_keys.reserve(records.size());
     icon_kinds.reserve(records.size());
     search_tags.reserve(records.size());
+#if defined(Q_OS_WIN) && QT_VERSION < QT_VERSION_CHECK(6, 11, 2)
+    collator = QCollator{};
+#else
+    name_sort_keys.clear();
+    tag_sort_keys.clear();
     name_sort_keys.reserve(records.size());
     tag_sort_keys.reserve(records.size());
     const QCollator collator;
+#endif
     for (const auto &record : records) {
         icon_keys.append(icon_cache_key(record));
         icon_kinds.append(Application::target_kind(record));
@@ -175,18 +270,28 @@ void LibraryModel::replace(QVector<app_record> applications) {
         const auto file_name = local_path.isEmpty() ? record.path : QFileInfo(local_path).fileName();
         searchable_records.append(SearchQuery::prepare(record.name, file_name, record.tags, record.aliases));
         search_tags.append(record.tags.join(", ").toCaseFolded());
+#if !defined(Q_OS_WIN) || QT_VERSION >= QT_VERSION_CHECK(6, 11, 2)
         name_sort_keys.append(collator.sortKey(searchable_records.back().names.front().text));
         tag_sort_keys.append(collator.sortKey(search_tags.back()));
+#endif
     }
     endResetModel();
 }
 
 int LibraryModel::compare_names(const int left_row, const int right_row) const {
+#if defined(Q_OS_WIN) && QT_VERSION < QT_VERSION_CHECK(6, 11, 2)
+    return collator.compare(search_name(left_row), search_name(right_row));
+#else
     return name_sort_keys[left_row].compare(name_sort_keys[right_row]);
+#endif
 }
 
 int LibraryModel::compare_tags(const int left_row, const int right_row) const {
+#if defined(Q_OS_WIN) && QT_VERSION < QT_VERSION_CHECK(6, 11, 2)
+    return collator.compare(tag_names(left_row), tag_names(right_row));
+#else
     return tag_sort_keys[left_row].compare(tag_sort_keys[right_row]);
+#endif
 }
 
 QHash<int, QByteArray> LibraryModel::roleNames() const {
@@ -197,7 +302,32 @@ QHash<int, QByteArray> LibraryModel::roleNames() const {
     roles.insert(running_role, "running");
     roles.insert(favorite_role, "favorite");
     roles.insert(available_role, "available");
+    roles.insert(process_usage_role, "process_usage");
     return roles;
+}
+
+QString LibraryModel::process_usage(const app_record &record) const {
+    if (!record.running)
+        return {};
+    QStringList values;
+    if (show_cpu)
+        values.append(QCoreApplication::translate("XLibrary", "CPU: %1")
+                          .arg(record.cpu_percent < 0 ? QString::fromUtf8("—")
+                                                      : QLocale{}.toString(record.cpu_percent, 'f', 1) + '%'));
+    if (show_memory)
+        values.append(QCoreApplication::translate("XLibrary", "RAM: %1")
+                          .arg(record.memory_bytes < 0 ? QString::fromUtf8("—")
+                                                       : QLocale{}.formattedDataSize(record.memory_bytes, 1)));
+    return values.join(QString::fromUtf8(" · "));
+}
+
+void LibraryModel::set_process_display(const bool memory, const bool cpu) {
+    if (show_memory == memory && show_cpu == cpu)
+        return;
+    show_memory = memory;
+    show_cpu = cpu;
+    if (!records.isEmpty())
+        emit dataChanged(index(0, 0), index(rowCount() - 1, 2), {process_usage_role, Qt::ToolTipRole});
 }
 
 void LibraryModel::update_state(const QVector<app_record> &applications) {
@@ -210,9 +340,12 @@ void LibraryModel::update_state(const QVector<app_record> &applications) {
         auto &record = records[row];
         const auto *state = states.value(record.id);
         if (state && (record.running != state->running || record.available != state->available ||
+                      record.cpu_percent != state->cpu_percent || record.memory_bytes != state->memory_bytes ||
                       record.volume_unavailable != state->volume_unavailable ||
                       record.new_instance_error != state->new_instance_error)) {
             record.running = state->running;
+            record.cpu_percent = state->cpu_percent;
+            record.memory_bytes = state->memory_bytes;
             record.available = state->available;
             record.volume_unavailable = state->volume_unavailable;
             record.new_instance_error = state->new_instance_error;
@@ -223,8 +356,9 @@ void LibraryModel::update_state(const QVector<app_record> &applications) {
     }
     // Let the proxy update ordering once, after the entire state snapshot has been applied.
     if (first_changed >= 0)
-        emit dataChanged(index(first_changed, 0), index(last_changed, 2),
-                         {Qt::DisplayRole, running_role, available_role, record_role});
+        emit dataChanged(
+            index(first_changed, 0), index(last_changed, 2),
+            {Qt::DisplayRole, running_role, available_role, record_role, process_usage_role, Qt::ToolTipRole});
 }
 
 const app_record *LibraryModel::find(const qint64 id) const {
@@ -278,7 +412,8 @@ int LibraryFilter::query_rank(const int row) const {
         for (int index = 0; index < model->rowCount(); ++index) {
             const auto &record = model->at(index);
             if ((section == "favorites" && !record.favorite) || (section == "running" && !record.running) ||
-                (!selected_tag.isEmpty() && !has_tag(record.tags, selected_tag)))
+                !std::all_of(selected_tags.cbegin(), selected_tags.cend(),
+                             [&](const QString &tag) { return has_tag(record.tags, tag); }))
                 continue;
             const auto rank = query.rank(model->search_data(index));
             query_ranks[index] = rank;
@@ -293,11 +428,15 @@ int LibraryFilter::query_rank(const int row) const {
 }
 
 void LibraryFilter::set_section(const QString &value, const QString &tag) {
+    set_tag_section(value, tag.isEmpty() ? QStringList{} : QStringList{tag});
+}
+
+void LibraryFilter::set_tag_section(const QString &value, const QStringList &tags) {
 #if QT_VERSION >= QT_VERSION_CHECK(6, 10, 0)
     beginFilterChange();
 #endif
     section = value;
-    selected_tag = tag;
+    selected_tags = tags;
     query_ranks.clear();
 #if QT_VERSION >= QT_VERSION_CHECK(6, 10, 0)
     endFilterChange(Direction::Rows);
@@ -334,7 +473,8 @@ bool LibraryFilter::filterAcceptsRow(const int row, const QModelIndex &parent) c
         return false;
     if (section == "running" && !record.running)
         return false;
-    if (!selected_tag.isEmpty() && !has_tag(record.tags, selected_tag))
+    if (!std::all_of(selected_tags.cbegin(), selected_tags.cend(),
+                     [&](const QString &tag) { return has_tag(record.tags, tag); }))
         return false;
     return query_rank(row) >= 0;
 }
@@ -343,19 +483,23 @@ bool LibraryFilter::lessThan(const QModelIndex &left, const QModelIndex &right) 
     const auto *model = static_cast<const LibraryModel *>(sourceModel());
     const auto &a = model->at(left.row());
     const auto &b = model->at(right.row());
-    if (query.has_text()) {
+    const bool ranked_search = query.has_text();
+    const bool ascending = sortOrder() == Qt::AscendingOrder;
+    if (ranked_search) {
         const auto a_rank = query_rank(left.row());
         const auto b_rank = query_rank(right.row());
         if (a_rank != b_rank)
-            return sortOrder() == Qt::AscendingOrder ? a_rank < b_rank : a_rank > b_rank;
+            return ascending ? a_rank < b_rank : a_rank > b_rank;
     }
-    // The proxy reverses comparisons for descending order; keep favorites pinned within each relevance rank.
-    if (a.favorite != b.favorite)
-        return sortOrder() == Qt::AscendingOrder ? a.favorite : b.favorite;
-    if (a.launch_count != b.launch_count)
-        return sortOrder() == Qt::AscendingOrder ? a.launch_count > b.launch_count : a.launch_count < b.launch_count;
-    if (a.launch_count > 0 && a.last_launch != b.last_launch)
-        return sortOrder() == Qt::AscendingOrder ? a.last_launch > b.last_launch : a.last_launch < b.last_launch;
+    // The proxy reverses comparisons in descending order. Keep search ranking and favorites-first stable.
+    if ((ranked_search || sort_mode == 2) && a.favorite != b.favorite)
+        return ascending ? a.favorite : b.favorite;
+    if (ranked_search) {
+        if (a.launch_count != b.launch_count)
+            return ascending ? a.launch_count > b.launch_count : a.launch_count < b.launch_count;
+        if (a.launch_count > 0 && a.last_launch != b.last_launch)
+            return ascending ? a.last_launch > b.last_launch : a.last_launch < b.last_launch;
+    }
     if (sort_mode == 3) {
         const auto &a_tags = model->tag_names(left.row());
         const auto &b_tags = model->tag_names(right.row());
@@ -366,8 +510,8 @@ bool LibraryFilter::lessThan(const QModelIndex &left, const QModelIndex &right) 
             return comparison < 0;
     }
     if (sort_mode == 4) {
-        const auto a_status = a.running ? 0 : a.available ? 1 : 2;
-        const auto b_status = b.running ? 0 : b.available ? 1 : 2;
+        const auto a_status = status_of(a);
+        const auto b_status = status_of(b);
         if (a_status != b_status)
             return a_status < b_status;
     }

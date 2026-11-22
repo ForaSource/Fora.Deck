@@ -4,6 +4,278 @@
 <context>
     <name>XLibrary</name>
     <message>
+        <source>Drop files or applications here</source>
+        <translation>Перетащите сюда файлы или приложения</translation>
+    </message>
+    <message>
+        <source>Add application manually…</source>
+        <translation>Добавить приложение вручную…</translation>
+    </message>
+    <message>
+        <source>Next, review the selected applications.</source>
+        <translation>Затем проверьте выбранные приложения.</translation>
+    </message>
+    <message>
+        <source>Skip files</source>
+        <translation>Пропустить файлы</translation>
+    </message>
+    <message>
+        <source>Wait for the current scan or import to finish, then try again.</source>
+        <translation>Дождитесь окончания сканирования или импорта и попробуйте снова.</translation>
+    </message>
+    <message>
+        <source>Add to My files</source>
+        <translation>Добавить в «Свои файлы»</translation>
+    </message>
+    <message>
+        <source>Choose files…</source>
+        <translation>Выбрать файлы…</translation>
+    </message>
+    <message>
+        <source>Drop documents to add to My files</source>
+        <translation>Перетащите документы в «Свои файлы»</translation>
+    </message>
+    <message>
+        <source>Drop an application file or shortcut here</source>
+        <translation>Перетащите сюда файл приложения или ярлык</translation>
+    </message>
+    <message>
+        <source>Drop to check files</source>
+        <translation>Отпустите для проверки</translation>
+    </message>
+    <message>
+        <source>Drop local files or use the file picker.</source>
+        <translation>Перетащите локальные файлы или выберите их кнопкой.</translation>
+    </message>
+    <message>
+        <source>Choose one application here. Drop several on the main window to review an import.</source>
+        <translation>Выберите одно приложение. Для пакетного импорта перетащите несколько файлов в главное окно.</translation>
+    </message>
+    <message>
+        <source>Choose a file inside the folder.</source>
+        <translation>Выберите файл внутри папки.</translation>
+    </message>
+    <message>
+        <source>The file no longer exists or is inaccessible.</source>
+        <translation>Файл исчез или недоступен.</translation>
+    </message>
+    <message>
+        <source>Files to add</source>
+        <translation>Файлы для добавления</translation>
+    </message>
+    <message>
+        <source>Remove from selection</source>
+        <translation>Убрать из списка</translation>
+    </message>
+    <message>
+        <source>Checking file…</source>
+        <translation>Проверяем файл…</translation>
+    </message>
+    <message>
+        <source>Checking files…</source>
+        <translation>Проверяем файлы…</translation>
+    </message>
+    <message>
+        <source>Adding files…</source>
+        <translation>Добавляем файлы…</translation>
+    </message>
+    <message>
+        <source>Already in My files</source>
+        <translation>Уже в коллекции</translation>
+    </message>
+    <message>
+        <source>1 file ready to add</source>
+        <translation>Можно добавить 1 файл</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n files ready to add</source>
+        <translation>
+            <numerusform>Можно добавить %n файл</numerusform>
+            <numerusform>Можно добавить %n файла</numerusform>
+            <numerusform>Можно добавить %n файлов</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Added 1 file to My files</source>
+        <translation>В «Свои файлы» добавлен 1 файл</translation>
+    </message>
+    <message numerus="yes">
+        <source>Added %n files to My files</source>
+        <translation>
+            <numerusform>В «Свои файлы» добавлен %n файл</numerusform>
+            <numerusform>В «Свои файлы» добавлено %n файла</numerusform>
+            <numerusform>В «Свои файлы» добавлено %n файлов</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n already in My files</source>
+        <translation>
+            <numerusform>%n уже в коллекции</numerusform>
+            <numerusform>%n уже в коллекции</numerusform>
+            <numerusform>%n уже в коллекции</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n skipped</source>
+        <translation>
+            <numerusform>Пропущен %n файл</numerusform>
+            <numerusform>Пропущено %n файла</numerusform>
+            <numerusform>Пропущено %n файлов</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Could not add files to My files.</source>
+        <translation>Не удалось добавить файлы в «Свои файлы».</translation>
+    </message>
+    <message>
+        <source>Use Add or save a file from the search result menu. Removing a saved file keeps it on disk.</source>
+        <translation>Нажмите «Добавить» или сохраните файл из меню результата поиска. При удалении из коллекции файл остаётся на диске.</translation>
+    </message>
+    <message>
+        <source>↑↓ Select</source>
+        <translation>↑↓ Выбор</translation>
+    </message>
+    <message>
+        <source>Enter Open</source>
+        <translation>Enter Открыть</translation>
+    </message>
+    <message>
+        <source>Esc Close</source>
+        <translation>Esc Закрыть</translation>
+    </message>
+    <message>
+        <source>%1 Quick search</source>
+        <translation>%1 Быстрый поиск</translation>
+    </message>
+    <message>
+        <source>Show memory usage</source>
+        <translation>Показывать потребление памяти</translation>
+    </message>
+    <message>
+        <source>Show CPU usage</source>
+        <translation>Показывать загрузку CPU</translation>
+    </message>
+    <message>
+        <source>CPU: %1</source>
+        <translation>CPU: %1</translation>
+    </message>
+    <message>
+        <source>RAM: %1</source>
+        <translation>ОЗУ: %1</translation>
+    </message>
+    <message>
+        <source>CPU is a percentage of total processor capacity. RAM is the sum of resident memory of matching processes.</source>
+        <translation>CPU — доля общей мощности процессора. ОЗУ — сумма резидентной памяти соответствующих приложению процессов.</translation>
+    </message>
+    <message>
+        <source>Terminate</source>
+        <translation>Завершить</translation>
+    </message>
+    <message>
+        <source>Terminate application</source>
+        <translation>Завершить приложение</translation>
+    </message>
+    <message>
+        <source>Force terminate all processes of %1? Unsaved work may be lost.</source>
+        <translation>Принудительно завершить все процессы приложения «%1»? Несохранённые данные могут быть потеряны.</translation>
+    </message>
+    <message>
+        <source>PID %1: %2</source>
+        <translation>PID %1: %2</translation>
+    </message>
+    <message>
+        <source>Fora.Deck cannot terminate itself here.</source>
+        <translation>Fora.Deck не может завершить собственный процесс этим действием.</translation>
+    </message>
+    <message>
+        <source>Library health</source>
+        <translation>Состояние библиотеки</translation>
+    </message>
+    <message>
+        <source>Problem</source>
+        <translation>Проблема</translation>
+    </message>
+    <message>
+        <source>Launch failed this session: %1</source>
+        <translation>Ошибка запуска в этом сеансе: %1</translation>
+    </message>
+    <message>
+        <source>Unavailable applications: %1; on unavailable drives: %2; removal candidates: %3; launch failures: %4.</source>
+        <translation>Недоступных приложений: %1; на недоступных дисках: %2; кандидатов на удаление: %3; ошибок запуска: %4.</translation>
+    </message>
+    <message>
+        <source>No operation errors recorded this session.</source>
+        <translation>В этом сеансе ошибки операций не зафиксированы.</translation>
+    </message>
+    <message>
+        <source>Last operation error this session: %1</source>
+        <translation>Последняя ошибка операции в этом сеансе: %1</translation>
+    </message>
+    <message>
+        <source>Unavailable sources are checked about every 30 seconds. Returning sources refresh separately from the regular index refresh.</source>
+        <translation>Доступность источников проверяется примерно каждые 30 секунд. Вернувшиеся источники обновляются отдельно от планового обновления индекса.</translation>
+    </message>
+    <message>
+        <source>File index diagnostics</source>
+        <translation>Диагностика файлового индекса</translation>
+    </message>
+    <message>
+        <source>No completed source scan. Refresh required.</source>
+        <translation>Нет завершённого обхода источников. Требуется обновление.</translation>
+    </message>
+    <message>
+        <source>Never</source>
+        <translation>Никогда</translation>
+    </message>
+    <message>
+        <source>Source unavailable; cached results retained</source>
+        <translation>Источник недоступен; сохранённые результаты остаются в индексе</translation>
+    </message>
+    <message>
+        <source>Refresh required; search may be incomplete</source>
+        <translation>Требуется обновление; поиск может быть неполным</translation>
+    </message>
+    <message>
+        <source>Last scan complete</source>
+        <translation>Последний обход завершён полностью</translation>
+    </message>
+    <message>
+        <source>Last attempt: %1. Last complete scan: %2.</source>
+        <translation>Последняя попытка: %1. Последний полный обход: %2.</translation>
+    </message>
+    <message>
+        <source>Unavailable folders: %1</source>
+        <translation>Недоступных папок: %1</translation>
+    </message>
+    <message>
+        <source>Only the first 200 folders are shown.</source>
+        <translation>Показаны только первые 200 папок.</translation>
+    </message>
+    <message>
+        <source>Source or file unavailable</source>
+        <translation>Источник или файл недоступен</translation>
+    </message>
+    <message>
+        <source>Reason for removal</source>
+        <translation>Причина удаления</translation>
+    </message>
+    <message>
+        <source>Steam manifest and installation folder are missing on the verified local drive: %1; %2</source>
+        <translation>На проверенном локальном диске отсутствуют манифест Steam и папка установки: %1; %2</translation>
+    </message>
+    <message>
+        <source>Desktop entry and executable are missing on the verified local drive: %1; %2</source>
+        <translation>На проверенном локальном диске отсутствуют desktop-файл и исполняемый файл: %1; %2</translation>
+    </message>
+    <message>
+        <source>Application file is missing on the verified local drive: %1</source>
+        <translation>На проверенном локальном диске отсутствует файл приложения: %1</translation>
+    </message>
+    <message>
+        <source>XLibrary is now Fora.Deck. Your library and settings have been preserved.</source>
+        <translation>XLibrary теперь Fora.Deck. Ваша библиотека и настройки сохранены.</translation>
+    </message>
+    <message>
         <source>Search applications and files, calculate or enter a path</source>
         <translation>Поиск приложений и файлов, вычисление или ввод пути</translation>
     </message>
@@ -40,8 +312,8 @@
         <translation>Не удалось открыть файл.</translation>
     </message>
     <message>
-        <source>Restart XLibrary before changing the shortcut again.</source>
-        <translation>Перезапустите XLibrary перед следующим изменением сочетания клавиш.</translation>
+        <source>Restart Fora.Deck before changing the shortcut again.</source>
+        <translation>Перезапустите Fora.Deck перед следующим изменением сочетания клавиш.</translation>
     </message>
     <message>
         <source>The saved GitHub token was not found. Save a new token or delete it from the update settings.</source>
@@ -124,28 +396,28 @@
         <translation>Не удалось создать временный профиль для проверки запуска.</translation>
     </message>
     <message>
-        <source>Could not create the XLibrary settings folder.</source>
-        <translation>Не удалось создать папку настроек XLibrary.</translation>
+        <source>Could not create the Fora.Deck settings folder.</source>
+        <translation>Не удалось создать папку настроек Fora.Deck.</translation>
     </message>
     <message>
-        <source>Could not write the XLibrary profile lock file. Check access permissions.</source>
-        <translation>Не удалось записать файл блокировки профиля XLibrary. Проверьте права доступа.</translation>
+        <source>Could not write the Fora.Deck profile lock file. Check access permissions.</source>
+        <translation>Не удалось записать файл блокировки профиля Fora.Deck. Проверьте права доступа.</translation>
     </message>
     <message>
-        <source>Another instance of XLibrary is starting or not responding.</source>
-        <translation>Другой экземпляр XLibrary уже запускается или не отвечает.</translation>
+        <source>Another instance of Fora.Deck is starting or not responding.</source>
+        <translation>Другой экземпляр Fora.Deck уже запускается или не отвечает.</translation>
     </message>
     <message>
-        <source>Could not open the XLibrary local channel.</source>
-        <translation>Не удалось открыть локальный канал XLibrary.</translation>
+        <source>Could not open the Fora.Deck local channel.</source>
+        <translation>Не удалось открыть локальный канал Fora.Deck.</translation>
     </message>
     <message>
-        <source>Cannot write XLibrary settings. Choose a writable folder.</source>
-        <translation>Нет прав на запись настроек XLibrary. Выберите доступную для записи папку.</translation>
+        <source>Cannot write Fora.Deck settings. Choose a writable folder.</source>
+        <translation>Нет прав на запись настроек Fora.Deck. Выберите доступную для записи папку.</translation>
     </message>
     <message>
-        <source>XLibrary error</source>
-        <translation>Ошибка XLibrary</translation>
+        <source>Fora.Deck error</source>
+        <translation>Ошибка Fora.Deck</translation>
     </message>
     <message>
         <source>Invalid application name or path.</source>
@@ -369,7 +641,39 @@
     </message>
     <message>
         <source>Application file or shortcut</source>
-        <translation type="vanished">Файл приложения или ярлык</translation>
+        <translation>Файл приложения или ярлык</translation>
+    </message>
+    <message>
+        <source>Choose file…</source>
+        <translation>Выбрать файл…</translation>
+    </message>
+    <message>
+        <source>Or paste a file path</source>
+        <translation>Или вставьте путь к файлу</translation>
+    </message>
+    <message>
+        <source>Paste the full path or use Choose file…</source>
+        <translation>Вставьте полный путь или нажмите «Выбрать файл…».</translation>
+    </message>
+    <message>
+        <source>Filled in from the file</source>
+        <translation>Подставится из файла</translation>
+    </message>
+    <message>
+        <source>More options</source>
+        <translation>Дополнительные параметры</translation>
+    </message>
+    <message>
+        <source>Launch settings</source>
+        <translation>Параметры запуска</translation>
+    </message>
+    <message>
+        <source>Launch type</source>
+        <translation>Тип запуска</translation>
+    </message>
+    <message>
+        <source>In the library</source>
+        <translation>В библиотеке</translation>
     </message>
     <message>
         <source>Name</source>
@@ -748,6 +1052,14 @@
         <translation>Нет тегов</translation>
     </message>
     <message>
+        <source>No matching tags</source>
+        <translation>Подходящих тегов нет</translation>
+    </message>
+    <message>
+        <source>A dash means the tag is assigned to some selected applications.</source>
+        <translation>Черта означает, что тег назначен только части выбранных приложений.</translation>
+    </message>
+    <message>
         <source>Arguments: </source>
         <translation>Аргументы: </translation>
     </message>
@@ -858,8 +1170,8 @@ Applications: %1</source>
         <translation>Используйте одно сочетание клавиш.</translation>
     </message>
     <message>
-        <source>Wayland manages global shortcuts. Assign XLibrary in the system keyboard settings.</source>
-        <translation>Wayland управляет глобальными сочетаниями. Назначьте запуск XLibrary в настройках клавиатуры системы.</translation>
+        <source>Wayland manages global shortcuts. Assign Fora.Deck in the system keyboard settings.</source>
+        <translation>Wayland управляет глобальными сочетаниями. Назначьте запуск Fora.Deck в настройках клавиатуры системы.</translation>
     </message>
     <message>
         <source>Use a letter, digit, F1–F24, or Space.</source>
@@ -894,8 +1206,8 @@ Applications: %1</source>
         <translation>Сочетание занято оконным менеджером или другим приложением.</translation>
     </message>
     <message>
-        <source>The global shortcut requires an X11-enabled build. Assign XLibrary using system settings.</source>
-        <translation>Глобальное сочетание требует сборку с поддержкой X11. Назначьте запуск XLibrary средствами системы.</translation>
+        <source>The global shortcut requires an X11-enabled build. Assign Fora.Deck using system settings.</source>
+        <translation>Глобальное сочетание требует сборку с поддержкой X11. Назначьте запуск Fora.Deck средствами системы.</translation>
     </message>
     <message>
         <source>The /proc filesystem is unavailable: process state is unknown.</source>
@@ -962,8 +1274,8 @@ Applications: %1</source>
         <translation>Закрыть уведомление</translation>
     </message>
     <message>
-        <source>Open XLibrary</source>
-        <translation>Открыть XLibrary</translation>
+        <source>Open Fora.Deck</source>
+        <translation>Открыть Fora.Deck</translation>
     </message>
     <message>
         <source>Launch</source>
@@ -1102,6 +1414,14 @@ Applications: %1</source>
         <translation>Размер текста</translation>
     </message>
     <message>
+        <source>Visible results in quick search</source>
+        <translation>Количество видимых результатов быстрого поиска</translation>
+    </message>
+    <message>
+        <source>Scroll to see more results. The height is limited by the screen size.</source>
+        <translation>Прокрутите список, чтобы увидеть остальные результаты. Высота ограничена размером экрана.</translation>
+    </message>
+    <message>
         <source>Short, smooth transitions follow available system animation settings.</source>
         <translation>Короткие плавные переходы учитывают доступные системные настройки анимации.</translation>
     </message>
@@ -1134,8 +1454,8 @@ Applications: %1</source>
         <translation>Открыть настройки</translation>
     </message>
     <message>
-        <source>On Wayland, assign a desktop shortcut to the XLibrary command. It opens the running library. The built-in global shortcut is available on X11.</source>
-        <translation>В Wayland назначьте сочетание в настройках рабочего стола для команды XLibrary. Она открывает уже запущенную библиотеку. Встроенное глобальное сочетание доступно в X11.</translation>
+        <source>On Wayland, assign a desktop shortcut to the Fora.Deck command. It opens the running library. The built-in global shortcut is available on X11.</source>
+        <translation>В Wayland назначьте сочетание в настройках рабочего стола для команды Fora.Deck. Она открывает уже запущенную библиотеку. Встроенное глобальное сочетание доступно в X11.</translation>
     </message>
     <message>
         <source>An empty field disables the shortcut. Application actions use the selected library entry. Text editing keys keep their usual behavior in text fields. ↑↓ selects a row. Escape clears the search and is reserved.</source>
@@ -1182,8 +1502,8 @@ Applications: %1</source>
         <translation>Импорт библиотеки</translation>
     </message>
     <message>
-        <source>XLibrary catalog (*.json)</source>
-        <translation>Библиотека XLibrary (*.json)</translation>
+        <source>Fora.Deck catalog (*.json)</source>
+        <translation>Библиотека Fora.Deck (*.json)</translation>
     </message>
     <message>
         <source>Export library</source>
@@ -1210,12 +1530,12 @@ Applications: %1</source>
         <translation>Модули интерфейса</translation>
     </message>
     <message>
-        <source>Native plugins can change interface areas and appearance. Enable only trusted modules; they run inside XLibrary. Changes take effect after restart.</source>
-        <translation>Нативные плагины могут менять области интерфейса и оформление. Включайте только доверенные модули; они выполняются внутри XLibrary. Изменения применяются после перезапуска.</translation>
+        <source>Native plugins can change interface areas and appearance. Enable only trusted modules; they run inside Fora.Deck. Changes take effect after restart.</source>
+        <translation>Нативные плагины могут менять области интерфейса и оформление. Включайте только доверенные модули; они выполняются внутри Fora.Deck. Изменения применяются после перезапуска.</translation>
     </message>
     <message>
-        <source>No modules installed. Folder: plugins next to the XLibrary executable.</source>
-        <translation>Модули не установлены. Каталог: plugins рядом с исполняемым файлом XLibrary.</translation>
+        <source>No modules installed. Folder: plugins next to the Fora.Deck executable.</source>
+        <translation>Модули не установлены. Каталог: plugins рядом с исполняемым файлом Fora.Deck.</translation>
     </message>
     <message>
         <source>About</source>
@@ -1250,20 +1570,20 @@ Applications: %1</source>
         <translation>Технологии и лицензии</translation>
     </message>
     <message>
-        <source>Qt %1 · C++23 · SQLite · QtKeychain
-XLibrary — MIT
+        <source>Qt %1 · C++23 · SQLite · QtKeychain · Inter
+Fora.Deck — MIT; Inter — OFL 1.1
 Third-party licenses are included with the application.</source>
-        <translation>Qt %1 · C++23 · SQLite · QtKeychain
-XLibrary — MIT
-Лицензии сторонних компонентов входят в комплект программы.</translation>
+        <translation>Qt %1 · C++23 · SQLite · QtKeychain · Inter
+Fora.Deck — MIT; Inter — OFL 1.1
+Лицензии сторонних компонентов включены в поставку приложения.</translation>
     </message>
     <message>
-        <source>XLibrary settings</source>
-        <translation>Настройки XLibrary</translation>
+        <source>Fora.Deck settings</source>
+        <translation>Настройки Fora.Deck</translation>
     </message>
     <message>
-        <source>XLibrary appearance, behavior, and features</source>
-        <translation>Оформление, поведение и возможности XLibrary</translation>
+        <source>Fora.Deck appearance, behavior, and features</source>
+        <translation>Оформление, поведение и возможности Fora.Deck</translation>
     </message>
     <message>
         <source>General</source>
@@ -1358,12 +1678,12 @@ XLibrary — MIT
         <translation>Сочетание занято Windows или другим приложением.</translation>
     </message>
     <message>
-        <source>Invalid XLibrary AppImage launch paths.</source>
-        <translation>Некорректные пути запуска XLibrary AppImage.</translation>
+        <source>Invalid Fora.Deck AppImage launch paths.</source>
+        <translation>Некорректные пути запуска Fora.Deck AppImage.</translation>
     </message>
     <message>
-        <source>Invalid XLibrary AppImage file path.</source>
-        <translation>Некорректный путь к файлу XLibrary AppImage.</translation>
+        <source>Invalid Fora.Deck AppImage file path.</source>
+        <translation>Некорректный путь к файлу Fora.Deck AppImage.</translation>
     </message>
     <message>
         <source>Interface language</source>
@@ -1374,8 +1694,8 @@ XLibrary — MIT
         <translation>Язык системы</translation>
     </message>
     <message>
-        <source>Language changes take effect after restarting XLibrary.</source>
-        <translation>Изменение языка применяется после перезапуска XLibrary.</translation>
+        <source>Language changes take effect after restarting Fora.Deck.</source>
+        <translation>Изменение языка применяется после перезапуска Fora.Deck.</translation>
     </message>
     <message>
         <source>Check for updates</source>
@@ -1430,16 +1750,16 @@ XLibrary — MIT
         <translation>Перейти к обновлению</translation>
     </message>
     <message>
-        <source>XLibrary update</source>
-        <translation>Обновление XLibrary</translation>
+        <source>Fora.Deck update</source>
+        <translation>Обновление Fora.Deck</translation>
     </message>
     <message>
         <source>A new version is available: %1 (current: %2). Update now?
 
-XLibrary will download and verify the installer, then close. Complete the update in the installation wizard. Your library and settings will be kept. Save any unsaved edits before continuing.</source>
+Fora.Deck will download and verify the installer, then close. Complete the update in the installation wizard. Your library and settings will be kept. Save any unsaved edits before continuing.</source>
         <translation>Доступна новая версия: %1 (текущая: %2). Хотите обновиться сейчас?
 
-XLibrary скачает и проверит установщик, затем закроется. Завершите обновление в мастере установки. Библиотека и настройки сохранятся. Перед продолжением сохраните несохранённые изменения.</translation>
+Fora.Deck скачает и проверит установщик, затем закроется. Завершите обновление в мастере установки. Библиотека и настройки сохранятся. Перед продолжением сохраните несохранённые изменения.</translation>
     </message>
     <message>
         <source>Update now</source>
@@ -1514,8 +1834,8 @@ Automatic installation is unavailable for this copy or release. Follow the relea
         <translation>Автоматическое обновление этой установки больше недоступно. Откройте выпуск на GitHub.</translation>
     </message>
     <message>
-        <source>This copy of XLibrary was not installed by the installer.</source>
-        <translation>Эта копия XLibrary не была установлена установщиком.</translation>
+        <source>This copy of Fora.Deck was not installed by the installer.</source>
+        <translation>Эта копия Fora.Deck не была установлена установщиком.</translation>
     </message>
     <message>
         <source>Could not start the installer (Windows error %1).</source>
@@ -1686,8 +2006,8 @@ Automatic installation is unavailable for this copy or release. Follow the relea
         <translation>Профиль восстановлен, но настройки автозапуска обновить не удалось.</translation>
     </message>
     <message>
-        <source>Profile restored. Restart XLibrary to apply all settings. Previous profile: %1</source>
-        <translation>Профиль восстановлен. Перезапустите XLibrary, чтобы применить все настройки. Прежний профиль: %1</translation>
+        <source>Profile restored. Restart Fora.Deck to apply all settings. Previous profile: %1</source>
+        <translation>Профиль восстановлен. Перезапустите Fora.Deck, чтобы применить все настройки. Прежний профиль: %1</translation>
     </message>
     <message>
         <source>The profile is being restored or requires a restart.</source>
@@ -1752,8 +2072,8 @@ Technical reason: %3</source>
         <translation>Не удалось сохранить настройки перед восстановлением профиля.</translation>
     </message>
     <message>
-        <source>The profile was restored but could not be opened. Restart XLibrary.</source>
-        <translation>Профиль восстановлен, но открыть его не удалось. Перезапустите XLibrary.</translation>
+        <source>The profile was restored but could not be opened. Restart Fora.Deck.</source>
+        <translation>Профиль восстановлен, но открыть его не удалось. Перезапустите Fora.Deck.</translation>
     </message>
     <message>
         <source>Could not save the diagnostic report.</source>
@@ -1768,8 +2088,8 @@ Technical reason: %3</source>
         <translation>Восстановлено путей приложений: %1.</translation>
     </message>
     <message>
-        <source>Could not restart XLibrary. Close and open it manually.</source>
-        <translation>Не удалось перезапустить XLibrary. Закройте приложение и откройте его снова.</translation>
+        <source>Could not restart Fora.Deck. Close and open it manually.</source>
+        <translation>Не удалось перезапустить Fora.Deck. Закройте приложение и откройте его снова.</translation>
     </message>
     <message>
         <source>Restore database backup…</source>
@@ -1780,8 +2100,8 @@ Technical reason: %3</source>
         <translation>Восстановить весь профиль…</translation>
     </message>
     <message>
-        <source>Restart XLibrary</source>
-        <translation>Перезапустить XLibrary</translation>
+        <source>Restart Fora.Deck</source>
+        <translation>Перезапустить Fora.Deck</translation>
     </message>
     <message>
         <source>Replace only the database with this SQLite backup? Settings are not restored. The current database files will be preserved.</source>
@@ -1800,8 +2120,8 @@ Technical reason: %3</source>
         <translation>Дата создания: %1</translation>
     </message>
     <message>
-        <source>XLibrary version: %1</source>
-        <translation>Версия XLibrary: %1</translation>
+        <source>Fora.Deck version: %1</source>
+        <translation>Версия Fora.Deck: %1</translation>
     </message>
     <message>
         <source>Database schema: %1</source>
@@ -1928,8 +2248,8 @@ Technical reason: %3</source>
         <translation>Выберите резервную копию профиля</translation>
     </message>
     <message>
-        <source>XLibrary profile (*.xlprofile)</source>
-        <translation>Профиль XLibrary (*.xlprofile)</translation>
+        <source>Fora.Deck profile (*.xlprofile)</source>
+        <translation>Профиль Fora.Deck (*.xlprofile)</translation>
     </message>
     <message>
         <source>Restore complete profile</source>
@@ -1944,8 +2264,8 @@ Technical reason: %3</source>
         <translation>Содержимое резервной копии профиля</translation>
     </message>
     <message>
-        <source>Restore replaces the current library and settings. The current profile is preserved for recovery. Restart XLibrary afterward to apply the restored settings. Applications will not be launched.</source>
-        <translation>Восстановление заменит текущую библиотеку и настройки. Текущий профиль будет сохранён для возможного возврата. После восстановления перезапустите XLibrary, чтобы применить настройки. Приложения автоматически не запустятся.</translation>
+        <source>Restore replaces the current library and settings. The current profile is preserved for recovery. Restart Fora.Deck afterward to apply the restored settings. Applications will not be launched.</source>
+        <translation>Восстановление заменит текущую библиотеку и настройки. Текущий профиль будет сохранён для возможного возврата. После восстановления перезапустите Fora.Deck, чтобы применить настройки. Приложения автоматически не запустятся.</translation>
     </message>
     <message>
         <source>Restore profile</source>
@@ -2000,8 +2320,8 @@ Technical reason: %3</source>
         <translation>Восстановить пути после переноса папки…</translation>
     </message>
     <message>
-        <source>The profile was restored. Restart XLibrary to apply its settings before making further changes.</source>
-        <translation>Профиль восстановлен. Перед дальнейшими изменениями перезапустите XLibrary, чтобы применить настройки.</translation>
+        <source>The profile was restored. Restart Fora.Deck to apply its settings before making further changes.</source>
+        <translation>Профиль восстановлен. Перед дальнейшими изменениями перезапустите Fora.Deck, чтобы применить настройки.</translation>
     </message>
     <message>
         <source>Back up complete profile</source>
@@ -2748,6 +3068,18 @@ Technical reason: %3</source>
         <translation>Не удалось сохранить исключения обнаружения.</translation>
     </message>
     <message>
+        <source>Automatically remove unavailable applications without icons</source>
+        <translation>Автоматически удалять недоступные приложения без иконок</translation>
+    </message>
+    <message>
+        <source>Runs at startup and during application scans.</source>
+        <translation>Очистка выполняется при запуске и сканировании приложений.</translation>
+    </message>
+    <message>
+        <source>Removed unavailable applications without icons: %1.</source>
+        <translation>Удалено недоступных приложений без иконок: %1.</translation>
+    </message>
+    <message>
         <source>No new applications found.</source>
         <translation>Новых приложений не найдено.</translation>
     </message>
@@ -2792,8 +3124,8 @@ Technical reason: %3</source>
         <translation>Портал GlobalShortcuts не зарегистрировал сочетание. Используйте системные настройки клавиатуры: KDE: Клавиатура → Комбинации клавиш; GNOME: Клавиатура → Пользовательские комбинации; Xfce: Клавиатура → Комбинации клавиш приложений. Команда: XLibrary --overlay (быстрый поиск) или XLibrary (библиотека). Для приложений и сценариев используйте команду из их редактора.</translation>
     </message>
     <message>
-        <source>XLibrary shortcut</source>
-        <translation>Горячая клавиша XLibrary</translation>
+        <source>Fora.Deck shortcut</source>
+        <translation>Горячая клавиша Fora.Deck</translation>
     </message>
     <message>
         <source>Use Ctrl, Alt, or Super with a letter, digit, F1–F24, or Space.</source>
@@ -2848,8 +3180,8 @@ Technical reason: %3</source>
         <translation>Добавить приложение вручную</translation>
     </message>
     <message>
-        <source>Choose a file and customize its name, tags and launch options.</source>
-        <translation>Выберите файл, задайте название, теги и параметры запуска.</translation>
+        <source>Choose a file or shortcut to add it to your library.</source>
+        <translation>Выберите файл или ярлык, чтобы добавить его в библиотеку.</translation>
     </message>
     <message>
         <source>Choose how to start. You can return to this screen in Settings.</source>
@@ -2880,8 +3212,8 @@ Technical reason: %3</source>
         <translation>Начать с пустой библиотеки</translation>
     </message>
     <message>
-        <source>Welcome to XLibrary</source>
-        <translation>Добро пожаловать в XLibrary</translation>
+        <source>Welcome to Fora.Deck</source>
+        <translation>Добро пожаловать в Fora.Deck</translation>
     </message>
     <message>
         <source>Your applications. One home.</source>
@@ -2912,8 +3244,8 @@ Technical reason: %3</source>
         <translation>Файл настроек</translation>
     </message>
     <message>
-        <source>Your library, tags, scenarios and settings are stored on this computer. XLibrary does not upload your catalog. Update checks contact GitHub; your saved access token is kept in the system credential store.</source>
-        <translation>Библиотека, теги, сценарии и настройки хранятся на этом компьютере. XLibrary не загружает каталог в сеть. Проверка обновлений обращается к GitHub; сохранённый токен доступа хранится в системном хранилище учётных данных.</translation>
+        <source>Your library, tags, scenarios and settings are stored on this computer. Fora.Deck does not upload your catalog. Update checks contact GitHub; your saved access token is kept in the system credential store.</source>
+        <translation>Библиотека, теги, сценарии и настройки хранятся на этом компьютере. Fora.Deck не загружает каталог в сеть. Проверка обновлений обращается к GitHub; сохранённый токен доступа хранится в системном хранилище учётных данных.</translation>
     </message>
     <message>
         <source>Delay</source>
@@ -2968,7 +3300,7 @@ Technical reason: %3</source>
         <translation>Создавайте теги в боковом меню или редакторе приложения. Тег содержит до 64 символов без пробелов, запятых и #. Выделите несколько приложений с Ctrl или Shift для изменения тегов сразу у всех. Удаление тега сохраняет приложения.</translation>
     </message>
     <message>
-        <source>Open Settings → Keyboard shortcuts to see or change the current bindings. Clear a binding to disable it. Assign application and scenario shortcuts in their editors. A shortcut already used by XLibrary or another application may be refused. On Wayland, system permission or a desktop shortcut may be required.</source>
+        <source>Open Settings → Keyboard shortcuts to see or change the current bindings. Clear a binding to disable it. Assign application and scenario shortcuts in their editors. A shortcut already used by Fora.Deck or another application may be refused. On Wayland, system permission or a desktop shortcut may be required.</source>
         <translation>Откройте «Настройки → Горячие клавиши» для просмотра и изменения сочетаний. Очистите поле, чтобы отключить сочетание. Клавиши для приложений и сценариев назначаются в их редакторах. Занятое сочетание может быть отклонено. На Wayland может потребоваться системное разрешение или настройка сочетания в среде рабочего стола.</translation>
     </message>
     <message>
@@ -2992,13 +3324,13 @@ Technical reason: %3</source>
         <translation>Версия и сведения об окружении скопированы.</translation>
     </message>
     <message>
-        <source>XLibrary %1
+        <source>Fora.Deck %1
 OS: %2
 Architecture: %3
 Qt: %4
 Session: %5
 Mode: %6</source>
-        <translation>XLibrary %1
+        <translation>Fora.Deck %1
 ОС: %2
 Архитектура: %3
 Qt: %4
@@ -3022,16 +3354,16 @@ Qt: %4
         <translation>Сбросить настройки…</translation>
     </message>
     <message>
-        <source>Restore default interface, shortcuts, sources and behavior settings? Applications, tags, scenarios, history and saved credentials will be kept. XLibrary will need a restart.</source>
-        <translation>Восстановить стандартные настройки интерфейса, сочетаний клавиш, источников и поведения? Приложения, теги, сценарии, история и сохранённые учётные данные останутся. Потребуется перезапуск XLibrary.</translation>
+        <source>Restore default interface, shortcuts, sources and behavior settings? Applications, tags, scenarios, history and saved credentials will be kept. Fora.Deck will need a restart.</source>
+        <translation>Восстановить стандартные настройки интерфейса, сочетаний клавиш, источников и поведения? Приложения, теги, сценарии, история и сохранённые учётные данные останутся. Потребуется перезапуск Fora.Deck.</translation>
     </message>
     <message>
-        <source>Settings reset. Restart XLibrary to apply the defaults. Your catalog was kept.</source>
-        <translation>Настройки сброшены. Перезапустите XLibrary для применения значений по умолчанию. Каталог сохранён.</translation>
+        <source>Settings reset. Restart Fora.Deck to apply the defaults. Your catalog was kept.</source>
+        <translation>Настройки сброшены. Перезапустите Fora.Deck для применения значений по умолчанию. Каталог сохранён.</translation>
     </message>
     <message>
-        <source>Settings were reset. Restart XLibrary now?</source>
-        <translation>Настройки сброшены. Перезапустить XLibrary сейчас?</translation>
+        <source>Settings were reset. Restart Fora.Deck now?</source>
+        <translation>Настройки сброшены. Перезапустить Fora.Deck сейчас?</translation>
     </message>
     <message>
         <source>Author: %1</source>
@@ -3046,8 +3378,8 @@ Qt: %4
         <translation>Включить анимации интерфейса</translation>
     </message>
     <message>
-        <source>A quick tour of XLibrary</source>
-        <translation>Короткое обучение XLibrary</translation>
+        <source>A quick tour of Fora.Deck</source>
+        <translation>Короткое обучение Fora.Deck</translation>
     </message>
     <message>
         <source>Add → Edit → Tags → Favorites</source>
@@ -3074,8 +3406,8 @@ Qt: %4
         <translation>Готово</translation>
     </message>
     <message>
-        <source>Keep XLibrary close</source>
-        <translation>Держите XLibrary под рукой</translation>
+        <source>Keep Fora.Deck close</source>
+        <translation>Держите Fora.Deck под рукой</translation>
     </message>
     <message>
         <source>Make the library yours</source>
@@ -3238,6 +3570,18 @@ Qt: %4
         <translation>Режим индексации</translation>
     </message>
     <message>
+        <source>Maximum results in the Files tab</source>
+        <translation>Максимум результатов во вкладке «Файлы»</translation>
+    </message>
+    <message>
+        <source>Custom</source>
+        <translation>Свой вариант</translation>
+    </message>
+    <message>
+        <source>Custom file result limit</source>
+        <translation>Свой лимит результатов для файлов</translation>
+    </message>
+    <message>
         <source>Off by default. Basic: Desktop, Documents and Downloads, including all subfolders; other local drives are checked only at the root and one folder level below it (max-depth=1). Full: all accessible local drives recursively. Not recommended: indexing can take a long time.</source>
         <translation>По умолчанию выключен. Базовый: рабочий стол, документы и загрузки со всеми вложенными папками; остальные локальные диски — только корень и один уровень папок (max-depth=1). Полный: все доступные локальные диски рекурсивно. Не рекомендуется: индексация может занять много времени.</translation>
     </message>
@@ -3280,6 +3624,925 @@ Qt: %4
     <message>
         <source>File index is up to date</source>
         <translation>Файловый индекс актуален</translation>
+    </message>
+    <message>
+        <source>By ForaSource</source>
+        <translation>Автор: ForaSource</translation>
+    </message>
+    <message>
+        <source>↑↓ Select · Enter Open · Esc Close · %1 Quick search</source>
+        <translation>↑↓ Выбор · Enter Открыть · Esc Закрыть · %1 Быстрый поиск</translation>
+    </message>
+    <message>
+        <source>Path</source>
+        <translation>Путь</translation>
+    </message>
+    <message>
+        <source>Open</source>
+        <translation>Открыть</translation>
+    </message>
+    <message>
+        <source>List</source>
+        <translation>Список</translation>
+    </message>
+    <message>
+        <source>Cards</source>
+        <translation>Карточки</translation>
+    </message>
+    <message>
+        <source>Library view</source>
+        <translation>Вид библиотеки</translation>
+    </message>
+    <message>
+        <source>Library actions</source>
+        <translation>Действия библиотеки</translation>
+    </message>
+    <message>
+        <source>More actions</source>
+        <translation>Другие действия</translation>
+    </message>
+    <message>
+        <source>Select a scenario</source>
+        <translation>Выберите сценарий</translation>
+    </message>
+    <message>
+        <source>Delay: %1 s</source>
+        <translation>Задержка: %1 с</translation>
+    </message>
+    <message>
+        <source>Copy launch target</source>
+        <translation>Копировать цель запуска</translation>
+    </message>
+    <message>
+        <source>File</source>
+        <translation>Файл</translation>
+    </message>
+    <message>
+        <source>Folder</source>
+        <translation>Папка</translation>
+    </message>
+    <message>
+        <source>Recommended</source>
+        <translation>Рекомендуемые</translation>
+    </message>
+    <message>
+        <source>Recently opened</source>
+        <translation>Недавно открытые</translation>
+    </message>
+    <message>
+        <source>File sort order</source>
+        <translation>Сортировка файлов</translation>
+    </message>
+    <message>
+        <source>File actions</source>
+        <translation>Действия с файлами</translation>
+    </message>
+    <message>
+        <source>Refresh index</source>
+        <translation>Обновить индекс</translation>
+    </message>
+    <message>
+        <source>↑↓  Select     Enter  Open     Shift+F10  Actions</source>
+        <translation>↑↓  Выбор     Enter  Открыть     Shift+F10  Действия</translation>
+    </message>
+    <message>
+        <source> from all applications and files? Saved filters will also stop using this tag.</source>
+        <translation> из всех приложений и файлов? Сохранённые фильтры также перестанут использовать этот тег.</translation>
+    </message>
+    <message>
+        <source>Extension</source>
+        <translation>Расширение</translation>
+    </message>
+    <message>
+        <source>Date added</source>
+        <translation>Дата добавления</translation>
+    </message>
+    <message>
+        <source>By extension</source>
+        <translation>По расширению</translation>
+    </message>
+    <message>
+        <source>By date added</source>
+        <translation>По дате добавления</translation>
+    </message>
+    <message>
+        <source>File type</source>
+        <translation>Тип файла</translation>
+    </message>
+    <message>
+        <source>Size</source>
+        <translation>Размер</translation>
+    </message>
+    <message>
+        <source>Modified</source>
+        <translation>Дата изменения</translation>
+    </message>
+    <message>
+        <source>File path</source>
+        <translation>Путь к файлу</translation>
+    </message>
+    <message>
+        <source>Opens with</source>
+        <translation>Открывается в</translation>
+    </message>
+    <message>
+        <source>Default application not found</source>
+        <translation>Приложение по умолчанию не найдено</translation>
+    </message>
+    <message>
+        <source>Detecting application…</source>
+        <translation>Определение приложения…</translation>
+    </message>
+    <message>
+        <source>Select a file</source>
+        <translation>Выберите файл</translation>
+    </message>
+    <message>
+        <source>File details</source>
+        <translation>Сведения о файле</translation>
+    </message>
+</context>
+<context>
+    <name>Workspaces</name>
+    <message>
+        <source>Add an application to the library first.</source>
+        <translation>Сначала добавьте приложение в библиотеку.</translation>
+    </message>
+    <message>
+        <source>Add application</source>
+        <translation>Добавить приложение</translation>
+    </message>
+    <message>
+        <source>Add file</source>
+        <translation>Добавить файл</translation>
+    </message>
+    <message>
+        <source>Add folder</source>
+        <translation>Добавить папку</translation>
+    </message>
+    <message>
+        <source>Add link</source>
+        <translation>Добавить ссылку</translation>
+    </message>
+    <message>
+        <source>Add to workspace</source>
+        <translation>Добавить в пространство</translation>
+    </message>
+    <message>
+        <source>Choosing a different library app adds it without the window position.</source>
+        <translation>При выборе другого приложения положение этого окна не переносится.</translation>
+    </message>
+    <message>
+        <source>Add file to library…</source>
+        <translation>Добавить файл в библиотеку…</translation>
+    </message>
+    <message>
+        <source>Back to windows</source>
+        <translation>Назад к окнам</translation>
+    </message>
+    <message>
+        <source>Capture open windows</source>
+        <translation>Выбрать открытые окна</translation>
+    </message>
+    <message>
+        <source>Check one window per application. Where prompted, choose a library launch option.</source>
+        <translation>Отметьте по одному окну на приложение. Если доступен список вариантов запуска, выберите нужный.</translation>
+    </message>
+    <message>
+        <source>Choose launch option…</source>
+        <translation>Выбрать способ запуска…</translation>
+    </message>
+    <message>
+        <source>Choose application…</source>
+        <translation>Выбрать приложение…</translation>
+    </message>
+    <message>
+        <source>Choose windows to save</source>
+        <translation>Какие окна сохранить</translation>
+    </message>
+    <message>
+        <source>Create manually</source>
+        <translation>Создать вручную</translation>
+    </message>
+    <message>
+        <source>Drag to reorder. Clear a checkbox to skip that resource.</source>
+        <translation>Перетащите строку, чтобы изменить порядок. Снимите галочку, чтобы пропустить ресурс при запуске.</translation>
+    </message>
+    <message>
+        <source>e.g. Design, Study, or Work</source>
+        <translation>Например, «Учёба» или «Работа»</translation>
+    </message>
+    <message>
+        <source>File or folder path</source>
+        <translation>Путь к файлу или папке</translation>
+    </message>
+    <message>
+        <source>Launch and window options</source>
+        <translation>Параметры запуска и окна</translation>
+    </message>
+    <message>
+        <source>Library application or status</source>
+        <translation>Приложение или состояние</translation>
+    </message>
+    <message>
+        <source>Library applications</source>
+        <translation>Приложения из библиотеки</translation>
+    </message>
+    <message>
+        <source>Link</source>
+        <translation>Ссылка</translation>
+    </message>
+    <message>
+        <source>No applications match your search.</source>
+        <translation>По вашему запросу ничего не найдено.</translation>
+    </message>
+    <message>
+        <source>No matching library entry</source>
+        <translation>Нет совпадения в библиотеке</translation>
+    </message>
+    <message>
+        <source>No workspaces yet</source>
+        <translation>Здесь будут ваши пространства</translation>
+    </message>
+    <message>
+        <source>Nothing to open yet</source>
+        <translation>Пока нет ресурсов</translation>
+    </message>
+    <message>
+        <source>Open a group of applications, files, folders and links together.</source>
+        <translation>Открывайте нужные приложения, файлы, папки и ссылки одним действием.</translation>
+    </message>
+    <message>
+        <source>Remove</source>
+        <translation>Убрать</translation>
+    </message>
+    <message>
+        <source>Review workspace</source>
+        <translation>Проверить пространство</translation>
+    </message>
+    <message>
+        <source>Search library applications…</source>
+        <translation>Поиск приложений в библиотеке…</translation>
+    </message>
+    <message>
+        <source>Start with an empty workspace or capture the windows already open.</source>
+        <translation>Создайте пространство с нуля или выберите окна, которые уже открыты.</translation>
+    </message>
+    <message>
+        <source>Use the buttons above to add your first resource.</source>
+        <translation>Выберите приложение, файл, папку или ссылку с помощью кнопок выше.</translation>
+    </message>
+    <message>
+        <source>Web address</source>
+        <translation>Адрес сайта</translation>
+    </message>
+    <message>
+        <source>Window identity could not be verified</source>
+        <translation>Не удалось определить владельца окна</translation>
+    </message>
+    <message>
+        <source>Window layout</source>
+        <translation>С раскладкой окна</translation>
+    </message>
+    <message>
+        <source>Applications selected: %1</source>
+        <translation>Выбрано приложений: %1</translation>
+    </message>
+    <message>
+        <source>You can still build a workspace manually.</source>
+        <translation>Вы можете создать пространство вручную.</translation>
+    </message>
+    <message>
+        <source>Invalid resource details.</source>
+        <translation>Недопустимые параметры ресурса.</translation>
+    </message>
+    <message>
+        <source>Choose an application from the library.</source>
+        <translation>Выберите приложение из библиотеки.</translation>
+    </message>
+    <message>
+        <source>Application options require a library application.</source>
+        <translation>Параметры запуска доступны для приложений из библиотеки.</translation>
+    </message>
+    <message>
+        <source>Invalid window placement.</source>
+        <translation>Недопустимое положение окна.</translation>
+    </message>
+    <message>
+        <source>Enter an absolute file or folder path.</source>
+        <translation>Введите абсолютный путь к файлу или папке.</translation>
+    </message>
+    <message>
+        <source>Enter an HTTP or HTTPS URL without credentials.</source>
+        <translation>Введите HTTP- или HTTPS-адрес без учётных данных.</translation>
+    </message>
+    <message>
+        <source>Unknown resource type.</source>
+        <translation>Неизвестный тип ресурса.</translation>
+    </message>
+    <message>
+        <source>Enter a workspace name of up to 128 characters.</source>
+        <translation>Введите название рабочего пространства длиной до 128 символов.</translation>
+    </message>
+    <message>
+        <source>Add between 1 and %1 resources.</source>
+        <translation>Добавьте от 1 до %1 ресурсов.</translation>
+    </message>
+    <message>
+        <source>A resource ID occurs more than once.</source>
+        <translation>Идентификатор ресурса повторяется.</translation>
+    </message>
+    <message>
+        <source>Profile contains an invalid workspace item</source>
+        <translation>В профиле есть некорректный ресурс рабочего пространства</translation>
+    </message>
+    <message>
+        <source>Profile contains an invalid workspace</source>
+        <translation>В профиле есть некорректное рабочее пространство</translation>
+    </message>
+    <message>
+        <source>Application configuration changed. Run preflight again.</source>
+        <translation>Конфигурация приложения изменилась. Повторите предварительную проверку.</translation>
+    </message>
+    <message>
+        <source>This workspace name is already in use.</source>
+        <translation>Рабочее пространство с таким названием уже есть.</translation>
+    </message>
+    <message>
+        <source>The workspace was removed.</source>
+        <translation>Рабочее пространство удалено.</translation>
+    </message>
+    <message>
+        <source>The resource list has changed.</source>
+        <translation>Список ресурсов изменился.</translation>
+    </message>
+    <message>
+        <source>The library application was removed.</source>
+        <translation>Приложение удалено из библиотеки.</translation>
+    </message>
+    <message>
+        <source>Wayland workspaces can launch resources only. Window capture and placement are unavailable.</source>
+        <translation>В Wayland доступно открытие ресурсов. Захват и размещение окон недоступны.</translation>
+    </message>
+    <message>
+        <source>The X11 server cannot verify window ownership. Workspaces can launch resources only.</source>
+        <translation>Сервер X11 не может подтвердить принадлежность окон. Доступно открытие ресурсов.</translation>
+    </message>
+    <message>
+        <source>Window capture and placement require a local X11 session with a compatible window manager.</source>
+        <translation>Для захвата и размещения окон нужен локальный сеанс X11 с совместимым оконным менеджером.</translation>
+    </message>
+    <message>
+        <source>Window placement is unavailable with this X11 window manager.</source>
+        <translation>Оконный менеджер X11 не поддерживает размещение окон.</translation>
+    </message>
+    <message>
+        <source>Window capture and placement are unavailable on this display. Workspaces can launch resources only.</source>
+        <translation>На этом дисплее захват и размещение окон недоступны. Ресурсы можно открывать.</translation>
+    </message>
+    <message>
+        <source>This build lacks X11 window management support. Workspaces can launch resources only.</source>
+        <translation>В этой сборке доступно открытие ресурсов. Управление окнами X11 недоступно.</translation>
+    </message>
+    <message>
+        <source>Window capture and placement require the Windows desktop.</source>
+        <translation>Для захвата и размещения окон нужен рабочий стол Windows.</translation>
+    </message>
+    <message>
+        <source>Windows could not read the desktop layout.</source>
+        <translation>Не удалось прочитать расположение окон Windows.</translation>
+    </message>
+    <message>
+        <source>Unrecognized window</source>
+        <translation>Окно не распознано</translation>
+    </message>
+    <message>
+        <source>Launch configuration could not be identified</source>
+        <translation>Конфигурация запуска не определена</translation>
+    </message>
+    <message>
+        <source>File or folder is missing.</source>
+        <translation>Файл или папка отсутствует.</translation>
+    </message>
+    <message>
+        <source>Permission to open the resource is unavailable.</source>
+        <translation>Нет доступа к ресурсу.</translation>
+    </message>
+    <message>
+        <source>Add executable targets from the application library.</source>
+        <translation>Добавляйте исполняемые файлы из библиотеки приложений.</translation>
+    </message>
+    <message>
+        <source>The launch request did not respond in time.</source>
+        <translation>Истекло время ожидания ответа на запрос запуска.</translation>
+    </message>
+    <message>
+        <source>Library application is missing.</source>
+        <translation>Приложение отсутствует в библиотеке.</translation>
+    </message>
+    <message>
+        <source>Application target is unavailable.</source>
+        <translation>Цель запуска недоступна.</translation>
+    </message>
+    <message>
+        <source>Application working directory is unavailable.</source>
+        <translation>Рабочая папка приложения недоступна.</translation>
+    </message>
+    <message>
+        <source>Application lacks permission to execute.</source>
+        <translation>Нет прав на запуск приложения.</translation>
+    </message>
+    <message>
+        <source>The existing window matches several launch configurations. Turn off reuse to request a fresh launch.</source>
+        <translation>Существующее окно подходит нескольким конфигурациям запуска. Отключите повторное использование окон, чтобы запросить новый запуск.</translation>
+    </message>
+    <message>
+        <source>Several windows match. This resource will be skipped while the match is ambiguous.</source>
+        <translation>Найдено несколько подходящих окон. Ресурс будет пропущен, пока совпадение неоднозначно.</translation>
+    </message>
+    <message>
+        <source>Existing windows cannot be reused with these launch options. A fresh launch will be requested.</source>
+        <translation>С этими параметрами нельзя использовать существующие окна. Будет запрошен новый запуск.</translation>
+    </message>
+    <message>
+        <source>Window placement is unavailable.</source>
+        <translation>Размещение окон недоступно.</translation>
+    </message>
+    <message>
+        <source>Window identity cannot be verified for this launch configuration.</source>
+        <translation>Для этой конфигурации запуска не удалось подтвердить принадлежность окна.</translation>
+    </message>
+    <message>
+        <source>Saved monitor unavailable. The primary monitor will be used if available.</source>
+        <translation>Сохранённый монитор недоступен. При наличии будет выбран основной монитор.</translation>
+    </message>
+    <message>
+        <source>Open request accepted.</source>
+        <translation>Запрос на открытие принят.</translation>
+    </message>
+    <message>
+        <source>The system did not accept the open request.</source>
+        <translation>Система отклонила запрос на открытие.</translation>
+    </message>
+    <message>
+        <source>Several windows match. Turn off reuse to request a fresh launch.</source>
+        <translation>Найдено несколько подходящих окон. Отключите повторное использование окон, чтобы запросить новый запуск.</translation>
+    </message>
+    <message>
+        <source>The application is busy.</source>
+        <translation>Приложение занято.</translation>
+    </message>
+    <message>
+        <source>Could not open the application.</source>
+        <translation>Не удалось открыть приложение.</translation>
+    </message>
+    <message>
+        <source>Launch accepted. Window verification is unavailable.</source>
+        <translation>Запрос запуска принят. Проверка окон недоступна.</translation>
+    </message>
+    <message>
+        <source>Launch accepted. Window identity could not be verified.</source>
+        <translation>Запрос запуска принят. Принадлежность окна не подтверждена.</translation>
+    </message>
+    <message>
+        <source>Launch accepted. Several new windows match.</source>
+        <translation>Запрос запуска принят. Найдено несколько новых подходящих окон.</translation>
+    </message>
+    <message>
+        <source>Launch accepted. No matching window appeared in time.</source>
+        <translation>Запрос запуска принят. Подходящее окно не появилось за отведённое время.</translation>
+    </message>
+    <message>
+        <source>The saved monitor was unavailable.</source>
+        <translation>Сохранённый монитор недоступен.</translation>
+    </message>
+    <message>
+        <source>Window activation was refused.</source>
+        <translation>Система отклонила активацию окна.</translation>
+    </message>
+    <message>
+        <source>The existing window could not be activated.</source>
+        <translation>Не удалось активировать существующее окно.</translation>
+    </message>
+    <message>
+        <source>Window placement was refused.</source>
+        <translation>Система отклонила изменение положения окна.</translation>
+    </message>
+    <message>
+        <source>Window positioned on %1.</source>
+        <translation>Окно размещено на мониторе %1.</translation>
+    </message>
+    <message>
+        <source>The window manager did not confirm the requested placement.</source>
+        <translation>Оконный менеджер не подтвердил размещение.</translation>
+    </message>
+    <message>
+        <source>Run cancelled. Open applications stay open.</source>
+        <translation>Запуск отменён. Открытые приложения продолжат работу.</translation>
+    </message>
+    <message>
+        <source>Missing application</source>
+        <translation>Приложение отсутствует</translation>
+    </message>
+    <message>
+        <source>Pending</source>
+        <translation>Ожидает</translation>
+    </message>
+    <message>
+        <source>Disabled</source>
+        <translation>Отключено</translation>
+    </message>
+    <message>
+        <source>Checking</source>
+        <translation>Проверка</translation>
+    </message>
+    <message>
+        <source>Opening</source>
+        <translation>Открытие</translation>
+    </message>
+    <message>
+        <source>Waiting for window</source>
+        <translation>Ожидание окна</translation>
+    </message>
+    <message>
+        <source>Positioning window</source>
+        <translation>Размещение окна</translation>
+    </message>
+    <message>
+        <source>Open request accepted</source>
+        <translation>Запрос на открытие принят</translation>
+    </message>
+    <message>
+        <source>Window ready</source>
+        <translation>Окно готово</translation>
+    </message>
+    <message>
+        <source>Reused existing window</source>
+        <translation>Использовано существующее окно</translation>
+    </message>
+    <message>
+        <source>Window positioned</source>
+        <translation>Окно размещено</translation>
+    </message>
+    <message>
+        <source>Unverified</source>
+        <translation>Результат не подтверждён</translation>
+    </message>
+    <message>
+        <source>Skipped</source>
+        <translation>Пропущено</translation>
+    </message>
+    <message>
+        <source>Failed</source>
+        <translation>Ошибка</translation>
+    </message>
+    <message>
+        <source>Cancelled</source>
+        <translation>Отменено</translation>
+    </message>
+    <message>
+        <source>Workspace completed</source>
+        <translation>Запуск завершён</translation>
+    </message>
+    <message>
+        <source>Workspace partially completed</source>
+        <translation>Запуск завершён частично</translation>
+    </message>
+    <message>
+        <source>Workspace failed</source>
+        <translation>Запуск не удался</translation>
+    </message>
+    <message>
+        <source>Workspace cancelled</source>
+        <translation>Запуск отменён</translation>
+    </message>
+    <message>
+        <source>Application</source>
+        <translation>Приложение</translation>
+    </message>
+    <message>
+        <source>File</source>
+        <translation>Файл</translation>
+    </message>
+    <message>
+        <source>Folder</source>
+        <translation>Папка</translation>
+    </message>
+    <message>
+        <source>URL</source>
+        <translation>Ссылка</translation>
+    </message>
+    <message>
+        <source>Edit resource</source>
+        <translation>Изменить ресурс</translation>
+    </message>
+    <message>
+        <source>Add resource</source>
+        <translation>Добавить ресурс</translation>
+    </message>
+    <message>
+        <source>Resource type</source>
+        <translation>Тип ресурса</translation>
+    </message>
+    <message>
+        <source>Missing application · %1</source>
+        <translation>Приложение отсутствует · %1</translation>
+    </message>
+    <message>
+        <source>Library application</source>
+        <translation>Приложение из библиотеки</translation>
+    </message>
+    <message>
+        <source>Browser launch profile</source>
+        <translation>Профиль браузера</translation>
+    </message>
+    <message>
+        <source>Reuse existing window when identity is verified</source>
+        <translation>Использовать существующее подтверждённое окно</translation>
+    </message>
+    <message>
+        <source>Use application default</source>
+        <translation>Как в приложении</translation>
+    </message>
+    <message>
+        <source>Use configured launch</source>
+        <translation>Использовать настроенный запуск</translation>
+    </message>
+    <message>
+        <source>Unavailable profile · %1</source>
+        <translation>Профиль недоступен · %1</translation>
+    </message>
+    <message>
+        <source>Restore window placement</source>
+        <translation>Восстановить положение окна</translation>
+    </message>
+    <message>
+        <source>Primary monitor</source>
+        <translation>Основной монитор</translation>
+    </message>
+    <message>
+        <source>Maximized</source>
+        <translation>Развёрнуто</translation>
+    </message>
+    <message>
+        <source>Unavailable monitor · %1</source>
+        <translation>Монитор недоступен · %1</translation>
+    </message>
+    <message>
+        <source>&amp;Monitor</source>
+        <translation>&amp;Монитор</translation>
+    </message>
+    <message>
+        <source>Left offset</source>
+        <translation>Отступ слева</translation>
+    </message>
+    <message>
+        <source>Top offset</source>
+        <translation>Отступ сверху</translation>
+    </message>
+    <message>
+        <source>Width</source>
+        <translation>Ширина</translation>
+    </message>
+    <message>
+        <source>Height</source>
+        <translation>Высота</translation>
+    </message>
+    <message>
+        <source>Path or URL</source>
+        <translation>Путь или ссылка</translation>
+    </message>
+    <message>
+        <source>Browse…</source>
+        <translation>Обзор…</translation>
+    </message>
+    <message>
+        <source>Apply</source>
+        <translation>Применить</translation>
+    </message>
+    <message>
+        <source>Edit workspace</source>
+        <translation>Изменить пространство</translation>
+    </message>
+    <message>
+        <source>New workspace</source>
+        <translation>Новое пространство</translation>
+    </message>
+    <message>
+        <source>Workspace name</source>
+        <translation>Название пространства</translation>
+    </message>
+    <message>
+        <source>Resource</source>
+        <translation>Ресурс</translation>
+    </message>
+    <message>
+        <source>Type</source>
+        <translation>Тип</translation>
+    </message>
+    <message>
+        <source>Resources in launch order</source>
+        <translation>Ресурсы в порядке запуска</translation>
+    </message>
+    <message>
+        <source>Remove resource</source>
+        <translation>Убрать ресурс</translation>
+    </message>
+    <message>
+        <source>Move up</source>
+        <translation>Выше</translation>
+    </message>
+    <message>
+        <source>Move down</source>
+        <translation>Ниже</translation>
+    </message>
+    <message>
+        <source>Save workspace</source>
+        <translation>Сохранить</translation>
+    </message>
+    <message>
+        <source>Save current desktop</source>
+        <translation>Сохранить рабочий стол</translation>
+    </message>
+    <message>
+        <source>Select one window per application. You can add other resources before saving.</source>
+        <translation>Выберите по одному окну для каждого приложения. Перед сохранением можно добавить другие ресурсы.</translation>
+    </message>
+    <message>
+        <source>Detected window</source>
+        <translation>Обнаруженное окно</translation>
+    </message>
+    <message>
+        <source>Application and monitor</source>
+        <translation>Приложение и монитор</translation>
+    </message>
+    <message>
+        <source>Detected windows</source>
+        <translation>Обнаруженные окна</translation>
+    </message>
+    <message>
+        <source>Untitled window</source>
+        <translation>Окно без заголовка</translation>
+    </message>
+    <message>
+        <source>Several windows for this application</source>
+        <translation>У приложения несколько окон</translation>
+    </message>
+    <message>
+        <source>No eligible windows were found.</source>
+        <translation>Подходящих окон не найдено.</translation>
+    </message>
+    <message>
+        <source>Continue to editor</source>
+        <translation>Перейти к редактированию</translation>
+    </message>
+    <message>
+        <source>Select only one window for each application.</source>
+        <translation>Выберите по одному окну для каждого приложения.</translation>
+    </message>
+    <message>
+        <source>Select up to %1 windows.</source>
+        <translation>Выберите не более %1 окон.</translation>
+    </message>
+    <message>
+        <source>Workspace preflight</source>
+        <translation>Проверка пространства</translation>
+    </message>
+    <message>
+        <source>Review these warnings before opening resources.</source>
+        <translation>Проверьте предупреждения перед открытием ресурсов.</translation>
+    </message>
+    <message>
+        <source>Warnings</source>
+        <translation>Предупреждения</translation>
+    </message>
+    <message>
+        <source>Preflight warnings</source>
+        <translation>Предупреждения предварительной проверки</translation>
+    </message>
+    <message>
+        <source>Run workspace</source>
+        <translation>Запустить пространство</translation>
+    </message>
+    <message>
+        <source>Workspaces</source>
+        <translation>Рабочие пространства</translation>
+    </message>
+    <message>
+        <source>Open the apps, files, folders and links for your work in one action. Create a workspace to get started.</source>
+        <translation>Открывайте нужные приложения, файлы, папки и ссылки одним действием. Создайте рабочее пространство, чтобы начать.</translation>
+    </message>
+    <message>
+        <source>Name</source>
+        <translation>Название</translation>
+    </message>
+    <message>
+        <source>Resources</source>
+        <translation>Ресурсы</translation>
+    </message>
+    <message>
+        <source>Saved workspaces</source>
+        <translation>Сохранённые рабочие пространства</translation>
+    </message>
+    <message>
+        <source>Run</source>
+        <translation>Запустить</translation>
+    </message>
+    <message>
+        <source>Edit</source>
+        <translation>Изменить</translation>
+    </message>
+    <message>
+        <source>Duplicate</source>
+        <translation>Дублировать</translation>
+    </message>
+    <message>
+        <source>Delete</source>
+        <translation>Удалить</translation>
+    </message>
+    <message>
+        <source>Status</source>
+        <translation>Состояние</translation>
+    </message>
+    <message>
+        <source>Selected workspace resources</source>
+        <translation>Ресурсы выбранного пространства</translation>
+    </message>
+    <message>
+        <source>Last run</source>
+        <translation>Последний запуск</translation>
+    </message>
+    <message>
+        <source>Workspace run progress</source>
+        <translation>Ход запуска пространства</translation>
+    </message>
+    <message>
+        <source>Details</source>
+        <translation>Подробности</translation>
+    </message>
+    <message>
+        <source>Workspace run report</source>
+        <translation>Отчёт о запуске пространства</translation>
+    </message>
+    <message>
+        <source>Cancel run</source>
+        <translation>Отменить запуск</translation>
+    </message>
+    <message>
+        <source>Export run diagnostics…</source>
+        <translation>Экспорт диагностики…</translation>
+    </message>
+    <message>
+        <source>Checking open windows…</source>
+        <translation>Проверка открытых окон…</translation>
+    </message>
+    <message>
+        <source>Invalid resource</source>
+        <translation>Недопустимый ресурс</translation>
+    </message>
+    <message>
+        <source>Copy of %1</source>
+        <translation>Копия %1</translation>
+    </message>
+    <message>
+        <source>Delete workspace</source>
+        <translation>Удалить пространство</translation>
+    </message>
+    <message>
+        <source>Delete “%1”?</source>
+        <translation>Удалить «%1»?</translation>
+    </message>
+    <message>
+        <source>Export run diagnostics</source>
+        <translation>Экспорт диагностики запуска</translation>
+    </message>
+    <message>
+        <source>JSON files (*.json)</source>
+        <translation>Файлы JSON (*.json)</translation>
+    </message>
+    <message>
+        <source>Finish the workspace operation first.</source>
+        <translation>Сначала завершите операцию с рабочим пространством.</translation>
+    </message>
+    <message>
+        <source>Finish the current operation before running a workspace.</source>
+        <translation>Завершите текущую операцию перед запуском пространства.</translation>
+    </message>
+    <message>
+        <source>Stop the workspace before running a scenario.</source>
+        <translation>Остановите запуск рабочего пространства перед запуском сценария.</translation>
+    </message>
+    <message>
+        <source>Workspaces (%1)</source>
+        <translation>Рабочие пространства (%1)</translation>
+    </message>
+    <message>
+        <source>Workspace resources (%1)</source>
+        <translation>Ресурсы рабочих пространств (%1)</translation>
+    </message>
+    <message>
+        <source>Saved window placements (%1)</source>
+        <translation>Сохранённые положения окон (%1)</translation>
     </message>
 </context>
 </TS>

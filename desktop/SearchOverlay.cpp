@@ -5,6 +5,7 @@
 #include <QGraphicsOpacityEffect>
 #include <QHBoxLayout>
 #include <QHideEvent>
+#include <QLabel>
 #include <QLineEdit>
 #include <QPainter>
 #include <QPainterPath>
@@ -31,10 +32,11 @@ SearchOverlay::SearchOverlay(DesktopService &service, QWidget *const parent)
               Qt::Window |
 #endif
                   Qt::FramelessWindowHint),
-      service(service), contents(new QWidget(this)), input(new QLineEdit), open_button(new QToolButton),
-      results(new SearchResults(service, *input, true)), notice(new NotificationBanner(service.settings, 0, 7000)),
-      opacity(new QGraphicsOpacityEffect(contents)), reveal(new QVariantAnimation(this)),
-      height_animation(new QVariantAnimation(this)), activation_check(new QTimer(this)) {
+      service(service), contents(new QWidget(this)), input(new QLineEdit), shortcut_hint(new QLabel),
+      open_button(new QToolButton), results(new SearchResults(service, *input, true)),
+      notice(new NotificationBanner(service.settings, 0, 7000)), opacity(new QGraphicsOpacityEffect(contents)),
+      reveal(new QVariantAnimation(this)), height_animation(new QVariantAnimation(this)),
+      activation_check(new QTimer(this)) {
     setObjectName("search_overlay");
     setWindowTitle(QCoreApplication::translate("XLibrary", "Quick search"));
     setWindowIcon(appearance::logo());
@@ -58,17 +60,21 @@ SearchOverlay::SearchOverlay(DesktopService &service, QWidget *const parent)
     input->setToolTip(
         QCoreApplication::translate("XLibrary", "#tag includes a tag; -#tag excludes it. All conditions apply."));
     input->setClearButtonEnabled(true);
-    input->addAction(appearance::icon("search"), QLineEdit::LeadingPosition);
+    auto *search_icon = input->addAction(appearance::icon("search"), QLineEdit::LeadingPosition);
+    search_icon->setObjectName("overlay_search_icon");
     row->addWidget(input, 1);
     open_button->setIcon(appearance::icon("external"));
-    open_button->setAccessibleName(QCoreApplication::translate("XLibrary", "Open XLibrary"));
+    open_button->setAccessibleName(QCoreApplication::translate("XLibrary", "Open Fora.Deck"));
     open_button->setToolTip(open_button->accessibleName());
     open_button->setCursor(Qt::PointingHandCursor);
-    row->addWidget(file_search_switch(service, contents));
     row->addWidget(open_button);
     layout->addLayout(row);
+    layout->addWidget(file_search_switch(service, contents), 0, Qt::AlignLeft);
     layout->addWidget(results);
     layout->addWidget(notice);
+    shortcut_hint->setProperty("caption", true);
+    shortcut_hint->setWordWrap(true);
+    layout->addWidget(shortcut_hint);
     contents->installEventFilter(this);
     connect(&service, &DesktopService::message, notice, [this](const QString &message) {
         if (isVisible()) {
@@ -123,21 +129,44 @@ SearchOverlay::SearchOverlay(DesktopService &service, QWidget *const parent)
 
 void SearchOverlay::refresh_appearance() {
     notice->refresh_appearance();
+    const auto shortcut =
+        QKeySequence::fromString(
+            service.settings.value("shortcuts/overlay", desktop_platform::default_overlay_shortcut()).toString(),
+            QKeySequence::PortableText)
+            .toString(QKeySequence::NativeText);
+    QStringList hints{QCoreApplication::translate("XLibrary", "↑↓ Select"),
+                      QCoreApplication::translate("XLibrary", "Enter Open"),
+                      QCoreApplication::translate("XLibrary", "Esc Close")};
+    if (!shortcut.isEmpty())
+        hints.append(QCoreApplication::translate("XLibrary", "%1 Quick search").arg(shortcut));
+    for (auto &hint : hints)
+        hint.replace(' ', QChar(0x00a0));
+    shortcut_hint->setText(hints.join("    "));
+    input->findChild<QAction *>("overlay_search_icon")->setIcon(appearance::icon("search"));
+    open_button->setIcon(appearance::icon("library"));
     inset = appearance::scaled(service.settings, 16);
-    header_height = appearance::scaled(service.settings, 40);
+    header_height = appearance::scaled(service.settings, 52);
     input->setFixedHeight(header_height);
     open_button->setFixedSize(appearance::scaled(service.settings, 40), appearance::scaled(service.settings, 40));
+    open_button->setIconSize(QSize(appearance::scaled(service.settings, 20), appearance::scaled(service.settings, 20)));
+    for (auto *control : input->findChildren<QAbstractButton *>())
+        control->setIconSize(open_button->iconSize());
     auto font = input->font();
     font.setPixelSize(appearance::scaled(service.settings, 20));
     input->setFont(font);
     setStyleSheet(
-        QStringLiteral("QWidget#search_overlay, QWidget#overlay_contents { background: transparent; }"
-                       "QLineEdit#overlay_search_input { background: transparent; border: none; padding: 0 8px; "
-                       "min-height: %1px; max-height: %1px; }"
-                       "QListView#search_results { background: transparent; border: none; }"
-                       "QToolButton { border: none; border-radius: 10px; background: transparent; }"
-                       "QToolButton:hover { background: rgba(135,140,150,35); }")
-            .arg(header_height));
+        QStringLiteral(
+            "QWidget#search_overlay, QWidget#overlay_contents { background: transparent; }"
+            "QLineEdit#overlay_search_input { background: transparent; border: 2px solid transparent; padding: 0 6px; "
+            "min-height: %1px; max-height: %1px; font-size: %3px; }"
+            "QLineEdit#overlay_search_input:focus { border-color: %2; }"
+            "QAbstractItemView#search_results { background: transparent; border: none; }"
+            "QToolButton { border: 2px solid transparent; border-radius: 8px; background: transparent; }"
+            "QToolButton[keyboard_focus=\"true\"]:focus { border-color: %2; }"
+            "QToolButton:hover { background: rgba(135,140,150,35); }")
+            .arg(header_height - 4)
+            .arg(palette().color(QPalette::Link).name())
+            .arg(appearance::scaled(service.settings, 20)));
     update_height();
 }
 
@@ -145,10 +174,16 @@ void SearchOverlay::update_height() {
     // Resolve stylesheet constraints before measuring, including on the first show.
     contents->ensurePolished();
     contents->layout()->activate();
+    const auto available = screen()->availableGeometry();
+    const int natural_results_height = results->property("preferred_height").toInt();
+    if (!results->isHidden() && natural_results_height > 0) {
+        const int overhead = contents->layout()->sizeHint().height() - results->height();
+        results->setFixedHeight(qMin(natural_results_height, qMax(0, available.height() - inset * 2 - overhead)));
+        contents->layout()->activate();
+    }
     const int content_height = contents->layout()->sizeHint().height();
     // The painted surface starts 8 px below the window; keep both inner insets equal.
     const qreal target = content_height + (inset - 8) * 2;
-    const auto available = screen()->availableGeometry();
     const int desired_height = qMin(qRound(target) + 16, available.height());
     const bool animate =
         isVisible() && desktop_platform::animations_enabled() && progress >= 1 && surface_height != target;
@@ -166,24 +201,22 @@ void SearchOverlay::update_height() {
 }
 
 void SearchOverlay::update_surface() {
-    // Children keep their final size. A mask reveals them without ever stretching glyphs.
-    const qreal center_y = inset + header_height / 2.0;
-    const qreal surface_width = 8 + (width() - 16 - 8) * progress;
-    const qreal animated_height = 8 + (surface_height - 8) * progress;
-    const QRectF surface((width() - surface_width) / 2, center_y * (1 - progress) + 8 * progress - 4 * (1 - progress),
-                         surface_width, animated_height);
+    // Children keep their final size while the existing reveal fades the surface.
+    const qreal surface_width = width() - 16;
+    const qreal animated_height = surface_height;
+    const QRectF surface((width() - surface_width) / 2, 8 - 4 * (1 - progress), surface_width, animated_height);
     // Without an X11 compositor, alpha pixels outside the panel are displayed as black.
     // A native window shape removes those pixels; composited desktops keep the soft shadow.
     if (!translucent_surface) {
         QPainterPath window_clip;
-        window_clip.addRoundedRect(surface, qMin(22.0, animated_height / 2), qMin(22.0, animated_height / 2));
+        window_clip.addRoundedRect(surface, qMin(12.0, animated_height / 2), qMin(12.0, animated_height / 2));
         setMask(QRegion(window_clip.toFillPolygon().toPolygon()));
     } else if (!mask().isEmpty()) {
         clearMask();
     }
     QPainterPath clip;
-    clip.addRoundedRect(surface.translated(-inset, -inset), qMin(22.0, animated_height / 2),
-                        qMin(22.0, animated_height / 2));
+    clip.addRoundedRect(surface.translated(-inset, -inset), qMin(12.0, animated_height / 2),
+                        qMin(12.0, animated_height / 2));
     if (progress < 1)
         contents->setMask(QRegion(clip.toFillPolygon().toPolygon()));
     else
@@ -196,12 +229,11 @@ void SearchOverlay::update_surface() {
 void SearchOverlay::paintEvent(QPaintEvent *) {
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
-    const qreal center_y = inset + header_height / 2.0;
-    const qreal surface_width = 8 + (width() - 24) * progress;
-    const qreal animated_height = 8 + (surface_height - 8) * progress;
-    const QRectF surface((width() - surface_width) / 2, (center_y - 4) * (1 - progress) + 8 * progress, surface_width,
-                         animated_height);
-    const auto radius = qMin(22.0, animated_height / 2);
+    painter.setOpacity(progress);
+    const qreal surface_width = width() - 16;
+    const qreal animated_height = surface_height;
+    const QRectF surface((width() - surface_width) / 2, 8 - 4 * (1 - progress), surface_width, animated_height);
+    const auto radius = qMin(12.0, animated_height / 2);
     const bool dark = appearance::is_dark(service.settings);
     for (int spread = 7; spread > 0; --spread) {
         painter.setPen(Qt::NoPen);
@@ -209,12 +241,18 @@ void SearchOverlay::paintEvent(QPaintEvent *) {
         painter.drawRoundedRect(surface.adjusted(-spread, -spread / 2.0, spread, spread), radius + spread,
                                 radius + spread);
     }
-    painter.setBrush(dark ? QColor("#20232A") : QColor("#F7F8FA"));
-    QLinearGradient border(surface.topLeft(), surface.bottomLeft());
-    border.setColorAt(0, dark ? QColor("#59606D") : QColor("#FFFFFF"));
-    border.setColorAt(1, dark ? QColor("#303640") : QColor("#CCD0D7"));
-    painter.setPen(QPen(QBrush(border), 1));
+    // The transparent widget stylesheet also clears its Base palette role.
+    // Paint from the application palette so only the rounded margins stay transparent.
+    auto surface_color = QApplication::palette().color(QPalette::Base);
+    surface_color.setAlpha(255);
+    painter.setBrush(surface_color);
+    painter.setPen(QPen(palette().color(QPalette::Mid), 1));
     painter.drawRoundedRect(surface, radius, radius);
+    if (results->isVisible() && progress == 1) {
+        painter.setPen(palette().color(QPalette::Mid));
+        painter.drawLine(QPointF(inset, inset + header_height + 2),
+                         QPointF(width() - inset, inset + header_height + 2));
+    }
 }
 
 void SearchOverlay::toggle() {
@@ -268,6 +306,8 @@ void SearchOverlay::show_search() {
 }
 
 bool SearchOverlay::event(QEvent *const event) {
+    if (event->type() == QEvent::ApplicationPaletteChange || event->type() == QEvent::ApplicationFontChange)
+        QTimer::singleShot(0, this, &SearchOverlay::refresh_appearance);
     if (event->type() == QEvent::WindowActivate) {
         dismiss_on_deactivate = true;
         activation_check->stop();

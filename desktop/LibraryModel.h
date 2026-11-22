@@ -5,6 +5,7 @@
 #include <QCache>
 #include <QCollator>
 #include <QIcon>
+#include <QImage>
 #include <QSet>
 #include <QSortFilterProxyModel>
 #include <QThreadPool>
@@ -22,16 +23,33 @@ private:
     QVector<QString> icon_kinds;
     mutable QHash<QString, QIcon> fallback_icons;
     QStringList search_tags;
+#if defined(Q_OS_WIN) && QT_VERSION < QT_VERSION_CHECK(6, 11, 2)
+    // Older Windows Qt sort keys can compare uninitialized bytes.
+    QCollator collator;
+#else
     QVector<QCollatorSortKey> name_sort_keys;
     QVector<QCollatorSortKey> tag_sort_keys;
+#endif
     mutable QCache<QString, QIcon> icons{256};
     mutable QSet<QString> pending_icons;
     QThreadPool icon_pool;
+    bool show_memory = true;
+    bool show_cpu = true;
     QIcon fallback_icon(const QString &kind) const;
-    void request_icon(const app_record &record, const QString &key, const QString &kind) const;
+    QIcon application_icon(const app_record &record, const QString &key, const QString &kind) const;
+    void request_icon(const app_record &record, const QString &key) const;
+    void store_icon(const QString &key, const QImage &image);
 
 public:
-    enum role { id_role = Qt::UserRole + 1, record_role, tags_role, running_role, favorite_role, available_role };
+    enum role {
+        id_role = Qt::UserRole + 1,
+        record_role,
+        tags_role,
+        running_role,
+        favorite_role,
+        available_role,
+        process_usage_role
+    };
     explicit LibraryModel(QObject *parent = nullptr);
     ~LibraryModel() override;
     int rowCount(const QModelIndex &parent = {}) const override;
@@ -41,6 +59,11 @@ public:
     QHash<int, QByteArray> roleNames() const override;
     void replace(QVector<app_record> applications);
     void update_state(const QVector<app_record> &applications);
+    void set_process_display(bool memory, bool cpu);
+    QString process_usage(const app_record &record) const;
+    QIcon application_icon(const app_record &record) const;
+    QIcon file_icon(const QString &path, qint64 modified, qint64 size) const;
+    void retry_file_icons();
     int row_for_id(qint64 id) const { return rows_by_id.value(id, -1); }
     const app_record *find(qint64 id) const;
     const app_record &at(const int row) const { return records[row]; }
@@ -51,6 +74,9 @@ public:
     int compare_names(int left_row, int right_row) const;
     int compare_tags(int left_row, int right_row) const;
     const QVector<app_record> &applications() const { return records; }
+
+signals:
+    void icon_ready();
 };
 
 class LibraryFilter : public QSortFilterProxyModel {
@@ -63,7 +89,7 @@ private:
     QMetaObject::Connection state_connection;
     int query_rank(int row) const;
     QString section = "library";
-    QString selected_tag;
+    QStringList selected_tags;
     int sort_mode = 0;
 
 protected:
@@ -77,6 +103,7 @@ public:
     int sort_mode_value() const { return sort_mode; }
     void set_query(const QString &query);
     void set_section(const QString &value, const QString &tag = {});
+    void set_tag_section(const QString &value, const QStringList &tags);
     void set_sort_mode(int value, Qt::SortOrder order = Qt::AscendingOrder);
     void sort(int column, Qt::SortOrder order = Qt::AscendingOrder) override;
 

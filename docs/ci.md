@@ -42,7 +42,7 @@ Successful compilation, CTest and `--check-startup` establish different things. 
 | Windows | `windows-msvc-Release`, `windows-msvc-Debug`, `windows-mingw-Release`, `windows-mingw-Debug` |
 | Linux | `linux-debug`, `linux-release`, `linux-clang-debug`, `linux-clang-release`, `linux-AppImage-and-DEB` |
 
-The template retains an always-on bypass for the Repository admin role. [CODEOWNERS](../.github/CODEOWNERS) assigns `@lappland-open` to all paths, including CI and the ownership file. GitHub uses CODEOWNERS from the target branch. A PR author cannot approve their own PR; delegating code-owner review requires another maintainer with write access in CODEOWNERS.
+The template retains an always-on bypass for the Repository admin role. [CODEOWNERS](../.github/CODEOWNERS) assigns `@lappland-open` to all paths, including CI and the ownership file. This is the author's technical GitHub account; the public author name is ForaSource. GitHub uses CODEOWNERS from the target branch. A PR author cannot approve their own PR; delegating code-owner review requires another maintainer with write access in CODEOWNERS.
 
 An administrator applies/updates rules through **Settings → Rules → Rulesets** or the GitHub API. Verify successful hosted runs with the intended names before requiring new checks. When renaming jobs, update both the template and server settings. Remove obsolete required contexts from the server before merging their workflow removal, or GitHub may wait indefinitely for them.
 

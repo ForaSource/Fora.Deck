@@ -16,6 +16,7 @@
 #include "PlatformIntegration.h"
 #include "ProfileBackup.h"
 #include "UpdateChecker.h"
+#include "WorkspaceCoordinator.h"
 
 class Manager;
 
@@ -38,6 +39,7 @@ private:
     void queue_launch_profiles(const app_record &record, bool priority);
     void next_launch_profiles();
     void warm_launch_profiles();
+    std::unique_ptr<WorkspaceCoordinator> workspaces;
     QTimer scenario_timer;
     QVector<scenario_step> pending_steps;
     QStringList step_states;
@@ -57,6 +59,7 @@ private:
     quint64 scenario_request_id = 0;
     std::shared_ptr<std::atomic<quint64>> scenario_generation = std::make_shared<std::atomic<quint64>>(0);
     QSet<qint64> launching;
+    QHash<quint64, qint64> workspace_launches;
     operation_state discovery_state = operation_state::ready;
     quint64 discovery_request_id = 0;
     QStringList pending_exclusions;
@@ -94,6 +97,7 @@ private:
     quint64 library_request_id = 0;
     operation_error opening_error;
     operation_error last_failure;
+    QHash<qint64, QString> launch_failures;
     operation_state profile_status = operation_state::ready;
     quint64 profile_request_id = 0;
     quint64 update_request_id = 0;
@@ -102,8 +106,11 @@ private:
     bool restart_pending = false;
     QString library_file;
     qint64 selected_id = 0;
+    QString selected_file_path;
+    QString selected_file_volume_root;
+    QString selected_file_volume_device;
     QString current_section = "library";
-    QString current_tag;
+    QStringList current_tags;
     bool files_selected = false;
     catalog_snapshot snapshot;
     quint64 begin_operation(const QString &operation);
@@ -126,6 +133,8 @@ public:
     ~DesktopService() override;
     operation_state library_state() const { return library_status; }
     const operation_error &last_error() const { return last_failure; }
+    const QHash<qint64, QString> &launch_errors() const { return launch_failures; }
+    const QVector<app_record> &removal_candidates() const { return missing_records; }
     bool is_ready() const { return library_status == operation_state::ready; }
     bool is_opening() const { return library_status == operation_state::loading; }
     QString library_error() const { return opening_error.user_message; }
@@ -168,6 +177,11 @@ public:
     void check_scenario(qint64 id, bool force = false);
     qint64 selection() const { return selected_id; }
     const app_record *selected() const { return model.find(selected_id); }
+    const QString &selected_file() const { return selected_file_path; }
+    void select_file(const QString &path, const QString &volume_root = {}, const QString &volume_device = {});
+    bool selected_file_available() const {
+        return FileManager::can_open(selected_file_path, selected_file_volume_root, selected_file_volume_device);
+    }
     const catalog_snapshot &catalog() const { return snapshot; }
     const QVector<qint64> &selections() const { return selected_ids; }
     void select_applications(const QVector<qint64> &ids);
@@ -191,9 +205,12 @@ public:
     bool searching_files() const { return files->is_enabled() && files_selected; }
     void set_searching_files(bool selected);
     bool file_search_active() const {
-        return searching_files() && current_section == "library" && current_tag.isEmpty();
+        return searching_files() && (current_section == "library" || current_section == "favorites");
     }
-    QString tag() const { return current_tag; }
+    QString tag() const { return current_tags.value(0); }
+    const QStringList &tags() const { return current_tags; }
+    QString saved_filter_query() const;
+    void navigate_tags(const QString &section, const QStringList &tags);
     Q_INVOKABLE void select(qint64 id);
     Q_INVOKABLE void navigate(const QString &section, const QString &tag = {});
     Q_INVOKABLE quint64 save_application(app_record record);
@@ -201,6 +218,12 @@ public:
     Q_INVOKABLE void remove_application(qint64 id);
     Q_INVOKABLE quint64 save_tag(const QString &old_name, const QString &new_name);
     Q_INVOKABLE void remove_tag(const QString &name);
+    WorkspaceCoordinator &workspace_runs() { return *workspaces; }
+    quint64 capture_workspace();
+    quint64 prepare_workspace(qint64 id);
+    quint64 export_workspace_diagnostics(const QString &path);
+    quint64 save_workspace(workspace_record record);
+    quint64 remove_workspace(qint64 id);
     Q_INVOKABLE quint64 save_scenario(scenario_record record);
     Q_INVOKABLE void remove_scenario(qint64 id);
     Q_INVOKABLE void run_scenario(qint64 id);
@@ -210,6 +233,8 @@ public:
     Q_INVOKABLE void export_catalog(const QString &path);
     Q_INVOKABLE void import_catalog(const QString &path);
     Q_INVOKABLE void launch(qint64 id, bool new_instance = false, bool scenario = false);
+    void terminate_application(qint64 id);
+    void sync_process_monitoring();
     quint64 request_launch(qint64 id, bool new_instance = false, bool scenario = false);
     quint64 request_launch_mode(qint64 id, Application::launch_mode mode, bool scenario = false,
                                 const QString &profile = {});
@@ -234,15 +259,18 @@ signals:
     void target_shortcuts_changed();
     void launch_profiles_changed(const QString &path);
     void selection_changed();
+    void file_selection_changed();
     void selections_changed();
     void undo_removal_changed();
     void catalog_preview_ready();
     void navigation_changed();
     void message(const QString &text);
+    void saved_files_notice(const QString &text, bool show_collection_link);
     void operation_changed(const operation_result &result);
     void operation_finished(const QString &operation, bool success);
     void application_saved(quint64 request_id, qint64 id);
     void application_resolved(quint64 request_id, const QString &requested_path, const app_record &record);
+    void workspace_saved(quint64 request_id, qint64 id);
     void scenario_saved(quint64 request_id, qint64 id);
     void discovery_changed();
     void discovery_progress_changed();

@@ -5,6 +5,9 @@ function(xlibrary_add_test name)
     set_target_properties(${name} PROPERTIES AUTOMOC ON)
     target_include_directories(${name} PRIVATE "${PROJECT_SOURCE_DIR}/desktop")
     target_link_libraries(${name} PRIVATE xlibrary_core Qt6::Test)
+    if(MSVC)
+        target_compile_options(${name} PRIVATE /utf-8)
+    endif()
     add_test(NAME ${name} COMMAND ${name})
     set_tests_properties(${name} PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 60)
 endfunction()
@@ -14,6 +17,10 @@ xlibrary_add_test(update_checker_test update_checker_test.cpp
 target_link_libraries(update_checker_test PRIVATE Qt6::Network Qt6::Widgets)
 
 xlibrary_add_test(core_test core_test.cpp)
+xlibrary_add_test(catalog_test catalog_test.cpp)
+xlibrary_add_test(file_manager_test file_manager_test.cpp)
+xlibrary_add_test(launch_test launch_test.cpp)
+xlibrary_add_test(profile_settings_test profile_settings_test.cpp)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     find_program(XLIBRARY_DBUS_RUN_SESSION dbus-run-session REQUIRED)
@@ -37,8 +44,22 @@ target_link_libraries(library_model_test PRIVATE Qt6::Widgets Qt6::Concurrent)
 xlibrary_add_test(ui_registry_test ui_registry_test.cpp)
 target_link_libraries(ui_registry_test PRIVATE Qt6::Widgets)
 
+xlibrary_add_test(desktop_motion_test desktop_motion_test.cpp)
+target_link_libraries(desktop_motion_test PRIVATE xlibrary_desktop)
+# The combined GUI scenarios can take more than a minute with debug Qt on Windows.
+set_tests_properties(desktop_motion_test PROPERTIES TIMEOUT 120)
+
+xlibrary_add_test(notification_banner_test notification_banner_test.cpp
+    ../desktop/NotificationBanner.cpp ../desktop/appearance.cpp)
+target_link_libraries(notification_banner_test PRIVATE Qt6::Widgets)
+
 option(XLIBRARY_BUILD_BENCHMARKS "Build optional local poll timing tool (not installed)" OFF)
 if(XLIBRARY_BUILD_BENCHMARKS)
     add_executable(poll_benchmark poll_benchmark.cpp)
     target_link_libraries(poll_benchmark PRIVATE xlibrary_core)
 endif()
+
+xlibrary_add_test(workspaces_test workspaces_test.cpp
+    ../desktop/WorkspaceCapture.cpp ../desktop/WorkspaceCapture.h ../desktop/WorkspaceWindowBackend.h
+    ../desktop/WorkspaceCoordinator.cpp ../desktop/WorkspaceCoordinator.h)
+target_link_libraries(workspaces_test PRIVATE Qt6::Concurrent)

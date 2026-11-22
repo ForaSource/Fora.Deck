@@ -1,12 +1,15 @@
 #include <algorithm>
 #include <cctype>
+#include <limits>
 #include <QElapsedTimer>
+#include <QImage>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QLoggingCategory>
 #include <QSaveFile>
 #include <QScopeGuard>
+#include <QThread>
 #include <stdexcept>
 
 #include "LaunchArguments.h"
@@ -160,6 +163,27 @@ void Manager::refresh() {
     poll(true);
 }
 
+void Manager::set_process_monitoring(const bool memory, const bool cpu) {
+    if (monitor_memory == memory && monitor_cpu == cpu)
+        return;
+    monitor_memory = memory;
+    monitor_cpu = cpu;
+    previous_processes.clear();
+    process_age.invalidate();
+    if (store)
+        poll(true);
+}
+
+void Manager::terminate_application(const qint64 id) {
+    const auto found =
+        std::ranges::find_if(std::as_const(catalog.applications), [id](const auto &record) { return record.id == id; });
+    if (found == catalog.applications.cend())
+        return;
+    // Publish any partial termination even when another process denied access.
+    const auto refresh_state = qScopeGuard([this] { poll(true); });
+    Heartbeat::terminate_application(*found);
+}
+
 void Manager::poll(const bool force) {
     const bool measured = poll_log().isDebugEnabled();
     QElapsedTimer elapsed;
@@ -192,6 +216,7 @@ void Manager::poll(const bool force) {
     };
     bool capabilities_changed = false;
     auto paths = last_running;
+    Heartbeat::process_snapshot processes;
     try {
         if (check_availability) {
             for (auto &record : catalog.applications) {
@@ -285,12 +310,22 @@ void Manager::poll(const bool force) {
             availability_invalidated = false;
             availability_age.restart();
         }
-        paths = Heartbeat::running_paths(catalog.applications);
+        processes = Heartbeat::sample_processes(catalog.applications, monitor_memory, monitor_cpu);
+        paths.clear();
+        for (auto it = processes.cbegin(); it != processes.cend(); ++it)
+            paths.insert(it.key());
         if (monitor_state == operation_state::error)
             emit result({monitor_request_id, "monitor", operation_state::ready, {}});
         monitor_state = operation_state::ready;
     } catch (const std::exception &error) {
         availability_invalidated = true;
+        previous_processes.clear();
+        process_age.invalidate();
+        for (auto &record : catalog.applications) {
+            record.cpu_percent = -1;
+            record.memory_bytes = -1;
+        }
+        emit state_changed(catalog.applications);
         if (monitor_state != operation_state::error) {
             monitor_request_id = ++*request_sequence;
             emit result({monitor_request_id, "monitor", operation_state::error,
@@ -299,14 +334,50 @@ void Manager::poll(const bool force) {
         monitor_state = operation_state::error;
         return;
     }
-    for (auto &record : catalog.applications)
-        record.running = paths.contains(normalized_path(Application::process_path(record)));
+    const auto seconds = process_age.isValid() ? double(process_age.nsecsElapsed()) / 1000000000.0 : 0.0;
+    process_age.start();
+    const auto processors = qMax(1, QThread::idealThreadCount());
+    bool measurements_changed = false;
+    QHash<QString, QPair<double, qint64>> measurements;
+    for (auto it = processes.cbegin(); it != processes.cend(); ++it) {
+        QHash<quint32, Heartbeat::process_sample> previous;
+        for (const auto &sample : previous_processes.value(it.key()))
+            previous.insert(sample.pid, sample);
+        bool cpu_valid = monitor_cpu && seconds > 0;
+        bool memory_valid = monitor_memory;
+        double cpu_seconds = 0;
+        qint64 memory_bytes = 0;
+        for (const auto &sample : it.value()) {
+            const auto old = previous.constFind(sample.pid);
+            if (sample.cpu_seconds < 0 || !sample.start_time || old == previous.cend() ||
+                sample.start_time != old->start_time || old->cpu_seconds < 0 || sample.cpu_seconds < old->cpu_seconds)
+                cpu_valid = false;
+            else
+                cpu_seconds += sample.cpu_seconds - old->cpu_seconds;
+            if (sample.memory_bytes < 0 || sample.memory_bytes > std::numeric_limits<qint64>::max() - memory_bytes)
+                memory_valid = false;
+            else
+                memory_bytes += sample.memory_bytes;
+        }
+        measurements.insert(it.key(), {cpu_valid ? qBound(0.0, 100.0 * cpu_seconds / seconds / processors, 100.0) : -1,
+                                       memory_valid ? memory_bytes : -1});
+    }
+    for (auto &record : catalog.applications) {
+        const auto path = normalized_path(Application::process_path(record));
+        record.running = paths.contains(path);
+        const auto values = measurements.value(path, {-1, -1});
+        measurements_changed =
+            measurements_changed || record.cpu_percent != values.first || record.memory_bytes != values.second;
+        record.cpu_percent = values.first;
+        record.memory_bytes = values.second;
+    }
+    previous_processes = monitor_cpu ? std::move(processes) : Heartbeat::process_snapshot{};
     if (known_volume_roots != previous_roots)
         emit volumes_observed(known_volume_roots);
     if (locations_changed)
         emit locations_observed(verified_locations);
-    if (force || capabilities_changed || paths != last_running || unavailable != last_unavailable ||
-        missing_volumes != last_missing_volumes) {
+    if (force || capabilities_changed || measurements_changed || paths != last_running ||
+        unavailable != last_unavailable || missing_volumes != last_missing_volumes) {
         last_running = paths;
         last_unavailable = unavailable;
         last_missing_volumes = missing_volumes;
@@ -380,6 +451,17 @@ void Manager::remove_tag(const QString &name) {
     this->store->remove_tag(name);
     emit this->tag_renamed(name, {});
     this->refresh();
+}
+
+void Manager::save_workspace(const workspace_record &record) {
+    const auto id = store->save_workspace(record);
+    refresh();
+    emit workspace_saved(request_id, id);
+}
+
+void Manager::remove_workspace(const qint64 id) {
+    store->remove_workspace(id);
+    refresh();
 }
 
 void Manager::save_scenario(const scenario_record &record) {
@@ -662,12 +744,13 @@ void Manager::recover_paths(const QVector<path_relocation> &changes) {
         QCoreApplication::translate("XLibrary", "Application paths recovered: %1.").arg(changes.size()));
 }
 
-void Manager::launch_record(const qint64 id, const Application::launch_mode mode, const quint64 generation,
+void Manager::launch_record(const qint64 id, const Application::launch_mode mode, const launch_context context,
                             const std::shared_ptr<std::atomic<quint64>> &token,
-                            const std::function<void(const app_record &, Application::launch_mode)> &launch_action,
+                            const std::function<qint64(const app_record &, Application::launch_mode)> &launch_action,
                             const QString &profile) {
+    const auto operation = context.origin == launch_origin::workspace ? "workspace_launch" : "launch";
     try {
-        if (generation && token->load() != generation) {
+        if (context.generation && token->load() != context.generation) {
             throw DiscoveryCancelled();
         }
         const auto it = std::find_if(this->catalog.applications.cbegin(), this->catalog.applications.cend(),
@@ -675,6 +758,10 @@ void Manager::launch_record(const qint64 id, const Application::launch_mode mode
         if (it == this->catalog.applications.cend())
             throw std::invalid_argument(
                 QCoreApplication::translate("XLibrary", "The application was not found in the library.").toStdString());
+        if (context.origin == launch_origin::workspace && it->configuration_id != context.configuration_id)
+            throw std::invalid_argument(
+                QCoreApplication::translate("Workspaces", "Application configuration changed. Run preflight again.")
+                    .toStdString());
         const auto selected_profile = profile.isEmpty() ? it->default_launch_profile : profile;
         const auto record = Application::with_launch_profile(*it, selected_profile);
         const auto effective_mode = mode == Application::launch_mode::activate &&
@@ -682,9 +769,11 @@ void Manager::launch_record(const qint64 id, const Application::launch_mode mode
                                              Application::requires_fresh_launch(record))
                                         ? Application::launch_mode::launch
                                         : mode;
-        launch_action(record, effective_mode);
+        if (context.origin == launch_origin::workspace && token->load() != context.generation)
+            throw DiscoveryCancelled();
+        const auto process_id = launch_action(record, effective_mode);
         // Ошибка истории не должна превращать успешный запуск в неуспешный или повторный.
-        emit this->launched(id, {this->request_id, "launch", operation_state::completed, {}}, generation);
+        emit this->launched(id, {this->request_id, operation, operation_state::completed, {}}, context, process_id);
         try {
             this->store->record_launch(id);
             this->refresh();
@@ -699,19 +788,19 @@ void Manager::launch_record(const qint64 id, const Application::launch_mode mode
                                 reason, operation_error_source::sqlite}});
         }
     } catch (const DiscoveryCancelled &) {
-        emit this->launched(id, {this->request_id, "launch", operation_state::cancelled, {}}, generation);
+        emit this->launched(id, {this->request_id, operation, operation_state::cancelled, {}}, context);
         throw;
     } catch (const std::invalid_argument &error) {
         emit this->launched(id,
-                            {this->request_id, "launch", operation_state::error,
+                            {this->request_id, operation, operation_state::error,
                              exception_error("launch", error, operation_error_source::validation)},
-                            generation);
+                            context);
         throw;
     } catch (const std::exception &error) {
         emit this->launched(id,
-                            {this->request_id, "launch", operation_state::error,
+                            {this->request_id, operation, operation_state::error,
                              exception_error("launch", error, operation_error_source::platform)},
-                            generation);
+                            context);
         throw;
     }
 }
@@ -754,16 +843,6 @@ void Manager::preview_files(const QStringList &paths, const std::shared_ptr<disc
         if (cancelled->requested.load())
             throw DiscoveryCancelled();
         try {
-            const QFileInfo info(path);
-#ifdef Q_OS_WIN
-            const auto suffix = info.suffix().toLower();
-            if (suffix != "exe" && suffix != "lnk" && suffix != "bat" && suffix != "cmd")
-                throw std::invalid_argument(
-                    QCoreApplication::translate("XLibrary", "Supported files: .exe, .lnk, .bat, .cmd.").toStdString());
-#endif
-            if (!info.isFile())
-                throw std::invalid_argument(
-                    QCoreApplication::translate("XLibrary", "The application file is unavailable.").toStdString());
             auto record = Application::resolve_application(path);
             Database::validate_application(record);
             records.append(std::move(record));
@@ -776,7 +855,7 @@ void Manager::preview_files(const QStringList &paths, const std::shared_ptr<disc
 }
 
 void Manager::review_inventory(const QVector<app_record> &records, const QVector<discovery_issue> &issues,
-                               const std::shared_ptr<discovery_control> &cancelled) {
+                               const std::shared_ptr<discovery_control> &cancelled, const bool remove_without_icons) {
     // Refresh locations and sources only for known configurations; additions still require selection.
     store->refresh_discovery_metadata(records, *cancelled);
     refresh();
@@ -784,19 +863,47 @@ void Manager::review_inventory(const QVector<app_record> &records, const QVector
     for (const auto &record : records)
         found.insert(Application::launch_key(record));
     QVector<app_record> removed;
+    QVector<qint64> automatically_removed;
+    QSet<QString> removed_configurations;
     const bool complete = std::ranges::none_of(
         issues, [](const discovery_issue &issue) { return issue.kind == discovery_issue_kind::error; });
-    for (const auto &record : store->read().applications) {
+    for (const auto &record : std::as_const(catalog.applications)) {
         if (cancelled->requested.load())
             throw DiscoveryCancelled();
-        if (complete && monitor_state == operation_state::ready &&
-            !last_running.contains(normalized_path(Application::process_path(record))) &&
-            !found.contains(Application::launch_key(record)) &&
-            Application::definitely_removed(record, known_volume_roots, verified_locations))
-            removed.append(record);
+        if (monitor_state != operation_state::ready || record.running)
+            continue;
+        const auto key = Application::launch_key(record);
+        if (remove_without_icons && !record.available && !record.volume_unavailable) {
+            const auto has_icon = QFileInfo(record.icon_path).isAbsolute()
+                                      ? !QImage(record.icon_path).isNull()
+                                      : QFileInfo(Application::process_path(record)).isFile();
+            if (!has_icon && !Application::target_available(record)) {
+                automatically_removed.append(record.id);
+                removed_configurations.insert(key);
+                continue;
+            }
+        }
+        if (complete && !found.contains(key)) {
+            auto candidate = record;
+            candidate.removal_reason = Application::removal_reason(record, known_volume_roots, verified_locations);
+            if (!candidate.removal_reason.isEmpty())
+                removed.append(std::move(candidate));
+        }
+    }
+    auto preview = records;
+    if (!automatically_removed.isEmpty()) {
+        auto expected = discovery_phase::running;
+        if (!cancelled->phase.compare_exchange_strong(expected, discovery_phase::committing))
+            throw DiscoveryCancelled();
+        const auto resume_review = qScopeGuard([&] { cancelled->phase.store(discovery_phase::running); });
+        remove_applications(automatically_removed, false);
+        preview.removeIf(
+            [&](const app_record &record) { return removed_configurations.contains(Application::launch_key(record)); });
+        emit notification(QCoreApplication::translate("XLibrary", "Removed unavailable applications without icons: %1.")
+                              .arg(automatically_removed.size()));
     }
     defer_result = true;
-    emit inventory_ready(request_id, records, removed, issues);
+    emit inventory_ready(request_id, preview, removed, issues);
 }
 
 void Manager::remove_missing_applications(const QVector<app_record> &records,
@@ -886,7 +993,7 @@ void Manager::restore_profile(const QString &path, const QString &database_path,
         if (!this->store)
             throw std::runtime_error(
                 QCoreApplication::translate("XLibrary",
-                                            "The profile was restored but could not be opened. Restart XLibrary.")
+                                            "The profile was restored but could not be opened. Restart Fora.Deck.")
                     .toStdString());
     } catch (...) {
         const auto failure = std::current_exception();

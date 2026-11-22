@@ -21,6 +21,27 @@ ctest --test-dir build-msvc -C Release --output-on-failure
 
 Use `-DBUILD_TESTING=OFF` for an application-only build. Tests and Qt Test are not installed with the application. Current targets and environment settings are in [tests/CMakeLists.txt](../tests/CMakeLists.txt); [CI](ci.md) runs them across its build matrix.
 
+| Test target | Behavior covered |
+| --- | --- |
+| `catalog_test` | JSON import preview, malformed records and limits, metadata transfer, skip/replace conflicts, bulk edits, undo after deletion or conflicting edits, and transactional recovery of moved applications. |
+| `file_manager_test` | File eligibility, names and masks with tags, exclusions, saved paths, batch skips and rollback, queued saves during shutdown, favorites and metadata, and added dates from an older index. |
+| `desktop_motion_test` | Drop routing in the add forms, cancellation before confirmation, isolation of asynchronous results, and saving the quick-search row count. |
+| `launch_test` | Argument parsing, scenario preflight, workspace launch dispatch and cancellation, history on success or failure, and process monitoring using the test process itself. |
+| `profile_settings_test` | Typed settings in backups, malformed values, retention of the destination's credential marker, and preservation of previous settings during restore. |
+| `library_model_test` and `path_search_test` | Application filters, ranking and sorting, CPU/RAM display, directory browsing with file metadata, bounded results, cancellation, and calculator queries. |
+| `notification_banner_test` | Action activation, replacement and dismissal, and the countdown when the parent window is hidden. |
+| `update_checker_test` and `ui_registry_test` | Offline release selection, update error and cancellation paths, and plugin compatibility and configuration rollback. |
+
+The interactive checks below cover OS integrations such as installers, mounted drives and desktop sessions.
+
+## Workspaces
+
+`core_test` exercises schema migration, workspace edits, seeding and restoring complete backups and deleted app
+references. `workspaces_test` uses a fake window backend for capture confidence, normalized geometry,
+preflight, typed resource dispatch, ambiguity, PID filtering, cancellation, stale results and readiness timeouts.
+Run the [interactive matrix](workspaces.md#interactive-matrix) and [pilot](workspaces.md#five-person-opt-in-pilot)
+for release verification.
+
 ## Startup checks
 
 `--check-startup` creates the application/window and catalog in a temporary profile, then exits. It must not modify the normal/portable profile and does not perform the startup network update check.
@@ -78,15 +99,26 @@ Use a disposable profile and a small folder of documents, images, unsupported ex
 1. Check names, aliases, tag combinations, exclusions, initials, typo suggestions, and English/Russian layout correction in both search surfaces.
    Compare match categories and positions before checking favorites and usage ordering. Clear the query and sidebar filters when checking the full catalog.
 2. Enable Basic file search, add an additional recursive folder and file/folder exclusions, save, and refresh the index. Check plain names, extension filters, `*.pdf` and `report-??.txt` masks;
-   excluded files must stay absent, and an empty query must not show indexed files.
+   excluded files must stay absent. In Files mode an empty query should show eligible indexed files.
 3. Switch file search Off during scanning, then back to Basic or Full. Off must stop indexing; enabled modes must resume it. Change the query and folder scope while work is pending;
    old results must not overwrite the new query or scope. Check Basic depth limits and recursive standard/additional folders.
-   Confirm Full is marked not recommended. The Files switch must appear in both search surfaces only in Basic and Full.
-   Toggle it with a query and a pending file request: off shows only applications, on shows only files, and both windows stay synchronized.
-   In file mode, the main workspace hides application rows and keeps the details pane with “Nothing to display here :(”.
-   Check the same placeholder with an empty application list; switching modes must not move the Files switch.
+   Confirm Full is marked not recommended. The Applications / Files choice must appear in both search surfaces only in Basic and Full.
+   Change it with a query and a pending file request: Applications shows only applications, Files shows only files, and both windows stay synchronized.
+   With an empty file query, check indexed results, favorites and recent usage. Check list/cards views, the result count,
+   sorting, tag editing, `#tag`/`-#tag` with names, extensions and masks, and sidebar tags/favorites without leaving file mode.
+   Restart a disposable profile and verify file tags/favorites persist independently of My files. Check both switch directions,
+   rapid reversal, resizing, disabled animations and a pending search; file actions must never target the selected application.
+   Check associated-application icons and portrait/landscape image previews in the list, cards and quick search, including
+   EXIF rotation, transparency, unsupported/corrupt images, Unicode paths and files removed while loading. Scroll through
+   more than 32 uncached entries and switch modes during loading; icons must keep updating without moving selection.
+   Check default extension groups (case-insensitive alphabetical order) and newest-added-first order inside each group,
+   both with and without a query and in quick search. Check extension/date columns, their headers and the sort menu.
+   Refresh an old index twice: migration must retain its files and added dates must remain unchanged by the second scan.
+   Check equal dates, unknown dates, saved files outside the current scan scope, and changing paths while date lookup is pending.
+   In file mode, the main workspace hides application rows and keeps the details pane with a neutral placeholder.
+   Check the placeholder with an empty application list; switching modes must not move the mode choice.
    Disable indexing while files are selected:
-   both switches must disappear and application search must return. Re-enable indexing and check the switch again.
+   both mode controls must disappear and application search must return. Re-enable indexing and check the choice again.
    Search during scanning and keep a query open: progress and application discovery must not move its results.
    Restart after a completed scan: the cached index must be searchable without another scan before six hours; manual refresh must bypass the interval.
 4. Save a result to My files, restart, and check persistence. Removing it from My files must keep the disk file.
@@ -99,8 +131,11 @@ Use a disposable profile and a small folder of documents, images, unsupported ex
 Use [the update guide](updates.md) for channels, installer eligibility and expected behavior. Check both manual requests and the normal startup notification; `--check-startup` skips networking.
 
 1. Verify current/newer local versions never offer a downgrade. Stable excludes GitHub prereleases; Preview includes them. Version ordering follows SemVer, not publication dates. Change channels during a request and confirm the previous channel's installer cannot be used.
-2. On an older installed Windows copy, check version confirmation, cancellation, retry, progress and closing settings during the request. Cancel/failure should leave XLibrary open and remove the partial download.
-3. Accept a valid update: the ordinary interactive Inno Setup wizard should use the prior installation directory and XLibrary should exit normally. Confirm completed installation, preserved profile and new version startup.
+2. On an older installed Windows copy, check version confirmation, cancellation, retry, progress and closing settings during the request. Cancel/failure should leave Fora.Deck open and remove the partial download.
+3. Accept a valid update: the ordinary interactive Inno Setup wizard should use the prior installation directory and Fora.Deck should exit normally. Confirm completed installation, preserved profile and new version startup.
+   When upgrading an XLibrary installation, check that its standard Start Menu and desktop shortcuts are
+   replaced by Fora.Deck shortcuts without duplicates. Repeat with desktop-shortcut creation unchecked:
+   an already existing desktop shortcut should keep working under the new name.
 4. For portable, Linux, or a release without an eligible installer/digest, verify the confirmed action opens the specific release page.
 5. Check offline operation, timeout, API limit, malformed metadata, size/hash mismatch and failure to start the installer. Errors must be visible and retry remain available.
 6. Repeat checks without a token inside 60 seconds, then with a token inside 5 seconds. Results, errors and cancellations retain the interval across settings close/reopen; reading the cache must not extend it. After expiration, a new request should run. Token/channel changes must not reuse an unrelated cached result.

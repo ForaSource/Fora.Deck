@@ -2,15 +2,19 @@
 #define XLIBRARY_UI_HELPERS_H
 
 #include <QDialog>
+#include <QDir>
+#include <QDragEnterEvent>
 #include <QEvent>
 #include <QFrame>
 #include <QLabel>
 #include <QMessageBox>
+#include <QMimeData>
 #include <QPainter>
 #include <QPushButton>
 #include <QResizeEvent>
 #include <QScreen>
 #include <QScrollArea>
+#include <QUrl>
 #include <QVariantAnimation>
 #include <QVBoxLayout>
 
@@ -20,6 +24,58 @@
 #include "UiRegistry.h"
 
 namespace ui_helpers {
+inline QStringList local_drop_paths(const QDropEvent &event) {
+    if (!event.possibleActions().testFlag(Qt::CopyAction) || !event.mimeData()->hasUrls())
+        return {};
+    QStringList paths;
+    for (const auto &url : event.mimeData()->urls()) {
+        const auto path = url.toLocalFile();
+        if (!url.isLocalFile() || !QDir::isAbsolutePath(path))
+            return {};
+        paths.append(path);
+    }
+    return paths;
+}
+
+class WidgetMotion : public QVariantAnimation {
+    QWidget *owner;
+
+    void settle() {
+        if (state() == Running) {
+            stop();
+            setCurrentTime(duration());
+        }
+    }
+
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override {
+        if (watched == owner && event->type() == QEvent::Hide)
+            settle();
+        return QVariantAnimation::eventFilter(watched, event);
+    }
+
+public:
+    WidgetMotion(QWidget *widget, int milliseconds) : QVariantAnimation(widget), owner(widget) {
+        setDuration(milliseconds);
+        setEasingCurve(QEasingCurve::OutCubic);
+        owner->installEventFilter(this);
+        connect(this, &QVariantAnimation::valueChanged, owner, [this] {
+            if (state() == Running && !desktop_platform::animations_enabled())
+                settle();
+        });
+    }
+
+    void move(const QVariant &from, const QVariant &to, bool animate = true) {
+        stop();
+        setStartValue(from);
+        setEndValue(to);
+        if (animate && from != to && owner->isVisible() && desktop_platform::animations_enabled())
+            start();
+        else
+            setCurrentTime(duration());
+    }
+};
+
 inline QList<QKeySequence> shortcut_sequences(const QKeySequence &sequence) {
     if (sequence.isEmpty())
         return {};
@@ -117,7 +173,9 @@ public:
 class TransitionOverlay : public QWidget {
 public:
     QPixmap snapshot;
+    QPixmap previous_snapshot;
     qreal opacity = 1.0;
+    int direction = 0;
 
     explicit TransitionOverlay(QWidget *const parent) : QWidget(parent) {
         setAttribute(Qt::WA_TransparentForMouseEvents);
@@ -127,10 +185,20 @@ public:
 protected:
     void paintEvent(QPaintEvent *) override {
         QPainter painter(this);
-        // An opaque background preserves the surface color during transitions.
-        painter.fillRect(rect(), palette().window());
+        const int distance = qRound(width() * 0.025) * direction;
+        if (snapshot.isNull()) {
+            // Fade the previous page over the live destination while its results arrive.
+            painter.setOpacity(1.0 - opacity);
+            painter.drawPixmap(rect().translated(qRound(-distance * opacity), 0), previous_snapshot);
+            return;
+        }
+        painter.fillRect(rect(), palette().base());
+        if (!previous_snapshot.isNull()) {
+            painter.setOpacity(1.0);
+            painter.drawPixmap(rect().translated(qRound(-distance * opacity), 0), previous_snapshot);
+        }
         painter.setOpacity(opacity);
-        painter.drawPixmap(rect(), snapshot);
+        painter.drawPixmap(rect().translated(qRound(distance * (1.0 - opacity)), 0), snapshot);
     }
 };
 
@@ -145,6 +213,7 @@ protected:
         animation->stop();
         overlay->hide();
         overlay->snapshot = QPixmap{};
+        overlay->previous_snapshot = QPixmap{};
         QWidget::resizeEvent(event);
     }
 
@@ -152,6 +221,7 @@ public:
     explicit PageTransition(QWidget *const contents)
         : contents(contents), overlay(new TransitionOverlay(this)), animation(new QVariantAnimation(this)) {
         setAutoFillBackground(true);
+        setBackgroundRole(QPalette::Base);
         auto *layout = new QVBoxLayout(this);
         layout->setContentsMargins(0, 0, 0, 0);
         layout->addWidget(contents);
@@ -166,16 +236,46 @@ public:
         connect(animation, &QVariantAnimation::finished, this, [this] {
             overlay->hide();
             overlay->snapshot = QPixmap{};
+            overlay->previous_snapshot = QPixmap{};
         });
+    }
+
+    void transition_to(const std::function<void()> &change, const int direction = 0, const bool live_contents = false) {
+        const bool animate = isVisible() && desktop_platform::animations_enabled();
+        // Include an in-flight transition so rapid reversals start from the displayed frame.
+        const auto previous = animate ? grab() : QPixmap{};
+        animation->stop();
+        overlay->hide();
+        overlay->snapshot = QPixmap{};
+        overlay->previous_snapshot = QPixmap{};
+        change();
+        layout()->activate();
+        if (!animate)
+            return;
+        overlay->previous_snapshot = previous;
+        if (!live_contents)
+            overlay->snapshot = grab();
+        overlay->direction = direction;
+        overlay->setGeometry(rect());
+        overlay->opacity = 0.0;
+        animation->setDuration(220);
+        animation->setStartValue(0.0);
+        overlay->show();
+        overlay->raise();
+        animation->start();
     }
 
     void start() {
         animation->stop();
         overlay->hide();
         overlay->snapshot = QPixmap{};
+        overlay->previous_snapshot = QPixmap{};
         if (!contents->isVisible() || !desktop_platform::animations_enabled())
             return;
-        overlay->snapshot = contents->grab();
+        overlay->snapshot = grab();
+        overlay->direction = 0;
+        animation->setDuration(140);
+        animation->setStartValue(0.88);
         overlay->setGeometry(rect());
         overlay->opacity = animation->startValue().toReal();
         overlay->show();
@@ -192,10 +292,18 @@ inline QLabel *label(const QString &text, const char *const property = nullptr) 
         result->setProperty(property, true);
     return result;
 }
-inline QPushButton *button(const QString &text, const char *const property = nullptr) {
+inline QPushButton *button(const QString &text, const char *const property = nullptr, const QString &icon_name = {}) {
     auto *result = new QPushButton(text);
     if (property)
         result->setProperty(property, true);
+    if (!icon_name.isEmpty()) {
+        result->setProperty("appearance_icon", icon_name);
+        result->setIcon(appearance::icon(icon_name, result->property("primary").toBool()
+                                                        ? QColor("#181A1D")
+                                                        : result->palette().color(QPalette::PlaceholderText)));
+        const auto size = qRound(qMax(14, result->font().pixelSize()) * 20 / 14.0);
+        result->setIconSize({size, size});
+    }
     return result;
 }
 inline QPushButton *action_button(QAction *const action, const bool quiet = false, const QString &text = {}) {
@@ -203,12 +311,23 @@ inline QPushButton *action_button(QAction *const action, const bool quiet = fals
     result->setIcon(action->icon());
     result->setEnabled(action->isEnabled());
     result->setToolTip(action->toolTip());
+    result->setProperty("icon_only", !text.isNull() && text.isEmpty());
+    if (result->property("icon_only").toBool()) {
+        result->setFixedWidth(qRound(qMax(14, result->font().pixelSize()) * 44 / 14.0));
+        result->setAccessibleName(action->text());
+    }
+    result->setIconSize(QSize(qRound(qMax(14, result->font().pixelSize()) * 20 / 14.0),
+                              qRound(qMax(14, result->font().pixelSize()) * 20 / 14.0)));
     QObject::connect(result, &QPushButton::clicked, action, &QAction::trigger);
     QObject::connect(action, &QAction::changed, result, [action, result, text] {
         result->setText(text.isNull() ? action->text() : text);
         result->setEnabled(action->isEnabled());
-        result->setIcon(action->icon());
+        result->setIcon(result->property("primary").toBool()
+                            ? appearance::icon(action->property("appearance_icon").toString(), QColor("#181A1D"))
+                            : action->icon());
         result->setToolTip(action->toolTip());
+        if (result->property("icon_only").toBool())
+            result->setAccessibleName(action->text());
     });
     return result;
 }
@@ -258,22 +377,24 @@ inline void open_dialog(const QString &id, const ui_context &context) {
     }
     auto *widget = context.registry->create(id, context, context.window);
     if (auto *dialog = qobject_cast<QDialog *>(widget)) {
-        // This limit also applies to dialogs replaced by plugins.
-        const auto available = dialog->screen()->availableGeometry().size() - QSize(32, 64);
-        const auto size_key = "dialogs/" + id + "/size";
-        const auto saved = context.settings->value(size_key).toSize();
-        if (saved.isValid() && !saved.isEmpty())
-            dialog->resize(appearance::scaled(*context.settings, saved.width()),
-                           appearance::scaled(*context.settings, saved.height()));
-        dialog->setMinimumSize(dialog->minimumSize().boundedTo(available));
-        dialog->resize(dialog->size().boundedTo(available));
-        dialog->setSizeGripEnabled(true);
-        QObject::connect(dialog, &QDialog::finished, dialog, [dialog, settings = context.settings, size_key] {
-            if (settings->property("profile_locked").toBool())
-                return;
-            const auto scale = appearance::scaled(*settings, 100) / 100.0;
-            settings->setValue(size_key, QSize(qRound(dialog->width() / scale), qRound(dialog->height() / scale)));
-        });
+        if (!dialog->property("fit_content").toBool()) {
+            // This limit also applies to dialogs replaced by plugins.
+            const auto available = dialog->screen()->availableGeometry().size() - QSize(32, 64);
+            const auto size_key = "dialogs/" + id + "/size";
+            const auto saved = context.settings->value(size_key).toSize();
+            if (saved.isValid() && !saved.isEmpty())
+                dialog->resize(appearance::scaled(*context.settings, saved.width()),
+                               appearance::scaled(*context.settings, saved.height()));
+            dialog->setMinimumSize(dialog->minimumSize().boundedTo(available));
+            dialog->resize(dialog->size().boundedTo(available));
+            dialog->setSizeGripEnabled(true);
+            QObject::connect(dialog, &QDialog::finished, dialog, [dialog, settings = context.settings, size_key] {
+                if (settings->property("profile_locked").toBool())
+                    return;
+                const auto scale = appearance::scaled(*settings, 100) / 100.0;
+                settings->setValue(size_key, QSize(qRound(dialog->width() / scale), qRound(dialog->height() / scale)));
+            });
+        }
         dialog->setAttribute(Qt::WA_DeleteOnClose);
         dialog->setWindowModality(Qt::WindowModal);
         dialog->show();

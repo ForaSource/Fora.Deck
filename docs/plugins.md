@@ -5,20 +5,20 @@
 ## Enabling modules
 
 Place a compatible native module in `plugins/` beside the executable, then explicitly enable it in **Settings → Plugins**.
-Enable/disable changes take effect after restarting XLibrary. Settings shows available modules, metadata, and compatibility or load errors.
+Enable/disable changes take effect after restarting Fora.Deck. Settings shows available modules, metadata, and compatibility or load errors.
 Reading embedded metadata does not execute disabled modules.
 
-Plugins run native code inside XLibrary with the application's access to the profile and system. There is no sandbox.
+Plugins run native code inside Fora.Deck with the application's access to the profile and system. There is no sandbox.
 Enable modules from trusted sources and keep profile backups. A native crash, invalid callback, or undefined behavior can still terminate or corrupt the process.
 Plugin binaries are not included in profile backups.
 
 ## Compatibility and interface contract
 
 The contract is defined by [UiRegistry.h](../desktop/UiRegistry.h). Modules implement `UiPlugin::configure(UiRegistry &)`
-to replace registered widget factories or append styles. Build against matching XLibrary headers, architecture, compiler, and runtime ABI.
+to replace registered widget factories or append styles. Build against matching Fora.Deck headers, architecture, compiler, and runtime ABI.
 Qt also applies its own platform/build checks.
 
-Before instantiation, XLibrary requires Qt's embedded IID `org.xlibrary.desktop.UiPlugin/1.0`, a matching Qt major version,
+Before instantiation, Fora.Deck requires Qt's embedded IID `org.xlibrary.desktop.UiPlugin/1.0`, a matching Qt major version,
 and a required Qt minor version no newer than the running application. These checks cannot prove binary compatibility.
 Existing IID 1.0 modules do not need custom metadata. Optional custom `MetaData` strings `name`, `version`, and `author`
 (also accepted as `Name`, `Version`, and `Author`) appear in settings; absent names fall back to filenames.
