@@ -28,9 +28,9 @@ function Read-Cache([string]$name, [switch]$Optional) {
     $entry[0].Matches[0].Groups[1].Value
 }
 
-if ((Read-Cache 'CMAKE_PROJECT_NAME') -ne 'XLibrary' -or
+if ((Read-Cache 'CMAKE_PROJECT_NAME') -ne 'foradeck' -or
     (Resolve-RepositoryPath (Read-Cache 'CMAKE_HOME_DIRECTORY')) -ne $repository) {
-    throw 'Build directory must be configured from this XLibrary checkout.'
+    throw 'Build directory must be configured from this Fora.Deck checkout.'
 }
 $cmake = Read-Cache 'CMAKE_COMMAND'
 $log = Join-Path $build 'packaging-release.log'
@@ -93,14 +93,14 @@ if (-not $runtime_directory) {
 if (-not $runtime_directory) {
     $runtime_directory = if (Read-Cache 'CMAKE_CONFIGURATION_TYPES' -Optional) { 'Release' } else { '.' }
 }
-$executable = Join-Path ([IO.Path]::GetFullPath($runtime_directory, $build)) 'XLibrary.exe'
+$executable = Join-Path ([IO.Path]::GetFullPath($runtime_directory, $build)) 'foradeck.exe'
 if (Test-Path -LiteralPath $executable -PathType Leaf) {
     try {
         $executable_stream = [IO.File]::Open($executable, [IO.FileMode]::Open, [IO.FileAccess]::Write,
             [IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete)
         $executable_stream.Dispose()
     } catch {
-        throw "Cannot replace $executable. Close XLibrary launched from this build directory, including its tray icon, and retry. If it is already closed, check file permissions. $($_.Exception.Message)"
+        throw "Cannot replace $executable. Close Fora.Deck launched from this build directory, including its tray icon, and retry. If it is already closed, check file permissions. $($_.Exception.Message)"
     }
 }
 
@@ -146,7 +146,7 @@ try {
     if ($build_type -ne 'Release' -and 'Release' -notin $configurations) {
         throw 'Use a Release build directory or a multi-config generator with Release.'
     }
-    if ((Read-Cache 'XLIBRARY_NATIVE_CPU') -ne 'OFF') { throw 'Distribution requires XLIBRARY_NATIVE_CPU=OFF.' }
+    if ((Read-Cache 'FORADECK_NATIVE_CPU') -ne 'OFF') { throw 'Distribution requires FORADECK_NATIVE_CPU=OFF.' }
     $qt_version = $config.qt_version
     $version = $config.version
     $channel = if ($config.prerelease -eq 'TRUE') { 'pre-release' } else { 'stable' }
@@ -167,11 +167,11 @@ try {
     if (-not $OutputPath) { $OutputPath = "release/v$version-$compiler" }
     $output = Resolve-RepositoryPath $OutputPath
     if (Test-Path -LiteralPath $output) { throw "Output already exists; choose a new -OutputPath: $output" }
-    $package_name = "XLibrary-$version-windows-x64-$compiler-portable"
+    $package_name = "Fora.Deck-$version-windows-x64-$compiler-portable"
     $stage = Join-Path $repository "build/release-$([guid]::NewGuid().ToString('N'))"
     $package = Join-Path $stage $package_name
     invoke_cmake -step 'Release build' -command_arguments @('--build', $build, '--config', 'Release',
-        '--target', 'XLibrary', '--parallel', '4')
+        '--target', 'foradeck', '--parallel', '4')
     invoke_cmake -step 'Qt deployment' -command_arguments @('--install', $build, '--config', 'Release',
         '--prefix', $package)
 
@@ -323,7 +323,7 @@ try {
     @"
 Fora.Deck $version by ForaSource - Windows x64 ($compiler)
 
-Run XLibrary.exe. Keep the DLLs and plugins beside it.
+Run foradeck.exe. Keep the DLLs and plugins beside it.
 No Qt installation or administrator rights are required.
 portable.flag enables portable mode: database and settings use data/.
 Keep this folder writable. Move the whole folder to move the program and data.
@@ -333,7 +333,7 @@ This build has no digital signature. See licenses/, sources/ and THIRD_PARTY_NOT
     & "$repository/.github/scripts/check_package.ps1" -PackagePath $package -Compiler $compiler
     New-Item -ItemType Directory -Path $output | Out-Null
     if ($Installer) {
-        & $InnoCompiler /Qp "/DAppVersion=$version" "/DNumericVersion=$($config.windows_numeric_version)" "/DCompiler=$compiler" "/DPackageDir=$package" "/DOutputDir=$output" "$PSScriptRoot/xlibrary.iss"
+        & $InnoCompiler /Qp "/DAppVersion=$version" "/DNumericVersion=$($config.windows_numeric_version)" "/DCompiler=$compiler" "/DPackageDir=$package" "/DOutputDir=$output" "$PSScriptRoot/foradeck.iss"
         if ($LASTEXITCODE -ne 0) { throw 'Installer compilation failed.' }
     }
     Compress-Archive -LiteralPath $package -DestinationPath "$output/$package_name.zip" -CompressionLevel Optimal

@@ -16,12 +16,12 @@ name **Fora.Deck**; in the graphical wordmark only the dot is coral `#F16647`.
 | [fora_deck_avatar.svg](fora_deck_avatar.svg) | Avatar/icon composition with a graphite background. |
 | `github_header_dark.png`, `github_header_light.png` | README banners, 1600×480 each. |
 | `github_avatar.png`, `github_avatar_256.png` | 1024×1024 avatar and 256×256 installed Linux icon. |
-| `xlibrary_logo.png`, `xlibrary_mark.png` | Transparent light-background wordmark (1600×400) and color mark (1254×1254). |
-| `xlibrary.ico` | Windows/resource icon with 16, 20, 24, 32, 48, 64, 128 and 256 pixel PNG frames. |
+| `foradeck_logo.png`, `foradeck_mark.png` | Transparent light-background wordmark (1600×400) and color mark (1254×1254). |
+| `foradeck.ico` | Windows/resource icon with 16, 20, 24, 32, 48, 64, 128 and 256 pixel PNG frames. |
 
 Existing PNG/ICO filenames are retained for their consumers. CMake installs
 `github_avatar_256.png` under the existing Linux desktop icon identifier and embeds
-`xlibrary.ico` for the application; Windows also uses it as the executable/installer icon.
+`foradeck.ico` for the application; Windows also uses it as the executable/installer icon.
 The SVGs are design sources, not a new Qt SVG dependency.
 
 The wordmarks and banner text use outlines from the bundled [Inter fonts](fonts/README.md).

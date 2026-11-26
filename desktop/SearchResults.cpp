@@ -42,11 +42,11 @@ public:
     QVariant headerData(const int section, const Qt::Orientation orientation, const int role) const override {
         if (orientation != Qt::Horizontal || role != Qt::DisplayRole)
             return {};
-        return section == 0   ? QCoreApplication::translate("XLibrary", "File")
-               : section == 1 ? QCoreApplication::translate("XLibrary", "Tags")
-               : section == 2 ? QCoreApplication::translate("XLibrary", "Extension")
-               : section == 3 ? QCoreApplication::translate("XLibrary", "Date added")
-                              : QCoreApplication::translate("XLibrary", "Folder");
+        return section == 0   ? QCoreApplication::translate("Fora.Deck", "File")
+               : section == 1 ? QCoreApplication::translate("Fora.Deck", "Tags")
+               : section == 2 ? QCoreApplication::translate("Fora.Deck", "Extension")
+               : section == 3 ? QCoreApplication::translate("Fora.Deck", "Date added")
+                              : QCoreApplication::translate("Fora.Deck", "Folder");
     }
     int rowCount(const QModelIndex &parent = {}) const override {
         return parent.isValid() ? 0 : static_cast<int>(entries.size());
@@ -68,7 +68,7 @@ public:
                 return QDir::toNativeSeparators(QFileInfo(entry.path).absolutePath());
             return entry.available
                        ? entry.title
-                       : entry.title + " · " + QCoreApplication::translate("XLibrary", "Source or file unavailable");
+                       : entry.title + " · " + QCoreApplication::translate("Fora.Deck", "Source or file unavailable");
         }
         if (role == LibraryModel::tags_role)
             return entry.tags;
@@ -86,7 +86,7 @@ public:
         if (role == Qt::ToolTipRole)
             return (entry.path.isEmpty() ? entry.title : QDir::toNativeSeparators(entry.path)) +
                    (entry.available ? QString{}
-                                    : '\n' + QCoreApplication::translate("XLibrary", "Source or file unavailable"));
+                                    : '\n' + QCoreApplication::translate("Fora.Deck", "Source or file unavailable"));
         return {};
     }
     Qt::ItemFlags flags(const QModelIndex &index) const override {
@@ -231,7 +231,7 @@ SearchResults::SearchResults(DesktopService &service, QLineEdit &input, const bo
     file_delay.setSingleShot(true);
     file_delay.setInterval(100);
     connect(&file_delay, &QTimer::timeout, this, &SearchResults::update_files);
-    setAccessibleName(QCoreApplication::translate("XLibrary", "Search results"));
+    setAccessibleName(QCoreApplication::translate("Fora.Deck", "Search results"));
     setModel(results);
     connect(selectionModel(), &QItemSelectionModel::currentChanged, this, &SearchResults::sync_file_selection);
     results->favorite_changed = [this](const search_entry &entry, const bool favorite) {
@@ -363,7 +363,7 @@ void SearchResults::replace_entries(QVector<search_entry> entries) {
     if (entries.isEmpty() && (special || files_enabled || (compact && !input.text().trimmed().isEmpty()))) {
         const auto hint = special ? QString{} : SearchQuery(input.text()).tag_hint(service.catalog().tags);
         entries.append({search_entry::kind::message,
-                        hint.isEmpty() ? QCoreApplication::translate("XLibrary", "No results") : hint,
+                        hint.isEmpty() ? QCoreApplication::translate("Fora.Deck", "No results") : hint,
                         {},
                         0});
     }
@@ -458,10 +458,10 @@ void SearchResults::update_applications() {
         auto title = record.name;
         if (!record.default_launch_profile.isEmpty()) {
             const auto mode = record.default_launch_profile == "private"
-                                  ? QCoreApplication::translate("XLibrary", "Private mode")
+                                  ? QCoreApplication::translate("Fora.Deck", "Private mode")
                               : record.default_launch_profile == "normal"
-                                  ? QCoreApplication::translate("XLibrary", "Normal mode")
-                                  : QCoreApplication::translate("XLibrary", "Profile: %1")
+                                  ? QCoreApplication::translate("Fora.Deck", "Normal mode")
+                                  : QCoreApplication::translate("Fora.Deck", "Profile: %1")
                                         .arg(QFileInfo(record.default_launch_profile.mid(8)).fileName());
             title += " · " + mode;
         }
@@ -494,7 +494,7 @@ void SearchResults::update_query(const bool debounce_files) {
         rendered_file_query.reset();
         file_matches.clear();
         pending_path = search_query::expanded_path(text);
-        replace_entries({{search_entry::kind::message, QCoreApplication::translate("XLibrary", "…"), {}, 0}});
+        replace_entries({{search_entry::kind::message, QCoreApplication::translate("Fora.Deck", "…"), {}, 0}});
         if (!path_busy)
             read_path();
         return;
@@ -510,7 +510,7 @@ void SearchResults::update_query(const bool debounce_files) {
             const auto number = QString::number(*calculation.value, 'g', 15);
             replace_entries({{search_entry::kind::calculation, "= " + number, number, 0}});
         } else
-            replace_entries({{search_entry::kind::message, QCoreApplication::translate("XLibrary", "—"), {}, 0}});
+            replace_entries({{search_entry::kind::message, QCoreApplication::translate("Fora.Deck", "—"), {}, 0}});
     } else {
         if (!files_enabled)
             file_matches.clear();
@@ -526,7 +526,7 @@ void SearchResults::update_query(const bool debounce_files) {
             rendered_file_query.reset();
             if (file_workspace && !debounce_files) {
                 file_matches.clear();
-                replace_entries({{search_entry::kind::message, QCoreApplication::translate("XLibrary", "…"), {}, 0}});
+                replace_entries({{search_entry::kind::message, QCoreApplication::translate("Fora.Deck", "…"), {}, 0}});
             } else {
                 update_entries();
             }
@@ -631,7 +631,7 @@ void SearchResults::activate_current() {
         if (desktop_platform::open_url(QUrl::fromLocalFile(entry.path))) {
             emit application_activated();
         } else
-            service.notify(QCoreApplication::translate("XLibrary", "Could not open the folder."));
+            service.notify(QCoreApplication::translate("Fora.Deck", "Could not open the folder."));
     } else if (entry.type == search_entry::kind::directory) {
         input.setText(QDir::toNativeSeparators(entry.path + '/'));
         input.setFocus();
@@ -640,7 +640,8 @@ void SearchResults::activate_current() {
     } else if ((entry.type == search_entry::kind::file || entry.type == search_entry::kind::working_file)) {
         if (!entry.available || (entry.type == search_entry::kind::working_file &&
                                  !FileManager::can_open(entry.path, entry.volume_root, entry.volume_device))) {
-            service.notify(QCoreApplication::translate("XLibrary", "The file is unavailable or its type is excluded."));
+            service.notify(
+                QCoreApplication::translate("Fora.Deck", "The file is unavailable or its type is excluded."));
             update_query();
             return;
         }
@@ -648,7 +649,7 @@ void SearchResults::activate_current() {
             service.record_file_use(entry.path);
             emit application_activated();
         } else
-            service.notify(QCoreApplication::translate("XLibrary", "Could not open the file."));
+            service.notify(QCoreApplication::translate("Fora.Deck", "Could not open the file."));
     } else if (entry.type == search_entry::kind::calculation)
         QApplication::clipboard()->setText(entry.path);
 }
@@ -664,37 +665,37 @@ void SearchResults::show_actions() {
             action_menu->close();
         auto *menu = new QMenu(this);
         action_menu = menu;
-        auto *open = menu->addAction(QCoreApplication::translate("XLibrary", "Open"));
+        auto *open = menu->addAction(QCoreApplication::translate("Fora.Deck", "Open"));
         open->setEnabled(entry.available);
         connect(open, &QAction::triggered, this, [this, entry] {
             if (!entry.available || (entry.type == search_entry::kind::working_file &&
                                      !FileManager::can_open(entry.path, entry.volume_root, entry.volume_device))) {
                 service.notify(
-                    QCoreApplication::translate("XLibrary", "The file is unavailable or its type is excluded."));
+                    QCoreApplication::translate("Fora.Deck", "The file is unavailable or its type is excluded."));
                 return;
             }
             if (desktop_platform::open_url(QUrl::fromLocalFile(entry.path))) {
                 service.record_file_use(entry.path);
                 emit application_activated();
             } else
-                service.notify(QCoreApplication::translate("XLibrary", "Could not open the file."));
+                service.notify(QCoreApplication::translate("Fora.Deck", "Could not open the file."));
         });
-        connect(menu->addAction(QCoreApplication::translate("XLibrary", "Open folder")), &QAction::triggered, this,
+        connect(menu->addAction(QCoreApplication::translate("Fora.Deck", "Open folder")), &QAction::triggered, this,
                 [entry] { desktop_platform::open_url(QUrl::fromLocalFile(QFileInfo(entry.path).absolutePath())); });
-        connect(menu->addAction(QCoreApplication::translate("XLibrary", "Copy path")), &QAction::triggered, this,
+        connect(menu->addAction(QCoreApplication::translate("Fora.Deck", "Copy path")), &QAction::triggered, this,
                 [entry] { QApplication::clipboard()->setText(QDir::toNativeSeparators(entry.path)); });
         const bool favorite = service.files->is_favorite(entry.path);
         connect(menu->addAction(
-                    QCoreApplication::translate("XLibrary", favorite ? "Remove from favorites" : "Add to favorites")),
+                    QCoreApplication::translate("Fora.Deck", favorite ? "Remove from favorites" : "Add to favorites")),
                 &QAction::triggered, this, [this, entry, favorite] {
                     service.files->update_metadata(entry.path, service.files->tags_for(entry.path), !favorite);
                 });
-        connect(menu->addAction(QCoreApplication::translate("XLibrary", "Edit tags")), &QAction::triggered, this,
+        connect(menu->addAction(QCoreApplication::translate("Fora.Deck", "Edit tags")), &QAction::triggered, this,
                 [this, entry] {
                     bool accepted = false;
                     const auto text = QInputDialog::getText(
-                        this, QCoreApplication::translate("XLibrary", "Edit tags"),
-                        QCoreApplication::translate("XLibrary", "Tags separated by commas"), QLineEdit::Normal,
+                        this, QCoreApplication::translate("Fora.Deck", "Edit tags"),
+                        QCoreApplication::translate("Fora.Deck", "Tags separated by commas"), QLineEdit::Normal,
                         service.files->tags_for(entry.path).join(", "), &accepted);
                     if (!accepted || service.profile_busy() || service.restart_required())
                         return;
@@ -704,7 +705,7 @@ void SearchResults::show_actions() {
                         if (tag.startsWith('#'))
                             tag.remove(0, 1);
                         if (!valid_tag_name(tag) || tags.size() >= catalog_limits::tags_per_application) {
-                            service.notify(QCoreApplication::translate("XLibrary", "Invalid tag name."));
+                            service.notify(QCoreApplication::translate("Fora.Deck", "Invalid tag name."));
                             return;
                         }
                         if (!has_tag(tags, tag))
@@ -714,7 +715,7 @@ void SearchResults::show_actions() {
                 });
         const bool saved = entry.saved;
         connect(menu->addAction(
-                    QCoreApplication::translate("XLibrary", saved ? "Remove from My files" : "Save to My files")),
+                    QCoreApplication::translate("Fora.Deck", saved ? "Remove from My files" : "Save to My files")),
                 &QAction::triggered, this, [this, entry, saved] { service.files->set_saved(entry.path, !saved); });
         connect(menu, &QMenu::aboutToHide, this, [this, menu] {
             if (action_menu == menu)
@@ -740,24 +741,24 @@ void SearchResults::show_actions() {
     auto *menu = new QMenu(this);
     action_menu = menu;
     menu->setObjectName("quick_actions");
-    menu->setTitle(QCoreApplication::translate("XLibrary", "Application actions"));
+    menu->setTitle(QCoreApplication::translate("Fora.Deck", "Application actions"));
     menu->setAccessibleName(menu->title());
     const auto launch_action = [this, menu, id](const QString &title, const Application::launch_mode mode) {
         connect(menu->addAction(title), &QAction::triggered, this,
                 [this, id, mode] { pending_launch = service.request_launch_mode(id, mode); });
     };
-    launch_action(QCoreApplication::translate("XLibrary", "Launch"), Application::launch_mode::launch);
+    launch_action(QCoreApplication::translate("Fora.Deck", "Launch"), Application::launch_mode::launch);
     if (record.new_instance_error.isEmpty() && Application::file_target(record))
-        launch_action(QCoreApplication::translate("XLibrary", "New instance"), Application::launch_mode::new_instance);
+        launch_action(QCoreApplication::translate("Fora.Deck", "New instance"), Application::launch_mode::new_instance);
     if (record.running && Application::file_target(record))
-        launch_action(QCoreApplication::translate("XLibrary", "Switch to running window"),
+        launch_action(QCoreApplication::translate("Fora.Deck", "Switch to running window"),
                       Application::launch_mode::activate);
     if (record.running)
-        connect(menu->addAction(appearance::icon("stop"), QCoreApplication::translate("XLibrary", "Terminate")),
+        connect(menu->addAction(appearance::icon("stop"), QCoreApplication::translate("Fora.Deck", "Terminate")),
                 &QAction::triggered, this, [this, id] { confirm_application_termination(service, id, window()); });
     const auto profiles = service.launch_profiles(record);
     if (!profiles.isEmpty()) {
-        auto *profile_menu = menu->addMenu(QCoreApplication::translate("XLibrary", "Browser profile"));
+        auto *profile_menu = menu->addMenu(QCoreApplication::translate("Fora.Deck", "Browser profile"));
         for (const auto &profile : profiles) {
             auto *action =
                 profile_menu->addAction(appearance::icon(profile.kind == "private" ? "lock" : "app"), profile.name);
@@ -771,35 +772,35 @@ void SearchResults::show_actions() {
 #ifdef Q_OS_WIN
     if (Application::target_kind(record) == "executable" &&
         QFileInfo(record.path).suffix().compare("exe", Qt::CaseInsensitive) == 0)
-        launch_action(QCoreApplication::translate("XLibrary", "Run as administrator"),
+        launch_action(QCoreApplication::translate("Fora.Deck", "Run as administrator"),
                       Application::launch_mode::elevated);
 #endif
     menu->addSeparator();
     if (Application::file_target(record) || !record.installation_directory.isEmpty())
-        connect(menu->addAction(QCoreApplication::translate("XLibrary", "Open folder")), &QAction::triggered, this,
+        connect(menu->addAction(QCoreApplication::translate("Fora.Deck", "Open folder")), &QAction::triggered, this,
                 [this, id] { service.open_folder(id); });
     if (Application::file_target(record) || !record.installation_directory.isEmpty())
-        connect(menu->addAction(QCoreApplication::translate("XLibrary", "Copy path")), &QAction::triggered, this,
+        connect(menu->addAction(QCoreApplication::translate("Fora.Deck", "Copy path")), &QAction::triggered, this,
                 [record] {
                     QApplication::clipboard()->setText(QDir::toNativeSeparators(Application::application_path(record)));
                 });
-    connect(menu->addAction(record.favorite ? QCoreApplication::translate("XLibrary", "Remove from favorites")
-                                            : QCoreApplication::translate("XLibrary", "Add to favorites")),
+    connect(menu->addAction(record.favorite ? QCoreApplication::translate("Fora.Deck", "Remove from favorites")
+                                            : QCoreApplication::translate("Fora.Deck", "Add to favorites")),
             &QAction::triggered, this,
             [this, id, favorite = record.favorite] { service.update_metadata({id}, {}, {}, favorite ? 0 : 1); });
     const auto edit_action = [this, menu, id](const QString &text, const QString &focus) {
         connect(menu->addAction(text), &QAction::triggered, this,
                 [this, id, focus] { edit_application(service, id, window(), focus); });
     };
-    edit_action(QCoreApplication::translate("XLibrary", "Edit tags"), "application_tags");
-    edit_action(QCoreApplication::translate("XLibrary", "Edit application"), "application_name");
-    edit_action(QCoreApplication::translate("XLibrary", "Assign hotkey"), "application_hotkey");
+    edit_action(QCoreApplication::translate("Fora.Deck", "Edit tags"), "application_tags");
+    edit_action(QCoreApplication::translate("Fora.Deck", "Edit application"), "application_name");
+    edit_action(QCoreApplication::translate("Fora.Deck", "Assign hotkey"), "application_hotkey");
     menu->addSeparator();
-    connect(menu->addAction(QCoreApplication::translate("XLibrary", "Remove from library")), &QAction::triggered, this,
+    connect(menu->addAction(QCoreApplication::translate("Fora.Deck", "Remove from library")), &QAction::triggered, this,
             [this, id, name = record.name] {
                 if (QMessageBox::question(
-                        window(), QCoreApplication::translate("XLibrary", "Remove application"),
-                        QCoreApplication::translate("XLibrary",
+                        window(), QCoreApplication::translate("Fora.Deck", "Remove application"),
+                        QCoreApplication::translate("Fora.Deck",
                                                     "Remove “%1” from the library? The application files will be kept.")
                             .arg(name)) == QMessageBox::Yes)
                     service.remove_application(id);

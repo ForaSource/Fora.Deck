@@ -89,10 +89,10 @@ private slots:
     void compatibility_data() {
         QTest::addColumn<QJsonObject>("metadata");
         QTest::addColumn<bool>("compatible");
-        const QJsonObject current{{"IID", XLIBRARY_UI_PLUGIN_IID}, {"version", QT_VERSION}};
+        const QJsonObject current{{"IID", FORADECK_UI_PLUGIN_IID}, {"version", QT_VERSION}};
         QTest::newRow("IID 1.0 without custom metadata") << current << true;
         auto metadata = current;
-        metadata["IID"] = "org.xlibrary.desktop.UiPlugin/2.0";
+        metadata["IID"] = "io.github.ForaSource.ForaDeck.UiPlugin/2.0";
         QTest::newRow("different interface") << metadata << false;
         metadata = current;
         metadata["version"] = QT_VERSION_CHECK((QT_VERSION_MAJOR + 1), 0, 0);

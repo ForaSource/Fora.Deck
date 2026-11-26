@@ -2,7 +2,7 @@
 
 #include "WorkspaceWindowBackend.h"
 
-#ifdef XLIBRARY_HAVE_WORKSPACE_X11
+#ifdef FORADECK_HAVE_WORKSPACE_X11
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -45,7 +45,7 @@ QString wayland_limitation() {
         "Workspaces", "Wayland workspaces can launch resources only. Window capture and placement are unavailable.");
 }
 
-#ifdef XLIBRARY_HAVE_WORKSPACE_X11
+#ifdef FORADECK_HAVE_WORKSPACE_X11
 
 template <typename T> using x11_reply = std::unique_ptr<T, decltype(&std::free)>;
 
@@ -645,7 +645,7 @@ std::unique_ptr<WorkspaceWindowBackend> make_workspace_window_backend(const QStr
             "Workspaces",
             "Window capture and placement are unavailable on this display. Workspaces can launch resources only."));
     }
-#ifdef XLIBRARY_HAVE_WORKSPACE_X11
+#ifdef FORADECK_HAVE_WORKSPACE_X11
     return std::make_unique<X11WorkspaceBackend>();
 #else
     return std::make_unique<LaunchOnlyWorkspaceBackend>(QCoreApplication::translate(

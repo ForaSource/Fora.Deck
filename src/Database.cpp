@@ -14,7 +14,7 @@ void Database::execute(const char *const sql) const {
 
 void Database::initialize() const {
     this->execute("PRAGMA foreign_keys = ON;");
-    xlibrary::migrate_profile(this->connection.get(), this->file_path);
+    foradeck::migrate_profile(this->connection.get(), this->file_path);
 }
 
 Database::Database() : Database({}, true) {
@@ -54,22 +54,22 @@ bool Database::add_application(const Application &application) const {
 
 bool Database::add_application(const std::string &file_title, const std::filesystem::path &file_path) const {
     auto *connection = this->connection.get();
-    xlibrary::sqlite_execute(connection, "SAVEPOINT backend_application;");
+    foradeck::sqlite_execute(connection, "SAVEPOINT backend_application;");
     try {
-        const auto configuration_id = xlibrary::ensure_launch_configuration(connection, file_path);
-        xlibrary::SqliteStatement existing(connection, "SELECT 1 FROM applications WHERE configuration_id=? LIMIT 1;");
+        const auto configuration_id = foradeck::ensure_launch_configuration(connection, file_path);
+        foradeck::SqliteStatement existing(connection, "SELECT 1 FROM applications WHERE configuration_id=? LIMIT 1;");
         existing.bind(1, configuration_id);
         if (existing.next()) {
             if (this->drop_on_add_error)
                 throw std::invalid_argument("This launch configuration already has a library card");
-            xlibrary::sqlite_execute(connection, "RELEASE backend_application;");
+            foradeck::sqlite_execute(connection, "RELEASE backend_application;");
             return false;
         }
-        xlibrary::SqliteStatement insert(connection, "INSERT INTO applications(name,configuration_id) VALUES(?,?);");
+        foradeck::SqliteStatement insert(connection, "INSERT INTO applications(name,configuration_id) VALUES(?,?);");
         insert.bind(1, file_title);
         insert.bind(2, configuration_id);
         insert.next();
-        xlibrary::sqlite_execute(connection, "RELEASE backend_application;");
+        foradeck::sqlite_execute(connection, "RELEASE backend_application;");
         return true;
     } catch (...) {
         sqlite3_exec(connection, "ROLLBACK TO backend_application; RELEASE backend_application;", nullptr, nullptr,
@@ -97,8 +97,8 @@ bool Database::already_exists(const std::string &file_title) const {
 }
 
 bool Database::already_exists(const std::filesystem::path &file_path) const {
-    const auto identity = xlibrary::path_identity(file_path);
-    xlibrary::SqliteStatement statement(
+    const auto identity = foradeck::path_identity(file_path);
+    foradeck::SqliteStatement statement(
         this->connection.get(),
         "SELECT t.identity_key FROM applications a JOIN launch_configuration c ON c.id=a.configuration_id "
         "JOIN launch_target t ON t.id=c.target_id;");
@@ -174,7 +174,7 @@ void Database::validate_application(const app_record &record) {
         record.path.contains(QChar::Null) || record.arguments.contains(QChar::Null) ||
         record.working_directory.contains(QChar::Null)) {
         throw std::invalid_argument(
-            QCoreApplication::translate("XLibrary", "Invalid application name or path.").toStdString());
+            QCoreApplication::translate("Fora.Deck", "Invalid application name or path.").toStdString());
     }
     Application::validate_launch_target(record);
     if (!Application::valid_launch_profile_id(record.default_launch_profile))
@@ -182,11 +182,11 @@ void Database::validate_application(const app_record &record) {
 #ifdef Q_OS_WIN
     if (Application::file_target(record) && QFileInfo(record.path).suffix().isEmpty())
         throw std::invalid_argument(
-            QCoreApplication::translate("XLibrary", "A Windows target requires a filename extension.").toStdString());
+            QCoreApplication::translate("Fora.Deck", "A Windows target requires a filename extension.").toStdString());
 #endif
     if (!record.working_directory.isEmpty() && !QFileInfo(record.working_directory).isAbsolute()) {
         throw std::invalid_argument(
-            QCoreApplication::translate("XLibrary", "The working directory must be an absolute path.").toStdString());
+            QCoreApplication::translate("Fora.Deck", "The working directory must be an absolute path.").toStdString());
     }
     if (record.path.size() > catalog_limits::text_length || record.arguments.size() > catalog_limits::text_length ||
         record.working_directory.size() > catalog_limits::text_length ||
@@ -194,24 +194,25 @@ void Database::validate_application(const app_record &record) {
         record.icon_path.size() > catalog_limits::text_length || record.installation_directory.contains(QChar::Null) ||
         record.icon_path.contains(QChar::Null) || record.tags.size() > catalog_limits::tags_per_application) {
         throw std::invalid_argument(
-            QCoreApplication::translate("XLibrary", "Paths and arguments: up to 32768 characters; tags: up to 256.")
+            QCoreApplication::translate("Fora.Deck", "Paths and arguments: up to 32768 characters; tags: up to 256.")
                 .toStdString());
     }
     if (record.aliases.size() > 32)
         throw std::invalid_argument(
-            QCoreApplication::translate("XLibrary", "Use up to 32 aliases, each on one line with up to 256 characters.")
+            QCoreApplication::translate("Fora.Deck",
+                                        "Use up to 32 aliases, each on one line with up to 256 characters.")
                 .toStdString());
     for (const auto &alias : record.aliases)
         if (alias.trimmed().isEmpty() || alias.size() > 256 || alias.contains(QChar::Null) || alias.contains('\n') ||
             alias.contains('\r'))
             throw std::invalid_argument(
-                QCoreApplication::translate("XLibrary",
+                QCoreApplication::translate("Fora.Deck",
                                             "Use up to 32 aliases, each on one line with up to 256 characters.")
                     .toStdString());
     for (const auto &tag : record.tags) {
         if (!valid_tag_name(tag))
             throw std::invalid_argument(
-                QCoreApplication::translate("XLibrary", "Tag: up to 64 characters, without spaces, commas, or #.")
+                QCoreApplication::translate("Fora.Deck", "Tag: up to 64 characters, without spaces, commas, or #.")
                     .toStdString());
     }
 }
@@ -243,53 +244,53 @@ public:
 }
 
 Database::Database(const QString &database_path) : Database(filesystem_path(database_path), false) {
-    xlibrary::validate_profile(get_connection());
+    foradeck::validate_profile(get_connection());
 }
 
 int Database::schema_version() const {
-    return xlibrary::read_schema_version(get_connection());
+    return foradeck::read_schema_version(get_connection());
 }
 
 void Database::backup_database(const QString &destination) const {
-    xlibrary::backup_database(get_connection(), filesystem_path(destination));
+    foradeck::backup_database(get_connection(), filesystem_path(destination));
 }
 
 QString Database::restore_backup(const QString &source, const QString &destination) {
     const auto fail = [](const QString &message) { throw std::runtime_error(message.toStdString()); };
     if (!QFileInfo(source).isFile() ||
         QFileInfo(source).canonicalFilePath() == QFileInfo(destination).canonicalFilePath())
-        fail(QCoreApplication::translate("XLibrary", "Select a different, existing SQLite backup file."));
+        fail(QCoreApplication::translate("Fora.Deck", "Select a different, existing SQLite backup file."));
     const auto parent = QFileInfo(destination).absolutePath();
     if (!QDir().mkpath(parent))
-        fail(QCoreApplication::translate("XLibrary", "Could not create the library folder."));
-    QTemporaryDir staging(parent + "/.xlibrary-recovery-XXXXXX");
+        fail(QCoreApplication::translate("Fora.Deck", "Could not create the library folder."));
+    QTemporaryDir staging(parent + "/.foradeck-recovery-XXXXXX");
     if (!staging.isValid())
-        fail(QCoreApplication::translate("XLibrary", "Could not create a recovery folder."));
+        fail(QCoreApplication::translate("Fora.Deck", "Could not create a recovery folder."));
     const auto restored = staging.filePath("restored.db");
     {
         sqlite3 *raw_source = nullptr;
         const auto opened = sqlite3_open_v2(source.toUtf8().constData(), &raw_source, SQLITE_OPEN_READONLY, nullptr);
         const std::unique_ptr<sqlite3, decltype(&sqlite3_close_v2)> input(raw_source, &sqlite3_close_v2);
         if (opened != SQLITE_OK)
-            fail(QCoreApplication::translate("XLibrary", "Could not open the SQLite backup."));
-        xlibrary::SqliteStatement check(input.get(), "PRAGMA quick_check;");
+            fail(QCoreApplication::translate("Fora.Deck", "Could not open the SQLite backup."));
+        foradeck::SqliteStatement check(input.get(), "PRAGMA quick_check;");
         if (!check.next() || check.qtext(0) != "ok")
-            fail(QCoreApplication::translate("XLibrary", "The SQLite backup is damaged."));
-        xlibrary::SqliteStatement schema(input.get(), "SELECT a.id,a.name,t.id,t.name,at.application_id,at.tag_id "
+            fail(QCoreApplication::translate("Fora.Deck", "The SQLite backup is damaged."));
+        foradeck::SqliteStatement schema(input.get(), "SELECT a.id,a.name,t.id,t.name,at.application_id,at.tag_id "
                                                       "FROM applications a, tags t, application_tags at LIMIT 0;");
         schema.next();
         sqlite3 *raw_destination = nullptr;
         const auto created = sqlite3_open(restored.toUtf8().constData(), &raw_destination);
         const std::unique_ptr<sqlite3, decltype(&sqlite3_close_v2)> output(raw_destination, &sqlite3_close_v2);
         if (created != SQLITE_OK)
-            fail(QCoreApplication::translate("XLibrary", "Could not prepare the restored library."));
+            fail(QCoreApplication::translate("Fora.Deck", "Could not prepare the restored library."));
         auto *backup = sqlite3_backup_init(output.get(), "main", input.get(), "main");
         if (!backup)
-            fail(QCoreApplication::translate("XLibrary", "Could not read the SQLite backup."));
+            fail(QCoreApplication::translate("Fora.Deck", "Could not read the SQLite backup."));
         const auto copied = sqlite3_backup_step(backup, -1);
         const auto finished = sqlite3_backup_finish(backup);
         if (copied != SQLITE_DONE || finished != SQLITE_OK)
-            fail(QCoreApplication::translate("XLibrary", "Could not copy the SQLite backup."));
+            fail(QCoreApplication::translate("Fora.Deck", "Could not copy the SQLite backup."));
     }
     // Проверяем схему и миграцию в отдельном файле, прежде чем трогать исходную БД.
     {
@@ -307,7 +308,7 @@ QString Database::restore_backup(const QString &source, const QString &destinati
                 QFile::rename(it->second, it->first);
             // При сбое отката сохраняем папку с исходными файлами для ручного восстановления.
             staging.setAutoRemove(false);
-            fail(QCoreApplication::translate("XLibrary", "Could not preserve the current library. Recovery files: %1")
+            fail(QCoreApplication::translate("Fora.Deck", "Could not preserve the current library. Recovery files: %1")
                      .arg(staging.path()));
         }
         moved.append({original, saved});
@@ -316,7 +317,7 @@ QString Database::restore_backup(const QString &source, const QString &destinati
         for (auto it = moved.crbegin(); it != moved.crend(); ++it)
             QFile::rename(it->second, it->first);
         staging.setAutoRemove(false);
-        fail(QCoreApplication::translate("XLibrary", "Could not install the restored library. Recovery files: %1")
+        fail(QCoreApplication::translate("Fora.Deck", "Could not install the restored library. Recovery files: %1")
                  .arg(staging.path()));
     }
     if (!moved.isEmpty()) {
@@ -329,7 +330,7 @@ QString Database::restore_backup(const QString &source, const QString &destinati
 catalog_snapshot Database::read() const {
     catalog_snapshot result;
     auto *connection = get_connection();
-    xlibrary::SqliteStatement applications(connection, R"(
+    foradeck::SqliteStatement applications(connection, R"(
         SELECT a.id, a.name, c.path, c.arguments, c.working_directory,
                coalesce(d.favorite,0), coalesce(d.last_launch,0),c.id,c.target_id,t.kind,c.installation_directory,c.icon_path,coalesce(d.default_launch_profile,''),c.executable_path,coalesce(d.launch_count,0)
         FROM applications a JOIN launch_configuration c ON c.id=a.configuration_id
@@ -358,21 +359,21 @@ catalog_snapshot Database::read() const {
         rows.insert(record.id, result.applications.size());
         result.applications.append(std::move(record));
     }
-    xlibrary::SqliteStatement aliases(
+    foradeck::SqliteStatement aliases(
         connection, "SELECT application_id,name FROM application_alias ORDER BY application_id,position;");
     while (aliases.next()) {
         const auto row = rows.constFind(aliases.number(0));
         if (row != rows.cend())
             result.applications[*row].aliases.append(aliases.qtext(1));
     }
-    xlibrary::SqliteStatement filters(
+    foradeck::SqliteStatement filters(
         connection,
         "SELECT id,name,query,section,tag,sort_mode,sort_order FROM saved_filter ORDER BY name COLLATE NOCASE,id;");
     while (filters.next())
         result.filters.append({filters.number(0), filters.qtext(1), filters.qtext(2), filters.qtext(3),
                                filters.qtext(4), static_cast<int>(filters.number(5)),
                                static_cast<Qt::SortOrder>(filters.number(6))});
-    xlibrary::SqliteStatement sources(connection,
+    foradeck::SqliteStatement sources(connection,
                                       "SELECT a.id,s.source_key FROM applications a JOIN discovery_source s "
                                       "ON s.configuration_id=a.configuration_id ORDER BY s.kind,s.source_key;");
     while (sources.next()) {
@@ -384,11 +385,11 @@ catalog_snapshot Database::read() const {
                 record.discovery_source = sources.qtext(1);
         }
     }
-    xlibrary::SqliteStatement tags(connection, "SELECT name FROM tags ORDER BY name COLLATE NOCASE;");
+    foradeck::SqliteStatement tags(connection, "SELECT name FROM tags ORDER BY name COLLATE NOCASE;");
     while (tags.next()) {
         result.tags.append(tags.qtext(0));
     }
-    xlibrary::SqliteStatement links(
+    foradeck::SqliteStatement links(
         connection,
         "SELECT at.application_id, t.name FROM application_tags at JOIN tags t ON t.id = at.tag_id ORDER BY t.name;");
     while (links.next()) {
@@ -397,11 +398,11 @@ catalog_snapshot Database::read() const {
             result.applications[*row].tags.append(links.qtext(1));
         }
     }
-    result.workspaces = xlibrary::read_workspaces(connection);
-    xlibrary::SqliteStatement scenarios(connection, "SELECT id, name FROM desktop_scenario ORDER BY name;");
+    result.workspaces = foradeck::read_workspaces(connection);
+    foradeck::SqliteStatement scenarios(connection, "SELECT id, name FROM desktop_scenario ORDER BY name;");
     while (scenarios.next()) {
         scenario_record record{scenarios.number(0), scenarios.qtext(1), {}};
-        xlibrary::SqliteStatement steps(
+        foradeck::SqliteStatement steps(
             connection, "SELECT application_id, delay_ms, enabled, launch_profile FROM desktop_scenario_step WHERE "
                         "scenario_id = ? ORDER BY position;");
         steps.bind(1, record.id);
@@ -411,12 +412,12 @@ catalog_snapshot Database::read() const {
         }
         result.scenarios.append(std::move(record));
     }
-    xlibrary::SqliteStatement shortcuts(
+    foradeck::SqliteStatement shortcuts(
         connection,
         "SELECT scenario_id IS NOT NULL,coalesce(application_id,scenario_id),sequence FROM target_shortcut;");
     while (shortcuts.next())
         result.target_shortcuts.append({shortcuts.number(0) != 0, shortcuts.number(1), shortcuts.qtext(2)});
-    xlibrary::SqliteStatement usage(connection, "SELECT path,use_count,last_used FROM file_usage;");
+    foradeck::SqliteStatement usage(connection, "SELECT path,use_count,last_used FROM file_usage;");
     while (usage.next())
         result.file_usage.insert(usage.qtext(0), {usage.number(1), usage.number(2)});
     return result;
@@ -426,7 +427,7 @@ void Database::save_target_shortcut(const bool scenario, const qint64 id, const 
     if (id <= 0 || sequence.size() > 128 || sequence.contains(QChar::Null))
         throw std::invalid_argument("Invalid target shortcut");
     auto *connection = get_connection();
-    xlibrary::SqliteStatement target(connection, scenario ? "SELECT id FROM desktop_scenario WHERE id=?;"
+    foradeck::SqliteStatement target(connection, scenario ? "SELECT id FROM desktop_scenario WHERE id=?;"
                                                           : "SELECT id FROM applications WHERE id=?;");
     target.bind(1, id);
     if (!target.next())
@@ -434,7 +435,7 @@ void Database::save_target_shortcut(const bool scenario, const qint64 id, const 
     const auto column = scenario ? "scenario_id" : "application_id";
     if (sequence.isEmpty()) {
         const auto sql = std::string("DELETE FROM target_shortcut WHERE ") + column + "=?;";
-        xlibrary::SqliteStatement remove(connection, sql.c_str());
+        foradeck::SqliteStatement remove(connection, sql.c_str());
         remove.bind(1, id);
         remove.next();
     } else {
@@ -442,7 +443,7 @@ void Database::save_target_shortcut(const bool scenario, const qint64 id, const 
                          ",sequence) VALUES(?,?) "
                          "ON CONFLICT(" +
                          column + ") DO UPDATE SET sequence=excluded.sequence;";
-        xlibrary::SqliteStatement save(connection, sql.c_str());
+        foradeck::SqliteStatement save(connection, sql.c_str());
         save.bind(1, id);
         save.bind(2, sequence);
         save.next();
@@ -451,7 +452,7 @@ void Database::save_target_shortcut(const bool scenario, const qint64 id, const 
 
 void Database::write_metadata(const qint64 id, const app_record &record) {
     auto *connection = get_connection();
-    xlibrary::SqliteStatement metadata(connection, R"(
+    foradeck::SqliteStatement metadata(connection, R"(
         INSERT INTO desktop_application(application_id, favorite, default_launch_profile) VALUES(?,?,?)
         ON CONFLICT(application_id) DO UPDATE SET favorite=excluded.favorite,default_launch_profile=excluded.default_launch_profile;
     )");
@@ -459,7 +460,7 @@ void Database::write_metadata(const qint64 id, const app_record &record) {
     metadata.bind(2, record.favorite);
     metadata.bind(3, record.default_launch_profile);
     metadata.next();
-    xlibrary::SqliteStatement clear_aliases(connection, "DELETE FROM application_alias WHERE application_id=?;");
+    foradeck::SqliteStatement clear_aliases(connection, "DELETE FROM application_alias WHERE application_id=?;");
     clear_aliases.bind(1, id);
     clear_aliases.next();
     QSet<QString> alias_keys;
@@ -469,19 +470,19 @@ void Database::write_metadata(const qint64 id, const app_record &record) {
         if (alias_keys.contains(key))
             continue;
         alias_keys.insert(key);
-        xlibrary::SqliteStatement alias(connection,
+        foradeck::SqliteStatement alias(connection,
                                         "INSERT INTO application_alias(application_id,position,name) VALUES(?,?,?);");
         alias.bind(1, id);
         alias.bind(2, alias_position++);
         alias.bind(3, name.trimmed());
         alias.next();
     }
-    xlibrary::SqliteStatement clear(connection, "DELETE FROM application_tags WHERE application_id = ?;");
+    foradeck::SqliteStatement clear(connection, "DELETE FROM application_tags WHERE application_id = ?;");
     clear.bind(1, id);
     clear.next();
     QHash<QString, QString> known_tags;
     QSet<QString> existing_tag_names;
-    xlibrary::SqliteStatement existing_tags(connection, "SELECT name FROM tags;");
+    foradeck::SqliteStatement existing_tags(connection, "SELECT name FROM tags;");
     while (existing_tags.next()) {
         const auto name = existing_tags.qtext(0);
         known_tags.insert(tag_name_key(name), name);
@@ -491,10 +492,10 @@ void Database::write_metadata(const qint64 id, const app_record &record) {
         const auto key = tag_name_key(tag);
         // Preserve exact assignments in older profiles that already contain equivalent spellings.
         const auto canonical_tag = existing_tag_names.contains(tag) ? tag : known_tags.value(key, tag);
-        xlibrary::SqliteStatement create(connection, "INSERT OR IGNORE INTO tags(name) VALUES(?);");
+        foradeck::SqliteStatement create(connection, "INSERT OR IGNORE INTO tags(name) VALUES(?);");
         create.bind(1, canonical_tag);
         create.next();
-        xlibrary::SqliteStatement link(connection,
+        foradeck::SqliteStatement link(connection,
                                        "INSERT OR IGNORE INTO application_tags SELECT ?, id FROM tags WHERE name = ?;");
         link.bind(1, id);
         link.bind(2, canonical_tag);
@@ -512,7 +513,7 @@ void Database::write_source(const qint64 configuration_id, const app_record &rec
     for (const auto &path : sources) {
         if (path.isEmpty())
             continue;
-        xlibrary::SqliteStatement source(
+        foradeck::SqliteStatement source(
             get_connection(),
             "INSERT OR IGNORE INTO discovery_source(configuration_id,kind,source_key) VALUES(?,?,?);");
         source.bind(1, configuration_id);
@@ -531,7 +532,7 @@ qint64 Database::save_application(const app_record &record) {
     Transaction transaction(connection);
     qint64 configuration_id = 0;
     if (record.id != 0) {
-        xlibrary::SqliteStatement current(
+        foradeck::SqliteStatement current(
             connection, "SELECT c.id,c.path,c.arguments,c.working_directory,t.kind FROM applications a "
                         "JOIN launch_configuration c ON c.id=a.configuration_id "
                         "JOIN launch_target t ON t.id=c.target_id WHERE a.id=?;");
@@ -542,17 +543,17 @@ qint64 Database::save_application(const app_record &record) {
             configuration_id = current.number(0);
     }
     if (configuration_id == 0) {
-        configuration_id = xlibrary::ensure_launch_configuration(connection, record);
-        xlibrary::SqliteStatement duplicate(connection,
+        configuration_id = foradeck::ensure_launch_configuration(connection, record);
+        foradeck::SqliteStatement duplicate(connection,
                                             "SELECT id FROM applications WHERE configuration_id=? AND id<>? LIMIT 1;");
         duplicate.bind(1, configuration_id);
         duplicate.bind(2, record.id);
         if (duplicate.next())
             throw std::invalid_argument(
-                QCoreApplication::translate("XLibrary", "This launch configuration is already in the library.")
+                QCoreApplication::translate("Fora.Deck", "This launch configuration is already in the library.")
                     .toStdString());
     }
-    xlibrary::SqliteStatement location(
+    foradeck::SqliteStatement location(
         connection,
         "UPDATE launch_configuration SET installation_directory=?,icon_path=?,executable_path=? WHERE id=?;");
     location.bind(1, record.installation_directory);
@@ -562,21 +563,21 @@ qint64 Database::save_application(const app_record &record) {
     location.next();
     qint64 id = record.id;
     if (id == 0) {
-        xlibrary::SqliteStatement insert(connection, "INSERT INTO applications(name,configuration_id) VALUES(?,?);");
+        foradeck::SqliteStatement insert(connection, "INSERT INTO applications(name,configuration_id) VALUES(?,?);");
         insert.bind(1, record.name);
         insert.bind(2, configuration_id);
         insert.next();
         id = sqlite3_last_insert_rowid(connection);
         write_source(configuration_id, record);
     } else {
-        xlibrary::SqliteStatement update(connection, "UPDATE applications SET name=?,configuration_id=? WHERE id=?;");
+        foradeck::SqliteStatement update(connection, "UPDATE applications SET name=?,configuration_id=? WHERE id=?;");
         update.bind(1, record.name);
         update.bind(2, configuration_id);
         update.bind(3, id);
         update.next();
         if (sqlite3_changes(connection) == 0)
             throw std::runtime_error(
-                QCoreApplication::translate("XLibrary", "The application has already been removed from the library.")
+                QCoreApplication::translate("Fora.Deck", "The application has already been removed from the library.")
                     .toStdString());
     }
     write_metadata(id, record);
@@ -603,7 +604,8 @@ void Database::remove_applications(const QVector<qint64> &ids) {
                               backup.applications.end());
     if (backup.applications.size() != selected.size())
         throw std::invalid_argument(
-            QCoreApplication::translate("XLibrary", "The selection changed. Select applications again.").toStdString());
+            QCoreApplication::translate("Fora.Deck", "The selection changed. Select applications again.")
+                .toStdString());
     backup.scenarios.erase(std::remove_if(backup.scenarios.begin(), backup.scenarios.end(),
                                           [&](const scenario_record &record) {
                                               return std::none_of(record.steps.cbegin(), record.steps.cend(),
@@ -613,7 +615,7 @@ void Database::remove_applications(const QVector<qint64> &ids) {
                                           }),
                            backup.scenarios.end());
     for (const auto id : selected) {
-        xlibrary::SqliteStatement statement(connection, "DELETE FROM applications WHERE id=?;");
+        foradeck::SqliteStatement statement(connection, "DELETE FROM applications WHERE id=?;");
         statement.bind(1, id);
         statement.next();
     }
@@ -633,7 +635,7 @@ void Database::undo_removal() {
         deleted_ids.insert(record.id);
     const auto fail = [] {
         throw std::invalid_argument(
-            QCoreApplication::translate("XLibrary",
+            QCoreApplication::translate("Fora.Deck",
                                         "The library or a linked scenario changed. Undo would overwrite changes.")
                 .toStdString());
     };
@@ -657,21 +659,21 @@ void Database::undo_removal() {
             fail();
     }
     for (const auto &record : last_removal.applications) {
-        xlibrary::SqliteStatement conflict(connection, "SELECT id FROM applications WHERE id=? OR configuration_id=?;");
+        foradeck::SqliteStatement conflict(connection, "SELECT id FROM applications WHERE id=? OR configuration_id=?;");
         conflict.bind(1, record.id);
         conflict.bind(2, record.configuration_id);
         while (conflict.next())
             if (conflict.number(0) == record.id ||
                 removal_configurations.value(conflict.number(0)) != record.configuration_id)
                 fail();
-        xlibrary::SqliteStatement insert(connection,
+        foradeck::SqliteStatement insert(connection,
                                          "INSERT INTO applications(id,name,configuration_id) VALUES(?,?,?);");
         insert.bind(1, record.id);
         insert.bind(2, record.name);
         insert.bind(3, record.configuration_id);
         insert.next();
         write_metadata(record.id, record);
-        xlibrary::SqliteStatement history(
+        foradeck::SqliteStatement history(
             connection, "UPDATE desktop_application SET last_launch=?,launch_count=? WHERE application_id=?;");
         history.bind(1, record.last_launch);
         history.bind(2, record.launch_count);
@@ -682,12 +684,12 @@ void Database::undo_removal() {
         if (!shortcut.scenario && deleted_ids.contains(shortcut.target_id))
             save_target_shortcut(false, shortcut.target_id, shortcut.sequence);
     for (const auto &scenario : last_removal.scenarios) {
-        xlibrary::SqliteStatement clear(connection, "DELETE FROM desktop_scenario_step WHERE scenario_id=?;");
+        foradeck::SqliteStatement clear(connection, "DELETE FROM desktop_scenario_step WHERE scenario_id=?;");
         clear.bind(1, scenario.id);
         clear.next();
         for (qsizetype index = 0; index < scenario.steps.size(); ++index) {
             const auto &step = scenario.steps[index];
-            xlibrary::SqliteStatement insert(connection, "INSERT INTO "
+            foradeck::SqliteStatement insert(connection, "INSERT INTO "
                                                          "desktop_scenario_step(scenario_id,position,application_id,"
                                                          "delay_ms,enabled,launch_profile) VALUES(?,?,?,?,?,?);");
             insert.bind(1, scenario.id);
@@ -728,7 +730,8 @@ void Database::update_metadata(const QVector<qint64> &ids, const QStringList &ad
     }
     if (updated_count != selected.size())
         throw std::invalid_argument(
-            QCoreApplication::translate("XLibrary", "The selection changed. Select applications again.").toStdString());
+            QCoreApplication::translate("Fora.Deck", "The selection changed. Select applications again.")
+                .toStdString());
     transaction.commit();
 }
 
@@ -738,14 +741,14 @@ void Database::save_filter(const saved_filter &record) {
         (record.section != "library" && record.section != "favorites" && record.section != "running") ||
         (!record.tag.isEmpty() && !valid_tag_name(record.tag)) || record.sort_mode < 0 || record.sort_mode > 4 ||
         (record.sort_order != Qt::AscendingOrder && record.sort_order != Qt::DescendingOrder))
-        throw std::invalid_argument(QCoreApplication::translate("XLibrary", "Invalid saved filter.").toStdString());
+        throw std::invalid_argument(QCoreApplication::translate("Fora.Deck", "Invalid saved filter.").toStdString());
     Transaction transaction(get_connection());
-    xlibrary::SqliteStatement names(get_connection(), "SELECT id,name FROM saved_filter;");
+    foradeck::SqliteStatement names(get_connection(), "SELECT id,name FROM saved_filter;");
     while (names.next())
         if (names.number(0) != record.id && names.qtext(1).toCaseFolded() == record.name.toCaseFolded())
             throw std::invalid_argument(
-                QCoreApplication::translate("XLibrary", "A filter with this name already exists.").toStdString());
-    xlibrary::SqliteStatement write(
+                QCoreApplication::translate("Fora.Deck", "A filter with this name already exists.").toStdString());
+    foradeck::SqliteStatement write(
         get_connection(),
         record.id ? "UPDATE saved_filter SET name=?,query=?,section=?,tag=?,sort_mode=?,sort_order=? WHERE id=?;"
                   : "INSERT INTO saved_filter(name,query,section,tag,sort_mode,sort_order) VALUES(?,?,?,?,?,?);");
@@ -762,7 +765,7 @@ void Database::save_filter(const saved_filter &record) {
 }
 
 void Database::remove_filter(const qint64 id) {
-    xlibrary::SqliteStatement remove(get_connection(), "DELETE FROM saved_filter WHERE id=?;");
+    foradeck::SqliteStatement remove(get_connection(), "DELETE FROM saved_filter WHERE id=?;");
     remove.bind(1, id);
     remove.next();
 }
@@ -770,16 +773,16 @@ void Database::remove_filter(const qint64 id) {
 void Database::update_filter_tags(const QString &old_name, const QString &new_name) {
     if (old_name.isEmpty())
         return;
-    xlibrary::SqliteStatement filters(get_connection(), "SELECT id,query,tag FROM saved_filter;");
+    foradeck::SqliteStatement filters(get_connection(), "SELECT id,query,tag FROM saved_filter;");
     while (filters.next()) {
         const auto query = search_query::rewrite_tag(filters.qtext(1), old_name, new_name);
         if (query.size() > catalog_limits::text_length)
             throw std::invalid_argument(
-                QCoreApplication::translate("XLibrary", "Renaming this tag would make a saved filter query too long "
-                                                        "(maximum 32768 characters).")
+                QCoreApplication::translate("Fora.Deck", "Renaming this tag would make a saved filter query too long "
+                                                         "(maximum 32768 characters).")
                     .toStdString());
         const auto tag = tag_name_key(filters.qtext(2)) == tag_name_key(old_name) ? new_name : filters.qtext(2);
-        xlibrary::SqliteStatement update(get_connection(), "UPDATE saved_filter SET query=?,tag=? WHERE id=?;");
+        foradeck::SqliteStatement update(get_connection(), "UPDATE saved_filter SET query=?,tag=? WHERE id=?;");
         update.bind(1, query);
         update.bind(2, tag);
         update.bind(3, filters.number(0));
@@ -789,16 +792,16 @@ void Database::update_filter_tags(const QString &old_name, const QString &new_na
 
 void Database::save_tag(const QString &old_name, const QString &new_name) {
     if (!valid_tag_name(new_name))
-        throw std::invalid_argument(QCoreApplication::translate("XLibrary", "Invalid tag name.").toStdString());
+        throw std::invalid_argument(QCoreApplication::translate("Fora.Deck", "Invalid tag name.").toStdString());
     Transaction transaction(get_connection());
-    xlibrary::SqliteStatement existing(get_connection(), "SELECT name FROM tags;");
+    foradeck::SqliteStatement existing(get_connection(), "SELECT name FROM tags;");
     while (existing.next()) {
         if (existing.qtext(0) != old_name && tag_name_key(existing.qtext(0)) == tag_name_key(new_name)) {
             throw std::invalid_argument(
-                QCoreApplication::translate("XLibrary", "A tag with this name already exists.").toStdString());
+                QCoreApplication::translate("Fora.Deck", "A tag with this name already exists.").toStdString());
         }
     }
-    xlibrary::SqliteStatement statement(get_connection(), old_name.isEmpty()
+    foradeck::SqliteStatement statement(get_connection(), old_name.isEmpty()
                                                               ? "INSERT INTO tags(name) VALUES(?);"
                                                               : "UPDATE tags SET name = ? WHERE name = ?;");
     statement.bind(1, new_name);
@@ -812,7 +815,7 @@ void Database::save_tag(const QString &old_name, const QString &new_name) {
 
 void Database::remove_tag(const QString &name) {
     Transaction transaction(get_connection());
-    xlibrary::SqliteStatement statement(get_connection(), "DELETE FROM tags WHERE name = ?;");
+    foradeck::SqliteStatement statement(get_connection(), "DELETE FROM tags WHERE name = ?;");
     statement.bind(1, name);
     statement.next();
     update_filter_tags(name, {});
@@ -823,29 +826,29 @@ qint64 Database::save_scenario(const scenario_record &record) {
     if (record.name.trimmed().isEmpty() || record.name.size() > 128 || record.steps.isEmpty() ||
         record.steps.size() > 1000) {
         throw std::invalid_argument(
-            QCoreApplication::translate("XLibrary", "Enter a scenario name and between 1 and 1000 steps.")
+            QCoreApplication::translate("Fora.Deck", "Enter a scenario name and between 1 and 1000 steps.")
                 .toStdString());
     }
     auto *connection = get_connection();
     Transaction transaction(connection);
     auto id = record.id;
     if (id == 0) {
-        xlibrary::SqliteStatement insert(connection, "INSERT INTO desktop_scenario(name) VALUES(?);");
+        foradeck::SqliteStatement insert(connection, "INSERT INTO desktop_scenario(name) VALUES(?);");
         insert.bind(1, record.name);
         insert.next();
         id = sqlite3_last_insert_rowid(connection);
     } else {
-        xlibrary::SqliteStatement update(connection, "UPDATE desktop_scenario SET name = ? WHERE id = ?;");
+        foradeck::SqliteStatement update(connection, "UPDATE desktop_scenario SET name = ? WHERE id = ?;");
         update.bind(1, record.name);
         update.bind(2, id);
         update.next();
-        xlibrary::SqliteStatement clear(connection, "DELETE FROM desktop_scenario_step WHERE scenario_id = ?;");
+        foradeck::SqliteStatement clear(connection, "DELETE FROM desktop_scenario_step WHERE scenario_id = ?;");
         clear.bind(1, id);
         clear.next();
     }
     for (qsizetype index = 0; index < record.steps.size(); ++index) {
         const auto &step = record.steps[index];
-        xlibrary::SqliteStatement insert(
+        foradeck::SqliteStatement insert(
             connection,
             "INSERT INTO desktop_scenario_step(scenario_id,position,application_id,delay_ms,enabled,launch_profile) "
             "VALUES(?,?,?,?,?,?);");
@@ -864,28 +867,28 @@ qint64 Database::save_scenario(const scenario_record &record) {
 }
 
 void Database::remove_scenario(const qint64 id) {
-    xlibrary::SqliteStatement statement(get_connection(), "DELETE FROM desktop_scenario WHERE id = ?;");
+    foradeck::SqliteStatement statement(get_connection(), "DELETE FROM desktop_scenario WHERE id = ?;");
     statement.bind(1, id);
     statement.next();
 }
 
 qint64 Database::save_workspace(const workspace_record &record) {
-    if (const auto issue = xlibrary::workspace_record_issue(record); !issue.isEmpty())
+    if (const auto issue = foradeck::workspace_record_issue(record); !issue.isEmpty())
         throw std::invalid_argument(issue.toStdString());
     auto *connection = get_connection();
     Transaction transaction(connection);
     auto id = record.id;
     const auto name = record.name.trimmed();
-    const auto key = xlibrary::workspace_name_key(name);
+    const auto key = foradeck::workspace_name_key(name);
     const auto now = QDateTime::currentSecsSinceEpoch();
-    xlibrary::SqliteStatement duplicate(connection, "SELECT 1 FROM workspace WHERE name_key=? AND id<>?;");
+    foradeck::SqliteStatement duplicate(connection, "SELECT 1 FROM workspace WHERE name_key=? AND id<>?;");
     duplicate.bind(1, key);
     duplicate.bind(2, id);
     if (duplicate.next())
         throw std::invalid_argument(
             QCoreApplication::translate("Workspaces", "This workspace name is already in use.").toStdString());
     if (id == 0) {
-        xlibrary::SqliteStatement insert(connection,
+        foradeck::SqliteStatement insert(connection,
                                          "INSERT INTO workspace(name,name_key,created_at,updated_at) VALUES(?,?,?,?);");
         insert.bind(1, name);
         insert.bind(2, key);
@@ -894,7 +897,7 @@ qint64 Database::save_workspace(const workspace_record &record) {
         insert.next();
         id = sqlite3_last_insert_rowid(connection);
     } else {
-        xlibrary::SqliteStatement update(connection, "UPDATE workspace SET name=?,name_key=?,updated_at=? WHERE id=?;");
+        foradeck::SqliteStatement update(connection, "UPDATE workspace SET name=?,name_key=?,updated_at=? WHERE id=?;");
         update.bind(1, name);
         update.bind(2, key);
         update.bind(3, now);
@@ -907,7 +910,7 @@ qint64 Database::save_workspace(const workspace_record &record) {
 
     QSet<qint64> old_items;
     {
-        xlibrary::SqliteStatement select(connection, "SELECT id FROM workspace_item WHERE workspace_id=?;");
+        foradeck::SqliteStatement select(connection, "SELECT id FROM workspace_item WHERE workspace_id=?;");
         select.bind(1, id);
         while (select.next())
             old_items.insert(select.number(0));
@@ -917,14 +920,14 @@ qint64 Database::save_workspace(const workspace_record &record) {
             throw std::invalid_argument(
                 QCoreApplication::translate("Workspaces", "The resource list has changed.").toStdString());
 
-    xlibrary::SqliteStatement clear(connection, "DELETE FROM workspace_item WHERE workspace_id=?;");
+    foradeck::SqliteStatement clear(connection, "DELETE FROM workspace_item WHERE workspace_id=?;");
     clear.bind(1, id);
     clear.next();
     for (qsizetype position = 0; position < record.items.size(); ++position) {
         const auto &item = record.items[position];
         QString display_name = item.display_name;
         if (item.application_id) {
-            xlibrary::SqliteStatement app(connection, "SELECT name FROM applications WHERE id=?;");
+            foradeck::SqliteStatement app(connection, "SELECT name FROM applications WHERE id=?;");
             app.bind(1, item.application_id);
             if (!app.next())
                 throw std::invalid_argument(
@@ -932,7 +935,7 @@ qint64 Database::save_workspace(const workspace_record &record) {
             display_name = app.qtext(0).left(256);
             display_name.removeIf([](const QChar character) { return character.category() == QChar::Other_Control; });
         }
-        xlibrary::SqliteStatement insert(connection, R"(
+        foradeck::SqliteStatement insert(connection, R"(
             INSERT INTO workspace_item(id,workspace_id,position,kind,application_id,target,display_name,
                                        launch_profile,enabled,reuse_existing)
             VALUES(nullif(?,0),?,?,?,nullif(?,0),?,?,?,?,?);
@@ -952,7 +955,7 @@ qint64 Database::save_workspace(const workspace_record &record) {
             continue;
         const auto &placement = *item.placement;
         const auto item_id = sqlite3_last_insert_rowid(connection);
-        xlibrary::SqliteStatement window(connection, "INSERT INTO workspace_window VALUES(?,?,?,?,?,?,?);");
+        foradeck::SqliteStatement window(connection, "INSERT INTO workspace_window VALUES(?,?,?,?,?,?,?);");
         window.bind(1, item_id);
         window.bind(2, placement.monitor_id);
         window.bind_real(3, placement.geometry.x());
@@ -967,13 +970,13 @@ qint64 Database::save_workspace(const workspace_record &record) {
 }
 
 void Database::remove_workspace(const qint64 id) {
-    xlibrary::SqliteStatement remove(get_connection(), "DELETE FROM workspace WHERE id=?;");
+    foradeck::SqliteStatement remove(get_connection(), "DELETE FROM workspace WHERE id=?;");
     remove.bind(1, id);
     remove.next();
 }
 
 void Database::record_launch(const qint64 id) {
-    xlibrary::SqliteStatement statement(get_connection(),
+    foradeck::SqliteStatement statement(get_connection(),
                                         "INSERT INTO desktop_application(application_id,last_launch,launch_count) "
                                         "VALUES(?,?,1) ON CONFLICT(application_id) DO UPDATE SET "
                                         "last_launch=excluded.last_launch,"
@@ -986,7 +989,7 @@ void Database::record_launch(const qint64 id) {
 void Database::record_file_use(const QString &path) {
     if (!QFileInfo(path).isAbsolute() || path.contains(QChar::Null))
         throw std::invalid_argument("Invalid file history path");
-    xlibrary::SqliteStatement statement(get_connection(),
+    foradeck::SqliteStatement statement(get_connection(),
                                         "INSERT INTO file_usage(path,use_count,last_used) VALUES(?,1,?) "
                                         "ON CONFLICT(path) DO UPDATE SET "
                                         "use_count=min(use_count,9223372036854775806)+1,last_used=excluded.last_used;");
@@ -1001,7 +1004,7 @@ QString Database::path() const {
 
 void Database::clear_history() {
     Transaction transaction(get_connection());
-    xlibrary::sqlite_execute(get_connection(), "UPDATE desktop_application SET last_launch=0,launch_count=0; "
+    foradeck::sqlite_execute(get_connection(), "UPDATE desktop_application SET last_launch=0,launch_count=0; "
                                                "DELETE FROM file_usage;");
     transaction.commit();
     for (auto &record : last_removal.applications) {
@@ -1014,10 +1017,10 @@ void Database::consolidate_discovered_application(const qint64 configuration_id,
 #ifdef Q_OS_WIN
     if (QFileInfo(record.discovery_source).suffix().compare("lnk", Qt::CaseInsensitive) != 0)
         return;
-    xlibrary::SqliteStatement count(get_connection(),
+    foradeck::SqliteStatement count(get_connection(),
                                     "SELECT count(*) FROM applications a JOIN launch_configuration c "
                                     "ON c.id=a.configuration_id WHERE c.invocation_key=? AND c.arguments=?;");
-    count.bind(1, xlibrary::path_identity(filesystem_path(record.path), false));
+    count.bind(1, foradeck::path_identity(filesystem_path(record.path), false));
     count.bind(2, record.arguments);
     if (!count.next() || count.number(0) < 2)
         return;
@@ -1054,36 +1057,36 @@ void Database::consolidate_discovered_application(const qint64 configuration_id,
             std::min(combined.launch_count, std::numeric_limits<qint64>::max() - existing.launch_count) +
             existing.launch_count;
         write_metadata(combined.id, combined);
-        xlibrary::SqliteStatement history(
+        foradeck::SqliteStatement history(
             get_connection(), "UPDATE desktop_application SET last_launch=?,launch_count=? WHERE application_id=?;");
         history.bind(1, combined.last_launch);
         history.bind(2, combined.launch_count);
         history.bind(3, combined.id);
         history.next();
-        xlibrary::SqliteStatement sources(get_connection(),
+        foradeck::SqliteStatement sources(get_connection(),
                                           "INSERT OR IGNORE INTO discovery_source(configuration_id,kind,source_key) "
                                           "SELECT ?,kind,source_key FROM discovery_source WHERE configuration_id=?;");
         sources.bind(1, merged.configuration_id);
         sources.bind(2, existing.configuration_id);
         sources.next();
-        xlibrary::SqliteStatement steps(get_connection(),
+        foradeck::SqliteStatement steps(get_connection(),
                                         "UPDATE desktop_scenario_step SET application_id=? WHERE application_id=?;");
         steps.bind(1, combined.id);
         steps.bind(2, existing.id);
         steps.next();
-        xlibrary::SqliteStatement remove(get_connection(), "DELETE FROM applications WHERE id=?;");
+        foradeck::SqliteStatement remove(get_connection(), "DELETE FROM applications WHERE id=?;");
         remove.bind(1, existing.id);
         remove.next();
         merged = std::move(combined);
     }
     if (merged.id != 0 && merged.configuration_id != configuration_id) {
-        xlibrary::SqliteStatement sources(get_connection(),
+        foradeck::SqliteStatement sources(get_connection(),
                                           "INSERT OR IGNORE INTO discovery_source(configuration_id,kind,source_key) "
                                           "SELECT ?,kind,source_key FROM discovery_source WHERE configuration_id=?;");
         sources.bind(1, configuration_id);
         sources.bind(2, merged.configuration_id);
         sources.next();
-        xlibrary::SqliteStatement update(get_connection(), "UPDATE applications SET configuration_id=? WHERE id=?;");
+        foradeck::SqliteStatement update(get_connection(), "UPDATE applications SET configuration_id=? WHERE id=?;");
         update.bind(1, configuration_id);
         update.bind(2, merged.id);
         update.next();
@@ -1111,7 +1114,7 @@ void Database::refresh_discovery_metadata(const QVector<app_record> &records, co
         const bool moved =
             !record.installation_directory.isEmpty() &&
             normalized_path(record.installation_directory) != normalized_path(existing.installation_directory);
-        xlibrary::SqliteStatement metadata(
+        foradeck::SqliteStatement metadata(
             get_connection(),
             "UPDATE launch_configuration SET installation_directory=?,icon_path=?,executable_path=? WHERE id=?;");
         metadata.bind(1, record.installation_directory.isEmpty() ? existing.installation_directory
@@ -1155,16 +1158,16 @@ catalog_import_result Database::import_records(const QVector<app_record> &record
         if (progress)
             progress(index, candidates.size());
         const auto &record = *candidates[index];
-        const auto configuration_id = xlibrary::ensure_launch_configuration(get_connection(), record);
+        const auto configuration_id = foradeck::ensure_launch_configuration(get_connection(), record);
         consolidate_discovered_application(configuration_id, record);
         write_source(configuration_id, record);
-        xlibrary::SqliteStatement duplicate(get_connection(),
+        foradeck::SqliteStatement duplicate(get_connection(),
                                             "SELECT id FROM applications WHERE configuration_id=? LIMIT 1;");
         duplicate.bind(1, configuration_id);
         if (duplicate.next()) {
             if (policy == import_conflict_policy::replace_metadata) {
                 const auto id = duplicate.number(0);
-                xlibrary::SqliteStatement update(get_connection(), "UPDATE applications SET name=? WHERE id=?;");
+                foradeck::SqliteStatement update(get_connection(), "UPDATE applications SET name=? WHERE id=?;");
                 update.bind(1, record.name);
                 update.bind(2, id);
                 update.next();
@@ -1176,11 +1179,11 @@ catalog_import_result Database::import_records(const QVector<app_record> &record
             if (issues)
                 issues->append(discovery_issue{
                     record.discovery_source.isEmpty() ? record.path : record.discovery_source,
-                    QCoreApplication::translate("XLibrary", "This launch configuration is already in the library."),
+                    QCoreApplication::translate("Fora.Deck", "This launch configuration is already in the library."),
                     discovery_issue_kind::duplicate});
             continue;
         }
-        xlibrary::SqliteStatement insert(get_connection(),
+        foradeck::SqliteStatement insert(get_connection(),
                                          "INSERT INTO applications(name,configuration_id) VALUES(?,?);");
         insert.bind(1, record.name);
         insert.bind(2, configuration_id);
@@ -1204,7 +1207,7 @@ catalog_import_result Database::import_records(const QVector<app_record> &record
 QVector<path_relocation> Database::preview_relocation(const QString &old_root, const QString &new_root) const {
     if (!QFileInfo(old_root).isAbsolute() || !QFileInfo(new_root).isAbsolute() || !QFileInfo(new_root).isDir())
         throw std::invalid_argument(
-            QCoreApplication::translate("XLibrary", "Choose an absolute old folder and an existing new folder.")
+            QCoreApplication::translate("Fora.Deck", "Choose an absolute old folder and an existing new folder.")
                 .toStdString());
     const auto old_prefix = QDir::cleanPath(QDir::fromNativeSeparators(old_root));
     const auto new_prefix = QDir::cleanPath(QDir::fromNativeSeparators(new_root));
@@ -1235,13 +1238,13 @@ QVector<path_relocation> Database::preview_relocation(const QString &old_root, c
                                replace_root(record.working_directory),
                                {}};
         if (!QFileInfo(replacement).isFile())
-            change.issue = QCoreApplication::translate("XLibrary", "The replacement file was not found.");
+            change.issue = QCoreApplication::translate("Fora.Deck", "The replacement file was not found.");
 #ifdef Q_OS_LINUX
         else if (QFileInfo(replacement).suffix() != "desktop" && !QFileInfo(replacement).isExecutable())
-            change.issue = QCoreApplication::translate("XLibrary", "The replacement file is not executable.");
+            change.issue = QCoreApplication::translate("Fora.Deck", "The replacement file is not executable.");
 #endif
         if (change.issue.isEmpty() && !change.new_directory.isEmpty() && !QFileInfo(change.new_directory).isDir())
-            change.issue = QCoreApplication::translate("XLibrary", "The replacement working directory was not found.");
+            change.issue = QCoreApplication::translate("Fora.Deck", "The replacement working directory was not found.");
         change.uses_existing_configuration =
             std::any_of(snapshot.applications.cbegin(), snapshot.applications.cend(), [&](const app_record &other) {
                 return other.id != record.id && normalized_path(other.path) == normalized_path(change.new_path) &&
@@ -1256,7 +1259,7 @@ QVector<path_relocation> Database::preview_relocation(const QString &old_root, c
 void Database::apply_relocation(const QVector<path_relocation> &changes) {
     if (changes.isEmpty())
         throw std::invalid_argument(
-            QCoreApplication::translate("XLibrary", "No paths selected for recovery.").toStdString());
+            QCoreApplication::translate("Fora.Deck", "No paths selected for recovery.").toStdString());
     Transaction transaction(get_connection());
     const auto current = read();
     QSet<qint64> seen;
@@ -1266,17 +1269,17 @@ void Database::apply_relocation(const QVector<path_relocation> &changes) {
         if (record == current.applications.cend() || record->path != change.old_path ||
             record->working_directory != change.old_directory || seen.contains(change.application_id))
             throw std::invalid_argument(
-                QCoreApplication::translate("XLibrary", "The library changed. Preview path recovery again.")
+                QCoreApplication::translate("Fora.Deck", "The library changed. Preview path recovery again.")
                     .toStdString());
         seen.insert(change.application_id);
         if (!change.issue.isEmpty() || !QFileInfo(change.new_path).isFile())
             throw std::invalid_argument(
-                QCoreApplication::translate("XLibrary", "A replacement application file is unavailable.")
+                QCoreApplication::translate("Fora.Deck", "A replacement application file is unavailable.")
                     .toStdString());
 #ifdef Q_OS_LINUX
         if (QFileInfo(change.new_path).suffix() != "desktop" && !QFileInfo(change.new_path).isExecutable())
             throw std::invalid_argument(
-                QCoreApplication::translate("XLibrary", "The replacement file is not executable.").toStdString());
+                QCoreApplication::translate("Fora.Deck", "The replacement file is not executable.").toStdString());
 #endif
         auto updated = *record;
         updated.path = change.new_path;
@@ -1284,18 +1287,18 @@ void Database::apply_relocation(const QVector<path_relocation> &changes) {
         validate_application(updated);
         if (!updated.working_directory.isEmpty() && !QFileInfo(updated.working_directory).isDir())
             throw std::invalid_argument(
-                QCoreApplication::translate("XLibrary", "The replacement working directory was not found.")
+                QCoreApplication::translate("Fora.Deck", "The replacement working directory was not found.")
                     .toStdString());
-        const auto configuration_id = xlibrary::ensure_launch_configuration(
+        const auto configuration_id = foradeck::ensure_launch_configuration(
             get_connection(), filesystem_path(updated.path), updated.arguments.toStdString(),
             filesystem_path(updated.working_directory));
-        xlibrary::SqliteStatement sources(get_connection(),
+        foradeck::SqliteStatement sources(get_connection(),
                                           "INSERT OR IGNORE INTO discovery_source(configuration_id,kind,source_key) "
                                           "SELECT ?,kind,source_key FROM discovery_source WHERE configuration_id=?;");
         sources.bind(1, configuration_id);
         sources.bind(2, record->configuration_id);
         sources.next();
-        xlibrary::SqliteStatement update(get_connection(), "UPDATE applications SET configuration_id=? WHERE id=?;");
+        foradeck::SqliteStatement update(get_connection(), "UPDATE applications SET configuration_id=? WHERE id=?;");
         update.bind(1, configuration_id);
         update.bind(2, change.application_id);
         update.next();

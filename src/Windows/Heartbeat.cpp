@@ -130,7 +130,7 @@ Heartbeat::make_process_checker(const std::uint32_t process_id, const std::files
 #include <QCoreApplication>
 #include <QDir>
 #include <QFileInfo>
-QString xlibrary::windows_process_path(const quint32 process_id) {
+QString foradeck::windows_process_path(const quint32 process_id) {
     const unique_handle process(OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, process_id), &CloseHandle);
     if (!process) {
         return {};
@@ -159,7 +159,7 @@ Heartbeat::process_snapshot Heartbeat::sample_processes(const QVector<app_record
     const auto raw_snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
     if (raw_snapshot == INVALID_HANDLE_VALUE) {
         throw std::runtime_error(
-            QCoreApplication::translate("XLibrary", "Could not retrieve the Windows process list.").toStdString());
+            QCoreApplication::translate("Fora.Deck", "Could not retrieve the Windows process list.").toStdString());
     }
     const unique_handle snapshot(raw_snapshot, &CloseHandle);
     PROCESSENTRY32W entry{};
@@ -211,12 +211,12 @@ void Heartbeat::terminate_application(const app_record &application) {
         for (const auto &sample : it.value()) {
             const auto fail = [&](const DWORD error) {
                 errors.append(
-                    QCoreApplication::translate("XLibrary", "PID %1: %2")
+                    QCoreApplication::translate("Fora.Deck", "PID %1: %2")
                         .arg(sample.pid)
                         .arg(QString::fromStdString(std::system_category().message(static_cast<int>(error)))));
             };
             if (sample.pid == GetCurrentProcessId()) {
-                errors.append(QCoreApplication::translate("XLibrary", "Fora.Deck cannot terminate itself here."));
+                errors.append(QCoreApplication::translate("Fora.Deck", "Fora.Deck cannot terminate itself here."));
                 continue;
             }
             const unique_handle process(

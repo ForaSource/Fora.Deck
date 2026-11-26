@@ -1,5 +1,5 @@
-#ifndef XLIBRARY_LINUX_PROCESSOR_H
-#define XLIBRARY_LINUX_PROCESSOR_H
+#ifndef FORADECK_LINUX_PROCESSOR_H
+#define FORADECK_LINUX_PROCESSOR_H
 
 #include <cstdint>
 #include <filesystem>
@@ -7,7 +7,7 @@
 #include <string>
 #include <system_error>
 
-namespace xlibrary {
+namespace foradeck {
 
 struct process_identity {
     std::uint32_t pid = 0;
@@ -23,6 +23,6 @@ std::optional<process_identity> find_process(const std::filesystem::path &execut
 process_identity launch_process(const std::filesystem::path &executable_path, const std::wstring &arguments,
                                 const std::filesystem::path &working_directory);
 
-} // namespace xlibrary
+} // namespace foradeck
 
-#endif // XLIBRARY_LINUX_PROCESSOR_H
+#endif // FORADECK_LINUX_PROCESSOR_H

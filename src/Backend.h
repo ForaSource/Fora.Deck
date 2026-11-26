@@ -1,5 +1,5 @@
-#ifndef XLIBRARY_BACKEND_H
-#define XLIBRARY_BACKEND_H
+#ifndef FORADECK_BACKEND_H
+#define FORADECK_BACKEND_H
 
 #pragma once
 
@@ -14,4 +14,4 @@
 #endif
 #include "WindowManager.h"
 
-#endif //XLIBRARY_BACKEND_H
+#endif //FORADECK_BACKEND_H

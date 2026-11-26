@@ -161,7 +161,7 @@ private slots:
         QString error;
         QVERIFY(hotkey.set_sequence(QKeySequence("Ctrl+Alt+A"), error));
         QTRY_COMPARE(failures.size(), 1);
-        QVERIFY(failures.front().front().toString().contains("XLibrary --overlay"));
+        QVERIFY(failures.front().front().toString().contains("foradeck --overlay"));
         if (mode != 0)
             QTRY_VERIFY(portal->closed.contains(portal->sessions.front()));
         // Failure clears submission state, so saving the same binding can retry.

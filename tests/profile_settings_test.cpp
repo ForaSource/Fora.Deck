@@ -57,7 +57,7 @@ private slots:
         QVERIFY(directory.isValid());
         const auto db_path = directory.filePath("profile.db");
         const auto ini_path = directory.filePath("profile.ini");
-        const auto backup_path = directory.filePath("transfer.xlprofile");
+        const auto backup_path = directory.filePath("transfer.foradeckprofile");
         { Database empty_profile(db_path); }
         QCoreApplication::setApplicationVersion("1.0.0");
         const QByteArray geometry("window\0position", 15);
@@ -86,7 +86,7 @@ private slots:
         QVERIFY(!restored.contains("local/only"));
         QSettings previous(recovery.filePath("settings.ini"), QSettings::IniFormat);
         QCOMPARE(previous.value("local/only").toString(), QString("previous value"));
-        QCOMPARE(ProfileBackup::inspect(recovery.filePath("previous.xlprofile")).counts.value("settings"), 1);
+        QCOMPARE(ProfileBackup::inspect(recovery.filePath("previous.foradeckprofile")).counts.value("settings"), 1);
     }
 };
 

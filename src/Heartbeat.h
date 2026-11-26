@@ -1,5 +1,5 @@
-#ifndef XLIBRARY_HEARTBEAT_H
-#define XLIBRARY_HEARTBEAT_H
+#ifndef FORADECK_HEARTBEAT_H
+#define FORADECK_HEARTBEAT_H
 
 #include <cstdint>
 #include <filesystem>
@@ -46,9 +46,9 @@ public:
 };
 
 #ifdef _WIN32
-namespace xlibrary {
+namespace foradeck {
 QString windows_process_path(quint32 process_id);
 }
 #endif
 
-#endif //XLIBRARY_HEARTBEAT_H
+#endif //FORADECK_HEARTBEAT_H

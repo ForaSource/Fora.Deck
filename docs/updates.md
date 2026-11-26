@@ -27,9 +27,10 @@ Portable copies, Linux installations, and releases without a matching installer 
 Follow the release notes for the appropriate ZIP, DEB, or AppImage. Keep the portable `data/` folder or AppImage's adjacent profile directory;
 see [storage modes](profile.md#storage-modes). A complete profile backup is useful before upgrading.
 
-The rebrand keeps `XLibrary` in executable and distribution filenames. Windows upgrades use the same installer
-AppId and installation directory; the installer replaces its former standard XLibrary shortcuts with Fora.Deck
-shortcuts. An existing desktop shortcut is preserved under the new name. This does not migrate or rename the profile.
+If an older build shows only a release link, download its matching Fora.Deck installer from the release page.
+On Windows, new installations default to `%LOCALAPPDATA%\Programs\Fora.Deck`. In-place upgrades reuse the registered
+installation directory and update the standard shortcuts. The first launch migrates the [profile](profile.md#storage-modes).
+Update any custom shortcuts or scripts to use `foradeck.exe` on Windows or `foradeck` on Linux.
 
 ## Optional GitHub token
 

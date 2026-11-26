@@ -114,7 +114,7 @@ private slots:
         sqlite3 *raw = nullptr;
         QCOMPARE(sqlite3_open(temporary.filePath("file-index.sqlite").toUtf8().constData(), &raw), SQLITE_OK);
         std::unique_ptr<sqlite3, decltype(&sqlite3_close)> db(raw, sqlite3_close);
-        xlibrary::sqlite_execute(db.get(), "CREATE TRIGGER blocked_document BEFORE INSERT ON saved "
+        foradeck::sqlite_execute(db.get(), "CREATE TRIGGER blocked_document BEFORE INSERT ON saved "
                                            "WHEN NEW.path LIKE '%/blocked.txt' "
                                            "BEGIN SELECT RAISE(ABORT, 'blocked document'); END");
         QSignalSpy updated(&manager, &FileManager::saved_paths_changed);
@@ -125,7 +125,7 @@ private slots:
         QVERIFY(failure.added.isEmpty());
         QVERIFY(manager.persisted_saved_paths().isEmpty());
         QCOMPARE(updated.size(), 0);
-        xlibrary::sqlite_execute(db.get(), "DROP TRIGGER blocked_document");
+        foradeck::sqlite_execute(db.get(), "DROP TRIGGER blocked_document");
         const auto retry = wait_for_result<file_save_result>([&](QObject *receiver, auto completed) {
             manager.save_files({first, blocked, vanished}, receiver, completed);
         });
@@ -378,14 +378,14 @@ private slots:
             sqlite3 *raw = nullptr;
             QCOMPARE(sqlite3_open(temporary.filePath("file-index.sqlite").toUtf8().constData(), &raw), SQLITE_OK);
             std::unique_ptr<sqlite3, decltype(&sqlite3_close)> db(raw, sqlite3_close);
-            xlibrary::sqlite_execute(raw, "CREATE TABLE files(path TEXT PRIMARY KEY,name TEXT NOT NULL,"
+            foradeck::sqlite_execute(raw, "CREATE TABLE files(path TEXT PRIMARY KEY,name TEXT NOT NULL,"
                                           "scope TEXT NOT NULL,seen INTEGER NOT NULL)");
             for (const auto &entry : {path, nested, neighbor}) {
                 auto key = entry;
 #ifdef Q_OS_WIN
                 key = key.toCaseFolded();
 #endif
-                xlibrary::SqliteStatement insert(raw, "INSERT INTO files VALUES(?,?,'old',1234567)");
+                foradeck::SqliteStatement insert(raw, "INSERT INTO files VALUES(?,?,'old',1234567)");
                 insert.bind(1, key);
                 insert.bind(2, QFileInfo(entry).fileName());
                 insert.next();

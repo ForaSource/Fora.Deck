@@ -67,7 +67,7 @@ $output = Join-Path (resolve_repository_path $OutputRoot) "v$version"
 if (Test-Path -LiteralPath $output) { throw "Output already exists; choose another -OutputRoot: $output" }
 if (-not $IsWindows) { throw 'Run this script in PowerShell 7 on Windows; Linux packages use Docker or WSL.' }
 
-if (-not $PSCmdlet.ShouldProcess($output, "Build $Platform packages for XLibrary $version and write SHA256SUMS.txt")) {
+if (-not $PSCmdlet.ShouldProcess($output, "Build $Platform packages for Fora.Deck $version and write SHA256SUMS.txt")) {
     return
 }
 
@@ -138,7 +138,7 @@ if ($build_linux) {
         if ($docker_system -notin @('linux/x86_64', 'linux/amd64')) {
             throw "Linux packaging requires a Linux x86_64 Docker engine; found: $docker_system"
         }
-        $docker_image = 'xlibrary-linux-packaging:debian13'
+        $docker_image = 'foradeck-linux-packaging:debian13'
         # Prepare the base before the Windows build; do not copy sources into the packaging image.
         & $docker build --platform linux/amd64 --target linux-packaging --tag $docker_image `
             --file "$repository/Dockerfile" $repository
@@ -181,18 +181,18 @@ $package_paths = [Collections.Generic.List[string]]::new()
 if ($build_windows) {
     & "$PSScriptRoot/build_release.ps1" @windows_parameters
     if (-not $?) { throw 'Windows packaging failed.' }
-    $package_paths.Add("windows-$compiler/XLibrary-$version-windows-x64-$compiler-portable.zip")
-    $package_paths.Add("windows-$compiler/XLibrary-$version-windows-x64-$compiler-setup.exe")
+    $package_paths.Add("windows-$compiler/Fora.Deck-$version-windows-x64-$compiler-portable.zip")
+    $package_paths.Add("windows-$compiler/Fora.Deck-$version-windows-x64-$compiler-setup.exe")
 }
 if ($build_linux) {
     if ($LinuxEnvironment -eq 'Docker') {
         New-Item -ItemType Directory -Path $output -Force | Out-Null
         # Keep /build on the Linux filesystem; do not use the Ubuntu/WSL cache.
-        $container = "xlibrary-linux-packaging-$([guid]::NewGuid().ToString('N'))"
+        $container = "foradeck-linux-packaging-$([guid]::NewGuid().ToString('N'))"
         & $docker run --name $container --platform linux/amd64 `
             --mount "type=bind,source=$repository,target=/src,readonly" `
             --mount "type=bind,source=$output,target=/output" `
-            --mount 'type=volume,source=xlibrary-linux-packaging-cache-debian13,target=/cache' $docker_image
+            --mount 'type=volume,source=foradeck-linux-packaging-cache-debian13,target=/cache' $docker_image
         if ($LASTEXITCODE -ne 0) {
             & $docker container inspect $container *> $null
             if ($LASTEXITCODE -eq 0) {
@@ -206,10 +206,10 @@ if ($build_linux) {
         invoke_wsl -command_arguments @('python3', "$linux_repository/packaging/build_release.py",
             '--build-path', $linux_build, '--output-path', $linux_output, '--format', 'all')
     }
-    $package_paths.Add("linux-x86_64/XLibrary-$version-linux-x86_64.AppImage")
+    $package_paths.Add("linux-x86_64/Fora.Deck-$version-linux-x86_64.AppImage")
     $linux_info = Get-Content -LiteralPath "$output/linux-x86_64/build-info.json" -Raw | ConvertFrom-Json
     if ($linux_info.version -ne $version) { throw 'Linux package version does not match VERSION.' }
-    $package_paths.Add("linux-x86_64/xlibrary_$($linux_info.debian_version)_amd64.deb")
+    $package_paths.Add("linux-x86_64/foradeck_$($linux_info.debian_version)_amd64.deb")
 }
 if ((Get-Content -LiteralPath "$repository/VERSION" -Raw).Trim() -ne $version) {
     throw 'VERSION changed during packaging; no combined manifest was created.'

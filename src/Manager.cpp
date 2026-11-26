@@ -15,7 +15,7 @@
 #include "LaunchArguments.h"
 #include "Manager.h"
 
-Q_LOGGING_CATEGORY(poll_log, "xlibrary.poll", QtWarningMsg)
+Q_LOGGING_CATEGORY(poll_log, "foradeck.poll", QtWarningMsg)
 
 std::string Manager::to_lower(std::string data) {
     std::ranges::transform(data, data.begin(), [](const unsigned char c) { return std::tolower(c); });
@@ -124,7 +124,7 @@ void Manager::initialize(const quint64 id) {
         sqlite3 *raw = nullptr;
         if (sqlite3_open_v2(database_path.toUtf8().constData(), &raw, SQLITE_OPEN_READONLY, nullptr) == SQLITE_OK) {
             try {
-                emit schema_changed(xlibrary::read_schema_version(raw));
+                emit schema_changed(foradeck::read_schema_version(raw));
             } catch (...) {
                 // Повреждённая БД не должна скрывать исходную ошибку открытия.
             }
@@ -146,8 +146,8 @@ void Manager::restore(const quint64 id, const QString &path) {
         if (store)
             emit notification(
                 preserved.isEmpty()
-                    ? QCoreApplication::translate("XLibrary", "Library restored.")
-                    : QCoreApplication::translate("XLibrary", "Library restored. Previous files: %1").arg(preserved));
+                    ? QCoreApplication::translate("Fora.Deck", "Library restored.")
+                    : QCoreApplication::translate("Fora.Deck", "Library restored. Previous files: %1").arg(preserved));
     } catch (const std::exception &error) {
         emit result({id, "library", operation_state::error,
                      exception_error("library", error, operation_error_source::filesystem)});
@@ -422,7 +422,7 @@ void Manager::undo_removal() {
     emit this->undo_changed(this->store->can_undo_removal());
     this->refresh();
     emit this->notification(
-        QCoreApplication::translate("XLibrary", "Removed applications and scenario links restored."));
+        QCoreApplication::translate("Fora.Deck", "Removed applications and scenario links restored."));
 }
 
 void Manager::update_metadata(const QVector<qint64> &ids, const QStringList &add_tags, const QStringList &remove_tags,
@@ -478,7 +478,7 @@ void Manager::remove_scenario(const qint64 id) {
 void Manager::export_catalog(const QString &path) {
     const auto too_large = [] {
         return std::invalid_argument(
-            QCoreApplication::translate("XLibrary",
+            QCoreApplication::translate("Fora.Deck",
                                         "The JSON catalog exceeds 32 MiB or 50000 applications. Export was not saved. "
                                         "Use a database backup for a larger library.")
                 .toStdString());
@@ -488,14 +488,14 @@ void Manager::export_catalog(const QString &path) {
     QSaveFile file(path);
     if (!file.open(QIODevice::WriteOnly))
         throw std::runtime_error(
-            QCoreApplication::translate("XLibrary", "Could not open the export file.").toStdString());
+            QCoreApplication::translate("Fora.Deck", "Could not open the export file.").toStdString());
     qint64 written = 0;
     const auto write = [&](const QByteArray &contents) {
         if (contents.size() > catalog_limits::json_bytes - written)
             throw too_large();
         if (file.write(contents) != contents.size())
             throw std::runtime_error(
-                QCoreApplication::translate("XLibrary", "Could not save the export.").toStdString());
+                QCoreApplication::translate("Fora.Deck", "Could not save the export.").toStdString());
         written += contents.size();
     };
     write("{\"format\":1,\"applications\":[");
@@ -504,7 +504,7 @@ void Manager::export_catalog(const QString &path) {
         try {
             Database::validate_application(record);
         } catch (const std::invalid_argument &error) {
-            throw std::invalid_argument(QCoreApplication::translate("XLibrary", "Cannot export %1: %2")
+            throw std::invalid_argument(QCoreApplication::translate("Fora.Deck", "Cannot export %1: %2")
                                             .arg(record.path, QString::fromUtf8(error.what()))
                                             .toStdString());
         }
@@ -528,69 +528,69 @@ void Manager::export_catalog(const QString &path) {
     }
     write("]}\n");
     if (!file.commit())
-        throw std::runtime_error(QCoreApplication::translate("XLibrary", "Could not save the export.").toStdString());
-    emit this->notification(QCoreApplication::translate("XLibrary", "Library exported."));
+        throw std::runtime_error(QCoreApplication::translate("Fora.Deck", "Could not save the export.").toStdString());
+    emit this->notification(QCoreApplication::translate("Fora.Deck", "Library exported."));
 }
 
 void Manager::import_catalog(const QString &path) {
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly))
         throw std::runtime_error(
-            QCoreApplication::translate("XLibrary", "Could not read the import file.").toStdString());
+            QCoreApplication::translate("Fora.Deck", "Could not read the import file.").toStdString());
     const auto contents = file.read(catalog_limits::json_bytes + 1);
     if (file.error() != QFileDevice::NoError)
         throw std::runtime_error(file.errorString().toStdString());
     this->error_source = operation_error_source::validation;
     if (contents.size() > catalog_limits::json_bytes)
         throw std::runtime_error(
-            QCoreApplication::translate("XLibrary", "The JSON catalog exceeds 32 MiB. Import cancelled.")
+            QCoreApplication::translate("Fora.Deck", "The JSON catalog exceeds 32 MiB. Import cancelled.")
                 .toStdString());
     QJsonParseError error;
     const auto document = QJsonDocument::fromJson(contents, &error);
     if (error.error != QJsonParseError::NoError)
         throw std::runtime_error(
-            QCoreApplication::translate("XLibrary", "JSON error at offset %1: %2. Import cancelled.")
+            QCoreApplication::translate("Fora.Deck", "JSON error at offset %1: %2. Import cancelled.")
                 .arg(error.offset)
                 .arg(error.errorString())
                 .toStdString());
     const auto root = document.object();
     if (!document.isObject())
         throw std::runtime_error(
-            QCoreApplication::translate("XLibrary", "Field root: expected a JSON object. Import cancelled.")
+            QCoreApplication::translate("Fora.Deck", "Field root: expected a JSON object. Import cancelled.")
                 .toStdString());
     if (!root.value("format").isDouble() || root.value("format").toDouble() != 1)
         throw std::runtime_error(
-            QCoreApplication::translate("XLibrary", "Field format: only version 1 is supported. Import cancelled.")
+            QCoreApplication::translate("Fora.Deck", "Field format: only version 1 is supported. Import cancelled.")
                 .toStdString());
     if (!root.value("applications").isArray())
         throw std::runtime_error(
-            QCoreApplication::translate("XLibrary", "Field applications: expected an array. Import cancelled.")
+            QCoreApplication::translate("Fora.Deck", "Field applications: expected an array. Import cancelled.")
                 .toStdString());
     const auto applications = root.value("applications").toArray();
     if (applications.size() > catalog_limits::applications)
         throw std::runtime_error(
-            QCoreApplication::translate("XLibrary", "The JSON catalog exceeds 50000 applications. Import cancelled.")
+            QCoreApplication::translate("Fora.Deck", "The JSON catalog exceeds 50000 applications. Import cancelled.")
                 .toStdString());
     QVector<app_record> records;
     for (const auto &value : applications) {
         const auto fail = [&](const QString &field, const QString &reason) {
             throw std::runtime_error(
-                QCoreApplication::translate("XLibrary",
+                QCoreApplication::translate("Fora.Deck",
                                             "Record %1, field %2: %3. Import cancelled; changes were not saved.")
                     .arg(records.size() + 1)
                     .arg(field, reason)
                     .toStdString());
         };
         if (!value.isObject())
-            fail("applications[]", QCoreApplication::translate("XLibrary", "expected an object"));
+            fail("applications[]", QCoreApplication::translate("Fora.Deck", "expected an object"));
         const auto object = value.toObject();
         const auto text = [&](const QString &field, const bool required = false) {
             const auto item = object.value(field);
             if ((!item.isUndefined() || required) && !item.isString())
-                fail(field, QCoreApplication::translate("XLibrary", "expected a string"));
+                fail(field, QCoreApplication::translate("Fora.Deck", "expected a string"));
             const auto result = item.toString();
             if (result.contains(QChar::Null))
-                fail(field, QCoreApplication::translate("XLibrary", "null characters are not allowed"));
+                fail(field, QCoreApplication::translate("Fora.Deck", "null characters are not allowed"));
             return result;
         };
         app_record record;
@@ -604,49 +604,49 @@ void Manager::import_catalog(const QString &path) {
         record.default_launch_profile = text("default_launch_profile");
         record.working_directory = text("working_directory");
         if (object.contains("favorite") && !object.value("favorite").isBool())
-            fail("favorite", QCoreApplication::translate("XLibrary", "expected a boolean"));
+            fail("favorite", QCoreApplication::translate("Fora.Deck", "expected a boolean"));
         record.favorite = object.value("favorite").toBool();
         if (object.contains("tags") && !object.value("tags").isArray())
-            fail("tags", QCoreApplication::translate("XLibrary", "expected an array of strings"));
+            fail("tags", QCoreApplication::translate("Fora.Deck", "expected an array of strings"));
         const auto tags = object.value("tags").toArray();
         if (tags.size() > catalog_limits::tags_per_application)
-            fail("tags", QCoreApplication::translate("XLibrary", "at most 256 tags are allowed"));
+            fail("tags", QCoreApplication::translate("Fora.Deck", "at most 256 tags are allowed"));
         qsizetype tag_index = 0;
         for (const auto &tag : tags) {
             const auto field = QString("tags[%1]").arg(++tag_index);
             if (!tag.isString())
-                fail(field, QCoreApplication::translate("XLibrary", "expected a string"));
+                fail(field, QCoreApplication::translate("Fora.Deck", "expected a string"));
             const auto name = tag.toString().trimmed();
             if (!valid_tag_name(name))
-                fail(field, QCoreApplication::translate("XLibrary", "a tag must contain 1 to 64 characters, without "
-                                                                    "spaces, commas, #, or null characters"));
+                fail(field, QCoreApplication::translate("Fora.Deck", "a tag must contain 1 to 64 characters, without "
+                                                                     "spaces, commas, #, or null characters"));
             record.tags.append(name);
         }
         record.tags.removeDuplicates();
         if (object.contains("aliases") && !object.value("aliases").isArray())
-            fail("aliases", QCoreApplication::translate("XLibrary", "expected an array of strings"));
+            fail("aliases", QCoreApplication::translate("Fora.Deck", "expected an array of strings"));
         const auto aliases = object.value("aliases").toArray();
         if (aliases.size() > 32)
             fail("aliases", QCoreApplication::translate(
-                                "XLibrary", "Use up to 32 aliases, each on one line with up to 256 characters."));
+                                "Fora.Deck", "Use up to 32 aliases, each on one line with up to 256 characters."));
         for (const auto &alias : aliases) {
             if (!alias.isString() || alias.toString().trimmed().isEmpty() || alias.toString().size() > 256 ||
                 alias.toString().contains(QChar::Null) || alias.toString().contains('\n') ||
                 alias.toString().contains('\r'))
                 fail("aliases", QCoreApplication::translate(
-                                    "XLibrary", "Use up to 32 aliases, each on one line with up to 256 characters."));
+                                    "Fora.Deck", "Use up to 32 aliases, each on one line with up to 256 characters."));
             if (const auto name = alias.toString().trimmed(); !record.aliases.contains(name, Qt::CaseInsensitive))
                 record.aliases.append(name);
         }
         if (record.name.isEmpty() || record.name.size() > 256)
-            fail("name", QCoreApplication::translate("XLibrary", "the name must contain 1 to 256 characters"));
+            fail("name", QCoreApplication::translate("Fora.Deck", "the name must contain 1 to 256 characters"));
 #ifdef Q_OS_WIN
         if (Application::file_target(record) && QFileInfo(record.path).suffix().isEmpty())
-            fail("path", QCoreApplication::translate("XLibrary", "a Windows target requires a filename extension"));
+            fail("path", QCoreApplication::translate("Fora.Deck", "a Windows target requires a filename extension"));
 #endif
         if (!record.working_directory.isEmpty() && !QFileInfo(record.working_directory).isAbsolute())
             fail("working_directory",
-                 QCoreApplication::translate("XLibrary", "expected an empty string or an absolute path"));
+                 QCoreApplication::translate("Fora.Deck", "expected an empty string or an absolute path"));
         try {
             Database::validate_application(record);
         } catch (const std::invalid_argument &error) {
@@ -676,37 +676,38 @@ QStringList Manager::scenario_issues(const scenario_record &record, const QVecto
         try {
             if (found == applications.cend())
                 throw std::invalid_argument(
-                    QCoreApplication::translate("XLibrary", "Missing application").toStdString());
+                    QCoreApplication::translate("Fora.Deck", "Missing application").toStdString());
             name = found->name;
             if (step.delay_ms < 0)
                 throw std::invalid_argument(
-                    QCoreApplication::translate("XLibrary", "Invalid step delay").toStdString());
+                    QCoreApplication::translate("Fora.Deck", "Invalid step delay").toStdString());
             const auto profile = step.launch_profile.isEmpty() ? found->default_launch_profile : step.launch_profile;
             key = QString::number(step.application_id) + ':' + profile;
             if (checked_targets.contains(key)) {
                 reason = checked_targets.value(key);
                 if (!reason.isEmpty())
                     issues.append(
-                        QCoreApplication::translate("XLibrary", "Step %1 · %2: %3").arg(index + 1).arg(name, reason));
+                        QCoreApplication::translate("Fora.Deck", "Step %1 · %2: %3").arg(index + 1).arg(name, reason));
                 continue;
             }
             const auto app = Application::with_launch_profile(*found, profile);
             Database::validate_application(app);
             if (!Application::target_available(app))
                 throw std::invalid_argument(
-                    QCoreApplication::translate("XLibrary", "The application file is unavailable.").toStdString());
+                    QCoreApplication::translate("Fora.Deck", "The application file is unavailable.").toStdString());
             if (!app.working_directory.isEmpty() && !QFileInfo(app.working_directory).isDir())
                 throw std::invalid_argument(
-                    QCoreApplication::translate("XLibrary", "The working directory is unavailable.").toStdString());
+                    QCoreApplication::translate("Fora.Deck", "The working directory is unavailable.").toStdString());
 #ifdef Q_OS_LINUX
             if (Application::file_target(app)) {
                 const auto resolved = Application::resolve_application(app.path);
                 if (app.working_directory.isEmpty() && !resolved.working_directory.isEmpty() &&
                     !QFileInfo(resolved.working_directory).isDir())
                     throw std::invalid_argument(
-                        QCoreApplication::translate("XLibrary", "The working directory is unavailable.").toStdString());
+                        QCoreApplication::translate("Fora.Deck", "The working directory is unavailable.")
+                            .toStdString());
             }
-            (void)xlibrary::split_launch_arguments(app.arguments.toStdString());
+            (void)foradeck::split_launch_arguments(app.arguments.toStdString());
 #endif
         } catch (const std::exception &error) {
             reason = QString::fromUtf8(error.what());
@@ -714,19 +715,19 @@ QStringList Manager::scenario_issues(const scenario_record &record, const QVecto
         if (!key.isEmpty())
             checked_targets.insert(key, reason);
         if (!reason.isEmpty())
-            issues.append(QCoreApplication::translate("XLibrary", "Step %1 · %2: %3")
+            issues.append(QCoreApplication::translate("Fora.Deck", "Step %1 · %2: %3")
                               .arg(index + 1)
                               .arg(name.isEmpty() ? QString::number(step.application_id) : name, reason));
     }
     if (!enabled)
-        issues.append(QCoreApplication::translate("XLibrary", "The scenario has no enabled applications."));
+        issues.append(QCoreApplication::translate("Fora.Deck", "The scenario has no enabled applications."));
     return issues;
 }
 
 void Manager::clear_history() {
     this->store->clear_history();
     this->refresh();
-    emit this->notification(QCoreApplication::translate("XLibrary", "Usage history cleared."));
+    emit this->notification(QCoreApplication::translate("Fora.Deck", "Usage history cleared."));
 }
 
 void Manager::preview_profile(const QString &path) {
@@ -741,7 +742,7 @@ void Manager::recover_paths(const QVector<path_relocation> &changes) {
     this->store->apply_relocation(changes);
     this->refresh();
     emit this->notification(
-        QCoreApplication::translate("XLibrary", "Application paths recovered: %1.").arg(changes.size()));
+        QCoreApplication::translate("Fora.Deck", "Application paths recovered: %1.").arg(changes.size()));
 }
 
 void Manager::launch_record(const qint64 id, const Application::launch_mode mode, const launch_context context,
@@ -757,7 +758,8 @@ void Manager::launch_record(const qint64 id, const Application::launch_mode mode
                                      [id](const auto &record) { return record.id == id; });
         if (it == this->catalog.applications.cend())
             throw std::invalid_argument(
-                QCoreApplication::translate("XLibrary", "The application was not found in the library.").toStdString());
+                QCoreApplication::translate("Fora.Deck", "The application was not found in the library.")
+                    .toStdString());
         if (context.origin == launch_origin::workspace && it->configuration_id != context.configuration_id)
             throw std::invalid_argument(
                 QCoreApplication::translate("Workspaces", "Application configuration changed. Run preflight again.")
@@ -779,13 +781,14 @@ void Manager::launch_record(const qint64 id, const Application::launch_mode mode
             this->refresh();
         } catch (const std::exception &error) {
             const auto reason = QString::fromUtf8(error.what());
-            emit this->result({this->next_request_id(),
-                               "history",
-                               operation_state::error,
-                               {QCoreApplication::translate(
-                                    "XLibrary", "The application opened, but its launch history could not be saved: %1")
-                                    .arg(reason),
-                                reason, operation_error_source::sqlite}});
+            emit this->result(
+                {this->next_request_id(),
+                 "history",
+                 operation_state::error,
+                 {QCoreApplication::translate("Fora.Deck",
+                                              "The application opened, but its launch history could not be saved: %1")
+                      .arg(reason),
+                  reason, operation_error_source::sqlite}});
         }
     } catch (const DiscoveryCancelled &) {
         emit this->launched(id, {this->request_id, operation, operation_state::cancelled, {}}, context);
@@ -817,7 +820,7 @@ void Manager::execute(const quint64 id, const QString &operation, const std::fun
             this->error_source = operation_error_source::library;
             throw std::runtime_error(
                 QCoreApplication::translate(
-                    "XLibrary", "The library is unavailable. Restart the application after resolving the error.")
+                    "Fora.Deck", "The library is unavailable. Restart the application after resolving the error.")
                     .toStdString());
         }
         task(*this);
@@ -899,8 +902,9 @@ void Manager::review_inventory(const QVector<app_record> &records, const QVector
         remove_applications(automatically_removed, false);
         preview.removeIf(
             [&](const app_record &record) { return removed_configurations.contains(Application::launch_key(record)); });
-        emit notification(QCoreApplication::translate("XLibrary", "Removed unavailable applications without icons: %1.")
-                              .arg(automatically_removed.size()));
+        emit notification(
+            QCoreApplication::translate("Fora.Deck", "Removed unavailable applications without icons: %1.")
+                .arg(automatically_removed.size()));
     }
     defer_result = true;
     emit inventory_ready(request_id, preview, removed, issues);
@@ -927,7 +931,7 @@ void Manager::remove_missing_applications(const QVector<app_record> &records,
     if (!ids.isEmpty()) {
         remove_applications(ids, false);
         emit notification(
-            QCoreApplication::translate("XLibrary", "Removed uninstalled applications: %1.").arg(ids.size()));
+            QCoreApplication::translate("Fora.Deck", "Removed uninstalled applications: %1.").arg(ids.size()));
     }
 }
 
@@ -940,21 +944,21 @@ void Manager::apply_catalog_preview(const QVector<app_record> &applications, QVe
         const auto count = this->store->import_records(applications, cancelled.get(), report_progress, &issues, policy);
         const auto message = discovery_summary(
             count.added, issues,
-            QCoreApplication::translate("XLibrary", "Import complete. Updated: %1.").arg(count.updated));
+            QCoreApplication::translate("Fora.Deck", "Import complete. Updated: %1.").arg(count.updated));
         emit this->discovery_report_ready(discovery_details(message, issues));
         if (quiet) {
             if (count.added > 0)
                 emit this->notification(
-                    QCoreApplication::translate("XLibrary", "Added applications: %1.").arg(count.added));
+                    QCoreApplication::translate("Fora.Deck", "Added applications: %1.").arg(count.added));
         } else {
             emit this->notification(
-                QCoreApplication::translate("XLibrary", "Import complete. Added: %1. Already in the library: %2.")
+                QCoreApplication::translate("Fora.Deck", "Import complete. Added: %1. Already in the library: %2.")
                     .arg(count.added)
                     .arg(count.duplicates + count.updated));
         }
         this->refresh();
     } catch (const DiscoveryCancelled &) {
-        const auto message = QCoreApplication::translate("XLibrary", "Import cancelled; changes were not saved.");
+        const auto message = QCoreApplication::translate("Fora.Deck", "Import cancelled; changes were not saved.");
         emit this->discovery_report_ready(discovery_details(message, issues));
         if (!quiet)
             emit this->notification(message);
@@ -962,7 +966,7 @@ void Manager::apply_catalog_preview(const QVector<app_record> &applications, QVe
     } catch (const std::exception &error) {
         issues.append({"SQLite", QString::fromUtf8(error.what())});
         emit this->discovery_report_ready(discovery_details(
-            QCoreApplication::translate("XLibrary", "Import failed; changes were not saved."), issues));
+            QCoreApplication::translate("Fora.Deck", "Import failed; changes were not saved."), issues));
         throw;
     }
 }
@@ -971,9 +975,10 @@ void Manager::backup_profile(const QString &path, const QString &database_path, 
                              const bool settings_ok) {
     if (!settings_ok)
         throw std::runtime_error(
-            QCoreApplication::translate("XLibrary", "Could not save settings before creating a backup.").toStdString());
+            QCoreApplication::translate("Fora.Deck", "Could not save settings before creating a backup.")
+                .toStdString());
     ProfileBackup::create(path, database_path, settings_path);
-    emit this->notification(QCoreApplication::translate("XLibrary", "Full profile backup saved: %1").arg(path));
+    emit this->notification(QCoreApplication::translate("Fora.Deck", "Full profile backup saved: %1").arg(path));
 }
 
 void Manager::restore_profile(const QString &path, const QString &database_path, const QString &settings_path,
@@ -985,14 +990,14 @@ void Manager::restore_profile(const QString &path, const QString &database_path,
     try {
         if (!settings_ok)
             throw std::runtime_error(
-                QCoreApplication::translate("XLibrary", "Could not save settings before restoring the profile.")
+                QCoreApplication::translate("Fora.Deck", "Could not save settings before restoring the profile.")
                     .toStdString());
         const auto recovery = ProfileBackup::restore(path, database_path, settings_path, fingerprint);
         emit this->profile_replaced(recovery, old_autostart);
         this->initialize(library_id);
         if (!this->store)
             throw std::runtime_error(
-                QCoreApplication::translate("XLibrary",
+                QCoreApplication::translate("Fora.Deck",
                                             "The profile was restored but could not be opened. Restart Fora.Deck.")
                     .toStdString());
     } catch (...) {
@@ -1013,6 +1018,6 @@ void Manager::export_diagnostics(const QString &path, const QByteArray &report) 
     QSaveFile output(path);
     if (!output.open(QIODevice::WriteOnly) || output.write(report) != report.size() || !output.commit())
         throw std::runtime_error(
-            QCoreApplication::translate("XLibrary", "Could not save the diagnostic report.").toStdString());
-    emit this->notification(QCoreApplication::translate("XLibrary", "Diagnostic report saved."));
+            QCoreApplication::translate("Fora.Deck", "Could not save the diagnostic report.").toStdString());
+    emit this->notification(QCoreApplication::translate("Fora.Deck", "Diagnostic report saved."));
 }

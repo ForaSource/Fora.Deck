@@ -18,7 +18,7 @@ The contract is defined by [UiRegistry.h](../desktop/UiRegistry.h). Modules impl
 to replace registered widget factories or append styles. Build against matching Fora.Deck headers, architecture, compiler, and runtime ABI.
 Qt also applies its own platform/build checks.
 
-Before instantiation, Fora.Deck requires Qt's embedded IID `org.xlibrary.desktop.UiPlugin/1.0`, a matching Qt major version,
+Before instantiation, Fora.Deck requires Qt's embedded IID `io.github.ForaSource.ForaDeck.UiPlugin/1.0`, a matching Qt major version,
 and a required Qt minor version no newer than the running application. These checks cannot prove binary compatibility.
 Existing IID 1.0 modules do not need custom metadata. Optional custom `MetaData` strings `name`, `version`, and `author`
 (also accepted as `Name`, `Version`, and `Author`) appear in settings; absent names fall back to filenames.
@@ -30,6 +30,6 @@ Loaded libraries remain mapped while their callbacks may exist.
 
 ## Safe mode
 
-Start `XLibrary --safe-mode` to use the built-in interface without loading user modules.
+Start `foradeck --safe-mode` to use the built-in interface without loading user modules.
 Open **Settings → Plugins**, disable the faulty module, save, and restart normally.
 Safe mode lists saved enabled modules so they can be disabled without loading them.

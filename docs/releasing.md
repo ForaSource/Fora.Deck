@@ -17,7 +17,7 @@ Run commands from the repository root after [configuring a Release build](buildi
 
 DEB uses a SemVer-to-Debian conversion from [cmake/version.cmake](../cmake/version.cmake): prereleases sort before the final release and build metadata does not affect ordering. Use `debian_version` in `build-info.json` to find the exact DEB filename; it may differ from the SemVer string.
 
-Public packages should come from the intended commit with a clean working tree and `source_dirty=false`. `build-info.json` records version, platform, architecture, Qt/compiler versions, configuration, source commit, dirty state and UTC packaging time. This records build inputs; it does not promise identical archive bytes between builds. Leave `XLIBRARY_NATIVE_CPU=OFF` for distributed binaries.
+Public packages should come from the intended commit with a clean working tree and `source_dirty=false`. `build-info.json` records version, platform, architecture, Qt/compiler versions, configuration, source commit, dirty state and UTC packaging time. This records build inputs; it does not promise identical archive bytes between builds. Leave `FORADECK_NATIVE_CPU=OFF` for distributed binaries.
 
 ## Combined packaging from Windows
 
@@ -32,7 +32,7 @@ The default Windows build directory is `cmake-build-release`; set `-WindowsBuild
 
 The result is `release/v<VERSION>/`, with `windows-mingw/` (or `windows-msvc/`), `linux-x86_64/` and one root `SHA256SUMS.txt`. This manifest replaces platform manifests and covers every output file, including build metadata and supplied notes, using relative `/` paths. From the release directory on Linux, verify it with `sha256sum --check SHA256SUMS.txt`.
 
-Linux packaging builds the `linux-packaging` target in [Dockerfile](../Dockerfile) as `xlibrary-linux-packaging:debian13`. The source mount `/src` is read-only, `/build` is fresh inside the container, and `/output` receives packages. Tools and Qt sources persist in volume `xlibrary-linux-packaging-cache-debian13`. Docker readiness/image preparation precedes Windows packaging. Successful containers are removed; failed containers remain with `/build` and `/tmp` for `docker logs`/`docker cp`. After diagnosis, remove only that named container with `docker container rm <name>`.
+Linux packaging builds the `linux-packaging` target in [Dockerfile](../Dockerfile) as `foradeck-linux-packaging:debian13`. The source mount `/src` is read-only, `/build` is fresh inside the container, and `/output` receives packages. Tools and Qt sources persist in volume `foradeck-linux-packaging-cache-debian13`. Docker readiness/image preparation precedes Windows packaging. Successful containers are removed; failed containers remain with `/build` and `/tmp` for `docker logs`/`docker cp`. After diagnosis, remove only that named container with `docker container rm <name>`.
 
 An explicitly configured Debian 13 WSL environment is an alternative:
 
@@ -55,7 +55,7 @@ The existing [Windows packager](../packaging/build_release.ps1) builds Release, 
   -OutputPath release/windows-installer
 ```
 
-Choose one command per output directory. The default is `release/v<VERSION>-<compiler>/`, containing `XLibrary-<VERSION>-windows-x64-<compiler>-portable.zip`, optional `*-setup.exe`, `build-info.json` and `SHA256SUMS.txt`. The release workflow builds Windows assets with **MinGW**, preserving the toolchain-specific installer selection used by existing clients. MSVC packaging remains supported locally.
+Choose one command per output directory. The default is `release/v<VERSION>-<compiler>/`, containing `Fora.Deck-<VERSION>-windows-x64-<compiler>-portable.zip`, optional `*-setup.exe`, `build-info.json` and `SHA256SUMS.txt`. The release workflow builds Windows assets with **MinGW**, preserving the toolchain-specific installer selection used by existing clients. MSVC packaging remains supported locally.
 
 Close Fora.Deck if it is running from the selected build directory, including its tray process, before packaging: Windows locks that executable. A copy running from a different directory does not block rebuilding. Configure/build/install output is saved to `<BuildPath>/packaging-release.log`; failed staging remains under `build/release-<id>`.
 
@@ -69,7 +69,7 @@ Public Linux packages target **Debian 13 x86_64**, its system **Qt 6.8.2** and *
 
 Do not lower generated DEB dependencies: `dpkg-shlibdeps` derives them from the actual linked symbols. A DEB requiring newer Qt must be rebuilt with the baseline system Qt in a clean directory. Changing Qt or the base distribution always requires a clean build directory. Windows CI's Qt 6.8.3 is not the DEB baseline.
 
-AppImage includes Qt, its X11/Wayland plugins and the C++ runtime; DEB uses system dependencies and installs `/usr/bin/XLibrary`, a desktop entry and icon. Both inherit ABI requirements from the build system. AppImage does not replace glibc, graphics drivers or the window server. Compatibility with older distributions or other DEB-based systems needs separate verification. A baseline change must update packaging, CI and this guide together.
+AppImage includes Qt, its X11/Wayland plugins and the C++ runtime; DEB uses system dependencies and installs `/usr/bin/foradeck`, a desktop entry and icon. Both inherit ABI requirements from the build system. AppImage does not replace glibc, graphics drivers or the window server. Compatibility with older distributions or other DEB-based systems needs separate verification. A baseline change must update packaging, CI and this guide together.
 
 ## Linux packages
 
@@ -86,22 +86,22 @@ python3 packaging/build_release.py
 
 The [Linux packager](../packaging/build_release.py) uses `cmake-build-linux-release` and writes `release/v<VERSION>-linux/` by default. Use `--build-path` and `--output-path` for custom directories, or `--format appimage` / `--format deb` for one format. It builds Release, verifies native x86_64 and portable CPU settings, validates the extracted DEB and AppImage startup, and writes packages, `build-info.json` and SHA256 sums. Staging uses Linux `/tmp` to preserve permissions and links, even with sources on a WSL Windows mount; failed staging remains for diagnosis.
 
-The tool/source cache is `$XDG_CACHE_HOME/XLibrary/packaging`, falling back to `~/.cache/XLibrary/packaging`; `--cache-path` overrides it. Keep it on a Linux filesystem in WSL so tools can be marked executable.
+The tool/source cache is `$XDG_CACHE_HOME/Fora.Deck/packaging`, falling back to `~/.cache/Fora.Deck/packaging`; `--cache-path` overrides it. Keep it on a Linux filesystem in WSL so tools can be marked executable.
 
 Find the generated names in the output directory, then run or install the selected file:
 
 ```sh
-./XLibrary-<VERSION>-linux-x86_64.AppImage
+./Fora.Deck-<VERSION>-linux-x86_64.AppImage
 # If FUSE is unavailable:
-./XLibrary-<VERSION>-linux-x86_64.AppImage --appimage-extract-and-run
-sudo apt install ./xlibrary_<debian_version>_amd64.deb
-XLibrary
-sudo apt remove xlibrary
+./Fora.Deck-<VERSION>-linux-x86_64.AppImage --appimage-extract-and-run
+sudo apt install ./foradeck_<debian_version>_amd64.deb
+Fora.Deck
+sudo apt remove foradeck
 ```
 
 Replace placeholders with the actual filenames. AppImage's writable profile is `<AppImage filename>.data`; move it with the unchanged filename. DEB uses the normal XDG profile. See [profile handling](profile.md).
 
-Before publication, install the DEB in a **clean Debian 13 without Qt SDK or build packages** and run `QT_QPA_PLATFORM=offscreen XLibrary --check-startup`. Checks inside the build container do not replace this requirement.
+Before publication, install the DEB in a **clean Debian 13 without Qt SDK or build packages** and run `QT_QPA_PLATFORM=offscreen foradeck --check-startup`. Checks inside the build container do not replace this requirement.
 
 ## Dependency materials
 
@@ -109,10 +109,10 @@ The application is MIT licensed; dependencies retain their own licenses. Do not 
 
 Inter Regular/Medium/SemiBold are embedded font resources under SIL OFL 1.1. CMake installs the
 original [font license](../assets/fonts/OFL.txt) as `licenses/inter/OFL.txt` on Windows and
-`share/licenses/XLibrary/inter/OFL.txt` on Linux. The Debian copyright file also includes its full
+`share/licenses/Fora.Deck/inter/OFL.txt` on Linux. The Debian copyright file also includes its full
 text. Keep these notices in ZIP, installer, AppImage and DEB distributions; see the
 [font provenance](../assets/fonts/README.md). Product and author labels are Fora.Deck and ForaSource;
-technical package filenames, the `XLibrary` CMake target and installer AppId retain their existing values.
+the executable and CMake target are `foradeck`, and Windows installer upgrades use the existing installer AppId.
 
 [qt_sources.json](../packaging/qt_sources.json) pins hashes for supported official Qt source archives; unknown versions/modules require verified manifest entries matching the binaries. Windows accepts `-QtSourceManifest` and `-QtSourceCache` (default `build/windows-packaging-cache`), including through the combined packager. Cached archives are verified again. Windows source downloads use `curl.exe`, at most three attempts of 300 seconds; license extraction uses the configured `cmake -E tar`, with a 120-second limit per archive and diagnostics in the packaging log. SBOM files are included when the Qt installation supplies them.
 

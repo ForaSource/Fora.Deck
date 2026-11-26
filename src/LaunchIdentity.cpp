@@ -10,16 +10,16 @@
 #include "PathHelpers.h"
 #include "SqliteHelpers.h"
 
-std::string xlibrary::path_utf8(const std::filesystem::path &path) {
+std::string foradeck::path_utf8(const std::filesystem::path &path) {
     const auto value = path.generic_u8string();
     return {reinterpret_cast<const char *>(value.data()), value.size()};
 }
 
-std::filesystem::path xlibrary::utf8_path(const std::string &path) {
+std::filesystem::path foradeck::utf8_path(const std::string &path) {
     return std::filesystem::path(std::u8string(reinterpret_cast<const char8_t *>(path.data()), path.size()));
 }
 
-std::string xlibrary::path_identity(const std::filesystem::path &path, const bool resolve_links) {
+std::string foradeck::path_identity(const std::filesystem::path &path, const bool resolve_links) {
     if (path.empty() || !path.is_absolute())
         throw std::invalid_argument("Launch path must be absolute");
     auto normalized = path.lexically_normal();
@@ -47,7 +47,7 @@ std::string xlibrary::path_identity(const std::filesystem::path &path, const boo
     return path_utf8(normalized);
 }
 
-sqlite3_int64 xlibrary::ensure_launch_configuration(sqlite3 *const connection, const std::filesystem::path &path,
+sqlite3_int64 foradeck::ensure_launch_configuration(sqlite3 *const connection, const std::filesystem::path &path,
                                                     const std::string &arguments,
                                                     const std::filesystem::path &working_directory) {
     const auto launch_path = path_utf8(path);
@@ -125,7 +125,7 @@ sqlite3_int64 xlibrary::ensure_launch_configuration(sqlite3 *const connection, c
 
 #include "Application.h"
 
-sqlite3_int64 xlibrary::ensure_launch_configuration(sqlite3 *const connection, const app_record &record) {
+sqlite3_int64 foradeck::ensure_launch_configuration(sqlite3 *const connection, const app_record &record) {
     Application::validate_launch_target(record);
     sqlite3_int64 configuration_id = 0;
     const auto kind = Application::target_kind(record).toStdString();
@@ -146,7 +146,7 @@ sqlite3_int64 xlibrary::ensure_launch_configuration(sqlite3 *const connection, c
         target.bind(2, key);
         if (!target.next())
             throw std::runtime_error(
-                QCoreApplication::translate("XLibrary", "Launch target was not saved").toStdString());
+                QCoreApplication::translate("Fora.Deck", "Launch target was not saved").toStdString());
         const auto target_id = target.number(0);
         SqliteStatement create_configuration(
             connection,
@@ -162,7 +162,7 @@ sqlite3_int64 xlibrary::ensure_launch_configuration(sqlite3 *const connection, c
         find.bind(2, key);
         if (!find.next())
             throw std::runtime_error(
-                QCoreApplication::translate("XLibrary", "Launch configuration was not saved").toStdString());
+                QCoreApplication::translate("Fora.Deck", "Launch configuration was not saved").toStdString());
         configuration_id = find.number(0);
     }
     // Location is discovery metadata: moving a Steam library must preserve the card and target IDs.

@@ -12,7 +12,7 @@ RUN sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/debian.s
 ENV LANG=C.UTF-8
 
 WORKDIR /src
-CMD ["sh", "-c", "cmake -S /src -B /build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/usr -DXLIBRARY_NATIVE_CPU=OFF && python3 /src/packaging/build_release.py --build-path /build --output-path /output/linux-x86_64 --cache-path /cache --format all"]
+CMD ["sh", "-c", "cmake -S /src -B /build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/usr -DFORADECK_NATIVE_CPU=OFF && python3 /src/packaging/build_release.py --build-path /build --output-path /output/linux-x86_64 --cache-path /cache --format all"]
 
 FROM linux-packaging AS startup-check
 
@@ -20,10 +20,10 @@ COPY . .
 
 RUN cmake --preset linux-release -DCMAKE_PREFIX_PATH=/usr \
     && cmake --build --preset linux-release --parallel 2 \
-    && cmake --install cmake-build-linux-release --prefix /opt/xlibrary \
+    && cmake --install cmake-build-linux-release --prefix /opt/foradeck \
     && desktop-file-validate \
-       /opt/xlibrary/share/applications/io.github.LapplandJulia.XLibrary.desktop
+       /opt/foradeck/share/applications/io.github.ForaSource.ForaDeck.desktop
 
 ENV QT_QPA_PLATFORM=xcb
 
-CMD ["xvfb-run", "-a", "dbus-run-session", "--", "/opt/xlibrary/bin/XLibrary", "--check-startup"]
+CMD ["xvfb-run", "-a", "dbus-run-session", "--", "/opt/foradeck/bin/foradeck", "--check-startup"]

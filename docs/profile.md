@@ -7,24 +7,23 @@
 **Settings → Profile** shows the actual database and settings paths, schema/product versions, storage mode, and last error.
 Use these displayed paths when locating your profile; operating-system configuration can change the defaults.
 
-Fora.Deck retains XLibrary's technical application and organization names. The rebrand does not create
-a new profile folder, rename `xlibrary.db`, or change the `.xlprofile` format or credential-store identity.
-Do not rename profile directories just to match the new display name.
-Existing profiles receive a one-time notice when the main window is shown: XLibrary is now Fora.Deck,
-and the library and settings have been preserved. Background startup leaves the notice for the next visible window.
-
 | Mode | Storage |
 | --- | --- |
-| Installed | The operating system's per-user data folders. The catalog is normally `%LOCALAPPDATA%\XLibrary\xlibrary.db` on Windows or `${XDG_DATA_HOME:-~/.local/share}/XLibrary/xlibrary.db` on Linux. |
+| Installed | The operating system's per-user data folders. The catalog is normally `%LOCALAPPDATA%\Fora.Deck\foradeck.db` on Windows or `${XDG_DATA_HOME:-~/.local/share}/Fora.Deck/foradeck.db` on Linux. |
 | Portable folder | A `portable.flag` beside the executable selects its adjacent `data/` directory. Keep that directory during upgrades. |
 | AppImage | A normally launched AppImage uses `<AppImage filename>.data` beside the image. Keep the corresponding directory when replacing or renaming the image. |
 
 The file index is a separate, rebuildable `file-index.sqlite` cache. Saved file paths, file favorites/tags and usage history are durable profile data;
 the index is not a copy of the documents themselves.
 
+On the first launch after upgrading from an older installed build, Fora.Deck copies the previous catalog and settings to the new profile directory.
+For portable copies it creates `foradeck.db` in the existing `data/` directory. Close the previous build before migrating.
+The previous catalog stays available as a safety copy. If you rename or replace an AppImage, move its adjacent profile directory to match the new filename before launching it.
+
 ## Complete backups
 
-Choose **Settings → Profile → Back up profile…** to create a `.xlprofile` file.
+Choose **Settings → Profile → Back up profile…** to create a `.foradeckprofile` file.
+Backups created by older versions are also accepted by **Restore profile…**.
 It includes application cards and launch configurations, aliases, all tags, scenarios, workspaces with resource order and placement, settings, hotkey assignments,
 saved filter records, saved file paths and file favorites/tags, discovery sources, and launch/file usage history.
 This transfers more than the [JSON catalog format](catalog.md#json-import-and-export).

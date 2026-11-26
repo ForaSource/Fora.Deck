@@ -370,7 +370,8 @@ profile_settings::values profile_settings::read(const QString &path) {
     settings.setFallbacksEnabled(false);
     values result;
     for (const auto &key : settings.allKeys()) {
-        if (key.compare(QLatin1String(token_marker), Qt::CaseInsensitive) != 0)
+        if (key.compare(QLatin1String(token_marker), Qt::CaseInsensitive) != 0 &&
+            key.compare(QLatin1String(previous_token_profile), Qt::CaseInsensitive) != 0)
             result.insert(key, settings.value(key));
     }
     if (settings.status() != QSettings::NoError)

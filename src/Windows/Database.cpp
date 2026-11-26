@@ -14,5 +14,5 @@ std::filesystem::path Database::get_database_path() {
         throw std::runtime_error("LOCALAPPDATA must be an absolute path");
     }
 
-    return local_app_data_path / L"XLibrary" / L"xlibrary.db";
+    return local_app_data_path / L"Fora.Deck" / L"foradeck.db";
 }

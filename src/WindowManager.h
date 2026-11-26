@@ -1,5 +1,5 @@
-#ifndef XLIBRARY_WINDOWMANAGER_H
-#define XLIBRARY_WINDOWMANAGER_H
+#ifndef FORADECK_WINDOWMANAGER_H
+#define FORADECK_WINDOWMANAGER_H
 
 #include <QString>
 
@@ -21,4 +21,4 @@ public:
     int get_theme() const { return this->dark_theme; }
 };
 
-#endif //XLIBRARY_WINDOWMANAGER_H
+#endif //FORADECK_WINDOWMANAGER_H

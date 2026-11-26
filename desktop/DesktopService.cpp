@@ -11,12 +11,12 @@
 #include <QJsonObject>
 #include <QProcess>
 #include <QSaveFile>
-#include <QStandardPaths>
 #include <QStorageInfo>
 #include <QtConcurrent/QtConcurrentRun>
 #include <QUrl>
 
 #include "ApplicationPaths.h"
+#include "Database.h"
 #include "DesktopService.h"
 #include "GithubTokenStore.h"
 #include "localization.h"
@@ -29,10 +29,10 @@
 
 DesktopService::DesktopService(QObject *const parent, const QString &profile_path, const QString &database_path)
     : QObject(parent), worker(new Manager(database_path, request_sequence)), model(this), filter(this),
-      settings((profile_path.isEmpty() ? QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation)
-                                       : profile_path) +
-                   "/settings.ini",
-               QSettings::IniFormat) {
+      settings(
+          (profile_path.isEmpty() ? QFileInfo(path_text(Database::get_database_path())).absolutePath() : profile_path) +
+              "/settings.ini",
+          QSettings::IniFormat) {
     // Detect existing profiles before the worker opens a new database or the UI writes defaults.
     if (!settings.contains("onboarding/completed") &&
         (QFileInfo(settings.fileName()).isFile() || (!database_path.isEmpty() && QFileInfo(database_path).isFile())))
@@ -44,7 +44,7 @@ DesktopService::DesktopService(QObject *const parent, const QString &profile_pat
         settings.setValue("files/metadata", files->metadata_values());
         settings.sync();
         if (settings.status() != QSettings::NoError)
-            notify(QCoreApplication::translate("XLibrary", "Could not save the settings file."));
+            notify(QCoreApplication::translate("Fora.Deck", "Could not save the settings file."));
     });
     connect(files, &FileManager::error, this, &DesktopService::notify);
     connect(files, &FileManager::busy_changed, this, &DesktopService::profile_state_changed);
@@ -56,7 +56,7 @@ DesktopService::DesktopService(QObject *const parent, const QString &profile_pat
         settings.setValue("files/saved", paths);
         settings.sync();
         if (settings.status() != QSettings::NoError)
-            notify(QCoreApplication::translate("XLibrary", "Could not save the settings file."));
+            notify(QCoreApplication::translate("Fora.Deck", "Could not save the settings file."));
     });
     QTimer::singleShot(0, this, [this] {
         files->configure(FileManager::mode_from_setting(settings.value("files/mode", "off").toString()),
@@ -167,7 +167,7 @@ DesktopService::DesktopService(QObject *const parent, const QString &profile_pat
                             "autostart",
                             operation_state::error,
                             {QCoreApplication::translate(
-                                 "XLibrary", "The profile was restored, but autostart could not be updated."),
+                                 "Fora.Deck", "The profile was restored, but autostart could not be updated."),
                              failure, operation_error_source::platform}});
         } else {
             settings.remove("profile/autostart_pending");
@@ -175,7 +175,7 @@ DesktopService::DesktopService(QObject *const parent, const QString &profile_pat
         }
         emit profile_state_changed();
         notify(QCoreApplication::translate(
-                   "XLibrary", "Profile restored. Restart Fora.Deck to apply all settings. Previous profile: %1")
+                   "Fora.Deck", "Profile restored. Restart Fora.Deck to apply all settings. Previous profile: %1")
                    .arg(recovery));
     });
     connect(worker, &Manager::result, this, &DesktopService::publish_result);
@@ -189,7 +189,7 @@ DesktopService::DesktopService(QObject *const parent, const QString &profile_pat
         settings.setValue("sources/dismissed_targets", targets);
         settings.sync();
         if (settings.status() != QSettings::NoError)
-            notify(QCoreApplication::translate("XLibrary", "Could not save discovery exclusions."));
+            notify(QCoreApplication::translate("Fora.Deck", "Could not save discovery exclusions."));
     });
     connect(worker, &Manager::discovery_report_ready, this, [this](const QString &report) {
         scan_report = report;
@@ -300,7 +300,7 @@ DesktopService::DesktopService(QObject *const parent, const QString &profile_pat
             if (result.state != operation_state::completed) {
                 finish_scenario(result.state, result.error);
                 emit scenario_changed(QCoreApplication::translate(
-                    "XLibrary", "The scenario stopped because an application could not be launched."));
+                    "Fora.Deck", "The scenario stopped because an application could not be launched."));
                 return;
             }
             ++step_index;
@@ -408,7 +408,7 @@ void DesktopService::publish_result(const operation_result &result) {
             settings.sync();
             if (settings.status() != QSettings::NoError) {
                 last_failure = {QCoreApplication::translate(
-                                    "XLibrary", "Import completed, but discovery exclusions could not be saved."),
+                                    "Fora.Deck", "Import completed, but discovery exclusions could not be saved."),
                                 "QSettings sync failed for discovery exclusions", operation_error_source::filesystem};
                 emit message(last_failure.user_message);
             }
@@ -458,7 +458,7 @@ void DesktopService::publish_result(const operation_result &result) {
             reviewing = false;
         if (result.state == operation_state::completed) {
             scan_progress.percent = 100;
-            scan_progress.stage = QCoreApplication::translate("XLibrary", "Scan complete");
+            scan_progress.stage = QCoreApplication::translate("Fora.Deck", "Scan complete");
             emit discovery_progress_changed();
         }
         emit discovery_changed();
@@ -490,7 +490,7 @@ quint64 DesktopService::enqueue(const QString &operation, std::function<void(Man
                 {id,
                  operation,
                  operation_state::error,
-                 {QCoreApplication::translate("XLibrary", "The profile is being restored or requires a restart."),
+                 {QCoreApplication::translate("Fora.Deck", "The profile is being restored or requires a restart."),
                   "Profile changes are paused", operation_error_source::library}});
         });
         return id;
@@ -506,7 +506,7 @@ quint64 DesktopService::enqueue(const QString &operation, std::function<void(Man
             publish_result({id,
                             operation,
                             operation_state::error,
-                            {QCoreApplication::translate("XLibrary", "The operation could not be queued."),
+                            {QCoreApplication::translate("Fora.Deck", "The operation could not be queued."),
                              "Catalog worker invocation failed", operation_error_source::internal}});
         });
     }
@@ -596,7 +596,7 @@ void DesktopService::remove_applications(const QVector<qint64> &ids) {
     if (ids.isEmpty())
         return;
     if (is_scenario_active()) {
-        notify(QCoreApplication::translate("XLibrary", "Stop the scenario before removing applications."));
+        notify(QCoreApplication::translate("Fora.Deck", "Stop the scenario before removing applications."));
         return;
     }
     enqueue("remove_application", [ids](Manager &worker) { worker.remove_applications(ids); });
@@ -608,7 +608,7 @@ void DesktopService::undo_removal() {
         return;
     }
     if (is_scenario_active()) {
-        notify(QCoreApplication::translate("XLibrary", "Stop the scenario before restoring applications."));
+        notify(QCoreApplication::translate("Fora.Deck", "Stop the scenario before restoring applications."));
         return;
     }
     enqueue("undo_removal", [](Manager &worker) { worker.undo_removal(); });
@@ -731,7 +731,7 @@ quint64 DesktopService::request_launch_mode(const qint64 id, const Application::
         if (scenario) {
             cancel_scenario();
             notify(QCoreApplication::translate(
-                "XLibrary", "The application is still starting. Try the scenario again after it has started."));
+                "Fora.Deck", "The application is still starting. Try the scenario again after it has started."));
         }
         return 0;
     }
@@ -779,11 +779,11 @@ void DesktopService::run_scenario(const qint64 id) {
         return;
     }
     if (is_scenario_active()) {
-        notify(QCoreApplication::translate("XLibrary", "A scenario is already running. Stop it first."));
+        notify(QCoreApplication::translate("Fora.Deck", "A scenario is already running. Stop it first."));
         return;
     }
     pending_scenario_id = id;
-    emit scenario_changed(QCoreApplication::translate("XLibrary", "Checking scenario…"));
+    emit scenario_changed(QCoreApplication::translate("Fora.Deck", "Checking scenario…"));
     check_scenario(id, true);
 }
 
@@ -794,7 +794,7 @@ void DesktopService::start_scenario(const qint64 id) {
         if (record.id == id) {
             if (std::none_of(record.steps.cbegin(), record.steps.cend(),
                              [](const auto &step) { return step.enabled; })) {
-                notify(QCoreApplication::translate("XLibrary", "The scenario has no enabled applications."));
+                notify(QCoreApplication::translate("Fora.Deck", "The scenario has no enabled applications."));
                 return;
             }
             pending_steps = record.steps;
@@ -848,7 +848,7 @@ void DesktopService::check_scenario(const qint64 id, const bool force) {
         try {
             issues = watcher->result();
         } catch (const std::exception &) {
-            issues = {QCoreApplication::translate("XLibrary", "Could not check the scenario.")};
+            issues = {QCoreApplication::translate("Fora.Deck", "Could not check the scenario.")};
         }
         scenario_check_results.insert(id, issues);
         emit scenario_check_changed(id);
@@ -856,8 +856,8 @@ void DesktopService::check_scenario(const qint64 id, const bool force) {
             return;
         pending_scenario_id = 0;
         if (!issues.isEmpty()) {
-            emit scenario_changed(QCoreApplication::translate("XLibrary", "Fix the scenario before running it:"));
-            notify(QCoreApplication::translate("XLibrary", "Fix the scenario before running it:") + "\n" +
+            emit scenario_changed(QCoreApplication::translate("Fora.Deck", "Fix the scenario before running it:"));
+            notify(QCoreApplication::translate("Fora.Deck", "Fix the scenario before running it:") + "\n" +
                    issues.first());
             return;
         }
@@ -865,7 +865,7 @@ void DesktopService::check_scenario(const qint64 id, const bool force) {
     });
     watcher->setFuture(QtConcurrent::run(&launch_profile_pool, [record, applications = snapshot.applications] {
         if (!record.id)
-            return QStringList{QCoreApplication::translate("XLibrary", "The scenario was not found.")};
+            return QStringList{QCoreApplication::translate("Fora.Deck", "The scenario was not found.")};
         return Manager::scenario_issues(record, applications);
     }));
 }
@@ -875,11 +875,11 @@ void DesktopService::next_scenario_step() {
         ++step_index;
     if (step_index >= pending_steps.size()) {
         finish_scenario(operation_state::completed);
-        emit scenario_changed(QCoreApplication::translate("XLibrary", "Scenario “") + scenario_name +
-                              QCoreApplication::translate("XLibrary", "” completed."));
+        emit scenario_changed(QCoreApplication::translate("Fora.Deck", "Scenario “") + scenario_name +
+                              QCoreApplication::translate("Fora.Deck", "” completed."));
         return;
     }
-    emit scenario_changed(QCoreApplication::translate("XLibrary", "%1 · step %2 of %3")
+    emit scenario_changed(QCoreApplication::translate("Fora.Deck", "%1 · step %2 of %3")
                               .arg(scenario_name)
                               .arg(step_index + 1)
                               .arg(pending_steps.size()));
@@ -896,7 +896,7 @@ void DesktopService::cancel_scenario() {
     else
         finish_scenario(operation_state::cancelled);
     emit scenario_changed(QCoreApplication::translate(
-        "XLibrary", "The scenario stopped. Applications already opened will keep running."));
+        "Fora.Deck", "The scenario stopped. Applications already opened will keep running."));
 }
 
 void DesktopService::finish_scenario(const operation_state state, const operation_error &error) {
@@ -935,17 +935,17 @@ QString DesktopService::scenario_step_status(const qsizetype index) const {
     const auto &state = step_states[index];
     QString text;
     if (state == "waiting")
-        text = QCoreApplication::translate("XLibrary", "Waiting");
+        text = QCoreApplication::translate("Fora.Deck", "Waiting");
     else if (state == "delaying")
-        text = QCoreApplication::translate("XLibrary", "Delay");
+        text = QCoreApplication::translate("Fora.Deck", "Delay");
     else if (state == "launching")
-        text = QCoreApplication::translate("XLibrary", "Launching");
+        text = QCoreApplication::translate("Fora.Deck", "Launching");
     else if (state == "success")
-        text = QCoreApplication::translate("XLibrary", "Success");
+        text = QCoreApplication::translate("Fora.Deck", "Success");
     else if (state == "error")
-        text = QCoreApplication::translate("XLibrary", "Error");
+        text = QCoreApplication::translate("Fora.Deck", "Error");
     else
-        text = QCoreApplication::translate("XLibrary", "Skipped");
+        text = QCoreApplication::translate("Fora.Deck", "Skipped");
     if (!step_errors[index].isEmpty())
         text += ": " + step_errors[index];
     return text;
@@ -964,7 +964,7 @@ bool DesktopService::begin_catalog_preview(const QString &operation, const bool 
     discovery_state = operation_state::loading;
     discovery_request_id = begin_operation(operation);
     discovery_cancelled = std::make_shared<discovery_control>();
-    scan_progress = {-1, 0, 0, QCoreApplication::translate("XLibrary", "Preparing import preview…")};
+    scan_progress = {-1, 0, 0, QCoreApplication::translate("Fora.Deck", "Preparing import preview…")};
     emit discovery_changed();
     emit discovery_progress_changed();
     return true;
@@ -989,7 +989,7 @@ void DesktopService::present_catalog_preview(QVector<app_record> records, QVecto
 #endif
             if (!excluded)
                 return false;
-            issues.append({record.discovery_source, QCoreApplication::translate("XLibrary", "Excluded by the user."),
+            issues.append({record.discovery_source, QCoreApplication::translate("Fora.Deck", "Excluded by the user."),
                            discovery_issue_kind::skipped});
             return true;
         });
@@ -1020,16 +1020,16 @@ void DesktopService::present_catalog_preview(QVector<app_record> records, QVecto
 void DesktopService::continue_inventory_review() {
     if (is_scan_preview() && preview_records.isEmpty()) {
         scan_report =
-            discovery_details(QCoreApplication::translate("XLibrary", "No new applications found."), preview_issues);
+            discovery_details(QCoreApplication::translate("Fora.Deck", "No new applications found."), preview_issues);
         emit discovery_report_changed();
         publish_result({discovery_request_id, preview_operation, operation_state::completed, {}});
         if (!startup_scan)
-            notify(QCoreApplication::translate("XLibrary", "No new applications found."));
+            notify(QCoreApplication::translate("Fora.Deck", "No new applications found."));
         return;
     }
     reviewing = true;
     scan_progress = {90, 0, preview_records.size(),
-                     QCoreApplication::translate("XLibrary", "Review applications before import")};
+                     QCoreApplication::translate("Fora.Deck", "Review applications before import")};
     emit discovery_progress_changed();
     emit catalog_preview_ready();
 }
@@ -1047,7 +1047,7 @@ void DesktopService::keep_missing_applications() {
 }
 
 QString DesktopService::preview_details() const {
-    return discovery_details(QCoreApplication::translate("XLibrary", "Preview issues: %1").arg(preview_issues.size()),
+    return discovery_details(QCoreApplication::translate("Fora.Deck", "Preview issues: %1").arg(preview_issues.size()),
                              preview_issues);
 }
 
@@ -1057,7 +1057,7 @@ void DesktopService::clear_discovery_exclusions() {
     settings.remove("sources/excluded_configurations");
     settings.remove("sources/dismissed_targets");
     settings.sync();
-    notify(QCoreApplication::translate("XLibrary", "Discovery exclusions cleared."));
+    notify(QCoreApplication::translate("Fora.Deck", "Discovery exclusions cleared."));
 }
 
 void DesktopService::apply_catalog_preview(const QVector<int> &rows, const bool remember_exclusions,
@@ -1067,7 +1067,7 @@ void DesktopService::apply_catalog_preview(const QVector<int> &rows, const bool 
     const QSet<int> selected_rows(rows.cbegin(), rows.cend());
     if (reviewing_missing) {
         if (is_scenario_active()) {
-            notify(QCoreApplication::translate("XLibrary", "Stop the scenario before removing applications."));
+            notify(QCoreApplication::translate("Fora.Deck", "Stop the scenario before removing applications."));
             keep_missing_applications();
             return;
         }
@@ -1095,7 +1095,7 @@ void DesktopService::apply_catalog_preview(const QVector<int> &rows, const bool 
             applications.append(record);
         } else {
             issues.append({record.discovery_source.isEmpty() ? record.path : record.discovery_source,
-                           QCoreApplication::translate("XLibrary", "Not selected for import."),
+                           QCoreApplication::translate("Fora.Deck", "Not selected for import."),
                            discovery_issue_kind::skipped});
             if (remember_exclusions && is_scan_preview())
                 exclusions.append(launch_configuration_key(record.path, record.arguments, record.working_directory));
@@ -1108,7 +1108,7 @@ void DesktopService::apply_catalog_preview(const QVector<int> &rows, const bool 
     }
     reviewing = false;
     preview_records.clear();
-    scan_progress.stage = QCoreApplication::translate("XLibrary", "Adding applications to the library");
+    scan_progress.stage = QCoreApplication::translate("Fora.Deck", "Adding applications to the library");
     emit discovery_progress_changed();
     if (!is_json_preview())
         policy = import_conflict_policy::skip;
@@ -1124,7 +1124,7 @@ void DesktopService::apply_catalog_preview(const QVector<int> &rows, const bool 
                 if (request_id != discovery_request_id || !is_discovering() || discovery_cancelled->requested.load())
                     return;
                 scan_progress = {percent, processed, total,
-                                 QCoreApplication::translate("XLibrary", "Adding applications to the library")};
+                                 QCoreApplication::translate("Fora.Deck", "Adding applications to the library")};
                 emit discovery_progress_changed();
             },
             Qt::QueuedConnection);
@@ -1152,12 +1152,12 @@ void DesktopService::discover(const bool at_startup) {
     const bool registry = settings.value("sources/registry", true).toBool();
     const bool start_menu = settings.value("sources/start_menu", true).toBool();
     if (!registry && !start_menu && !at_startup) {
-        notify(QCoreApplication::translate("XLibrary", "Select discovery sources in the library settings."));
+        notify(QCoreApplication::translate("Fora.Deck", "Select discovery sources in the library settings."));
         return;
     }
     if (!begin_catalog_preview("discover", at_startup))
         return;
-    scan_progress = {-1, 0, 0, QCoreApplication::translate("XLibrary", "Preparing the application list…")};
+    scan_progress = {-1, 0, 0, QCoreApplication::translate("Fora.Deck", "Preparing the application list…")};
     emit discovery_changed();
     // Updates from both worker threads reach the UI only when the percentage or stage changes.
     const std::function<void(const discovery_progress &)> report_progress =
@@ -1185,7 +1185,7 @@ void DesktopService::discover(const bool at_startup) {
             if (discovery_cancelled->requested.load()) {
                 const auto message = discovery_summary(
                     0, result.second,
-                    QCoreApplication::translate("XLibrary", "Scan cancelled; changes were not saved."));
+                    QCoreApplication::translate("Fora.Deck", "Scan cancelled; changes were not saved."));
                 scan_report = discovery_details(message, result.second);
                 emit discovery_report_changed();
                 publish_result({discovery_request_id, "discover", operation_state::cancelled, {}});
@@ -1205,7 +1205,7 @@ void DesktopService::discover(const bool at_startup) {
                 operation_error_source::filesystem, discovery_request_id);
         } catch (const DiscoveryCancelled &) {
             const auto message = discovery_summary(
-                0, {}, QCoreApplication::translate("XLibrary", "Scan cancelled; changes were not saved."));
+                0, {}, QCoreApplication::translate("Fora.Deck", "Scan cancelled; changes were not saved."));
             scan_report = message;
             emit discovery_report_changed();
             publish_result({discovery_request_id, "discover", operation_state::cancelled, {}});
@@ -1214,7 +1214,7 @@ void DesktopService::discover(const bool at_startup) {
         } catch (const std::exception &error) {
             const QVector<discovery_issue> issues{{"Discovery", QString::fromUtf8(error.what())}};
             const auto message = discovery_summary(
-                0, issues, QCoreApplication::translate("XLibrary", "Scan failed; changes were not saved."));
+                0, issues, QCoreApplication::translate("Fora.Deck", "Scan failed; changes were not saved."));
             scan_report = discovery_details(message, issues);
             emit discovery_report_changed();
             publish_result({discovery_request_id,
@@ -1245,15 +1245,15 @@ void DesktopService::cancel_discovery() {
         missing_records.clear();
         reviewing_missing = false;
         scan_report = discovery_details(
-            QCoreApplication::translate("XLibrary", "Import cancelled; changes were not saved."), preview_issues);
+            QCoreApplication::translate("Fora.Deck", "Import cancelled; changes were not saved."), preview_issues);
         emit discovery_report_changed();
         publish_result({discovery_request_id, preview_operation, operation_state::cancelled, {}});
         return;
     }
-    scan_progress.stage = QCoreApplication::translate("XLibrary", "Stopping the scan…");
+    scan_progress.stage = QCoreApplication::translate("Fora.Deck", "Stopping the scan…");
     emit discovery_progress_changed();
     if (!startup_scan)
-        notify(QCoreApplication::translate("XLibrary", "Stopping application discovery…"));
+        notify(QCoreApplication::translate("Fora.Deck", "Stopping application discovery…"));
 }
 
 void DesktopService::export_catalog(const QString &path) {
@@ -1290,18 +1290,18 @@ bool DesktopService::safe_mode() const {
 }
 
 QString DesktopService::diagnostics_text() const {
-    const auto mode = application_paths::portable_mode() ? QCoreApplication::translate("XLibrary", "Portable")
-                                                         : QCoreApplication::translate("XLibrary", "Installed");
-    QString text = QCoreApplication::translate("XLibrary", "Product version: %1\nSchema version: %2 (supported: "
-                                                           "%3)\nDatabase: %4\nSettings: %5\nMode: %6\nSafe mode: %7")
+    const auto mode = application_paths::portable_mode() ? QCoreApplication::translate("Fora.Deck", "Portable")
+                                                         : QCoreApplication::translate("Fora.Deck", "Installed");
+    QString text = QCoreApplication::translate("Fora.Deck", "Product version: %1\nSchema version: %2 (supported: "
+                                                            "%3)\nDatabase: %4\nSettings: %5\nMode: %6\nSafe mode: %7")
                        .arg(QCoreApplication::applicationVersion())
                        .arg(current_schema_version)
-                       .arg(xlibrary::profile_schema_version)
+                       .arg(foradeck::profile_schema_version)
                        .arg(library_file, settings.fileName(), mode,
-                            safe_mode() ? QCoreApplication::translate("XLibrary", "Yes")
-                                        : QCoreApplication::translate("XLibrary", "No"));
+                            safe_mode() ? QCoreApplication::translate("Fora.Deck", "Yes")
+                                        : QCoreApplication::translate("Fora.Deck", "No"));
     if (last_failure.source != operation_error_source::none)
-        text += QCoreApplication::translate("XLibrary", "\nLast error (source %1): %2\nTechnical reason: %3")
+        text += QCoreApplication::translate("Fora.Deck", "\nLast error (source %1): %2\nTechnical reason: %3")
                     .arg(operation_source_name(last_failure.source))
                     .arg(last_failure.user_message, last_failure.technical_reason);
     return text;
@@ -1314,7 +1314,7 @@ quint64 DesktopService::backup_profile(const QString &path) {
     }
     if (path.isEmpty() || profile_busy() || is_discovering() || is_scenario_active()) {
         notify(QCoreApplication::translate(
-            "XLibrary", "Wait for the current profile operation or stop the scan and scenario first."));
+            "Fora.Deck", "Wait for the current profile operation or stop the scan and scenario first."));
         return 0;
     }
     settings.sync();
@@ -1336,7 +1336,7 @@ quint64 DesktopService::preview_profile(const QString &path) {
         return 0;
     if (is_discovering() || is_scenario_active()) {
         notify(QCoreApplication::translate(
-            "XLibrary", "Wait for the current profile operation or stop the scan and scenario first."));
+            "Fora.Deck", "Wait for the current profile operation or stop the scan and scenario first."));
         return 0;
     }
     return enqueue(
@@ -1352,7 +1352,7 @@ quint64 DesktopService::restore_profile(const QString &path, const QByteArray &f
     if (path.isEmpty() || profile_busy() || is_opening() || is_discovering() || is_scenario_active() ||
         !launching.isEmpty() || GithubTokenStore::pending_changes(settings)) {
         notify(QCoreApplication::translate(
-            "XLibrary", "Wait for the current profile operation or stop the scan and scenario first."));
+            "Fora.Deck", "Wait for the current profile operation or stop the scan and scenario first."));
         return 0;
     }
     settings.sync();
@@ -1375,7 +1375,7 @@ quint64 DesktopService::export_diagnostics(const QString &path) {
         QJsonDocument(QJsonObject{{"format", 1},
                                   {"application_version", QCoreApplication::applicationVersion()},
                                   {"schema_version", current_schema_version},
-                                  {"supported_schema_version", xlibrary::profile_schema_version},
+                                  {"supported_schema_version", foradeck::profile_schema_version},
                                   {"database_path", library_file},
                                   {"settings_path", settings.fileName()},
                                   {"mode", application_paths::portable_mode() ? "portable" : "installed"},
@@ -1396,7 +1396,7 @@ quint64 DesktopService::preview_paths(const QString &old_root, const QString &ne
     }
     if (profile_busy() || restart_pending || is_discovering() || is_scenario_active() || !launching.isEmpty()) {
         notify(QCoreApplication::translate(
-            "XLibrary", "Wait for the current profile operation or stop the scan and scenario first."));
+            "Fora.Deck", "Wait for the current profile operation or stop the scan and scenario first."));
         return 0;
     }
     return enqueue("profile_paths_preview",
@@ -1410,7 +1410,7 @@ quint64 DesktopService::recover_paths(const QVector<path_relocation> &changes) {
     }
     if (profile_busy() || restart_pending || is_discovering() || is_scenario_active() || !launching.isEmpty()) {
         notify(QCoreApplication::translate(
-            "XLibrary", "Wait for the current profile operation or stop the scan and scenario first."));
+            "Fora.Deck", "Wait for the current profile operation or stop the scan and scenario first."));
         return 0;
     }
     return enqueue("profile_paths_recovery", [changes](Manager &worker) { worker.recover_paths(changes); });
@@ -1424,12 +1424,12 @@ bool DesktopService::reset_settings() {
     if (!is_ready() || profile_busy() || restart_pending || is_discovering() || is_scenario_active() ||
         !launching.isEmpty() || pending_shortcut_request || GithubTokenStore::pending_changes(settings) ||
         updates.is_busy()) {
-        notify(QCoreApplication::translate("XLibrary", "Finish current operations before resetting settings."));
+        notify(QCoreApplication::translate("Fora.Deck", "Finish current operations before resetting settings."));
         return false;
     }
     settings.sync();
     if (settings.status() != QSettings::NoError) {
-        notify(QCoreApplication::translate("XLibrary", "Could not save the settings file."));
+        notify(QCoreApplication::translate("Fora.Deck", "Could not save the settings file."));
         return false;
     }
     QVariantMap previous;
@@ -1443,9 +1443,10 @@ bool DesktopService::reset_settings() {
     }
     settings.clear();
     // Credentials belong to the system store and are managed separately from preferences.
-    const auto marker = QString::fromLatin1(profile_settings::token_marker);
-    if (previous.contains(marker))
-        settings.setValue(marker, previous.value(marker));
+    for (const auto *key : {profile_settings::token_marker, profile_settings::previous_token_profile}) {
+        if (previous.contains(key))
+            settings.setValue(key, previous.value(key));
+    }
     settings.setValue("onboarding/completed", true);
     if (previous.contains("files/saved"))
         settings.setValue("files/saved", previous.value("files/saved"));
@@ -1459,14 +1460,14 @@ bool DesktopService::reset_settings() {
         settings.sync();
         if (autostart && !desktop_platform::set_autostart(true, error))
             notify(error);
-        notify(QCoreApplication::translate("XLibrary", "Could not save the settings file."));
+        notify(QCoreApplication::translate("Fora.Deck", "Could not save the settings file."));
         return false;
     }
     restart_pending = true;
     GithubTokenStore::lock_profile(settings, true);
     emit profile_state_changed();
     notify(QCoreApplication::translate(
-        "XLibrary", "Settings reset. Restart Fora.Deck to apply the defaults. Your catalog was kept."));
+        "Fora.Deck", "Settings reset. Restart Fora.Deck to apply the defaults. Your catalog was kept."));
     return true;
 }
 
@@ -1479,7 +1480,7 @@ void DesktopService::restart_application() {
         arguments.append("--wait-for-profile");
     if (!QProcess::startDetached(QCoreApplication::applicationFilePath(), arguments,
                                  QCoreApplication::applicationDirPath())) {
-        notify(QCoreApplication::translate("XLibrary", "Could not restart Fora.Deck. Close and open it manually."));
+        notify(QCoreApplication::translate("Fora.Deck", "Could not restart Fora.Deck. Close and open it manually."));
         return;
     }
     QCoreApplication::quit();
@@ -1555,15 +1556,16 @@ bool DesktopService::validate_shortcut_configuration(const QVariantMap &values, 
         if (sequence.isEmpty())
             return true;
         if (sequence.count() != 1 || sequence[0].key() == Qt::Key_unknown) {
-            error = QCoreApplication::translate("XLibrary", "Use a single key combination.");
+            error = QCoreApplication::translate("Fora.Deck", "Use a single key combination.");
             return false;
         }
         const auto aliases = shortcut_aliases(sequence);
         for (const auto &alias : aliases)
             if (sequences.contains(alias.toString(QKeySequence::PortableText))) {
-                error = QCoreApplication::translate("XLibrary", "The shortcut %1 is already assigned to another action "
-                                                                "or reserved for text editing and search.")
-                            .arg(sequence.toString(QKeySequence::NativeText));
+                error =
+                    QCoreApplication::translate("Fora.Deck", "The shortcut %1 is already assigned to another action "
+                                                             "or reserved for text editing and search.")
+                        .arg(sequence.toString(QKeySequence::NativeText));
                 return false;
             }
         for (const auto &alias : aliases)
@@ -1605,20 +1607,20 @@ bool DesktopService::validate_target_shortcut(const bool scenario, const qint64 
                                               QString &error) const {
     if (!sequence.isEmpty()) {
         if (sequence.count() != 1) {
-            error = QCoreApplication::translate("XLibrary", "Use a single key combination.");
+            error = QCoreApplication::translate("Fora.Deck", "Use a single key combination.");
             return false;
         }
         const auto combination = sequence[0];
         const auto key = combination.key();
         if (!((key >= Qt::Key_A && key <= Qt::Key_Z) || (key >= Qt::Key_0 && key <= Qt::Key_9) ||
               (key >= Qt::Key_F1 && key <= Qt::Key_F24) || key == Qt::Key_Space)) {
-            error = QCoreApplication::translate("XLibrary", "Use a letter, digit, F1–F24, or Space.");
+            error = QCoreApplication::translate("Fora.Deck", "Use a letter, digit, F1–F24, or Space.");
             return false;
         }
         const auto modifiers = combination.keyboardModifiers();
         if (!(modifiers & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier)) ||
             (modifiers & ~(Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier | Qt::ShiftModifier))) {
-            error = QCoreApplication::translate("XLibrary", "Add Ctrl, Alt, or Super to the global shortcut.");
+            error = QCoreApplication::translate("Fora.Deck", "Add Ctrl, Alt, or Super to the global shortcut.");
             return false;
         }
     }
@@ -1628,14 +1630,14 @@ bool DesktopService::validate_target_shortcut(const bool scenario, const qint64 
 bool DesktopService::set_target_shortcut(const bool scenario, const qint64 id, const QKeySequence &sequence,
                                          QString &error) {
     if (!is_ready() || profile_busy() || restart_pending || pending_shortcut_request) {
-        error = QCoreApplication::translate("XLibrary", "Wait for the current library operation to finish.");
+        error = QCoreApplication::translate("Fora.Deck", "Wait for the current library operation to finish.");
         return false;
     }
     const auto exists = scenario ? std::any_of(snapshot.scenarios.cbegin(), snapshot.scenarios.cend(),
                                                [id](const auto &record) { return record.id == id; })
                                  : model.find(id) != nullptr;
     if (id <= 0 || !exists) {
-        error = QCoreApplication::translate("XLibrary", "The shortcut target no longer exists.");
+        error = QCoreApplication::translate("Fora.Deck", "The shortcut target no longer exists.");
         return false;
     }
     if (!validate_target_shortcut(scenario, id, sequence, error))

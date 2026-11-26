@@ -96,7 +96,7 @@ bool download_redirect(const QUrl &url, const QUrl &original) {
 
 QNetworkRequest request(const QUrl &url) {
     QNetworkRequest result(url);
-    result.setRawHeader("User-Agent", "XLibrary/" + QCoreApplication::applicationVersion().toLatin1());
+    result.setRawHeader("User-Agent", "Fora.Deck/" + QCoreApplication::applicationVersion().toLatin1());
     result.setRawHeader("Accept-Encoding", "identity");
     result.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::UserVerifiedRedirectPolicy);
     result.setAttribute(QNetworkRequest::CacheLoadControlAttribute, QNetworkRequest::AlwaysNetwork);
@@ -194,7 +194,7 @@ UpdateChecker::UpdateChecker(QObject *const parent) : QObject(parent) {
     qRegisterMetaType<operation_result>();
     deadline.setSingleShot(true);
     connect(&deadline, &QTimer::timeout, this, [this] {
-        fail(QCoreApplication::translate("XLibrary", "The update request timed out. Please try again."),
+        fail(QCoreApplication::translate("Fora.Deck", "The update request timed out. Please try again."),
              "request_timeout");
     });
 }
@@ -286,12 +286,12 @@ quint64 UpdateChecker::check(const QString &token) {
     if (trimmed_token.size() > 1024 || !std::all_of(trimmed_token.begin(), trimmed_token.end(), [](const QChar c) {
             return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
         })) {
-        fail(QCoreApplication::translate("XLibrary", "The GitHub token contains invalid characters."),
+        fail(QCoreApplication::translate("Fora.Deck", "The GitHub token contains invalid characters."),
              "invalid_token_characters", operation_error_source::validation);
         return id;
     }
     if (!parse_version(QCoreApplication::applicationVersion())) {
-        fail(QCoreApplication::translate("XLibrary", "The current application version is invalid."),
+        fail(QCoreApplication::translate("Fora.Deck", "The current application version is invalid."),
              "invalid_current_version", operation_error_source::validation);
         return id;
     }
@@ -339,7 +339,8 @@ void UpdateChecker::request_releases() {
     reply = network.get(query);
     reply->setReadBufferSize(256 * 1024);
     connect(reply, &QNetworkReply::redirected, this, [this](const QUrl &) {
-        fail(QCoreApplication::translate("XLibrary", "GitHub returned an unexpected redirect."), "unexpected_redirect");
+        fail(QCoreApplication::translate("Fora.Deck", "GitHub returned an unexpected redirect."),
+             "unexpected_redirect");
     });
     connect(reply, &QIODevice::readyRead, this, &UpdateChecker::read_response);
     connect(reply, &QNetworkReply::finished, this, &UpdateChecker::finish_reply);
@@ -359,22 +360,22 @@ void UpdateChecker::read_response() {
             break;
         if (current_request == request_kind::download) {
             if (installer.pos() > installer_size - bytes.size()) {
-                fail(QCoreApplication::translate("XLibrary", "The installer size does not match the GitHub release."),
+                fail(QCoreApplication::translate("Fora.Deck", "The installer size does not match the GitHub release."),
                      "installer_size_mismatch");
                 return;
             }
             if (installer.write(bytes) != bytes.size()) {
-                fail(
-                    QCoreApplication::translate(
-                        "XLibrary", "Could not write the downloaded installer. Check free disk space and permissions."),
-                    installer.errorString(), operation_error_source::filesystem);
+                fail(QCoreApplication::translate(
+                         "Fora.Deck",
+                         "Could not write the downloaded installer. Check free disk space and permissions."),
+                     installer.errorString(), operation_error_source::filesystem);
                 return;
             }
             download_hash.addData(bytes);
             emit download_progress(installer.pos(), installer_size);
         } else {
             if (response.size() > metadata_limit - bytes.size()) {
-                fail(QCoreApplication::translate("XLibrary", "The GitHub response is too large."),
+                fail(QCoreApplication::translate("Fora.Deck", "The GitHub response is too large."),
                      "metadata_limit_exceeded");
                 return;
             }
@@ -395,32 +396,32 @@ void UpdateChecker::finish_reply() {
         QString("network_error=%1; http_status=%2").arg(static_cast<int>(finished->error())).arg(status);
     if (current_request == request_kind::check && status == 401) {
         fail(QCoreApplication::translate(
-                 "XLibrary", "GitHub rejected the personal token. Replace or delete it in the update settings."),
+                 "Fora.Deck", "GitHub rejected the personal token. Replace or delete it in the update settings."),
              network_reason);
         return;
     }
     if (status == 403 || status == 429) {
-        fail(QCoreApplication::translate("XLibrary", "GitHub has limited update requests. Please try again later."),
+        fail(QCoreApplication::translate("Fora.Deck", "GitHub has limited update requests. Please try again later."),
              network_reason);
         return;
     }
     if (finished->error() != QNetworkReply::NoError || status != 200) {
-        fail(
-            QCoreApplication::translate(
-                "XLibrary", "Could not retrieve the update from GitHub. Check your internet connection and try again."),
-            network_reason);
+        fail(QCoreApplication::translate(
+                 "Fora.Deck",
+                 "Could not retrieve the update from GitHub. Check your internet connection and try again."),
+             network_reason);
         return;
     }
     if (current_request == request_kind::download) {
         if (installer.pos() != installer_size || download_hash.result() != installer_digest) {
-            fail(QCoreApplication::translate("XLibrary",
+            fail(QCoreApplication::translate("Fora.Deck",
                                              "Installer verification failed. The file was removed; please try again."),
                  installer.pos() != installer_size ? "installer_size_mismatch" : "installer_digest_mismatch");
             return;
         }
         if (!installer.flush()) {
             fail(QCoreApplication::translate(
-                     "XLibrary", "Could not write the downloaded installer. Check free disk space and permissions."),
+                     "Fora.Deck", "Could not write the downloaded installer. Check free disk space and permissions."),
                  installer.errorString(), operation_error_source::filesystem);
             return;
         }
@@ -434,8 +435,8 @@ void UpdateChecker::finish_reply() {
         select_release_page(response, QCoreApplication::applicationVersion(), update_channel, latest_release);
     if (!selection.error.isEmpty()) {
         fail(selection.error == "invalid_release_link"
-                 ? QCoreApplication::translate("XLibrary", "GitHub returned an invalid release link.")
-                 : QCoreApplication::translate("XLibrary", "GitHub returned an invalid release list."),
+                 ? QCoreApplication::translate("Fora.Deck", "GitHub returned an invalid release link.")
+                 : QCoreApplication::translate("Fora.Deck", "GitHub returned an invalid release list."),
              selection.error);
         return;
     }
@@ -443,7 +444,7 @@ void UpdateChecker::finish_reply() {
     const auto releases = QJsonDocument::fromJson(response).array();
     if (releases.size() == 100) {
         if (release_page >= 20) {
-            fail(QCoreApplication::translate("XLibrary",
+            fail(QCoreApplication::translate("Fora.Deck",
                                              "The release list is too long. Open GitHub to check for updates."),
                  "release_page_limit_exceeded");
             return;
@@ -460,7 +461,7 @@ void UpdateChecker::finish_reply() {
 void UpdateChecker::select_release() {
     const auto current = parse_version(QCoreApplication::applicationVersion());
     if (!current) {
-        fail(QCoreApplication::translate("XLibrary", "The current application version is invalid."),
+        fail(QCoreApplication::translate("Fora.Deck", "The current application version is invalid."),
              "invalid_current_version", operation_error_source::validation);
         return;
     }
@@ -482,16 +483,11 @@ void UpdateChecker::select_release() {
     auto full_version = release_tag;
     if (full_version.startsWith('v'))
         full_version.remove(0, 1);
-    const auto base_name = "XLibrary-" + full_version;
-    const auto legacy_base_name = "XLibrary-" + latest->numbers.join('.');
+    const auto installer_name = "Fora.Deck-" + full_version + "-windows-x64-" + compiler + "-setup.exe";
     for (const auto &value : latest_release.value("assets").toArray()) {
         const auto asset = value.toObject();
         const auto name = asset.value("name").toString();
-        if (compiler.isEmpty() || QSysInfo::buildCpuArchitecture() != "x86_64" ||
-            (name != base_name + "-windows-x64-" + compiler + "-setup.exe" &&
-             name != legacy_base_name + "-windows-x64-" + compiler + "-setup.exe" &&
-             // Старые сборщики добавляли pre-release независимо от суффикса GitHub-тега.
-             name != legacy_base_name + "-pre-release-windows-x64-" + compiler + "-setup.exe"))
+        if (compiler.isEmpty() || QSysInfo::buildCpuArchitecture() != "x86_64" || name != installer_name)
             continue;
         const auto url = QUrl(asset.value("browser_download_url").toString());
         const auto digest = asset.value("digest").toString();
@@ -525,21 +521,21 @@ quint64 UpdateChecker::download() {
         return id;
     if (!can_install()) {
         fail(QCoreApplication::translate(
-                 "XLibrary",
+                 "Fora.Deck",
                  "This installation can no longer be updated automatically. Please open the release on GitHub."),
              "automatic_updates_unavailable", operation_error_source::platform);
         return id;
     }
-    download_directory = std::make_unique<QTemporaryDir>(QDir::tempPath() + "/xlibrary-update-XXXXXX");
+    download_directory = std::make_unique<QTemporaryDir>(QDir::tempPath() + "/foradeck-update-XXXXXX");
     if (!download_directory->isValid()) {
-        fail(QCoreApplication::translate("XLibrary", "Could not create a temporary folder for the update."),
+        fail(QCoreApplication::translate("Fora.Deck", "Could not create a temporary folder for the update."),
              download_directory->errorString(), operation_error_source::filesystem);
         return id;
     }
-    installer.setFileName(download_directory->filePath("XLibrary-setup.exe"));
+    installer.setFileName(download_directory->filePath("Fora.Deck-setup.exe"));
     if (!installer.open(QIODevice::WriteOnly | QIODevice::NewOnly)) {
         fail(QCoreApplication::translate(
-                 "XLibrary", "Could not write the downloaded installer. Check free disk space and permissions."),
+                 "Fora.Deck", "Could not write the downloaded installer. Check free disk space and permissions."),
              installer.errorString(), operation_error_source::filesystem);
         return id;
     }
@@ -554,7 +550,7 @@ quint64 UpdateChecker::download() {
         if (download_redirect(url, installer_url))
             reply->redirectAllowed();
         else
-            fail(QCoreApplication::translate("XLibrary", "GitHub returned an unexpected redirect."),
+            fail(QCoreApplication::translate("Fora.Deck", "GitHub returned an unexpected redirect."),
                  "unexpected_redirect");
     });
     connect(reply, &QIODevice::readyRead, this, &UpdateChecker::read_response);
@@ -565,12 +561,13 @@ quint64 UpdateChecker::download() {
 bool UpdateChecker::launch_installer(QString &error) {
     if (is_busy() || !download_directory || !can_install() || installer.isOpen()) {
         error = QCoreApplication::translate(
-            "XLibrary", "This installation can no longer be updated automatically. Please open the release on GitHub.");
+            "Fora.Deck",
+            "This installation can no longer be updated automatically. Please open the release on GitHub.");
         return false;
     }
     if (!desktop_platform::start_update_installer(installer.fileName(), error))
         return false;
-    // The installer reads itself after XLibrary exits; keep the temporary file until installation finishes.
+    // The installer reads itself after Fora.Deck exits; keep the temporary file until installation finishes.
     download_directory->setAutoRemove(false);
     return true;
 }

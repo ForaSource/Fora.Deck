@@ -1,5 +1,5 @@
-#ifndef XLIBRARY_FILE_MANAGER_H
-#define XLIBRARY_FILE_MANAGER_H
+#ifndef FORADECK_FILE_MANAGER_H
+#define FORADECK_FILE_MANAGER_H
 
 #include <atomic>
 #include <functional>

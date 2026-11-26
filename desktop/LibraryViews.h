@@ -1,5 +1,5 @@
-#ifndef XLIBRARY_LIBRARY_VIEWS_H
-#define XLIBRARY_LIBRARY_VIEWS_H
+#ifndef FORADECK_LIBRARY_VIEWS_H
+#define FORADECK_LIBRARY_VIEWS_H
 
 #include "UiRegistry.h"
 

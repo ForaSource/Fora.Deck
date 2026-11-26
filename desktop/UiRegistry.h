@@ -1,5 +1,5 @@
-#ifndef XLIBRARY_UI_REGISTRY_H
-#define XLIBRARY_UI_REGISTRY_H
+#ifndef FORADECK_UI_REGISTRY_H
+#define FORADECK_UI_REGISTRY_H
 
 #include <functional>
 #include <QAbstractItemModel>
@@ -12,7 +12,7 @@
 #include <QWidget>
 #include <stdexcept>
 
-#define XLIBRARY_UI_PLUGIN_IID "org.xlibrary.desktop.UiPlugin/1.0"
+#define FORADECK_UI_PLUGIN_IID "io.github.ForaSource.ForaDeck.UiPlugin/1.0"
 
 class UiRegistry;
 
@@ -29,6 +29,8 @@ struct ui_context {
 
 class UiRegistry {
 public:
+    static constexpr auto previous_plugin_iid = "org.xlibrary.desktop.UiPlugin/1.0";
+
     using widget_factory = std::function<QWidget *(const ui_context &, QWidget *)>;
 
 private:
@@ -40,15 +42,16 @@ public:
     // Qt supplies IID and version without executing the module. IID 1.0 modules
     // need no custom metadata; their compiler/runtime ABI remains a trust decision.
     static QString plugin_compatibility_error(const QJsonObject &metadata) {
-        if (metadata.value("IID").toString() != XLIBRARY_UI_PLUGIN_IID)
-            return QCoreApplication::translate("XLibrary", "Unsupported UI plugin interface (requires IID 1.0).");
+        const auto iid = metadata.value("IID").toString();
+        if (iid != FORADECK_UI_PLUGIN_IID && iid != previous_plugin_iid)
+            return QCoreApplication::translate("Fora.Deck", "Unsupported UI plugin interface (requires IID 1.0).");
         const auto version = metadata.value("version").toInt(-1);
         if (version < 0 || version > 0xffffff)
-            return QCoreApplication::translate("XLibrary", "Missing or invalid Qt version metadata.");
+            return QCoreApplication::translate("Fora.Deck", "Missing or invalid Qt version metadata.");
         if ((version >> 16) != QT_VERSION_MAJOR)
-            return QCoreApplication::translate("XLibrary", "Incompatible Qt major version.");
+            return QCoreApplication::translate("Fora.Deck", "Incompatible Qt major version.");
         if (((version >> 8) & 0xff) > QT_VERSION_MINOR)
-            return QCoreApplication::translate("XLibrary", "Plugin requires a newer Qt minor version.");
+            return QCoreApplication::translate("Fora.Deck", "Plugin requires a newer Qt minor version.");
         return {};
     }
 
@@ -66,10 +69,10 @@ public:
             rollback.dismiss();
             return {};
         } catch (const std::exception &error) {
-            return QCoreApplication::translate("XLibrary", "Plugin configuration failed: %1")
+            return QCoreApplication::translate("Fora.Deck", "Plugin configuration failed: %1")
                 .arg(QString::fromUtf8(error.what()));
         } catch (...) {
-            return QCoreApplication::translate("XLibrary",
+            return QCoreApplication::translate("Fora.Deck",
                                                "Plugin configuration failed with an unknown C++ exception.");
         }
     }
@@ -111,6 +114,6 @@ public:
     virtual void configure(UiRegistry &registry) = 0;
 };
 
-Q_DECLARE_INTERFACE(UiPlugin, XLIBRARY_UI_PLUGIN_IID)
+Q_DECLARE_INTERFACE(UiPlugin, FORADECK_UI_PLUGIN_IID)
 
 #endif

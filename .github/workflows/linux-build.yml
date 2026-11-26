@@ -63,7 +63,7 @@ jobs:
           tidy_enabled=OFF
           if [ "$BUILD_PRESET" = linux-clang-debug ]; then tidy_enabled=ON; fi
           cmake --preset "$BUILD_PRESET" -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            -DXLIBRARY_ENABLE_CLANG_TIDY="$tidy_enabled"
+            -DFORADECK_ENABLE_CLANG_TIDY="$tidy_enabled"
 
       - name: Build
         env:
@@ -80,15 +80,15 @@ jobs:
         env:
           BUILD_PRESET: ${{ matrix.preset }}
           QT_QPA_PLATFORM: xcb
-        run: timeout 45s xvfb-run -a dbus-run-session -- "./cmake-build-$BUILD_PRESET/XLibrary" --check-startup
+        run: timeout 45s xvfb-run -a dbus-run-session -- "./cmake-build-$BUILD_PRESET/foradeck" --check-startup
 
       - name: Install and check desktop entry
         env:
           BUILD_PRESET: ${{ matrix.preset }}
         run: |
-          cmake --install "cmake-build-$BUILD_PRESET" --prefix "$RUNNER_TEMP/xlibrary"
-          desktop-file-validate "$RUNNER_TEMP/xlibrary/share/applications/io.github.LapplandJulia.XLibrary.desktop"
-          QT_QPA_PLATFORM=offscreen timeout 45s "$RUNNER_TEMP/xlibrary/bin/XLibrary" --check-startup
+          cmake --install "cmake-build-$BUILD_PRESET" --prefix "$RUNNER_TEMP/foradeck"
+          desktop-file-validate "$RUNNER_TEMP/foradeck/share/applications/io.github.ForaSource.ForaDeck.desktop"
+          QT_QPA_PLATFORM=offscreen timeout 45s "$RUNNER_TEMP/foradeck/bin/foradeck" --check-startup
 
       - name: Report compiler cache
         if: always()
@@ -138,20 +138,20 @@ jobs:
       - name: Check AppImage on X11
         run: |
           APPIMAGE_EXTRACT_AND_RUN=1 QT_QPA_PLATFORM=xcb timeout 45s xvfb-run -a dbus-run-session -- \
-            ./release/linux-packages/XLibrary-*-linux-x86_64.AppImage --check-startup
+            ./release/linux-packages/Fora.Deck-*-linux-x86_64.AppImage --check-startup
           cd release/linux-packages
           sha256sum --check SHA256SUMS.txt
 
       - name: Install, run and remove DEB
         run: |
-          apt-get install -y ./release/linux-packages/xlibrary_*_amd64.deb
-          QT_QPA_PLATFORM=offscreen timeout 45s /usr/bin/XLibrary --check-startup
-          apt-get remove -y xlibrary
+          apt-get install -y ./release/linux-packages/foradeck_*_amd64.deb
+          QT_QPA_PLATFORM=offscreen timeout 45s /usr/bin/foradeck --check-startup
+          apt-get remove -y foradeck
 
       - name: Upload Linux packages
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: XLibrary-linux-x86_64
+          name: Fora.Deck-linux-x86_64
           path: release/linux-packages/
           if-no-files-found: error
           retention-days: 14

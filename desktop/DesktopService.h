@@ -1,5 +1,5 @@
-#ifndef XLIBRARY_DESKTOP_SERVICE_H
-#define XLIBRARY_DESKTOP_SERVICE_H
+#ifndef FORADECK_DESKTOP_SERVICE_H
+#define FORADECK_DESKTOP_SERVICE_H
 
 #include <atomic>
 #include <functional>

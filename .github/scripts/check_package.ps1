@@ -9,7 +9,7 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $package = (Resolve-Path -LiteralPath $PackagePath).Path
-$required_files = @('XLibrary.exe', 'qt.conf', 'Qt6Core.dll', 'Qt6Gui.dll',
+$required_files = @('foradeck.exe', 'qt.conf', 'Qt6Core.dll', 'Qt6Gui.dll',
     'Qt6Widgets.dll', 'Qt6Network.dll', 'Qt6Concurrent.dll', 'plugins/platforms/qwindows.dll',
     'LICENSE', 'THIRD_PARTY_NOTICES.txt', 'build-info.json', 'portable.flag',
     'licenses/qtbase/LGPL-3.0-only.txt', 'licenses/qtbase/GPL-3.0-only.txt')
@@ -43,21 +43,21 @@ $diagnostics = Join-Path $PSScriptRoot '../../build/package-check'
 New-Item -ItemType Directory -Force -Path $diagnostics | Out-Null
 $diagnostics = (Resolve-Path -LiteralPath $diagnostics).Path
 # Use a copy to protect the user's portable profile and check Unicode/spaces in paths.
-$scratch = Join-Path ([IO.Path]::GetTempPath()) "XLibrary проверка $([guid]::NewGuid().ToString('N'))"
+$scratch = Join-Path ([IO.Path]::GetTempPath()) "Fora.Deck проверка $([guid]::NewGuid().ToString('N'))"
 $test_package = Join-Path $scratch 'Пакет с пробелами'
 New-Item -ItemType Directory -Path $scratch | Out-Null
 Copy-Item -LiteralPath $package -Destination $test_package -Recurse
 # Verify that --check-startup neither reads nor modifies the existing portable profile.
 New-Item -ItemType Directory -Path "$test_package/data" -Force | Out-Null
 $sentinel = [Text.Encoding]::UTF8.GetBytes('startup must not touch this database')
-[IO.File]::WriteAllBytes("$test_package/data/xlibrary.db", $sentinel)
+[IO.File]::WriteAllBytes("$test_package/data/foradeck.db", $sentinel)
 $settings = "[behavior]`nstartup=tray"
 Set-Content -LiteralPath "$test_package/data/settings.ini" -Value $settings -NoNewline
 try {
     foreach ($mode in @('portable', 'installed')) {
         if ($mode -eq 'installed') { Remove-Item -LiteralPath "$test_package/portable.flag" }
         $start_info = [System.Diagnostics.ProcessStartInfo]::new()
-        $start_info.FileName = Join-Path $test_package 'XLibrary.exe'
+        $start_info.FileName = Join-Path $test_package 'foradeck.exe'
         $start_info.Arguments = '--check-startup'
         $start_info.WorkingDirectory = $scratch
         $start_info.UseShellExecute = $false
@@ -99,7 +99,7 @@ try {
             }
             $process.Dispose()
         }
-        if ([Convert]::ToBase64String([IO.File]::ReadAllBytes("$test_package/data/xlibrary.db")) -ne
+        if ([Convert]::ToBase64String([IO.File]::ReadAllBytes("$test_package/data/foradeck.db")) -ne
             [Convert]::ToBase64String($sentinel) -or
             (Get-Content -LiteralPath "$test_package/data/settings.ini" -Raw) -cne $settings -or
             @(Get-ChildItem -LiteralPath "$test_package/data" -File).Count -ne 2) {

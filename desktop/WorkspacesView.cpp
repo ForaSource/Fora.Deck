@@ -410,7 +410,7 @@ std::optional<workspace_item> edit_item(DesktopService &service, const ui_contex
         } else {
             item.target = item.kind == workspace_item_kind::url ? target->text().trimmed() : target->text();
         }
-        const auto issue = xlibrary::workspace_item_issue(item);
+        const auto issue = foradeck::workspace_item_issue(item);
         if (!issue.isEmpty()) {
             error->setText(issue);
             error->show();
@@ -500,7 +500,7 @@ bool edit_workspace(DesktopService &service, const ui_context &context, QWidget 
     const auto sync_buttons = [&] {
         const auto index = selected();
         for (auto *add : add_buttons)
-            add->setEnabled(!save_request && record.items.size() < xlibrary::workspace_item_limit);
+            add->setEnabled(!save_request && record.items.size() < foradeck::workspace_item_limit);
         save->setEnabled(!save_request && !record.items.isEmpty() && !name->text().trimmed().isEmpty());
         edit->setEnabled(!save_request && index >= 0);
         remove->setEnabled(edit->isEnabled());
@@ -580,7 +580,7 @@ bool edit_workspace(DesktopService &service, const ui_context &context, QWidget 
     QObject::connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
     QObject::connect(buttons, &QDialogButtonBox::accepted, &dialog, [&] {
         record.name = name->text().trimmed();
-        const auto issue = xlibrary::workspace_record_issue(record);
+        const auto issue = foradeck::workspace_record_issue(record);
         error->setText(issue);
         error->setVisible(!issue.isEmpty());
         if (!issue.isEmpty()) {
@@ -667,7 +667,7 @@ void capture_preview(DesktopService &service, const ui_context &context, QWidget
             used.insert(item->application_id);
             selected.append(*item);
         }
-        const bool over_limit = selected.size() > xlibrary::workspace_item_limit;
+        const bool over_limit = selected.size() > foradeck::workspace_item_limit;
         next->setEnabled(!duplicate && !over_limit);
         next->setText(selected.isEmpty() ? QCoreApplication::translate("Workspaces", "Create manually")
                                          : QCoreApplication::translate("Workspaces", "Review workspace"));
@@ -675,7 +675,7 @@ void capture_preview(DesktopService &service, const ui_context &context, QWidget
             status->setText(QCoreApplication::translate("Workspaces", "Select only one window for each application."));
         else if (over_limit)
             status->setText(QCoreApplication::translate("Workspaces", "Select up to %1 windows.")
-                                .arg(xlibrary::workspace_item_limit));
+                                .arg(foradeck::workspace_item_limit));
         else
             status->setText(
                 QCoreApplication::translate("Workspaces", "Applications selected: %1").arg(selected.size()));
@@ -726,7 +726,7 @@ void capture_preview(DesktopService &service, const ui_context &context, QWidget
             assignments[index] = candidate.item;
             const auto id = candidate.item->application_id;
             const bool already_selected = preselected.contains(id);
-            const bool checked = !already_selected && preselected.size() < xlibrary::workspace_item_limit;
+            const bool checked = !already_selected && preselected.size() < foradeck::workspace_item_limit;
             if (checked)
                 preselected.insert(id);
             entry->setCheckState(0, checked ? Qt::Checked : Qt::Unchecked);
@@ -965,7 +965,7 @@ QWidget *workspaces_view(const ui_context &context, QWidget *const parent) {
                 if (item.kind == workspace_item_kind::application &&
                     std::ranges::find(apps, item.application_id, &app_record::id) == apps.cend())
                     status = QCoreApplication::translate("Workspaces", "Missing application");
-                else if (!xlibrary::workspace_item_issue(item).isEmpty())
+                else if (!foradeck::workspace_item_issue(item).isEmpty())
                     status = QCoreApplication::translate("Workspaces", "Invalid resource");
                 else if (item.enabled && item.placement)
                     status = QCoreApplication::translate("Workspaces", "Window layout");

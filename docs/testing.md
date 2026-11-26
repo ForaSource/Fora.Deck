@@ -47,9 +47,9 @@ for release verification.
 `--check-startup` creates the application/window and catalog in a temporary profile, then exits. It must not modify the normal/portable profile and does not perform the startup network update check.
 
 ```sh
-./cmake-build-linux-debug/XLibrary --check-startup
-QT_QPA_PLATFORM=xcb xvfb-run -a dbus-run-session -- ./cmake-build-linux-debug/XLibrary --check-startup
-QT_QPA_PLATFORM=offscreen ./cmake-build-linux-debug/XLibrary --check-startup
+./cmake-build-linux-debug/foradeck --check-startup
+QT_QPA_PLATFORM=xcb xvfb-run -a dbus-run-session -- ./cmake-build-linux-debug/foradeck --check-startup
+QT_QPA_PLATFORM=offscreen ./cmake-build-linux-debug/foradeck --check-startup
 ```
 
 For Xvfb install `xvfb`, `xauth`, `dbus-x11` and Qt xcb runtime dependencies. Offscreen startup cannot prove a visible window, hotkeys, tray integration, multi-monitor behavior or a real Wayland session.
@@ -59,7 +59,7 @@ For Xvfb install `xvfb`, `xauth`, `dbus-x11` and Qt xcb runtime dependencies. Of
 Use the [Windows packager](releasing.md#windows-packages), unpack its entire ZIP to a writable directory with Unicode/spaces, then check the unpacked application root:
 
 ```powershell
-./.github/scripts/check_package.ps1 -PackagePath 'path/to/unpacked/XLibrary' -Compiler mingw
+./.github/scripts/check_package.ps1 -PackagePath 'path/to/unpacked/Fora.Deck' -Compiler mingw
 Get-FileHash 'path/to/package.zip' -Algorithm SHA256
 ```
 
@@ -79,7 +79,7 @@ Portable and installed profiles are separate. Back up and stop the application b
 
 Verify checksums from the package directory with `sha256sum --check SHA256SUMS.txt`. Test AppImage offscreen and through X11/Xvfb, then interactively in the intended desktop. Check normal launch/restart, profile persistence, moving the AppImage together with `<filename>.data`, and that `--check-startup` leaves existing data unchanged.
 
-Install, launch and remove the DEB in a **clean Debian 13 without Qt SDK or build packages**; use `QT_QPA_PLATFORM=offscreen XLibrary --check-startup` for the isolated startup step. Build-container checks do not prove this environment. See [the compatibility baseline](releasing.md#linux-compatibility-baseline).
+Install, launch and remove the DEB in a **clean Debian 13 without Qt SDK or build packages**; use `QT_QPA_PLATFORM=offscreen foradeck --check-startup` for the isolated startup step. Build-container checks do not prove this environment. See [the compatibility baseline](releasing.md#linux-compatibility-baseline).
 
 Check discovery, launching, process status, tray behavior and autostart on the target desktop. X11 hotkeys/window activation and Wayland compositor restrictions need their own sessions; an offscreen run cannot establish them. Check DPI and multiple monitors where relevant.
 
@@ -133,7 +133,7 @@ Use [the update guide](updates.md) for channels, installer eligibility and expec
 1. Verify current/newer local versions never offer a downgrade. Stable excludes GitHub prereleases; Preview includes them. Version ordering follows SemVer, not publication dates. Change channels during a request and confirm the previous channel's installer cannot be used.
 2. On an older installed Windows copy, check version confirmation, cancellation, retry, progress and closing settings during the request. Cancel/failure should leave Fora.Deck open and remove the partial download.
 3. Accept a valid update: the ordinary interactive Inno Setup wizard should use the prior installation directory and Fora.Deck should exit normally. Confirm completed installation, preserved profile and new version startup.
-   When upgrading an XLibrary installation, check that its standard Start Menu and desktop shortcuts are
+   When upgrading a build from before the rename, check that the standard Start Menu and desktop shortcuts are
    replaced by Fora.Deck shortcuts without duplicates. Repeat with desktop-shortcut creation unchecked:
    an already existing desktop shortcut should keep working under the new name.
 4. For portable, Linux, or a release without an eligible installer/digest, verify the confirmed action opens the specific release page.
@@ -145,11 +145,11 @@ Use [the update guide](updates.md) for channels, installer eligibility and expec
 The existing timing tool is opt-in, is not a CTest test and is not installed:
 
 ```sh
-cmake --preset linux-debug -DXLIBRARY_BUILD_BENCHMARKS=ON
+cmake --preset linux-debug -DFORADECK_BUILD_BENCHMARKS=ON
 cmake --build --preset linux-debug --target poll_benchmark
-QT_LOGGING_RULES=xlibrary.poll.debug=true ./cmake-build-linux-debug/tests/poll_benchmark
+QT_LOGGING_RULES=foradeck.poll.debug=true ./cmake-build-linux-debug/tests/poll_benchmark
 # The same logging category is available in the application:
-QT_LOGGING_RULES=xlibrary.poll.debug=true ./cmake-build-linux-debug/XLibrary
+QT_LOGGING_RULES=foradeck.poll.debug=true ./cmake-build-linux-debug/foradeck
 ```
 
 Multi-config Windows builds place the executable under `tests/<configuration>/`. Do not run profiling when the task excludes benchmarks.

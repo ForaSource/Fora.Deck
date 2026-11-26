@@ -321,7 +321,7 @@ QIcon appearance::icon(const QString &name, const QColor &requested_color) {
 }
 
 QIcon appearance::logo() {
-    static const QIcon result(":/assets/xlibrary.ico");
+    static const QIcon result(":/assets/foradeck.ico");
     return result;
 }
 
@@ -359,7 +359,7 @@ void appearance::apply(const QSettings &settings, const QString &additional_styl
         qApp->installEventFilter(result);
         return result;
     }();
-    qApp->setProperty("xlibrary_disable_animations", !settings.value("appearance/animations", true).toBool());
+    qApp->setProperty("foradeck_disable_animations", !settings.value("appearance/animations", true).toBool());
     const bool dark = is_dark(settings);
     const QColor base(dark ? "#22262D" : "#FFFFFF");
     const QColor panel(dark ? "#191B20" : "#F4F5F7");

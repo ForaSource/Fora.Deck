@@ -37,7 +37,7 @@ struct workspace_record {
     bool operator==(const workspace_record &) const = default;
 };
 
-namespace xlibrary {
+namespace foradeck {
 inline constexpr qsizetype workspace_item_limit = 32;
 QString workspace_name_key(const QString &name);
 QString workspace_item_issue(const workspace_item &item);

@@ -13,6 +13,7 @@
 #include "Manager.h"
 #include "ProfileBackup.h"
 #include "ProfileSchema.h"
+#include "ProfileSettings.h"
 #include "SearchQuery.h"
 #include "SqliteHelpers.h"
 
@@ -104,24 +105,24 @@ private slots:
         QTemporaryDir temporary;
         QVERIFY(temporary.isValid());
         Database db(temporary.filePath("profile.db"));
-        const auto executable = xlibrary::utf8_path(record().path.toStdString());
-        const auto id = xlibrary::ensure_launch_configuration(db.get_connection(), executable);
-        QCOMPARE(xlibrary::ensure_launch_configuration(db.get_connection(), executable), id);
-        QVERIFY(xlibrary::ensure_launch_configuration(db.get_connection(), executable, "--test") != id);
-        QVERIFY(xlibrary::ensure_launch_configuration(db.get_connection(), executable, "",
+        const auto executable = foradeck::utf8_path(record().path.toStdString());
+        const auto id = foradeck::ensure_launch_configuration(db.get_connection(), executable);
+        QCOMPARE(foradeck::ensure_launch_configuration(db.get_connection(), executable), id);
+        QVERIFY(foradeck::ensure_launch_configuration(db.get_connection(), executable, "--test") != id);
+        QVERIFY(foradeck::ensure_launch_configuration(db.get_connection(), executable, "",
                                                       temporary.path().toStdString()) != id);
-        const auto base = xlibrary::utf8_path(temporary.path().toStdString());
-        QCOMPARE(xlibrary::path_identity(base / "a" / ".." / "b", false), xlibrary::path_identity(base / "b", false));
+        const auto base = foradeck::utf8_path(temporary.path().toStdString());
+        QCOMPARE(foradeck::path_identity(base / "a" / ".." / "b", false), foradeck::path_identity(base / "b", false));
 #ifdef Q_OS_WIN
-        QCOMPARE(xlibrary::path_identity(base / "B", false), xlibrary::path_identity(base / "b", false));
+        QCOMPARE(foradeck::path_identity(base / "B", false), foradeck::path_identity(base / "b", false));
 #else
-        QVERIFY(xlibrary::path_identity(base / "B", false) != xlibrary::path_identity(base / "b", false));
+        QVERIFY(foradeck::path_identity(base / "B", false) != foradeck::path_identity(base / "b", false));
 #endif
     }
     void database_integrity() {
         QTemporaryDir temporary;
         Database db(temporary.filePath("profile.db"));
-        QCOMPARE(db.schema_version(), xlibrary::profile_schema_version);
+        QCOMPARE(db.schema_version(), foradeck::profile_schema_version);
         auto app = record();
         const auto id = db.save_application(app);
         QCOMPARE(db.read().applications.size(), 1);
@@ -136,12 +137,12 @@ private slots:
                              nullptr, nullptr) != SQLITE_OK);
         QVERIFY(sqlite3_exec(db.get_connection(), "INSERT INTO tags(name) VALUES('work');", nullptr, nullptr,
                              nullptr) != SQLITE_OK);
-        xlibrary::validate_profile(db.get_connection());
+        foradeck::validate_profile(db.get_connection());
         auto invalid = app;
         invalid.name.clear();
         QVERIFY_THROWS_EXCEPTION(std::exception, db.import_records({app, invalid}));
         QCOMPARE(db.read().applications.size(), 1);
-        xlibrary::validate_profile(db.get_connection());
+        foradeck::validate_profile(db.get_connection());
     }
     void migration() {
         QTemporaryDir temporary;
@@ -149,7 +150,7 @@ private slots:
         sqlite3 *raw = nullptr;
         QCOMPARE(sqlite3_open(path.toUtf8().constData(), &raw), SQLITE_OK);
         std::unique_ptr<sqlite3, decltype(&sqlite3_close_v2)> connection(raw, sqlite3_close_v2);
-        xlibrary::sqlite_execute(raw, R"(
+        foradeck::sqlite_execute(raw, R"(
             PRAGMA foreign_keys=ON;
             CREATE TABLE applications(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT NOT NULL,path TEXT);
             CREATE TABLE tags(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT NOT NULL UNIQUE);
@@ -159,26 +160,26 @@ private slots:
             PRAGMA user_version=1;
         )");
         {
-            xlibrary::SqliteStatement insert(raw, "INSERT INTO applications VALUES(1,'Legacy',?);");
+            foradeck::SqliteStatement insert(raw, "INSERT INTO applications VALUES(1,'Legacy',?);");
             insert.bind(1, QCoreApplication::applicationFilePath());
             insert.next();
         }
-        xlibrary::sqlite_execute(raw, "INSERT INTO application_tags VALUES(1,1);");
+        foradeck::sqlite_execute(raw, "INSERT INTO application_tags VALUES(1,1);");
         connection.reset();
         Database migrated(path);
-        QCOMPARE(migrated.schema_version(), xlibrary::profile_schema_version);
+        QCOMPARE(migrated.schema_version(), foradeck::profile_schema_version);
         const auto apps = migrated.read().applications;
         QCOMPARE(apps.size(), 1);
         QCOMPARE(apps.front().name, QString("Legacy"));
         QCOMPARE(apps.front().tags, QStringList{"legacy"});
-        xlibrary::validate_profile(migrated.get_connection());
+        foradeck::validate_profile(migrated.get_connection());
     }
     void workspace_schema_upgrade() {
         QTemporaryDir temporary;
         const auto path = temporary.filePath("v9.db");
         {
             Database previous(path);
-            xlibrary::sqlite_execute(previous.get_connection(), R"(
+            foradeck::sqlite_execute(previous.get_connection(), R"(
                 DROP TABLE IF EXISTS workspace_window;
                 DROP TABLE IF EXISTS workspace_item;
                 DROP TABLE IF EXISTS workspace;
@@ -198,14 +199,14 @@ private slots:
                                  nullptr),
                  SQLITE_OK);
         const std::unique_ptr<sqlite3, decltype(&sqlite3_close_v2)> backup(raw, sqlite3_close_v2);
-        QCOMPARE(xlibrary::read_schema_version(raw), 9);
+        QCOMPARE(foradeck::read_schema_version(raw), 9);
     }
     void workspace_migration_rolls_back_on_table_collision() {
         QTemporaryDir temporary;
         const auto path = temporary.filePath("v9.db");
         {
             Database previous(path);
-            xlibrary::sqlite_execute(previous.get_connection(), R"(
+            foradeck::sqlite_execute(previous.get_connection(), R"(
                 DROP TABLE workspace_window;
                 DROP TABLE workspace_item;
                 DROP TABLE workspace;
@@ -218,11 +219,11 @@ private slots:
         sqlite3 *raw = nullptr;
         QCOMPARE(sqlite3_open_v2(path.toUtf8().constData(), &raw, SQLITE_OPEN_READONLY, nullptr), SQLITE_OK);
         const std::unique_ptr<sqlite3, decltype(&sqlite3_close_v2)> connection(raw, sqlite3_close_v2);
-        QCOMPARE(xlibrary::read_schema_version(raw), 9);
-        xlibrary::SqliteStatement marker(raw, "SELECT legacy_marker FROM workspace_item;");
+        QCOMPARE(foradeck::read_schema_version(raw), 9);
+        foradeck::SqliteStatement marker(raw, "SELECT legacy_marker FROM workspace_item;");
         QVERIFY(marker.next());
         QCOMPARE(marker.qtext(0), QString("original"));
-        xlibrary::SqliteStatement rolled_back(raw, "SELECT 1 FROM sqlite_master WHERE name='workspace';");
+        foradeck::SqliteStatement rolled_back(raw, "SELECT 1 FROM sqlite_master WHERE name='workspace';");
         QVERIFY(!rolled_back.next());
         QCOMPARE(QDir(temporary.path()).entryList({"v9.db.before-schema-v10.*.bak"}, QDir::Files).size(), 1);
     }
@@ -230,7 +231,7 @@ private slots:
     void workspace_persistence() {
         QTemporaryDir temporary;
         const auto path = temporary.filePath("profile.db");
-        const auto archive = temporary.filePath("backup.xlprofile");
+        const auto archive = temporary.filePath("backup.foradeckprofile");
         const auto settings = temporary.filePath("settings.ini");
         workspace_record stored;
         {
@@ -284,12 +285,12 @@ private slots:
         const auto path = temporary.filePath("future.db");
         {
             Database db(path);
-            xlibrary::sqlite_execute(db.get_connection(), "PRAGMA user_version=999;");
+            foradeck::sqlite_execute(db.get_connection(), "PRAGMA user_version=999;");
         }
         QVERIFY_THROWS_EXCEPTION(std::exception, Database{path});
         sqlite3 *raw = nullptr;
         QCOMPARE(sqlite3_open(path.toUtf8().constData(), &raw), SQLITE_OK);
-        QCOMPARE(xlibrary::read_schema_version(raw), 999);
+        QCOMPARE(foradeck::read_schema_version(raw), 999);
         sqlite3_close_v2(raw);
         QFile damaged(temporary.filePath("damaged.db"));
         QVERIFY(damaged.open(QIODevice::WriteOnly));
@@ -319,7 +320,7 @@ private slots:
                                          control.phase.store(discovery_phase::cancelling);
                                      }));
             QCOMPARE(db.read().applications.size(), 2);
-            xlibrary::validate_profile(db.get_connection());
+            foradeck::validate_profile(db.get_connection());
         }
         Database reopened(path);
         const auto applications = reopened.read().applications;
@@ -336,7 +337,7 @@ private slots:
         QTemporaryDir temporary;
         const auto path = temporary.filePath("profile.db");
         const auto settings_path = temporary.filePath("settings.ini");
-        const auto recovery = temporary.filePath(".xlibrary-recovery-fixture");
+        const auto recovery = temporary.filePath(".foradeck-recovery-fixture");
         QVERIFY(QDir().mkpath(recovery));
         {
             Database db(path);
@@ -374,11 +375,56 @@ private slots:
         ProfileBackup::recover(path, settings_path);
         QCOMPARE(Database(path).read().applications.size(), 1);
     }
+    void migrate_profile_storage_data() {
+        QTest::addColumn<bool>("portable");
+        QTest::newRow("installed") << false;
+        QTest::newRow("portable") << true;
+    }
+    void migrate_profile_storage() {
+        QFETCH(bool, portable);
+        QTemporaryDir temporary;
+        QVERIFY(temporary.isValid());
+        const auto previous = temporary.filePath(portable ? "data" : "XLibrary");
+        const auto current = portable ? previous : temporary.filePath("Fora.Deck");
+        QVERIFY(QDir().mkpath(previous));
+        const auto previous_database = previous + "/xlibrary.db";
+        const auto database_path = current + "/foradeck.db";
+        const auto previous_settings = previous + "/settings.ini";
+        {
+            Database database(previous_database);
+            database.save_application(record());
+            QSettings settings(previous_settings, QSettings::IniFormat);
+            settings.setValue("behavior/autostart", true);
+            settings.setValue(profile_settings::token_marker, true);
+            settings.sync();
+            QCOMPARE(settings.status(), QSettings::NoError);
+        }
+        ProfileBackup::migrate_storage(database_path, portable);
+        QVERIFY(QFileInfo::exists(previous_database));
+        {
+            Database migrated(database_path);
+            QCOMPARE(migrated.read().applications.size(), 1);
+            migrated.remove_application(migrated.read().applications.front().id);
+        }
+        QSettings settings(current + "/settings.ini", QSettings::IniFormat);
+        QVERIFY(settings.value("behavior/autostart").toBool());
+        QVERIFY(settings.value("profile/autostart_pending").toBool());
+        QVERIFY(settings.value(profile_settings::token_marker).toBool());
+        QCOMPARE(settings.value(profile_settings::previous_token_profile).toString(), previous_settings);
+        ProfileBackup::migrate_storage(database_path, portable);
+        QVERIFY(Database(database_path).read().applications.isEmpty());
+    }
+    void backup_roundtrip_data() {
+        QTest::addColumn<bool>("previous");
+        QTest::newRow("current format") << false;
+        QTest::newRow("previous format") << true;
+    }
     void backup_roundtrip() {
+        QFETCH(bool, previous);
         QTemporaryDir temporary;
         const auto database_path = temporary.filePath("profile.db");
         const auto settings_path = temporary.filePath("settings.ini");
-        const auto backup_path = temporary.filePath("backup.xlprofile");
+        const auto backup_path = temporary.filePath(previous ? "backup.xlprofile" : "backup.foradeckprofile");
         qint64 id = 0;
         {
             Database db(database_path);
@@ -393,9 +439,20 @@ private slots:
         {
             QSettings settings(settings_path, QSettings::IniFormat);
             settings.setValue("test/setting", "saved value");
+            settings.setValue(profile_settings::token_marker, true);
+            settings.setValue(profile_settings::previous_token_profile, "local credential address");
             settings.sync();
         }
         ProfileBackup::create(backup_path, database_path, settings_path);
+        if (previous) {
+            Database backup(backup_path);
+            foradeck::sqlite_execute(backup.get_connection(), R"(
+                UPDATE _foradeck_profile_manifest SET format_id='io.github.LapplandJulia.XLibrary.profile';
+                ALTER TABLE _foradeck_profile_manifest RENAME TO _xlibrary_profile_manifest;
+                ALTER TABLE _foradeck_profile_counts RENAME TO _xlibrary_profile_counts;
+                ALTER TABLE _foradeck_profile_settings RENAME TO _xlibrary_profile_settings;
+            )");
+        }
         const auto manifest = ProfileBackup::inspect(backup_path);
         QVERIFY(!manifest.fingerprint.isEmpty());
         auto wrong_fingerprint = manifest.fingerprint;
@@ -424,12 +481,14 @@ private slots:
             QCOMPARE(snapshot.scenarios.size(), 1);
             QCOMPARE(snapshot.scenarios.front().steps.front().application_id, id);
             QCOMPARE(snapshot.target_shortcuts.size(), 1);
-            xlibrary::validate_profile(restored.get_connection());
+            foradeck::validate_profile(restored.get_connection());
         }
         QSettings restored_settings(settings_path, QSettings::IniFormat);
         QCOMPARE(restored_settings.value("test/setting").toString(), QString("saved value"));
+        QCOMPARE(restored_settings.value(profile_settings::previous_token_profile).toString(),
+                 QString("local credential address"));
         ProfileBackup::recover(database_path, settings_path);
-        QFile damaged(temporary.filePath("bad.xlprofile"));
+        QFile damaged(temporary.filePath("bad.foradeckprofile"));
         QVERIFY(damaged.open(QIODevice::WriteOnly));
         damaged.write("broken archive");
         damaged.close();

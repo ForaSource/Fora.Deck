@@ -108,50 +108,51 @@ public:
 };
 
 QWidget *general(const ui_context &context, QWidget *) {
-    auto *widget = page(QCoreApplication::translate("XLibrary", "Application behavior"));
+    auto *widget = page(QCoreApplication::translate("Fora.Deck", "Application behavior"));
     auto &settings = *context.settings;
     widget->layout()->addWidget(action_button(context.actions.value("welcome")));
     choices(
-        widget, settings, "interface/language", QCoreApplication::translate("XLibrary", "Interface language"),
-        {{QCoreApplication::translate("XLibrary", "System language"), "system"}, {"English", "en"}, {"Русский", "ru"}},
+        widget, settings, "interface/language", QCoreApplication::translate("Fora.Deck", "Interface language"),
+        {{QCoreApplication::translate("Fora.Deck", "System language"), "system"}, {"English", "en"}, {"Русский", "ru"}},
         "system");
     widget->layout()->addWidget(label(
-        QCoreApplication::translate("XLibrary", "Language changes take effect after restarting Fora.Deck."), "muted"));
-    checkbox(widget, settings, "behavior/autostart", QCoreApplication::translate("XLibrary", "Start at login"), false);
+        QCoreApplication::translate("Fora.Deck", "Language changes take effect after restarting Fora.Deck."), "muted"));
+    checkbox(widget, settings, "behavior/autostart", QCoreApplication::translate("Fora.Deck", "Start at login"), false);
     checkbox(widget, settings, "behavior/close_to_tray",
-             QCoreApplication::translate("XLibrary", "Minimize to tray on close"), true);
+             QCoreApplication::translate("Fora.Deck", "Minimize to tray on close"), true);
     choices(widget, settings, "behavior/after_launch",
-            QCoreApplication::translate("XLibrary", "After launching an application"),
-            {{QCoreApplication::translate("XLibrary", "Keep the window open in the background"), "keep"},
-             {QCoreApplication::translate("XLibrary", "Minimize the window"), "minimize"}},
+            QCoreApplication::translate("Fora.Deck", "After launching an application"),
+            {{QCoreApplication::translate("Fora.Deck", "Keep the window open in the background"), "keep"},
+             {QCoreApplication::translate("Fora.Deck", "Minimize the window"), "minimize"}},
             "keep");
-    choices(widget, settings, "behavior/relaunch", QCoreApplication::translate("XLibrary", "Launch again"),
-            {{QCoreApplication::translate("XLibrary", "Switch to the open window"), "activate"},
-             {QCoreApplication::translate("XLibrary", "Open a new instance"), "new"}},
+    choices(widget, settings, "behavior/relaunch", QCoreApplication::translate("Fora.Deck", "Launch again"),
+            {{QCoreApplication::translate("Fora.Deck", "Switch to the open window"), "activate"},
+             {QCoreApplication::translate("Fora.Deck", "Open a new instance"), "new"}},
             "activate");
-    choices(widget, settings, "behavior/startup", QCoreApplication::translate("XLibrary", "At startup"),
-            {{QCoreApplication::translate("XLibrary", "Show the library"), "show"},
-             {QCoreApplication::translate("XLibrary", "Start in the tray"), "tray"}},
+    choices(widget, settings, "behavior/startup", QCoreApplication::translate("Fora.Deck", "At startup"),
+            {{QCoreApplication::translate("Fora.Deck", "Show the library"), "show"},
+             {QCoreApplication::translate("Fora.Deck", "Start in the tray"), "tray"}},
             "show");
-    widget->layout()->addWidget(label(QCoreApplication::translate("XLibrary", "Running applications"), "subheading"));
-    checkbox(widget, settings, "monitoring/memory", QCoreApplication::translate("XLibrary", "Show memory usage"), true);
-    checkbox(widget, settings, "monitoring/cpu", QCoreApplication::translate("XLibrary", "Show CPU usage"), true);
-    auto *reset = button(QCoreApplication::translate("XLibrary", "Reset settings…"), "danger");
+    widget->layout()->addWidget(label(QCoreApplication::translate("Fora.Deck", "Running applications"), "subheading"));
+    checkbox(widget, settings, "monitoring/memory", QCoreApplication::translate("Fora.Deck", "Show memory usage"),
+             true);
+    checkbox(widget, settings, "monitoring/cpu", QCoreApplication::translate("Fora.Deck", "Show CPU usage"), true);
+    auto *reset = button(QCoreApplication::translate("Fora.Deck", "Reset settings…"), "danger");
     widget->layout()->addWidget(reset);
     QObject::connect(reset, &QPushButton::clicked, widget, [=] {
         auto *service = static_cast<DesktopService *>(context.service);
-        if (!confirm(widget, QCoreApplication::translate("XLibrary", "Reset settings"),
-                     QCoreApplication::translate("XLibrary",
+        if (!confirm(widget, QCoreApplication::translate("Fora.Deck", "Reset settings"),
+                     QCoreApplication::translate("Fora.Deck",
                                                  "Restore default interface, shortcuts, sources and behavior settings? "
                                                  "Applications, tags, scenarios, history and saved credentials will be "
                                                  "kept. Fora.Deck will need a restart."),
-                     QCoreApplication::translate("XLibrary", "Reset")))
+                     QCoreApplication::translate("Fora.Deck", "Reset")))
             return;
         if (!service->reset_settings())
             return;
-        if (confirm(widget, QCoreApplication::translate("XLibrary", "Restart Fora.Deck"),
-                    QCoreApplication::translate("XLibrary", "Settings were reset. Restart Fora.Deck now?"),
-                    QCoreApplication::translate("XLibrary", "Restart")))
+        if (confirm(widget, QCoreApplication::translate("Fora.Deck", "Restart Fora.Deck"),
+                    QCoreApplication::translate("Fora.Deck", "Settings were reset. Restart Fora.Deck now?"),
+                    QCoreApplication::translate("Fora.Deck", "Restart")))
             service->restart_application();
         if (auto *dialog = qobject_cast<QDialog *>(widget->window()))
             dialog->reject();
@@ -161,22 +162,22 @@ QWidget *general(const ui_context &context, QWidget *) {
 }
 
 QWidget *appearance_page(const ui_context &context, QWidget *) {
-    auto *widget = page(QCoreApplication::translate("XLibrary", "Appearance"));
+    auto *widget = page(QCoreApplication::translate("Fora.Deck", "Appearance"));
     auto &settings = *context.settings;
-    choices(widget, settings, "appearance/theme", QCoreApplication::translate("XLibrary", "Theme"),
-            {{QCoreApplication::translate("XLibrary", "Dark"), "dark"},
-             {QCoreApplication::translate("XLibrary", "Light"), "light"},
-             {QCoreApplication::translate("XLibrary", "System"), "system"}},
+    choices(widget, settings, "appearance/theme", QCoreApplication::translate("Fora.Deck", "Theme"),
+            {{QCoreApplication::translate("Fora.Deck", "Dark"), "dark"},
+             {QCoreApplication::translate("Fora.Deck", "Light"), "light"},
+             {QCoreApplication::translate("Fora.Deck", "System"), "system"}},
             "dark");
 #ifdef Q_OS_WIN
     checkbox(widget, settings, "appearance/glass",
-             QCoreApplication::translate("XLibrary", "Windows 11 system window material"), false);
+             QCoreApplication::translate("Fora.Deck", "Windows 11 system window material"), false);
     widget->layout()->addWidget(
-        label(QCoreApplication::translate("XLibrary",
+        label(QCoreApplication::translate("Fora.Deck",
                                           "Windows 10 uses a standard opaque frame. The list and text remain opaque."),
               "muted"));
 #endif
-    choices(widget, settings, "appearance/text_scale", QCoreApplication::translate("XLibrary", "Text size"),
+    choices(widget, settings, "appearance/text_scale", QCoreApplication::translate("Fora.Deck", "Text size"),
             {{"100%", 100}, {"125%", 125}, {"150%", 150}, {"200%", 200}}, 100);
     auto *slider = new OverlayRowsSlider;
     slider->setObjectName("overlay_rows");
@@ -193,20 +194,20 @@ QWidget *appearance_page(const ui_context &context, QWidget *) {
     row_layout->addWidget(number);
     QObject::connect(slider, &QSlider::valueChanged, number,
                      [number](int value) { number->setText(QString::number(value)); });
-    const auto caption = QCoreApplication::translate("XLibrary", "Visible results in quick search");
+    const auto caption = QCoreApplication::translate("Fora.Deck", "Visible results in quick search");
     auto *buddy = label(caption, "muted");
     buddy->setBuddy(slider);
     slider->setAccessibleName(caption);
     widget->layout()->addWidget(buddy);
     widget->layout()->addWidget(row);
     widget->layout()->addWidget(
-        label(QCoreApplication::translate("XLibrary",
+        label(QCoreApplication::translate("Fora.Deck",
                                           "Scroll to see more results. The height is limited by the screen size."),
               "muted"));
     checkbox(widget, settings, "appearance/animations",
-             QCoreApplication::translate("XLibrary", "Enable interface animations"), true);
+             QCoreApplication::translate("Fora.Deck", "Enable interface animations"), true);
     widget->layout()->addWidget(
-        label(QCoreApplication::translate("XLibrary",
+        label(QCoreApplication::translate("Fora.Deck",
                                           "Short, smooth transitions follow available system animation settings."),
               "muted"));
     static_cast<QVBoxLayout *>(widget->layout())->addStretch();
@@ -214,7 +215,7 @@ QWidget *appearance_page(const ui_context &context, QWidget *) {
 }
 
 QWidget *hotkeys(const ui_context &context, QWidget *) {
-    auto *widget = page(QCoreApplication::translate("XLibrary", "Keyboard shortcuts"));
+    auto *widget = page(QCoreApplication::translate("Fora.Deck", "Keyboard shortcuts"));
     auto *tabs = new QTabBar;
     tabs->setObjectName("shortcut_tabs");
     tabs->setDrawBase(false);
@@ -231,21 +232,21 @@ QWidget *hotkeys(const ui_context &context, QWidget *) {
         QList<QStringList> values;
     };
     const QList<shortcut_group> groups{
-        {QCoreApplication::translate("XLibrary", "Global shortcuts"),
-         {{"shortcuts/global", QCoreApplication::translate("XLibrary", "Show the library from any application"),
+        {QCoreApplication::translate("Fora.Deck", "Global shortcuts"),
+         {{"shortcuts/global", QCoreApplication::translate("Fora.Deck", "Show the library from any application"),
            desktop_platform::default_global_shortcut()},
-          {"shortcuts/overlay", QCoreApplication::translate("XLibrary", "Show quick search from any application"),
+          {"shortcuts/overlay", QCoreApplication::translate("Fora.Deck", "Show quick search from any application"),
            desktop_platform::default_overlay_shortcut()}}},
-        {QCoreApplication::translate("XLibrary", "Navigation"),
-         {{"shortcuts/search", QCoreApplication::translate("XLibrary", "Search the library"), "Ctrl+K"},
-          {"shortcuts/settings", QCoreApplication::translate("XLibrary", "Open settings"), "Ctrl+,"}}},
-        {QCoreApplication::translate("XLibrary", "Application actions"),
-         {{"shortcuts/add", QCoreApplication::translate("XLibrary", "Add"), "Ctrl+N"},
-          {"shortcuts/launch", QCoreApplication::translate("XLibrary", "Launch application"), "Return"},
-          {"shortcuts/new_instance", QCoreApplication::translate("XLibrary", "New instance"), "Ctrl+Return"},
-          {"shortcuts/open_folder", QCoreApplication::translate("XLibrary", "Open application folder"), "Alt+Return"},
-          {"shortcuts/copy_path", QCoreApplication::translate("XLibrary", "Copy path"), "Ctrl+Shift+C"},
-          {"shortcuts/remove", QCoreApplication::translate("XLibrary", "Remove from library"), "Delete"}}}};
+        {QCoreApplication::translate("Fora.Deck", "Navigation"),
+         {{"shortcuts/search", QCoreApplication::translate("Fora.Deck", "Search the library"), "Ctrl+K"},
+          {"shortcuts/settings", QCoreApplication::translate("Fora.Deck", "Open settings"), "Ctrl+,"}}},
+        {QCoreApplication::translate("Fora.Deck", "Application actions"),
+         {{"shortcuts/add", QCoreApplication::translate("Fora.Deck", "Add"), "Ctrl+N"},
+          {"shortcuts/launch", QCoreApplication::translate("Fora.Deck", "Launch application"), "Return"},
+          {"shortcuts/new_instance", QCoreApplication::translate("Fora.Deck", "New instance"), "Ctrl+Return"},
+          {"shortcuts/open_folder", QCoreApplication::translate("Fora.Deck", "Open application folder"), "Alt+Return"},
+          {"shortcuts/copy_path", QCoreApplication::translate("Fora.Deck", "Copy path"), "Ctrl+Shift+C"},
+          {"shortcuts/remove", QCoreApplication::translate("Fora.Deck", "Remove from library"), "Delete"}}}};
     for (const auto &group : groups) {
         tabs->addTab(group.title);
         auto *contents = new QWidget;
@@ -264,10 +265,10 @@ QWidget *hotkeys(const ui_context &context, QWidget *) {
         if (pages->count() == 0)
             layout->addWidget(label(
                 QCoreApplication::translate(
-                    "XLibrary", "Wayland shortcuts request permission through the GlobalShortcuts portal when "
-                                "supported. If refused or unavailable, bind XLibrary --overlay in system "
-                                "keyboard settings: KDE: Keyboard → Shortcuts; GNOME: Keyboard → Custom "
-                                "Shortcuts; Xfce: Keyboard → Application Shortcuts. Use XLibrary for the library."),
+                    "Fora.Deck", "Wayland shortcuts request permission through the GlobalShortcuts portal when "
+                                 "supported. If refused or unavailable, bind foradeck --overlay in system "
+                                 "keyboard settings: KDE: Keyboard → Shortcuts; GNOME: Keyboard → Custom "
+                                 "Shortcuts; Xfce: Keyboard → Application Shortcuts. Use foradeck for the library."),
                 "muted"));
 #endif
         layout->addStretch();
@@ -275,28 +276,28 @@ QWidget *hotkeys(const ui_context &context, QWidget *) {
     }
     auto *service = static_cast<DesktopService *>(context.service);
     for (const auto scenario : {false, true}) {
-        tabs->addTab(scenario ? QCoreApplication::translate("XLibrary", "Scenarios")
-                              : QCoreApplication::translate("XLibrary", "Applications"));
+        tabs->addTab(scenario ? QCoreApplication::translate("Fora.Deck", "Scenarios")
+                              : QCoreApplication::translate("Fora.Deck", "Applications"));
         auto *contents = new QWidget;
         auto *layout = new QVBoxLayout(contents);
         layout->setContentsMargins(0, 0, 0, 0);
         layout->setSpacing(12);
         layout->addWidget(
             label(QCoreApplication::translate(
-                      "XLibrary",
+                      "Fora.Deck",
                       "Assign a global shortcut in the application or scenario editor. An empty shortcut disables it."),
                   "muted"));
         auto *targets = new QTreeWidget;
         targets->setRootIsDecorated(false);
-        targets->setHeaderLabels({QCoreApplication::translate("XLibrary", "Name"),
-                                  QCoreApplication::translate("XLibrary", "Keyboard shortcuts")});
+        targets->setHeaderLabels({QCoreApplication::translate("Fora.Deck", "Name"),
+                                  QCoreApplication::translate("Fora.Deck", "Keyboard shortcuts")});
         targets->header()->setStretchLastSection(false);
         targets->header()->setSectionResizeMode(0, QHeaderView::Stretch);
         targets->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
         targets->setMinimumHeight(appearance::scaled(*context.settings, 160));
         targets->setUniformRowHeights(true);
         layout->addWidget(targets, 1);
-        auto *edit = button(QCoreApplication::translate("XLibrary", "Edit"), "quiet");
+        auto *edit = button(QCoreApplication::translate("Fora.Deck", "Edit"), "quiet");
         layout->addWidget(edit, 0, Qt::AlignRight);
         const auto open_editor = [=] {
             if (!targets->currentItem())
@@ -328,10 +329,10 @@ QWidget *hotkeys(const ui_context &context, QWidget *) {
             const auto add_target = [=](const qint64 id, const QString &name) {
                 const auto sequence = service->target_shortcut(scenario, id);
                 auto *item = new QTreeWidgetItem(
-                    targets, {name, sequence.isEmpty() ? QCoreApplication::translate("XLibrary", "Not assigned")
+                    targets, {name, sequence.isEmpty() ? QCoreApplication::translate("Fora.Deck", "Not assigned")
                                                        : sequence.toString(QKeySequence::NativeText)});
                 item->setData(0, Qt::UserRole, id);
-                item->setToolTip(0, QStringLiteral("XLibrary ") +
+                item->setToolTip(0, QStringLiteral("foradeck ") +
                                         (scenario ? QStringLiteral("--scenario-id ") : QStringLiteral("--launch-id ")) +
                                         QString::number(id));
                 if (id == selected)
@@ -351,8 +352,8 @@ QWidget *hotkeys(const ui_context &context, QWidget *) {
         rebuild();
 #ifdef Q_OS_LINUX
         layout->addWidget(
-            label(QCoreApplication::translate("XLibrary", "On Wayland, configure a desktop shortcut for XLibrary "
-                                                          "--launch-id <id> or XLibrary --scenario-id <id>."),
+            label(QCoreApplication::translate("Fora.Deck", "On Wayland, configure a desktop shortcut for foradeck "
+                                                           "--launch-id <id> or foradeck --scenario-id <id>."),
                   "muted"));
 #endif
         pages->addWidget(contents);
@@ -361,7 +362,7 @@ QWidget *hotkeys(const ui_context &context, QWidget *) {
     QObject::connect(pages, &QStackedWidget::currentChanged, tabs, &QTabBar::setCurrentIndex);
     QObject::connect(pages, &QStackedWidget::currentChanged, transition, [transition] { transition->start(); });
     widget->layout()->addWidget(label(
-        QCoreApplication::translate("XLibrary",
+        QCoreApplication::translate("Fora.Deck",
                                     "An empty field disables the shortcut. Application actions use the "
                                     "selected library entry. Text editing keys keep their usual behavior "
                                     "in text fields. ↑↓ selects a row. Escape clears the search and is reserved."),
@@ -371,77 +372,78 @@ QWidget *hotkeys(const ui_context &context, QWidget *) {
 
 QWidget *library_settings(const ui_context &context, QWidget *) {
     auto *service = static_cast<DesktopService *>(context.service);
-    auto *widget = page(QCoreApplication::translate("XLibrary", "Application sources"));
+    auto *widget = page(QCoreApplication::translate("Fora.Deck", "Application sources"));
     widget->layout()->addWidget(action_button(context.actions.value("library_health")));
 #ifdef Q_OS_WIN
     checkbox(widget, *context.settings, "sources/registry",
-             QCoreApplication::translate("XLibrary", "Registered Windows applications"), true);
+             QCoreApplication::translate("Fora.Deck", "Registered Windows applications"), true);
     checkbox(widget, *context.settings, "sources/start_menu",
-             QCoreApplication::translate("XLibrary", "Start menu shortcuts"), true);
+             QCoreApplication::translate("Fora.Deck", "Start menu shortcuts"), true);
 #else
     checkbox(widget, *context.settings, "sources/registry",
-             QCoreApplication::translate("XLibrary", "Linux system applications"), true);
+             QCoreApplication::translate("Fora.Deck", "Linux system applications"), true);
     checkbox(widget, *context.settings, "sources/start_menu",
-             QCoreApplication::translate("XLibrary", "Linux user applications"), true);
+             QCoreApplication::translate("Fora.Deck", "Linux user applications"), true);
 #endif
     widget->layout()->addWidget(label(
         QCoreApplication::translate(
-            "XLibrary", "Applications are checked in the background at every startup. New applications are offered "
-                        "for selection. Applications removed from the library are not offered again. "
-                        "Changed sources will be used after saving settings."),
+            "Fora.Deck", "Applications are checked in the background at every startup. New applications are offered "
+                         "for selection. Applications removed from the library are not offered again. "
+                         "Changed sources will be used after saving settings."),
         "muted"));
     checkbox(widget, *context.settings, "sources/confirm_removal",
-             QCoreApplication::translate("XLibrary", "Ask before removing uninstalled applications from the library"),
+             QCoreApplication::translate("Fora.Deck", "Ask before removing uninstalled applications from the library"),
              true);
     widget->layout()->addWidget(
-        label(QCoreApplication::translate("XLibrary",
+        label(QCoreApplication::translate("Fora.Deck",
                                           "When disabled, confirmed missing applications are removed automatically. "
                                           "Unavailable drives and uncertain targets are kept."),
               "muted"));
     checkbox(widget, *context.settings, "sources/remove_unavailable_without_icons",
-             QCoreApplication::translate("XLibrary", "Automatically remove unavailable applications without icons"),
+             QCoreApplication::translate("Fora.Deck", "Automatically remove unavailable applications without icons"),
              true);
     widget->layout()->addWidget(
-        label(QCoreApplication::translate("XLibrary", "Runs at startup and during application scans."), "muted"));
+        label(QCoreApplication::translate("Fora.Deck", "Runs at startup and during application scans."), "muted"));
     widget->layout()->addWidget(action_button(context.actions.value("discover")));
-    auto *clear_exclusions = button(QCoreApplication::translate("XLibrary", "Reset discovery exclusions"));
+    auto *clear_exclusions = button(QCoreApplication::translate("Fora.Deck", "Reset discovery exclusions"));
     widget->layout()->addWidget(clear_exclusions);
     QObject::connect(clear_exclusions, &QPushButton::clicked, service, &DesktopService::clear_discovery_exclusions);
     widget->layout()->addWidget(context.registry->create("discovery_progress", context, widget));
     widget->layout()->addWidget(
-        label(QCoreApplication::translate("XLibrary", "Library import and export"), "subheading"));
+        label(QCoreApplication::translate("Fora.Deck", "Library import and export"), "subheading"));
     widget->layout()->addWidget(
         label(QCoreApplication::translate(
-                  "XLibrary",
+                  "Fora.Deck",
                   "JSON saves applications, parameters, favorites, and tags. Review the entries and conflict policy "
                   "before importing. Matching configurations are skipped by default. Applications are never launched "
                   "automatically."),
               "muted"));
-    auto *import = button(QCoreApplication::translate("XLibrary", "Import…"), nullptr, "import");
-    auto *export_button = button(QCoreApplication::translate("XLibrary", "Export…"), nullptr, "export");
+    auto *import = button(QCoreApplication::translate("Fora.Deck", "Import…"), nullptr, "import");
+    auto *export_button = button(QCoreApplication::translate("Fora.Deck", "Export…"), nullptr, "export");
     widget->layout()->addWidget(import);
     widget->layout()->addWidget(export_button);
     QObject::connect(import, &QPushButton::clicked, widget, [=] {
         const auto path =
-            QFileDialog::getOpenFileName(widget, QCoreApplication::translate("XLibrary", "Import library"), {},
-                                         QCoreApplication::translate("XLibrary", "Fora.Deck catalog (*.json)"));
+            QFileDialog::getOpenFileName(widget, QCoreApplication::translate("Fora.Deck", "Import library"), {},
+                                         QCoreApplication::translate("Fora.Deck", "Fora.Deck catalog (*.json)"));
         if (!path.isEmpty())
             service->import_catalog(path);
     });
     QObject::connect(export_button, &QPushButton::clicked, widget, [=] {
         const auto path = QFileDialog::getSaveFileName(
-            widget, QCoreApplication::translate("XLibrary", "Export library"), "xlibrary.json",
-            QCoreApplication::translate("XLibrary", "Fora.Deck catalog (*.json)"));
+            widget, QCoreApplication::translate("Fora.Deck", "Export library"), "foradeck.json",
+            QCoreApplication::translate("Fora.Deck", "Fora.Deck catalog (*.json)"));
         if (!path.isEmpty())
             service->export_catalog(path);
     });
-    auto *clear = button(QCoreApplication::translate("XLibrary", "Clear usage history"));
+    auto *clear = button(QCoreApplication::translate("Fora.Deck", "Clear usage history"));
     widget->layout()->addWidget(clear);
     QObject::connect(clear, &QPushButton::clicked, widget, [=] {
-        if (confirm(widget, QCoreApplication::translate("XLibrary", "Usage history"),
-                    QCoreApplication::translate("XLibrary", "Clear application and file usage counts and recent launch "
-                                                            "times? Applications and tags will be kept."),
-                    QCoreApplication::translate("XLibrary", "Clear")))
+        if (confirm(widget, QCoreApplication::translate("Fora.Deck", "Usage history"),
+                    QCoreApplication::translate("Fora.Deck",
+                                                "Clear application and file usage counts and recent launch "
+                                                "times? Applications and tags will be kept."),
+                    QCoreApplication::translate("Fora.Deck", "Clear")))
             service->clear_history();
     });
     static_cast<QVBoxLayout *>(widget->layout())->addStretch();
@@ -450,10 +452,10 @@ QWidget *library_settings(const ui_context &context, QWidget *) {
 
 QWidget *storage_page(const ui_context &context, QWidget *) {
     auto *service = static_cast<DesktopService *>(context.service);
-    auto *widget = page(QCoreApplication::translate("XLibrary", "Local data"));
+    auto *widget = page(QCoreApplication::translate("Fora.Deck", "Local data"));
     widget->layout()->addWidget(
         label(QCoreApplication::translate(
-                  "XLibrary",
+                  "Fora.Deck",
                   "Your library, tags, scenarios and settings are stored on this computer. Fora.Deck does not upload "
                   "your catalog. Update checks contact GitHub; your saved access token is kept in the system "
                   "credential store."),
@@ -464,27 +466,27 @@ QWidget *storage_page(const ui_context &context, QWidget *) {
         value->setTextInteractionFlags(Qt::TextSelectableByMouse | Qt::TextSelectableByKeyboard);
         widget->layout()->addWidget(value);
     };
-    add_path(QCoreApplication::translate("XLibrary", "Settings file"), context.settings->fileName());
+    add_path(QCoreApplication::translate("Fora.Deck", "Settings file"), context.settings->fileName());
     auto *database = label("", "muted");
     database->setTextInteractionFlags(Qt::TextSelectableByMouse | Qt::TextSelectableByKeyboard);
-    widget->layout()->addWidget(label(QCoreApplication::translate("XLibrary", "Catalog database"), "subheading"));
+    widget->layout()->addWidget(label(QCoreApplication::translate("Fora.Deck", "Catalog database"), "subheading"));
     widget->layout()->addWidget(database);
     const auto update_path = [=] { database->setText(QDir::toNativeSeparators(service->library_path())); };
     QObject::connect(service, &DesktopService::catalog_changed, widget, update_path);
     update_path();
     widget->layout()->addWidget(label(application_paths::portable_mode()
-                                          ? QCoreApplication::translate("XLibrary", "Current mode: portable")
-                                          : QCoreApplication::translate("XLibrary", "Current mode: installed"),
+                                          ? QCoreApplication::translate("Fora.Deck", "Current mode: portable")
+                                          : QCoreApplication::translate("Fora.Deck", "Current mode: installed"),
                                       "subheading"));
     widget->layout()->addWidget(label(
         QCoreApplication::translate(
-            "XLibrary",
+            "Fora.Deck",
             "Installed mode uses your operating system's user data folders. A portable.flag next to the executable "
             "selects the data folder beside it. An AppImage uses <AppImage>.data beside the image. Moving the "
             "executable "
             "alone does not transfer installed-mode data; use a complete profile backup to move your library."),
         "muted"));
-    auto *folder = button(QCoreApplication::translate("XLibrary", "Open profile folder"));
+    auto *folder = button(QCoreApplication::translate("Fora.Deck", "Open profile folder"));
     widget->layout()->addWidget(folder);
     QObject::connect(folder, &QPushButton::clicked, service, &DesktopService::open_profile_folder);
     static_cast<QVBoxLayout *>(widget->layout())->addStretch();
@@ -493,18 +495,19 @@ QWidget *storage_page(const ui_context &context, QWidget *) {
 
 QWidget *file_settings(const ui_context &context, QWidget *) {
     auto *service = static_cast<DesktopService *>(context.service);
-    auto *widget = page(QCoreApplication::translate("XLibrary", "File search"));
+    auto *widget = page(QCoreApplication::translate("Fora.Deck", "File search"));
     auto *mode = new QComboBox;
     mode->setObjectName("file_search_mode");
     mode->setProperty("setting_key", "files/mode");
-    mode->addItem(QCoreApplication::translate("XLibrary", "Off"), "off");
-    mode->addItem(QCoreApplication::translate("XLibrary", "Basic"), "basic");
-    mode->addItem(QCoreApplication::translate("XLibrary", "Full (not recommended)"), "full");
+    mode->addItem(QCoreApplication::translate("Fora.Deck", "Off"), "off");
+    mode->addItem(QCoreApplication::translate("Fora.Deck", "Basic"), "basic");
+    mode->addItem(QCoreApplication::translate("Fora.Deck", "Full (not recommended)"), "full");
     mode->setCurrentIndex(qMax(0, mode->findData(context.settings->value("files/mode", "off").toString())));
-    field(static_cast<QVBoxLayout *>(widget->layout()), QCoreApplication::translate("XLibrary", "Indexing mode"), mode);
+    field(static_cast<QVBoxLayout *>(widget->layout()), QCoreApplication::translate("Fora.Deck", "Indexing mode"),
+          mode);
     widget->layout()->addWidget(
         label(QCoreApplication::translate(
-                  "XLibrary",
+                  "Fora.Deck",
                   "Off by default. Basic: Desktop, Documents and Downloads, including all subfolders; "
                   "other local drives are checked only at the root and one folder level below it (max-depth=1). "
                   "Full: all accessible local drives recursively. Not recommended: indexing can take a long time."),
@@ -513,7 +516,7 @@ QWidget *file_settings(const ui_context &context, QWidget *) {
     limit_preset->setObjectName("file_result_limit_preset");
     for (const int limit : {50, 100, FileManager::default_result_limit, 500, 1000})
         limit_preset->addItem(QString::number(limit), limit);
-    limit_preset->addItem(QCoreApplication::translate("XLibrary", "Custom"), 0);
+    limit_preset->addItem(QCoreApplication::translate("Fora.Deck", "Custom"), 0);
     auto *result_limit = new QSpinBox;
     result_limit->setObjectName("file_result_limit");
     result_limit->setProperty("setting_key", "files/result_limit");
@@ -527,7 +530,7 @@ QWidget *file_settings(const ui_context &context, QWidget *) {
     limit_layout->setContentsMargins(0, 0, 0, 0);
     limit_layout->addWidget(limit_preset);
     limit_layout->addWidget(result_limit);
-    result_limit->setAccessibleName(QCoreApplication::translate("XLibrary", "Custom file result limit"));
+    result_limit->setAccessibleName(QCoreApplication::translate("Fora.Deck", "Custom file result limit"));
     result_limit->setVisible(preset < 0);
     QObject::connect(limit_preset, &QComboBox::currentIndexChanged, result_limit, [=] {
         const auto value = limit_preset->currentData().toInt();
@@ -537,7 +540,7 @@ QWidget *file_settings(const ui_context &context, QWidget *) {
         else
             result_limit->setFocus();
     });
-    const auto limit_label = QCoreApplication::translate("XLibrary", "Maximum results in the Files tab");
+    const auto limit_label = QCoreApplication::translate("Fora.Deck", "Maximum results in the Files tab");
     limit_preset->setAccessibleName(limit_label);
     field(static_cast<QVBoxLayout *>(widget->layout()), limit_label, limit_control);
     const auto path_list = [=](const QString &title, const QString &key, const bool allow_files) {
@@ -550,22 +553,22 @@ QWidget *file_settings(const ui_context &context, QWidget *) {
         paths->addItems(context.settings->value(key).toStringList());
         widget->layout()->addWidget(paths);
         auto *tools = new QHBoxLayout;
-        auto *add = button(QCoreApplication::translate("XLibrary", "Add folder"));
-        auto *remove = button(QCoreApplication::translate("XLibrary", "Remove selected"));
+        auto *add = button(QCoreApplication::translate("Fora.Deck", "Add folder"));
+        auto *remove = button(QCoreApplication::translate("Fora.Deck", "Remove selected"));
         tools->addWidget(add);
         const auto append = [=](const QString &path) {
             if (!path.isEmpty() && paths->findItems(path, Qt::MatchExactly).isEmpty())
                 paths->addItem(path);
         };
         QObject::connect(add, &QPushButton::clicked, widget, [=] {
-            append(QFileDialog::getExistingDirectory(widget, QCoreApplication::translate("XLibrary", "Add folder")));
+            append(QFileDialog::getExistingDirectory(widget, QCoreApplication::translate("Fora.Deck", "Add folder")));
         });
         if (allow_files) {
-            auto *file = button(QCoreApplication::translate("XLibrary", "Add file"));
+            auto *file = button(QCoreApplication::translate("Fora.Deck", "Add file"));
             tools->addWidget(file);
             QObject::connect(file, &QPushButton::clicked, widget, [=] {
                 const auto selected =
-                    QFileDialog::getOpenFileNames(widget, QCoreApplication::translate("XLibrary", "Add file"));
+                    QFileDialog::getOpenFileNames(widget, QCoreApplication::translate("Fora.Deck", "Add file"));
                 for (const auto &path : selected)
                     append(path);
             });
@@ -575,11 +578,11 @@ QWidget *file_settings(const ui_context &context, QWidget *) {
         QObject::connect(remove, &QPushButton::clicked, widget, [=] { delete paths->takeItem(paths->currentRow()); });
         static_cast<QVBoxLayout *>(widget->layout())->addLayout(tools);
     };
-    path_list(QCoreApplication::translate("XLibrary", "Additional recursive folders"), "files/roots", false);
-    path_list(QCoreApplication::translate("XLibrary", "Excluded folders and files"), "files/exclusions", true);
+    path_list(QCoreApplication::translate("Fora.Deck", "Additional recursive folders"), "files/roots", false);
+    path_list(QCoreApplication::translate("Fora.Deck", "Excluded folders and files"), "files/exclusions", true);
     widget->layout()->addWidget(
         label(QCoreApplication::translate(
-                  "XLibrary",
+                  "Fora.Deck",
                   "Additional folders expand the selected scope. Exclusions are applied afterwards and always win, "
                   "including inside additional folders. Excluding a folder excludes all its subfolders. "
                   "These rules take effect after Save."),
@@ -592,16 +595,16 @@ QWidget *file_settings(const ui_context &context, QWidget *) {
     auto *diagnostics = new QPlainTextEdit(service->files->diagnostics_text());
     diagnostics->setObjectName("file_index_diagnostics");
     diagnostics->setReadOnly(true);
-    diagnostics->setAccessibleName(QCoreApplication::translate("XLibrary", "File index diagnostics"));
+    diagnostics->setAccessibleName(QCoreApplication::translate("Fora.Deck", "File index diagnostics"));
     diagnostics->setMinimumHeight(appearance::scaled(*context.settings, 180));
     widget->layout()->addWidget(diagnostics);
     QObject::connect(service->files, &FileManager::status_changed, diagnostics,
                      [=] { diagnostics->setPlainText(service->files->diagnostics_text()); });
     widget->layout()->addWidget(label(
-        QCoreApplication::translate("XLibrary", "Unavailable sources are checked about every 30 seconds. Returning "
-                                                "sources refresh separately from the regular index refresh."),
+        QCoreApplication::translate("Fora.Deck", "Unavailable sources are checked about every 30 seconds. Returning "
+                                                 "sources refresh separately from the regular index refresh."),
         "muted"));
-    auto *scan = button(QCoreApplication::translate("XLibrary", "Refresh file index"));
+    auto *scan = button(QCoreApplication::translate("Fora.Deck", "Refresh file index"));
     scan->setEnabled(service->files->is_enabled());
     widget->layout()->addWidget(scan);
     QObject::connect(service->files, &FileManager::configuration_changed, scan,
@@ -609,14 +612,14 @@ QWidget *file_settings(const ui_context &context, QWidget *) {
     QObject::connect(scan, &QPushButton::clicked, service->files, &FileManager::rescan);
     widget->layout()->addWidget(
         label(QCoreApplication::translate(
-                  "XLibrary",
+                  "Fora.Deck",
                   "The index is saved locally and refreshes no sooner than every 6 hours, or on manual request. "
                   "Search remains available during indexing. New files appear on your next search; the current results "
                   "stay in place. "
                   "Supported working-file formats are indexed; unavailable locations and symbolic links are skipped."),
               "muted"));
     widget->layout()->addWidget(label(
-        QCoreApplication::translate("XLibrary",
+        QCoreApplication::translate("Fora.Deck",
                                     "Filename masks: * matches any number of characters; ? matches one character. "
                                     "Examples: *.pdf, report-??.txt. Other characters are literal."),
         "muted"));
@@ -625,21 +628,22 @@ QWidget *file_settings(const ui_context &context, QWidget *) {
 
 QWidget *plugins(const ui_context &context, QWidget *) {
     auto *service = static_cast<DesktopService *>(context.service);
-    auto *widget = page(QCoreApplication::translate("XLibrary", "Interface modules"));
+    auto *widget = page(QCoreApplication::translate("Fora.Deck", "Interface modules"));
     widget->layout()->addWidget(
         label(QCoreApplication::translate(
-                  "XLibrary",
+                  "Fora.Deck",
                   "Native plugins can change interface areas and appearance. Enable only trusted modules; they run "
                   "inside Fora.Deck. Changes take effect after restart."),
               "muted"));
     auto available = context.parameters.value("available_plugins").toStringList();
     const auto enabled = context.settings->value("plugins/enabled").toStringList();
     if (service->safe_mode()) {
-        widget->layout()->addWidget(label(
-            QCoreApplication::translate(
-                "XLibrary", "Safe mode skips native modules. Saved enabled modules are listed below so you can disable "
-                            "a faulty module before restarting."),
-            "muted"));
+        widget->layout()->addWidget(
+            label(QCoreApplication::translate(
+                      "Fora.Deck",
+                      "Safe mode skips native modules. Saved enabled modules are listed below so you can disable "
+                      "a faulty module before restarting."),
+                  "muted"));
         for (const auto &id : enabled)
             if (!available.contains(id))
                 available.append(id);
@@ -665,9 +669,9 @@ QWidget *plugins(const ui_context &context, QWidget *) {
         if (!name.isEmpty())
             information.append(id);
         if (!version.isEmpty())
-            information.append(QCoreApplication::translate("XLibrary", "Version %1").arg(version));
+            information.append(QCoreApplication::translate("Fora.Deck", "Version %1").arg(version));
         if (!author.isEmpty())
-            information.append(QCoreApplication::translate("XLibrary", "Author: %1").arg(author));
+            information.append(QCoreApplication::translate("Fora.Deck", "Author: %1").arg(author));
         if (!information.isEmpty())
             widget->layout()->addWidget(label(information.join(" · "), "muted"));
         const auto error = errors.value(id).toString();
@@ -682,37 +686,38 @@ QWidget *plugins(const ui_context &context, QWidget *) {
     if (available.isEmpty() && !service->safe_mode())
         widget->layout()->addWidget(
             label(QCoreApplication::translate(
-                      "XLibrary", "No modules installed. Folder: plugins next to the Fora.Deck executable."),
+                      "Fora.Deck", "No modules installed. Folder: plugins next to the Fora.Deck executable."),
                   "muted"));
     static_cast<QVBoxLayout *>(widget->layout())->addStretch();
     return widget;
 }
 
 QWidget *help_page(const ui_context &context, QWidget *) {
-    auto *widget = page(QCoreApplication::translate("XLibrary", "Quick help"));
+    auto *widget = page(QCoreApplication::translate("Fora.Deck", "Quick help"));
     widget->layout()->addWidget(action_button(context.actions.value("tutorial")));
     const QList<QPair<QString, QString>> topics{
-        {QCoreApplication::translate("XLibrary", "Search"),
-         QCoreApplication::translate("XLibrary",
+        {QCoreApplication::translate("Fora.Deck", "Search"),
+         QCoreApplication::translate("Fora.Deck",
                                      "Type an application name, alias or filename. Use #work to require a tag and "
                                      "-#games to exclude one; combine them with text. "
                                      "Clear filters to search the whole library. Quick search also accepts file paths "
                                      "and calculations such as (2 + 3) * 4; Enter copies the result.")},
-        {QCoreApplication::translate("XLibrary", "Tags"),
-         QCoreApplication::translate("XLibrary", "Create tags in the sidebar or application editor. A tag has up to 64 "
-                                                 "characters without spaces, commas or #. "
-                                                 "Select several applications with Ctrl or Shift to edit their tags "
-                                                 "together. Removing a tag keeps the applications.")},
-        {QCoreApplication::translate("XLibrary", "Scenarios"),
-         QCoreApplication::translate("XLibrary", "Create a scenario from the Scenarios section. Add applications in "
-                                                 "launch order, set each delay and choose a launch profile. "
-                                                 "Disabled steps are skipped. Fix the listed problems before running. "
-                                                 "Success means the launch request was accepted, "
-                                                 "not that the application finished loading. Stop skips remaining "
-                                                 "steps and keeps already opened applications running.")},
-        {QCoreApplication::translate("XLibrary", "Keyboard shortcuts"),
+        {QCoreApplication::translate("Fora.Deck", "Tags"),
+         QCoreApplication::translate("Fora.Deck",
+                                     "Create tags in the sidebar or application editor. A tag has up to 64 "
+                                     "characters without spaces, commas or #. "
+                                     "Select several applications with Ctrl or Shift to edit their tags "
+                                     "together. Removing a tag keeps the applications.")},
+        {QCoreApplication::translate("Fora.Deck", "Scenarios"),
+         QCoreApplication::translate("Fora.Deck", "Create a scenario from the Scenarios section. Add applications in "
+                                                  "launch order, set each delay and choose a launch profile. "
+                                                  "Disabled steps are skipped. Fix the listed problems before running. "
+                                                  "Success means the launch request was accepted, "
+                                                  "not that the application finished loading. Stop skips remaining "
+                                                  "steps and keeps already opened applications running.")},
+        {QCoreApplication::translate("Fora.Deck", "Keyboard shortcuts"),
          QCoreApplication::translate(
-             "XLibrary",
+             "Fora.Deck",
              "Open Settings → Keyboard shortcuts to see or change the current bindings. Clear a binding to disable it. "
              "Assign application and scenario shortcuts in their editors. A shortcut already used by Fora.Deck or "
              "another application "
@@ -726,7 +731,7 @@ QWidget *help_page(const ui_context &context, QWidget *) {
 }
 
 QWidget *about(const ui_context &context, QWidget *) {
-    auto *widget = page(QCoreApplication::translate("XLibrary", "About"));
+    auto *widget = page(QCoreApplication::translate("Fora.Deck", "About"));
     auto *card = new QFrame;
     card->setProperty("card", true);
     auto *card_layout = new QVBoxLayout(card);
@@ -741,22 +746,23 @@ QWidget *about(const ui_context &context, QWidget *) {
     auto *title = new QVBoxLayout;
     title->addWidget(label(QGuiApplication::applicationDisplayName(), "heading"));
     auto *version =
-        label(QCoreApplication::translate("XLibrary", "Version ") + QCoreApplication::applicationVersion(), "muted");
+        label(QCoreApplication::translate("Fora.Deck", "Version ") + QCoreApplication::applicationVersion(), "muted");
     version->setTextInteractionFlags(Qt::TextSelectableByMouse | Qt::TextSelectableByKeyboard);
     title->addWidget(version);
-    title->addWidget(label(QCoreApplication::translate("XLibrary", "By ForaSource"), "muted"));
+    title->addWidget(label(QCoreApplication::translate("Fora.Deck", "By ForaSource"), "muted"));
     identity->addLayout(title, 1);
     card_layout->addLayout(identity);
     card_layout->addWidget(
-        label(QCoreApplication::translate("XLibrary", "Application library for Windows and Linux"), "subheading"));
-    card_layout->addWidget(label(
-        QCoreApplication::translate("XLibrary", "Applications, tags, and scenarios in one place. The catalog is stored "
-                                                "locally; no internet connection is required."),
-        "muted"));
-    auto *github = button(QCoreApplication::translate("XLibrary", "Open GitHub ↗"));
-    auto *issues = button(QCoreApplication::translate("XLibrary", "Report an issue ↗"));
-    auto *documentation = button(QCoreApplication::translate("XLibrary", "Open documentation ↗"));
-    auto *copy = button(QCoreApplication::translate("XLibrary", "Copy version and environment"));
+        label(QCoreApplication::translate("Fora.Deck", "Application library for Windows and Linux"), "subheading"));
+    card_layout->addWidget(
+        label(QCoreApplication::translate("Fora.Deck",
+                                          "Applications, tags, and scenarios in one place. The catalog is stored "
+                                          "locally; no internet connection is required."),
+              "muted"));
+    auto *github = button(QCoreApplication::translate("Fora.Deck", "Open GitHub ↗"));
+    auto *issues = button(QCoreApplication::translate("Fora.Deck", "Report an issue ↗"));
+    auto *documentation = button(QCoreApplication::translate("Fora.Deck", "Open documentation ↗"));
+    auto *copy = button(QCoreApplication::translate("Fora.Deck", "Copy version and environment"));
     card_layout->addWidget(github);
     card_layout->addWidget(issues);
     card_layout->addWidget(documentation);
@@ -770,7 +776,7 @@ QWidget *about(const ui_context &context, QWidget *) {
     });
     QObject::connect(copy, &QPushButton::clicked, widget, [=] {
         const auto text =
-            QCoreApplication::translate("XLibrary",
+            QCoreApplication::translate("Fora.Deck",
                                         "Fora.Deck %1\nOS: %2\nArchitecture: %3\nQt: %4\nSession: %5\nMode: %6")
                 .arg(QCoreApplication::applicationVersion(), QSysInfo::prettyProductName(),
                      QSysInfo::currentCpuArchitecture(), QString::fromLatin1(qVersion()),
@@ -778,15 +784,15 @@ QWidget *about(const ui_context &context, QWidget *) {
                      application_paths::portable_mode() ? QStringLiteral("portable") : QStringLiteral("installed"));
         QGuiApplication::clipboard()->setText(text);
         static_cast<DesktopService *>(context.service)
-            ->notify(QCoreApplication::translate("XLibrary", "Version and environment copied."));
+            ->notify(QCoreApplication::translate("Fora.Deck", "Version and environment copied."));
     });
     widget->layout()->addWidget(card);
     widget->layout()->addWidget(
-        label(QCoreApplication::translate("XLibrary", "Technologies and licenses"), "subheading"));
+        label(QCoreApplication::translate("Fora.Deck", "Technologies and licenses"), "subheading"));
     widget->layout()->addWidget(
         label(QString(QCoreApplication::translate(
-                          "XLibrary", "Qt %1 · C++23 · SQLite · QtKeychain · Inter\nFora.Deck — "
-                                      "MIT; Inter — OFL 1.1\nThird-party licenses are included with the application."))
+                          "Fora.Deck", "Qt %1 · C++23 · SQLite · QtKeychain · Inter\nFora.Deck — "
+                                       "MIT; Inter — OFL 1.1\nThird-party licenses are included with the application."))
                   .arg(QString::fromLatin1(qVersion())),
               "muted"));
     static_cast<QVBoxLayout *>(widget->layout())->addStretch();
@@ -795,7 +801,7 @@ QWidget *about(const ui_context &context, QWidget *) {
 
 QWidget *update_page(const ui_context &context, QWidget *) {
     auto *service = static_cast<DesktopService *>(context.service);
-    auto *widget = page(QCoreApplication::translate("XLibrary", "Update"));
+    auto *widget = page(QCoreApplication::translate("Fora.Deck", "Update"));
     auto *card = new QFrame;
     card->setProperty("card", true);
     auto *card_layout = new QVBoxLayout(card);
@@ -810,14 +816,14 @@ QWidget *update_page(const ui_context &context, QWidget *) {
             updates->cancel();
     });
     auto *channel = new QComboBox;
-    channel->addItem(QCoreApplication::translate("XLibrary", "Stable"), "stable");
-    channel->addItem(QCoreApplication::translate("XLibrary", "Preview"), "preview");
+    channel->addItem(QCoreApplication::translate("Fora.Deck", "Stable"), "stable");
+    channel->addItem(QCoreApplication::translate("Fora.Deck", "Preview"), "preview");
     channel->setCurrentIndex(channel->findData(updates->channel()));
-    field(card_layout, QCoreApplication::translate("XLibrary", "Update channel"), channel);
+    field(card_layout, QCoreApplication::translate("Fora.Deck", "Update channel"), channel);
     card_layout->addWidget(
         label(QCoreApplication::translate(
-                  "XLibrary", "Stable includes published stable releases. Preview also includes pre-releases. "
-                              "Changing the channel takes effect immediately and cancels any current update request."),
+                  "Fora.Deck", "Stable includes published stable releases. Preview also includes pre-releases. "
+                               "Changing the channel takes effect immediately and cancels any current update request."),
               "muted"));
     auto *tokens = new GithubTokenStore(*context.settings, context.service);
     // libsecret completes requests asynchronously; closing the window must not destroy an active job.
@@ -835,15 +841,15 @@ QWidget *update_page(const ui_context &context, QWidget *) {
     token->setEchoMode(QLineEdit::Password);
     token->setMaxLength(1024);
     token->setValidator(new QRegularExpressionValidator(QRegularExpression("[A-Za-z0-9_]*"), token));
-    token->setPlaceholderText(QCoreApplication::translate("XLibrary", "Paste a GitHub Personal Access Token"));
-    field(card_layout, QCoreApplication::translate("XLibrary", "Personal GitHub token (optional)"), token);
+    token->setPlaceholderText(QCoreApplication::translate("Fora.Deck", "Paste a GitHub Personal Access Token"));
+    field(card_layout, QCoreApplication::translate("Fora.Deck", "Personal GitHub token (optional)"), token);
     card_layout->addWidget(label(
-        QCoreApplication::translate("XLibrary", "For public releases, use a token without additional permissions. "
-                                                "It is sent only to the GitHub API."),
+        QCoreApplication::translate("Fora.Deck", "For public releases, use a token without additional permissions. "
+                                                 "It is sent only to the GitHub API."),
         "muted"));
     auto *token_buttons = new QHBoxLayout;
-    auto *save_token = button(QCoreApplication::translate("XLibrary", "Save token"));
-    auto *remove_token = button(QCoreApplication::translate("XLibrary", "Delete token"));
+    auto *save_token = button(QCoreApplication::translate("Fora.Deck", "Save token"));
+    auto *remove_token = button(QCoreApplication::translate("Fora.Deck", "Delete token"));
     // Pressing Enter in the token field must not save the token instead of the regular settings.
     save_token->setAutoDefault(false);
     remove_token->setAutoDefault(false);
@@ -852,29 +858,29 @@ QWidget *update_page(const ui_context &context, QWidget *) {
     card_layout->addLayout(token_buttons);
     auto *token_status = label(
         tokens->has_token()
-            ? QCoreApplication::translate("XLibrary", "A personal token is saved in the system secret store.")
-            : QCoreApplication::translate("XLibrary", "No token saved. Update checks use unauthenticated requests."),
+            ? QCoreApplication::translate("Fora.Deck", "A personal token is saved in the system secret store.")
+            : QCoreApplication::translate("Fora.Deck", "No token saved. Update checks use unauthenticated requests."),
         "muted");
     card_layout->addWidget(token_status);
     card_layout->addWidget(label(
-        QCoreApplication::translate("XLibrary", "Save token and Delete token take effect immediately. "
-                                                "The token is not stored in the settings file or library export."),
+        QCoreApplication::translate("Fora.Deck", "Save token and Delete token take effect immediately. "
+                                                 "The token is not stored in the settings file or library export."),
         "muted"));
-    auto *check_update = button(QCoreApplication::translate("XLibrary", "Check for updates"));
+    auto *check_update = button(QCoreApplication::translate("Fora.Deck", "Check for updates"));
     auto *update_status =
         label(QCoreApplication::translate(
-                  "XLibrary", "Checks GitHub Releases at startup and on request for the selected channel. "
-                              "Results are cached for 60 seconds without a token or 5 seconds with a token."),
+                  "Fora.Deck", "Checks GitHub Releases at startup and on request for the selected channel. "
+                               "Results are cached for 60 seconds without a token or 5 seconds with a token."),
               "muted");
     auto *update_progress = new QProgressBar;
-    update_progress->setAccessibleName(QCoreApplication::translate("XLibrary", "Update download progress"));
+    update_progress->setAccessibleName(QCoreApplication::translate("Fora.Deck", "Update download progress"));
     update_progress->hide();
-    auto *cancel_update = button(QCoreApplication::translate("XLibrary", "Cancel"));
+    auto *cancel_update = button(QCoreApplication::translate("Fora.Deck", "Cancel"));
     cancel_update->hide();
     auto *release_button =
-        button(QCoreApplication::translate("XLibrary", "Open release on GitHub ↗"), nullptr, "external");
+        button(QCoreApplication::translate("Fora.Deck", "Open release on GitHub ↗"), nullptr, "external");
     release_button->hide();
-    auto *install_update = button(QCoreApplication::translate("XLibrary", "Update now"), "primary", "download");
+    auto *install_update = button(QCoreApplication::translate("Fora.Deck", "Update now"), "primary", "download");
     install_update->setAutoDefault(false);
     install_update->hide();
     card_layout->addWidget(check_update);
@@ -890,11 +896,12 @@ QWidget *update_page(const ui_context &context, QWidget *) {
         release_button->hide();
         install_update->hide();
         update_progress->hide();
-        update_status->setText(QCoreApplication::translate("XLibrary", "Channel changed. Check for updates."));
+        update_status->setText(QCoreApplication::translate("Fora.Deck", "Channel changed. Check for updates."));
     });
     auto open_release = [=] {
         if (!desktop_platform::open_url(updates->available_release_url()))
-            update_status->setText(QCoreApplication::translate("XLibrary", "Could not open the release in a browser."));
+            update_status->setText(
+                QCoreApplication::translate("Fora.Deck", "Could not open the release in a browser."));
     };
     QObject::connect(release_button, &QPushButton::clicked, widget, open_release);
     auto refresh_token_controls = [=] {
@@ -913,18 +920,18 @@ QWidget *update_page(const ui_context &context, QWidget *) {
     QObject::connect(service, &DesktopService::profile_state_changed, widget, refresh_token_controls);
     refresh_token_controls();
     QObject::connect(save_token, &QPushButton::clicked, widget, [=] {
-        token_status->setText(QCoreApplication::translate("XLibrary", "Saving token…"));
+        token_status->setText(QCoreApplication::translate("Fora.Deck", "Saving token…"));
         tokens->save(token->text());
     });
     QObject::connect(remove_token, &QPushButton::clicked, widget, [=] {
-        token_status->setText(QCoreApplication::translate("XLibrary", "Deleting token…"));
+        token_status->setText(QCoreApplication::translate("Fora.Deck", "Deleting token…"));
         tokens->remove();
     });
     QObject::connect(tokens, &GithubTokenStore::changed, widget, [=](const bool stored) {
         token->clear();
         token_status->setText(
-            stored ? QCoreApplication::translate("XLibrary", "A personal token is saved in the system secret store.")
-                   : QCoreApplication::translate("XLibrary",
+            stored ? QCoreApplication::translate("Fora.Deck", "A personal token is saved in the system secret store.")
+                   : QCoreApplication::translate("Fora.Deck",
                                                  "No token saved. Update checks use unauthenticated requests."));
     });
     QObject::connect(tokens, &GithubTokenStore::failed, widget, [=](const QString &message) {
@@ -949,14 +956,14 @@ QWidget *update_page(const ui_context &context, QWidget *) {
     QObject::connect(check_update, &QPushButton::clicked, widget, [=] {
         release_button->hide();
         install_update->hide();
-        update_status->setText(QCoreApplication::translate("XLibrary", "Checking for updates…"));
+        update_status->setText(QCoreApplication::translate("Fora.Deck", "Checking for updates…"));
         update_progress->setRange(0, 0);
         update_progress->show();
         tokens->read();
     });
     QObject::connect(cancel_update, &QPushButton::clicked, widget, [=] {
         updates->cancel();
-        update_status->setText(QCoreApplication::translate("XLibrary", "Update cancelled."));
+        update_status->setText(QCoreApplication::translate("Fora.Deck", "Update cancelled."));
     });
     QObject::connect(updates, &UpdateChecker::failed, widget, [=](const QString &message) {
         update_progress->hide();
@@ -965,40 +972,40 @@ QWidget *update_page(const ui_context &context, QWidget *) {
     QObject::connect(updates, &UpdateChecker::operation_changed, widget, [=](const operation_result &result) {
         if (result.state == operation_state::cancelled) {
             update_progress->hide();
-            update_status->setText(QCoreApplication::translate("XLibrary", "Update cancelled."));
+            update_status->setText(QCoreApplication::translate("Fora.Deck", "Update cancelled."));
         }
     });
     QObject::connect(updates, &UpdateChecker::up_to_date, widget, [=](const bool releases_exist) {
         update_status->setText(
             releases_exist
-                ? QCoreApplication::translate("XLibrary", "You are using the latest available version.")
-                : QCoreApplication::translate("XLibrary", "No releases with a supported version were found."));
+                ? QCoreApplication::translate("Fora.Deck", "You are using the latest available version.")
+                : QCoreApplication::translate("Fora.Deck", "No releases with a supported version were found."));
     });
     QObject::connect(
         updates, &UpdateChecker::download_progress, widget, [=](const qint64 received, const qint64 total) {
             update_progress->setRange(0, 100);
             update_progress->setValue(static_cast<int>(received * 100 / total));
             update_progress->show();
-            update_status->setText(QCoreApplication::translate("XLibrary", "Downloading update… %1 / %2 MiB")
+            update_status->setText(QCoreApplication::translate("Fora.Deck", "Downloading update… %1 / %2 MiB")
                                        .arg(received / (1024.0 * 1024.0), 0, 'f', 1)
                                        .arg(total / (1024.0 * 1024.0), 0, 'f', 1));
         });
     auto show_available_update = [=] {
         release_button->show();
         install_update->setText(
-            QCoreApplication::translate("XLibrary", updates->can_install() ? "Update now" : "Open release"));
+            QCoreApplication::translate("Fora.Deck", updates->can_install() ? "Update now" : "Open release"));
         const auto icon_name = updates->can_install() ? "download" : "external";
         install_update->setProperty("appearance_icon", icon_name);
         install_update->setIcon(appearance::icon(icon_name, QColor("#181A1D")));
         install_update->show();
-        update_status->setText(QCoreApplication::translate("XLibrary", "New version available: %1 (%2 channel)")
+        update_status->setText(QCoreApplication::translate("Fora.Deck", "New version available: %1 (%2 channel)")
                                    .arg(updates->available_version(), channel->currentText()));
     };
     QObject::connect(updates, &UpdateChecker::update_available, widget, show_available_update);
     if (!updates->available_version().isEmpty())
         show_available_update();
     if (updates->is_busy()) {
-        update_status->setText(QCoreApplication::translate("XLibrary", "Checking for updates…"));
+        update_status->setText(QCoreApplication::translate("Fora.Deck", "Checking for updates…"));
         update_progress->setRange(0, 0);
         update_progress->show();
         cancel_update->show();
@@ -1008,25 +1015,25 @@ QWidget *update_page(const ui_context &context, QWidget *) {
         if (updates->is_busy() || tokens->is_busy() || updates->available_version().isEmpty())
             return;
         if (updates->can_install()) {
-            if (confirm(widget, QCoreApplication::translate("XLibrary", "Fora.Deck update"),
+            if (confirm(widget, QCoreApplication::translate("Fora.Deck", "Fora.Deck update"),
                         QCoreApplication::translate(
-                            "XLibrary", "A new version is available: %1 (current: %2). Update now?\n\n"
-                                        "Fora.Deck will download and verify the installer, then close. "
-                                        "Complete the update in the installation wizard. Your library and settings "
-                                        "will be kept. Save any unsaved edits before continuing.")
+                            "Fora.Deck", "A new version is available: %1 (current: %2). Update now?\n\n"
+                                         "Fora.Deck will download and verify the installer, then close. "
+                                         "Complete the update in the installation wizard. Your library and settings "
+                                         "will be kept. Save any unsaved edits before continuing.")
                             .arg(updates->available_version(), QCoreApplication::applicationVersion()),
-                        QCoreApplication::translate("XLibrary", "Update now"))) {
+                        QCoreApplication::translate("Fora.Deck", "Update now"))) {
                 *request_started = true;
                 updates->download();
             }
-        } else if (confirm(widget, QCoreApplication::translate("XLibrary", "Fora.Deck update"),
+        } else if (confirm(widget, QCoreApplication::translate("Fora.Deck", "Fora.Deck update"),
                            QCoreApplication::translate(
-                               "XLibrary",
+                               "Fora.Deck",
                                "A new version is available: %1 (current: %2). Open the release on GitHub?\n\n"
                                "Automatic installation is unavailable for this copy or release. "
                                "Follow the release instructions and keep your existing profile.")
                                .arg(updates->available_version(), QCoreApplication::applicationVersion()),
-                           QCoreApplication::translate("XLibrary", "Open release"))) {
+                           QCoreApplication::translate("Fora.Deck", "Open release"))) {
             open_release();
         }
     });
@@ -1049,14 +1056,14 @@ QDialog *settings_dialog(const ui_context &context, QWidget *const parent) {
     auto *hotkey = static_cast<GlobalHotkey *>(context.parameters.value("hotkey").value<QObject *>());
     auto *overlay_hotkey = static_cast<GlobalHotkey *>(context.parameters.value("overlay_hotkey").value<QObject *>());
     auto *dialog = new QDialog(parent);
-    dialog->setWindowTitle(QCoreApplication::translate("XLibrary", "Fora.Deck settings"));
+    dialog->setWindowTitle(QCoreApplication::translate("Fora.Deck", "Fora.Deck settings"));
     prepare_dialog(dialog, context, {960, 700}, {640, 420});
     auto *root = new QVBoxLayout(dialog);
     root->setContentsMargins(24, 20, 24, 20);
     root->setSpacing(16);
-    root->addWidget(label(QCoreApplication::translate("XLibrary", "Settings"), "heading"));
+    root->addWidget(label(QCoreApplication::translate("Fora.Deck", "Settings"), "heading"));
     root->addWidget(
-        label(QCoreApplication::translate("XLibrary", "Fora.Deck appearance, behavior, and features"), "muted"));
+        label(QCoreApplication::translate("Fora.Deck", "Fora.Deck appearance, behavior, and features"), "muted"));
     auto *body = new QHBoxLayout;
     body->setSpacing(16);
     auto *categories = new QButtonGroup(dialog);
@@ -1067,17 +1074,17 @@ QDialog *settings_dialog(const ui_context &context, QWidget *const parent) {
     navigation_layout->setSpacing(8);
     auto *pages = new QStackedWidget;
     const QList<QPair<QString, QString>> sections{
-        {QCoreApplication::translate("XLibrary", "General"), "settings_general"},
-        {QCoreApplication::translate("XLibrary", "Appearance settings"), "settings_appearance"},
-        {QCoreApplication::translate("XLibrary", "Keyboard shortcuts"), "settings_hotkeys"},
-        {QCoreApplication::translate("XLibrary", "Library"), "settings_library"},
-        {QCoreApplication::translate("XLibrary", "Profile"), "settings_profile"},
-        {QCoreApplication::translate("XLibrary", "Local data"), "settings_storage"},
-        {QCoreApplication::translate("XLibrary", "File search"), "settings_files"},
-        {QCoreApplication::translate("XLibrary", "Plugins"), "settings_plugins"},
-        {QCoreApplication::translate("XLibrary", "Update"), "settings_update"},
-        {QCoreApplication::translate("XLibrary", "Quick help"), "settings_help"},
-        {QCoreApplication::translate("XLibrary", "About"), "settings_about"}};
+        {QCoreApplication::translate("Fora.Deck", "General"), "settings_general"},
+        {QCoreApplication::translate("Fora.Deck", "Appearance settings"), "settings_appearance"},
+        {QCoreApplication::translate("Fora.Deck", "Keyboard shortcuts"), "settings_hotkeys"},
+        {QCoreApplication::translate("Fora.Deck", "Library"), "settings_library"},
+        {QCoreApplication::translate("Fora.Deck", "Profile"), "settings_profile"},
+        {QCoreApplication::translate("Fora.Deck", "Local data"), "settings_storage"},
+        {QCoreApplication::translate("Fora.Deck", "File search"), "settings_files"},
+        {QCoreApplication::translate("Fora.Deck", "Plugins"), "settings_plugins"},
+        {QCoreApplication::translate("Fora.Deck", "Update"), "settings_update"},
+        {QCoreApplication::translate("Fora.Deck", "Quick help"), "settings_help"},
+        {QCoreApplication::translate("Fora.Deck", "About"), "settings_about"}};
     for (const auto &section : sections) {
         const auto index = pages->count();
         auto *item = new SelectionButton(section.first);
@@ -1136,9 +1143,9 @@ QDialog *settings_dialog(const ui_context &context, QWidget *const parent) {
         error->setVisible(!text.isEmpty());
     };
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Cancel);
-    buttons->button(QDialogButtonBox::Save)->setText(QCoreApplication::translate("XLibrary", "Save"));
+    buttons->button(QDialogButtonBox::Save)->setText(QCoreApplication::translate("Fora.Deck", "Save"));
     buttons->button(QDialogButtonBox::Save)->setProperty("primary", true);
-    buttons->button(QDialogButtonBox::Cancel)->setText(QCoreApplication::translate("XLibrary", "Cancel"));
+    buttons->button(QDialogButtonBox::Cancel)->setText(QCoreApplication::translate("Fora.Deck", "Cancel"));
     root->addWidget(buttons);
     const auto update_save = [=] {
         buttons->button(QDialogButtonBox::Save)->setEnabled(!service->profile_busy() && !service->restart_required());
@@ -1149,7 +1156,8 @@ QDialog *settings_dialog(const ui_context &context, QWidget *const parent) {
     QObject::connect(buttons, &QDialogButtonBox::accepted, dialog, [=] {
         if (service->profile_busy() || service->restart_required()) {
             service->notify(QCoreApplication::translate(
-                "XLibrary", "Settings cannot be saved while a profile operation is running or a restart is required."));
+                "Fora.Deck",
+                "Settings cannot be saved while a profile operation is running or a restart is required."));
             return;
         }
         QVariantMap values;
@@ -1172,7 +1180,7 @@ QDialog *settings_dialog(const ui_context &context, QWidget *const parent) {
                 for (int i = 0; i < list->count(); ++i) {
                     const QFileInfo entry(list->item(i)->text());
                     if (!entry.isAbsolute() || (key == "files/roots" && entry.exists() && !entry.isDir())) {
-                        show_error(QCoreApplication::translate("XLibrary", "Choose an absolute file or folder path."));
+                        show_error(QCoreApplication::translate("Fora.Deck", "Choose an absolute file or folder path."));
                         return;
                     }
                     const auto canonical = entry.canonicalFilePath();
@@ -1267,7 +1275,7 @@ QDialog *settings_dialog(const ui_context &context, QWidget *const parent) {
                 QString ignored;
                 desktop_platform::set_autostart(old_autostart, ignored);
             }
-            show_error(QCoreApplication::translate("XLibrary", "Could not save the settings file."));
+            show_error(QCoreApplication::translate("Fora.Deck", "Could not save the settings file."));
             return;
         }
         if (previous.value("files/roots") != values.value("files/roots") ||

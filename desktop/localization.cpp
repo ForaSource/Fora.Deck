@@ -27,7 +27,7 @@ void Localization::apply(const QString &preference) {
         }
     }
     // English source text remains available for unknown locales or translation loading failures.
-    if (language != "ru" || !russian.load(":/i18n/xlibrary_ru.qm") || !qt_russian.load(":/i18n/qt_widgets_ru.qm"))
+    if (language != "ru" || !russian.load(":/i18n/foradeck_ru.qm") || !qt_russian.load(":/i18n/qt_widgets_ru.qm"))
         return;
     QCoreApplication::installTranslator(&qt_russian);
     QCoreApplication::installTranslator(&russian);

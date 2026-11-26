@@ -1,5 +1,5 @@
-#ifndef XLIBRARY_MANAGER_H
-#define XLIBRARY_MANAGER_H
+#ifndef FORADECK_MANAGER_H
+#define FORADECK_MANAGER_H
 
 #include <QDir>
 #include <QElapsedTimer>
@@ -150,4 +150,4 @@ public:
     std::vector<std::filesystem::path> get_paths() const;
 };
 
-#endif //XLIBRARY_MANAGER_H
+#endif //FORADECK_MANAGER_H

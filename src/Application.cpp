@@ -95,48 +95,50 @@ void Application::validate_launch_target(const app_record &record) {
         record.path.contains(QChar::Null) || record.arguments.contains(QChar::Null) ||
         record.working_directory.contains(QChar::Null))
         throw std::invalid_argument(
-            QCoreApplication::translate("XLibrary", "Launch target is empty, too long, or contains a null character")
+            QCoreApplication::translate("Fora.Deck", "Launch target is empty, too long, or contains a null character")
                 .toStdString());
     // Metadata can travel between Windows and Linux profiles without becoming a launch target.
     static const QRegularExpression absolute_metadata_path(R"(^(/|[A-Za-z]:[/\\]|\\\\[^\\/]+[/\\][^\\/]+))");
     if (record.executable_path.size() > catalog_limits::text_length || record.executable_path.contains(QChar::Null) ||
         (!record.executable_path.isEmpty() && !absolute_metadata_path.match(record.executable_path).hasMatch()))
         throw std::invalid_argument(
-            QCoreApplication::translate("XLibrary", "Invalid executable metadata path").toStdString());
+            QCoreApplication::translate("Fora.Deck", "Invalid executable metadata path").toStdString());
     if (file_target(record)) {
         if (!QFileInfo(record.path).isAbsolute())
             throw std::invalid_argument(
-                QCoreApplication::translate("XLibrary", "Launch path must be absolute").toStdString());
+                QCoreApplication::translate("Fora.Deck", "Launch path must be absolute").toStdString());
         if ((kind == "desktop") != record.path.endsWith(".desktop"))
             throw std::invalid_argument(
-                QCoreApplication::translate("XLibrary", "Desktop files require the desktop target type").toStdString());
+                QCoreApplication::translate("Fora.Deck", "Desktop files require the desktop target type")
+                    .toStdString());
         return;
     }
     if (!record.arguments.isEmpty() || !record.working_directory.isEmpty())
         throw std::invalid_argument(
-            QCoreApplication::translate("XLibrary", "This target type does not accept arguments or a working directory")
+            QCoreApplication::translate("Fora.Deck",
+                                        "This target type does not accept arguments or a working directory")
                 .toStdString());
     if (kind == "steam") {
         static const QRegularExpression app_id("^[1-9][0-9]{0,9}$");
         bool numeric = false;
         const auto value = record.path.toULongLong(&numeric);
         if (!app_id.match(record.path).hasMatch() || !numeric || value > 4294967295ULL)
-            throw std::invalid_argument(QCoreApplication::translate("XLibrary", "Invalid Steam AppID").toStdString());
+            throw std::invalid_argument(QCoreApplication::translate("Fora.Deck", "Invalid Steam AppID").toStdString());
     } else if (kind == "system_uri") {
         static const QSet<QString> allowed{
             "ms-settings:",        "ms-settings:bluetooth",    "ms-settings:display",      "ms-settings:sound",
             "ms-settings:network", "ms-settings:appsfeatures", "ms-settings:windowsupdate"};
         if (!allowed.contains(record.path))
             throw std::invalid_argument(
-                QCoreApplication::translate("XLibrary", "Unsupported Windows settings URI").toStdString());
+                QCoreApplication::translate("Fora.Deck", "Unsupported Windows settings URI").toStdString());
     } else if (kind == "aumid") {
         static const QRegularExpression aumid("^[A-Za-z0-9][A-Za-z0-9._-]{0,199}![A-Za-z0-9][A-Za-z0-9._-]{0,199}$");
         if (!aumid.match(record.path).hasMatch())
             throw std::invalid_argument(
-                QCoreApplication::translate("XLibrary", "Invalid application user model ID").toStdString());
+                QCoreApplication::translate("Fora.Deck", "Invalid application user model ID").toStdString());
     } else {
         throw std::invalid_argument(
-            QCoreApplication::translate("XLibrary", "Unsupported launch target type").toStdString());
+            QCoreApplication::translate("Fora.Deck", "Unsupported launch target type").toStdString());
     }
 }
 
@@ -253,7 +255,7 @@ QString Application::removal_reason(const app_record &record, const QStringList 
         if (QFileInfo(source).fileName() == "appmanifest_" + record.path + ".acf" && absent_on_local_volume(source) &&
             absent_on_local_volume(record.installation_directory))
             return QCoreApplication::translate(
-                       "XLibrary",
+                       "Fora.Deck",
                        "Steam manifest and installation folder are missing on the verified local drive: %1; %2")
                 .arg(QDir::toNativeSeparators(source), QDir::toNativeSeparators(record.installation_directory));
         return {};
@@ -261,12 +263,12 @@ QString Application::removal_reason(const app_record &record, const QStringList 
     if (kind == "desktop") {
         if (absent_on_local_volume(record.path) && absent_on_local_volume(record.executable_path))
             return QCoreApplication::translate(
-                       "XLibrary", "Desktop entry and executable are missing on the verified local drive: %1; %2")
+                       "Fora.Deck", "Desktop entry and executable are missing on the verified local drive: %1; %2")
                 .arg(QDir::toNativeSeparators(record.path), QDir::toNativeSeparators(record.executable_path));
         return {};
     }
     if (absent_on_local_volume(record.path))
-        return QCoreApplication::translate("XLibrary", "Application file is missing on the verified local drive: %1")
+        return QCoreApplication::translate("Fora.Deck", "Application file is missing on the verified local drive: %1")
             .arg(QDir::toNativeSeparators(record.path));
     return {};
 }
@@ -297,14 +299,16 @@ class SteamVdfReader {
     QString token() {
         whitespace();
         if (position >= text.size())
-            throw std::invalid_argument(QCoreApplication::translate("XLibrary", "Unexpected end of VDF").toStdString());
+            throw std::invalid_argument(
+                QCoreApplication::translate("Fora.Deck", "Unexpected end of VDF").toStdString());
         QString result;
         if (text[position] != '"') {
             while (position < text.size() && !text[position].isSpace() && text[position] != '{' &&
                    text[position] != '}')
                 result += text[position++];
             if (result.isEmpty())
-                throw std::invalid_argument(QCoreApplication::translate("XLibrary", "Invalid VDF token").toStdString());
+                throw std::invalid_argument(
+                    QCoreApplication::translate("Fora.Deck", "Invalid VDF token").toStdString());
             return result;
         }
         ++position;
@@ -323,25 +327,25 @@ class SteamVdfReader {
             }
             result += character;
         }
-        throw std::invalid_argument(QCoreApplication::translate("XLibrary", "Unterminated VDF string").toStdString());
+        throw std::invalid_argument(QCoreApplication::translate("Fora.Deck", "Unterminated VDF string").toStdString());
     }
     QVector<steam_node> object(const int depth, const bool nested) {
         if (depth > 32)
             throw std::invalid_argument(
-                QCoreApplication::translate("XLibrary", "VDF nesting limit exceeded").toStdString());
+                QCoreApplication::translate("Fora.Deck", "VDF nesting limit exceeded").toStdString());
         QVector<steam_node> nodes;
         for (;;) {
             whitespace();
             if (position == text.size()) {
                 if (nested)
                     throw std::invalid_argument(
-                        QCoreApplication::translate("XLibrary", "Unterminated VDF object").toStdString());
+                        QCoreApplication::translate("Fora.Deck", "Unterminated VDF object").toStdString());
                 return nodes;
             }
             if (text[position] == '}') {
                 if (!nested)
                     throw std::invalid_argument(
-                        QCoreApplication::translate("XLibrary", "Unexpected VDF closing brace").toStdString());
+                        QCoreApplication::translate("Fora.Deck", "Unexpected VDF closing brace").toStdString());
                 ++position;
                 return nodes;
             }
@@ -372,7 +376,7 @@ QVector<steam_node> steam_read(const QString &path, const std::atomic_bool &canc
     const auto contents = file.read(8 * 1024 * 1024 + 1);
     if (contents.size() > 8 * 1024 * 1024)
         throw std::invalid_argument(
-            QCoreApplication::translate("XLibrary", "Steam metadata file exceeds 8 MiB").toStdString());
+            QCoreApplication::translate("Fora.Deck", "Steam metadata file exceeds 8 MiB").toStdString());
     if (file.error() != QFileDevice::NoError)
         throw std::runtime_error(file.errorString().toStdString());
     return SteamVdfReader(QString::fromUtf8(contents), cancelled).read();
@@ -407,7 +411,7 @@ public:
     void skip(const qsizetype size) {
         if (size < 0 || size > data.size() - position)
             throw std::invalid_argument(
-                QCoreApplication::translate("XLibrary", "Truncated Steam appinfo cache").toStdString());
+                QCoreApplication::translate("Fora.Deck", "Truncated Steam appinfo cache").toStdString());
         position += size;
     }
 
@@ -422,7 +426,7 @@ public:
         while (position < data.size() && data[position] != '\0') {
             if (position - start >= catalog_limits::text_length)
                 throw std::invalid_argument(
-                    QCoreApplication::translate("XLibrary", "Steam appinfo string is too long").toStdString());
+                    QCoreApplication::translate("Fora.Deck", "Steam appinfo string is too long").toStdString());
             ++position;
         }
         skip(1);
@@ -434,7 +438,7 @@ public:
     QVector<steam_node> object(const int depth = 0) {
         if (depth > 32)
             throw std::invalid_argument(
-                QCoreApplication::translate("XLibrary", "Steam appinfo nesting limit exceeded").toStdString());
+                QCoreApplication::translate("Fora.Deck", "Steam appinfo nesting limit exceeded").toStdString());
         QVector<steam_node> nodes;
         for (;;) {
             if (cancelled.load())
@@ -444,13 +448,13 @@ public:
                 return nodes;
             if (++node_count > 131072)
                 throw std::invalid_argument(
-                    QCoreApplication::translate("XLibrary", "Steam appinfo node limit exceeded").toStdString());
+                    QCoreApplication::translate("Fora.Deck", "Steam appinfo node limit exceeded").toStdString());
             steam_node node;
             if (keys) {
                 const auto index = number<quint32>();
                 if (index >= static_cast<quint64>(keys->size()))
                     throw std::invalid_argument(
-                        QCoreApplication::translate("XLibrary", "Invalid Steam appinfo string index").toStdString());
+                        QCoreApplication::translate("Fora.Deck", "Invalid Steam appinfo string index").toStdString());
                 node.key = (*keys)[index];
             } else
                 node.key = string();
@@ -475,7 +479,7 @@ public:
                 break;
             default:
                 throw std::invalid_argument(
-                    QCoreApplication::translate("XLibrary", "Unsupported Steam appinfo value type").toStdString());
+                    QCoreApplication::translate("Fora.Deck", "Unsupported Steam appinfo value type").toStdString());
             }
             nodes.append(std::move(node));
         }
@@ -493,12 +497,12 @@ QHash<QString, QVector<steam_node>> steam_appinfo(const QString &path, const QSe
         throw std::runtime_error(file.errorString().toStdString());
     if (data.size() > 128 * 1024 * 1024)
         throw std::invalid_argument(
-            QCoreApplication::translate("XLibrary", "Steam appinfo cache exceeds 128 MiB").toStdString());
+            QCoreApplication::translate("Fora.Deck", "Steam appinfo cache exceeds 128 MiB").toStdString());
     SteamBinaryReader reader(data, nullptr, cancelled);
     const auto magic = reader.number<quint32>();
     if (magic < 0x07564427U || magic > 0x07564429U)
         throw std::invalid_argument(
-            QCoreApplication::translate("XLibrary", "Unsupported Steam appinfo cache version").toStdString());
+            QCoreApplication::translate("Fora.Deck", "Unsupported Steam appinfo cache version").toStdString());
     reader.skip(4); // Universe.
     QVector<QString> keys;
     auto entries_end = data.size();
@@ -506,13 +510,13 @@ QHash<QString, QVector<steam_node>> steam_appinfo(const QString &path, const QSe
         const auto table_offset = reader.number<quint64>();
         if (table_offset < 16 || table_offset > static_cast<quint64>(data.size()))
             throw std::invalid_argument(
-                QCoreApplication::translate("XLibrary", "Invalid Steam appinfo string table offset").toStdString());
+                QCoreApplication::translate("Fora.Deck", "Invalid Steam appinfo string table offset").toStdString());
         entries_end = static_cast<qsizetype>(table_offset);
         SteamBinaryReader table(QByteArrayView(data).sliced(entries_end), nullptr, cancelled);
         const auto count = table.number<quint32>();
         if (count > 1048576 || count > static_cast<quint64>(data.size() - entries_end - 4))
             throw std::invalid_argument(
-                QCoreApplication::translate("XLibrary", "Invalid Steam appinfo string table size").toStdString());
+                QCoreApplication::translate("Fora.Deck", "Invalid Steam appinfo string table size").toStdString());
         keys.reserve(count);
         for (quint32 index = 0; index < count; ++index) {
             if (cancelled.load())
@@ -531,7 +535,7 @@ QHash<QString, QVector<steam_node>> steam_appinfo(const QString &path, const QSe
         const qsizetype header_size = magic >= 0x07564428U ? 60 : 40;
         if (size < header_size || size > static_cast<quint64>(entries_end - reader.offset()))
             throw std::invalid_argument(
-                QCoreApplication::translate("XLibrary", "Invalid Steam appinfo entry size").toStdString());
+                QCoreApplication::translate("Fora.Deck", "Invalid Steam appinfo entry size").toStdString());
         const auto id = QString::number(app_id);
         if (app_ids.contains(id)) {
             SteamBinaryReader entry(QByteArrayView(data).sliced(reader.offset() + header_size, size - header_size),
@@ -541,7 +545,7 @@ QHash<QString, QVector<steam_node>> steam_appinfo(const QString &path, const QSe
         reader.skip(size);
     }
     throw std::invalid_argument(
-        QCoreApplication::translate("XLibrary", "Steam appinfo cache has no footer").toStdString());
+        QCoreApplication::translate("Fora.Deck", "Steam appinfo cache has no footer").toStdString());
 }
 
 QString steam_local_executable(const app_record &record, const QString &value) {
@@ -688,7 +692,7 @@ QVector<app_record> Application::discover_steam(const QStringList &roots, QVecto
         const auto &manifest = manifests[index];
         if (progress)
             progress({static_cast<int>(90.0 * index / manifests.size()), index, manifests.size(),
-                      QCoreApplication::translate("XLibrary", "Checking Steam libraries")});
+                      QCoreApplication::translate("Fora.Deck", "Checking Steam libraries")});
         try {
             const auto tree = steam_read(manifest, cancelled);
             const steam_node *state = nullptr;
@@ -699,7 +703,7 @@ QVector<app_record> Application::discover_steam(const QStringList &roots, QVecto
                 }
             if (!state)
                 throw std::invalid_argument(
-                    QCoreApplication::translate("XLibrary", "Steam manifest has no AppState").toStdString());
+                    QCoreApplication::translate("Fora.Deck", "Steam manifest has no AppState").toStdString());
             app_record record;
             record.target_kind = "steam";
             record.path = steam_value(state->children, "appid");
@@ -708,31 +712,32 @@ QVector<app_record> Application::discover_steam(const QStringList &roots, QVecto
             const auto expected_file = "appmanifest_" + record.path + ".acf";
             if (QFileInfo(manifest).fileName() != expected_file)
                 throw std::invalid_argument(
-                    QCoreApplication::translate("XLibrary", "Steam AppID does not match manifest filename")
+                    QCoreApplication::translate("Fora.Deck", "Steam AppID does not match manifest filename")
                         .toStdString());
             const auto directory = steam_value(state->children, "installdir");
             if (record.name.isEmpty() || record.name.size() > 256 || record.name.contains(QChar::Null) ||
                 directory.isEmpty() || directory == "." || directory == ".." || directory.contains('/') ||
                 directory.contains('\\') || directory.contains(QChar::Null))
                 throw std::invalid_argument(
-                    QCoreApplication::translate("XLibrary", "Steam manifest has invalid name or installation directory")
+                    QCoreApplication::translate("Fora.Deck",
+                                                "Steam manifest has invalid name or installation directory")
                         .toStdString());
             bool state_numeric = false;
             const auto flags = steam_value(state->children, "StateFlags").toUInt(&state_numeric);
             if (!state_numeric || (flags & 4U) == 0) {
-                issues.append({manifest, QCoreApplication::translate("XLibrary", "Steam game is not fully installed"),
+                issues.append({manifest, QCoreApplication::translate("Fora.Deck", "Steam game is not fully installed"),
                                discovery_issue_kind::skipped});
                 continue;
             }
             record.installation_directory = QDir(QFileInfo(manifest).absolutePath()).filePath("common/" + directory);
             if (!QFileInfo(record.installation_directory).isDir()) {
                 issues.append({manifest,
-                               QCoreApplication::translate("XLibrary", "Steam installation directory is unavailable"),
+                               QCoreApplication::translate("Fora.Deck", "Steam installation directory is unavailable"),
                                discovery_issue_kind::skipped});
                 continue;
             }
             if (app_ids.contains(record.path)) {
-                issues.append({manifest, QCoreApplication::translate("XLibrary", "Duplicate Steam AppID"),
+                issues.append({manifest, QCoreApplication::translate("Fora.Deck", "Duplicate Steam AppID"),
                                discovery_issue_kind::duplicate});
                 continue;
             }
@@ -774,8 +779,8 @@ QVector<app_record> Application::discover_steam(const QStringList &roots, QVecto
         }
     }
     if (progress)
-        progress(
-            {90, manifests.size(), manifests.size(), QCoreApplication::translate("XLibrary", "Steam checks complete")});
+        progress({90, manifests.size(), manifests.size(),
+                  QCoreApplication::translate("Fora.Deck", "Steam checks complete")});
     return cancelled.load() ? QVector<app_record>{} : records;
 }
 
@@ -839,10 +844,10 @@ QVector<launch_profile> Application::launch_modes(const app_record &record) {
     const auto family = browser_family(record);
     if (family.isEmpty())
         return {};
-    return {{"normal", QCoreApplication::translate("XLibrary", "Normal window"), "normal", {}},
+    return {{"normal", QCoreApplication::translate("Fora.Deck", "Normal window"), "normal", {}},
             {"private",
-             family == "edge" ? QCoreApplication::translate("XLibrary", "InPrivate window")
-                              : QCoreApplication::translate("XLibrary", "Private window"),
+             family == "edge" ? QCoreApplication::translate("Fora.Deck", "InPrivate window")
+                              : QCoreApplication::translate("Fora.Deck", "Private window"),
              "private",
              {}}};
 }
@@ -930,13 +935,13 @@ app_record Application::with_launch_profile(const app_record &record, const QStr
     const auto found = std::ranges::find(profiles, profile, &launch_profile::id);
     if (found == profiles.cend())
         throw std::invalid_argument(
-            QCoreApplication::translate("XLibrary", "The selected browser profile is unavailable.").toStdString());
+            QCoreApplication::translate("Fora.Deck", "The selected browser profile is unavailable.").toStdString());
     const auto family = browser_family(record);
     // Existing custom mode/profile arguments remain intact unless the user chooses a conflicting mode.
     if (requires_fresh_launch(record))
         throw std::invalid_argument(
-            QCoreApplication::translate("XLibrary", "This configuration already specifies a browser mode or profile. "
-                                                    "Use its configured launch or edit its arguments.")
+            QCoreApplication::translate("Fora.Deck", "This configuration already specifies a browser mode or profile. "
+                                                     "Use its configured launch or edit its arguments.")
                 .toStdString());
     QString arguments;
     if (profile == "private")

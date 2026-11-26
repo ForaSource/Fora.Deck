@@ -1,5 +1,5 @@
-#ifndef XLIBRARY_UI_HELPERS_H
-#define XLIBRARY_UI_HELPERS_H
+#ifndef FORADECK_UI_HELPERS_H
+#define FORADECK_UI_HELPERS_H
 
 #include <QDialog>
 #include <QDir>
@@ -359,11 +359,11 @@ inline void prepare_dialog(QDialog *const dialog, const ui_context &context, con
                        .boundedTo(available));
 }
 inline bool confirm(QWidget *const parent, const QString &title, const QString &text,
-                    const QString &accept_text = QCoreApplication::translate("XLibrary", "Remove")) {
+                    const QString &accept_text = QCoreApplication::translate("Fora.Deck", "Remove")) {
     QMessageBox dialog(QMessageBox::Question, title, text, QMessageBox::Yes | QMessageBox::Cancel, parent);
     dialog.setTextFormat(Qt::PlainText);
     dialog.button(QMessageBox::Yes)->setText(accept_text);
-    dialog.button(QMessageBox::Cancel)->setText(QCoreApplication::translate("XLibrary", "Cancel"));
+    dialog.button(QMessageBox::Cancel)->setText(QCoreApplication::translate("Fora.Deck", "Cancel"));
     dialog.setDefaultButton(QMessageBox::Cancel);
     dialog.setEscapeButton(QMessageBox::Cancel);
     return dialog.exec() == QMessageBox::Yes;

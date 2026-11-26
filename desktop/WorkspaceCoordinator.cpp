@@ -10,7 +10,7 @@
 
 namespace {
 QString resource_issue(const workspace_item &item) {
-    if (const auto issue = xlibrary::workspace_item_issue(item); !issue.isEmpty())
+    if (const auto issue = foradeck::workspace_item_issue(item); !issue.isEmpty())
         return issue;
     if (item.kind != workspace_item_kind::file && item.kind != workspace_item_kind::folder)
         return {};
@@ -155,7 +155,7 @@ WorkspaceCoordinator::Entry WorkspaceCoordinator::preflight(workspace_item item,
 }
 
 quint64 WorkspaceCoordinator::prepare(workspace_record workspace, QVector<app_record> applications) {
-    if (active() || capturing() || !xlibrary::workspace_record_issue(workspace).isEmpty())
+    if (active() || capturing() || !foradeck::workspace_record_issue(workspace).isEmpty())
         return 0;
     const auto id = ++generation;
     run_token = std::make_shared<std::atomic<quint64>>(id);

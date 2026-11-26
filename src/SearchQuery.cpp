@@ -209,7 +209,7 @@ SearchQuery::SearchableData SearchQuery::prepare(const QString &name, const QStr
 
 QString SearchQuery::tag_hint(const QStringList &known_tags) const {
     if (incomplete_tag)
-        return QCoreApplication::translate("XLibrary", "Enter a tag name after # or -#.");
+        return QCoreApplication::translate("Fora.Deck", "Enter a tag name after # or -#.");
     QStringList unknown;
     for (const auto &tag : required_tags + excluded_tags) {
         bool found = false;
@@ -219,7 +219,7 @@ QString SearchQuery::tag_hint(const QStringList &known_tags) const {
             unknown.append(tag);
     }
     return unknown.isEmpty() ? QString{}
-                             : QCoreApplication::translate("XLibrary", "Unknown tags: %1").arg(unknown.join(", "));
+                             : QCoreApplication::translate("Fora.Deck", "Unknown tags: %1").arg(unknown.join(", "));
 }
 
 QString search_query::rewrite_tag(const QString &text, const QString &old_name, const QString &new_name) {

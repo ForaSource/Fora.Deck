@@ -42,7 +42,7 @@ BOOL CALLBACK find_window(const HWND window, const LPARAM parameter) {
     DWORD process_id = 0;
     GetWindowThreadProcessId(window, &process_id);
     auto &search = *reinterpret_cast<window_search *>(parameter);
-    if (xlibrary::windows_process_path(process_id).compare(search.path, Qt::CaseInsensitive) == 0) {
+    if (foradeck::windows_process_path(process_id).compare(search.path, Qt::CaseInsensitive) == 0) {
         search.window = window;
         return FALSE;
     }
@@ -131,7 +131,7 @@ bool WindowManager::activate_window(const app_record &record) {
     }
     if (!SetForegroundWindow(search.window)) {
         throw std::runtime_error(
-            QCoreApplication::translate("XLibrary",
+            QCoreApplication::translate("Fora.Deck",
                                         "Windows could not switch windows. Select the application on the taskbar.")
                 .toStdString());
     }
@@ -139,13 +139,13 @@ bool WindowManager::activate_window(const app_record &record) {
 }
 
 void desktop_platform::open_folder(const QString &path) {
-    const xlibrary::ComScope com;
+    const foradeck::ComScope com;
     const auto directory = QDir::toNativeSeparators(QFileInfo(path).absolutePath()).toStdWString();
     const auto result = reinterpret_cast<INT_PTR>(
         ShellExecuteW(nullptr, L"explore", directory.c_str(), nullptr, nullptr, SW_SHOWNORMAL));
     if (result <= 32)
         throw std::runtime_error(
-            QCoreApplication::translate("XLibrary", "Could not open the application folder.").toStdString());
+            QCoreApplication::translate("Fora.Deck", "Could not open the application folder.").toStdString());
 }
 
 bool desktop_platform::open_url(const QUrl &url) {
@@ -166,7 +166,7 @@ bool desktop_platform::installed_for_updates() {
 
 bool desktop_platform::start_update_installer(const QString &path, QString &error) {
     if (!installed_for_updates()) {
-        error = QCoreApplication::translate("XLibrary", "This copy of Fora.Deck was not installed by the installer.");
+        error = QCoreApplication::translate("Fora.Deck", "This copy of Fora.Deck was not installed by the installer.");
         return false;
     }
     const auto native_path = QDir::toNativeSeparators(path).toStdWString();
@@ -181,7 +181,7 @@ bool desktop_platform::start_update_installer(const QString &path, QString &erro
     execution.lpParameters = parameters.c_str();
     execution.nShow = SW_SHOWNORMAL;
     if (!ShellExecuteExW(&execution)) {
-        error = QCoreApplication::translate("XLibrary", "Could not start the installer (Windows error %1).")
+        error = QCoreApplication::translate("Fora.Deck", "Could not start the installer (Windows error %1).")
                     .arg(GetLastError());
         return false;
     }
@@ -294,14 +294,20 @@ QImage desktop_platform::application_icon(const QString &path) {
 bool desktop_platform::set_autostart(const bool enabled, QString &error) {
     QSettings startup("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", QSettings::NativeFormat);
     if (enabled) {
-        startup.setValue("XLibrary",
+        startup.setValue("Fora.Deck",
                          '"' + QDir::toNativeSeparators(QApplication::applicationFilePath()) + "\" --background");
     } else {
-        startup.remove("XLibrary");
+        startup.remove("Fora.Deck");
     }
     startup.sync();
     if (startup.status() != QSettings::NoError) {
-        error = QCoreApplication::translate("XLibrary", "Could not change autostart in the Windows registry.");
+        error = QCoreApplication::translate("Fora.Deck", "Could not change autostart in the Windows registry.");
+        return false;
+    }
+    startup.remove("XLibrary");
+    startup.sync();
+    if (startup.status() != QSettings::NoError) {
+        error = QCoreApplication::translate("Fora.Deck", "Could not change autostart in the Windows registry.");
         return false;
     }
     return true;
@@ -313,7 +319,7 @@ bool desktop_platform::translucent_windows_supported() {
 }
 
 bool desktop_platform::animations_enabled() {
-    if (qApp->property("xlibrary_disable_animations").toBool())
+    if (qApp->property("foradeck_disable_animations").toBool())
         return false;
     BOOL enabled = TRUE;
     SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION, 0, &enabled, 0);
@@ -355,7 +361,7 @@ bool GlobalHotkey::set_sequence(const QKeySequence &value, QString &error) {
         return true;
     }
     if (value.count() != 1) {
-        error = QCoreApplication::translate("XLibrary", "Use a single key combination.");
+        error = QCoreApplication::translate("Fora.Deck", "Use a single key combination.");
         return false;
     }
     const auto combination = value[0];
@@ -370,16 +376,16 @@ bool GlobalHotkey::set_sequence(const QKeySequence &value, QString &error) {
     } else if (key == Qt::Key_Space) {
         virtual_key = VK_SPACE;
     } else {
-        error = QCoreApplication::translate("XLibrary", "Use a letter, digit, F1–F24, or Space.");
+        error = QCoreApplication::translate("Fora.Deck", "Use a letter, digit, F1–F24, or Space.");
         return false;
     }
     const auto modifiers = combination.keyboardModifiers();
     if (!(modifiers & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier))) {
-        error = QCoreApplication::translate("XLibrary", "Add Ctrl, Alt, or Win to the global shortcut.");
+        error = QCoreApplication::translate("Fora.Deck", "Add Ctrl, Alt, or Win to the global shortcut.");
         return false;
     }
     if (modifiers & ~(Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier | Qt::ShiftModifier)) {
-        error = QCoreApplication::translate("XLibrary", "The shortcut contains an unsupported modifier.");
+        error = QCoreApplication::translate("Fora.Deck", "The shortcut contains an unsupported modifier.");
         return false;
     }
     UINT flags = MOD_NOREPEAT;
@@ -392,12 +398,12 @@ bool GlobalHotkey::set_sequence(const QKeySequence &value, QString &error) {
     if (modifiers & Qt::MetaModifier)
         flags |= MOD_WIN;
     if (next_id > 0xbfff) {
-        error = QCoreApplication::translate("XLibrary", "Restart Fora.Deck before changing the shortcut again.");
+        error = QCoreApplication::translate("Fora.Deck", "Restart Fora.Deck before changing the shortcut again.");
         return false;
     }
     const auto new_id = next_id++;
     if (!RegisterHotKey(nullptr, new_id, flags, virtual_key)) {
-        error = QCoreApplication::translate("XLibrary", "The shortcut is in use by Windows or another application.");
+        error = QCoreApplication::translate("Fora.Deck", "The shortcut is in use by Windows or another application.");
         return false;
     }
     if (current_id) {

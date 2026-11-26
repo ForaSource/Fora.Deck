@@ -1,5 +1,5 @@
-#ifndef XLIBRARY_EDITORS_H
-#define XLIBRARY_EDITORS_H
+#ifndef FORADECK_EDITORS_H
+#define FORADECK_EDITORS_H
 
 #include "UiRegistry.h"
 

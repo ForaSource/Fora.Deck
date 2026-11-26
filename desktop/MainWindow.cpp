@@ -57,14 +57,14 @@ QWidget *shell(const ui_context &context, QWidget *const parent) {
     QObject::connect(service, &DesktopService::message, notice, show_notice);
     QObject::connect(service, &DesktopService::saved_files_notice, notice, [=](const QString &text, bool link) {
         notice->activated = [=] { service->navigate("files"); };
-        notice->show_message(text, {}, link ? QCoreApplication::translate("XLibrary", "My files") : QString{});
+        notice->show_message(text, {}, link ? QCoreApplication::translate("Fora.Deck", "My files") : QString{});
     });
     QObject::connect(service, &DesktopService::scenario_changed, notice, show_notice);
     QObject::connect(service, &DesktopService::undo_removal_changed, notice, [=] {
         if (service->can_undo_removal()) {
             notice->activated = [=] { service->undo_removal(); };
-            notice->show_message(QCoreApplication::translate("XLibrary", "Applications removed from the library."), {},
-                                 QCoreApplication::translate("XLibrary", "Undo"));
+            notice->show_message(QCoreApplication::translate("Fora.Deck", "Applications removed from the library."), {},
+                                 QCoreApplication::translate("Fora.Deck", "Undo"));
         }
     });
     auto *update_notice = new NotificationBanner(*context.settings, 20);
@@ -72,26 +72,27 @@ QWidget *shell(const ui_context &context, QWidget *const parent) {
     QObject::connect(service, &DesktopService::appearance_changed, update_notice,
                      &NotificationBanner::refresh_appearance);
     QObject::connect(&service->updates, &UpdateChecker::check_started, update_notice, [=] {
-        update_notice->show_message(QCoreApplication::translate("XLibrary", "Checking for updates…"), {}, {}, false);
+        update_notice->show_message(QCoreApplication::translate("Fora.Deck", "Checking for updates…"), {}, {}, false);
     });
     QObject::connect(&service->updates, &UpdateChecker::update_available, update_notice, [=] {
         update_notice->show_message(
-            QCoreApplication::translate("XLibrary", "New version available: %1")
+            QCoreApplication::translate("Fora.Deck", "New version available: %1")
                 .arg(service->updates.available_version()),
-            QCoreApplication::translate("XLibrary", "Current version: %1").arg(QCoreApplication::applicationVersion()),
-            QCoreApplication::translate("XLibrary", "Open update settings"));
+            QCoreApplication::translate("Fora.Deck", "Current version: %1").arg(QCoreApplication::applicationVersion()),
+            QCoreApplication::translate("Fora.Deck", "Open update settings"));
     });
     QObject::connect(&service->updates, &UpdateChecker::up_to_date, update_notice, [=](const bool releases_exist) {
         update_notice->show_message(
             releases_exist
-                ? QCoreApplication::translate("XLibrary", "You are using the latest available version.")
-                : QCoreApplication::translate("XLibrary", "No releases with a supported version were found."),
-            QCoreApplication::translate("XLibrary", "Current version: %1").arg(QCoreApplication::applicationVersion()));
+                ? QCoreApplication::translate("Fora.Deck", "You are using the latest available version.")
+                : QCoreApplication::translate("Fora.Deck", "No releases with a supported version were found."),
+            QCoreApplication::translate("Fora.Deck", "Current version: %1")
+                .arg(QCoreApplication::applicationVersion()));
     });
     QObject::connect(&service->updates, &UpdateChecker::failed, update_notice,
                      [=](const QString &) { update_notice->hide(); });
     QObject::connect(&service->updates, &UpdateChecker::check_cancelled, update_notice, [=] {
-        update_notice->show_message(QCoreApplication::translate("XLibrary", "Update cancelled."));
+        update_notice->show_message(QCoreApplication::translate("Fora.Deck", "Update cancelled."));
     });
     QObject::connect(&service->updates, &UpdateChecker::channel_changed, update_notice, &QWidget::hide);
     update_notice->activated = [=] { context.actions.value("update_settings")->trigger(); };
@@ -155,7 +156,7 @@ MainWindow::MainWindow(DesktopService &service)
     appearance::apply(service.settings, registry.style_sheet());
     setCentralWidget(registry.create("shell", context, this));
     auto *tray_menu = new QMenu(this);
-    auto *show_action = tray_menu->addAction(QCoreApplication::translate("XLibrary", "Open Fora.Deck"));
+    auto *show_action = tray_menu->addAction(QCoreApplication::translate("Fora.Deck", "Open Fora.Deck"));
     connect(show_action, &QAction::triggered, this, &MainWindow::show_library);
     tray_menu->addAction(context.actions.value("settings"));
     tray_menu->addSeparator();
@@ -225,23 +226,23 @@ void MainWindow::create_actions() {
         connect(action, &QAction::triggered, this, callback);
         return action;
     };
-    add("launch", QCoreApplication::translate("XLibrary", "Launch"), "play", [this] {
+    add("launch", QCoreApplication::translate("Fora.Deck", "Launch"), "play", [this] {
         if (service.selection())
             service.launch(service.selection());
     });
-    add("new_instance", QCoreApplication::translate("XLibrary", "New instance"), "new_instance", [this] {
+    add("new_instance", QCoreApplication::translate("Fora.Deck", "New instance"), "new_instance", [this] {
         if (service.selection())
             service.launch(service.selection(), true);
     });
-    add("terminate", QCoreApplication::translate("XLibrary", "Terminate"), "stop",
+    add("terminate", QCoreApplication::translate("Fora.Deck", "Terminate"), "stop",
         [this] { confirm_application_termination(service, service.selection(), this); });
-    add("focus_search", QCoreApplication::translate("XLibrary", "Search"), "search", [] {});
-    add("settings", QCoreApplication::translate("XLibrary", "Settings"), "settings", [this] {
+    add("focus_search", QCoreApplication::translate("Fora.Deck", "Search"), "search", [] {});
+    add("settings", QCoreApplication::translate("Fora.Deck", "Settings"), "settings", [this] {
         if (!isVisible())
             show_library();
         open_dialog("settings", context);
     });
-    add("update_settings", QCoreApplication::translate("XLibrary", "Update"), "refresh", [this] {
+    add("update_settings", QCoreApplication::translate("Fora.Deck", "Update"), "refresh", [this] {
         if (!isVisible())
             show_library();
         auto update_context = context;
@@ -251,25 +252,25 @@ void MainWindow::create_actions() {
                 category->click();
         open_dialog("settings", update_context);
     });
-    add("add_application", QCoreApplication::translate("XLibrary", "Add application"), "add",
+    add("add_application", QCoreApplication::translate("Fora.Deck", "Add application"), "add",
         [this] { open_dialog("application_editor", context); });
-    add("add_items", QCoreApplication::translate("XLibrary", "Add"), "add", [this] { open_add_items(); });
-    add("welcome", QCoreApplication::translate("XLibrary", "Open welcome screen"), "app", [this] { show_welcome(); });
-    add("tutorial", QCoreApplication::translate("XLibrary", "Take a quick tour"), "help", [this] { show_tutorial(); });
-    add("edit_application", QCoreApplication::translate("XLibrary", "Edit"), "edit", [this] {
+    add("add_items", QCoreApplication::translate("Fora.Deck", "Add"), "add", [this] { open_add_items(); });
+    add("welcome", QCoreApplication::translate("Fora.Deck", "Open welcome screen"), "app", [this] { show_welcome(); });
+    add("tutorial", QCoreApplication::translate("Fora.Deck", "Take a quick tour"), "help", [this] { show_tutorial(); });
+    add("edit_application", QCoreApplication::translate("Fora.Deck", "Edit"), "edit", [this] {
         if (const auto *record = service.selected()) {
             auto edit_context = context;
             edit_context.parameters.insert("record", QVariant::fromValue(*record));
             open_dialog("application_editor", edit_context);
         }
     });
-    add("remove_application", QCoreApplication::translate("XLibrary", "Remove from library"), "trash", [this] {
+    add("remove_application", QCoreApplication::translate("Fora.Deck", "Remove from library"), "trash", [this] {
         const auto *record = service.selected();
         if (!record)
             return;
         const auto ids = service.selections().isEmpty() ? QVector<qint64>{record->id} : service.selections();
-        if (confirm(this, QCoreApplication::translate("XLibrary", "Remove application"),
-                    QCoreApplication::translate("XLibrary",
+        if (confirm(this, QCoreApplication::translate("Fora.Deck", "Remove application"),
+                    QCoreApplication::translate("Fora.Deck",
                                                 "Remove %1 applications from the library? Application files will be "
                                                 "kept. Linked scenario steps will be removed; Undo can restore them.")
                         .arg(ids.size())))
@@ -277,8 +278,8 @@ void MainWindow::create_actions() {
     });
     context.actions.value("remove_application")
         ->setToolTip(QCoreApplication::translate(
-            "XLibrary", "Remove the selected application from the library. Application files will be kept."));
-    add("favorite", QCoreApplication::translate("XLibrary", "Add to favorites"), "favorite", [this] {
+            "Fora.Deck", "Remove the selected application from the library. Application files will be kept."));
+    add("favorite", QCoreApplication::translate("Fora.Deck", "Add to favorites"), "favorite", [this] {
         auto *action = context.actions.value("favorite");
         action->setProperty("favorite_request_id", {});
         if (const auto *record = service.selected()) {
@@ -288,9 +289,9 @@ void MainWindow::create_actions() {
                                 QVariant::fromValue(service.save_application(std::move(updated))));
         }
     });
-    add("open_folder", QCoreApplication::translate("XLibrary", "Open folder"), "folder",
+    add("open_folder", QCoreApplication::translate("Fora.Deck", "Open folder"), "folder",
         [this] { service.open_folder(service.selection()); });
-    add("copy_path", QCoreApplication::translate("XLibrary", "Copy path"), "copy", [this] {
+    add("copy_path", QCoreApplication::translate("Fora.Deck", "Copy path"), "copy", [this] {
         if (const auto *record = service.selected()) {
             const auto path = Application::application_path(*record);
             const bool local_path =
@@ -298,35 +299,35 @@ void MainWindow::create_actions() {
             QApplication::clipboard()->setText(local_path ? QDir::toNativeSeparators(path) : record->path);
         }
     });
-    add("copy_arguments", QCoreApplication::translate("XLibrary", "Copy arguments"), "copy", [this] {
+    add("copy_arguments", QCoreApplication::translate("Fora.Deck", "Copy arguments"), "copy", [this] {
         if (const auto *record = service.selected())
             QApplication::clipboard()->setText(record->arguments);
     });
-    add("bulk_edit", QCoreApplication::translate("XLibrary", "Tags"), "tag",
+    add("bulk_edit", QCoreApplication::translate("Fora.Deck", "Tags"), "tag",
         [this] { show_application_tags(context); });
-    add("undo_removal", QCoreApplication::translate("XLibrary", "Undo removal"), "undo",
+    add("undo_removal", QCoreApplication::translate("Fora.Deck", "Undo removal"), "undo",
         [this] { service.undo_removal(); });
     connect(&service, &DesktopService::undo_removal_changed, this, &MainWindow::refresh_actions);
     connect(&service, &DesktopService::selections_changed, this, &MainWindow::refresh_actions);
     for (const auto &id : {"launch", "new_instance", "open_folder", "copy_path", "remove_application"})
         context.actions.value(id)->setAutoRepeat(false);
-    add("refresh_availability", QCoreApplication::translate("XLibrary", "Refresh availability"), "refresh",
+    add("refresh_availability", QCoreApplication::translate("Fora.Deck", "Refresh availability"), "refresh",
         [this] { service.refresh_availability(); });
-    add("library_health", QCoreApplication::translate("XLibrary", "Library health"), "info",
+    add("library_health", QCoreApplication::translate("Fora.Deck", "Library health"), "info",
         [this] { show_library_health(context); });
-    add("discover", QCoreApplication::translate("XLibrary", "Find installed applications"), "scan", [this] {
+    add("discover", QCoreApplication::translate("Fora.Deck", "Find installed applications"), "scan", [this] {
         if (service.is_discovering())
             service.cancel_discovery();
         else
             service.discover();
     });
-    add("add_tag", QCoreApplication::translate("XLibrary", "Add tag"), "add",
+    add("add_tag", QCoreApplication::translate("Fora.Deck", "Add tag"), "add",
         [this] { open_dialog("tag_editor", context); });
-    add("add_scenario", QCoreApplication::translate("XLibrary", "Create scenario"), "add",
+    add("add_scenario", QCoreApplication::translate("Fora.Deck", "Create scenario"), "add",
         [this] { open_dialog("scenario_editor", context); });
-    add("details", QCoreApplication::translate("XLibrary", "Details"), "app",
+    add("details", QCoreApplication::translate("Fora.Deck", "Details"), "app",
         [this] { open_dialog("details_dialog", context); });
-    add("quit", QCoreApplication::translate("XLibrary", "Quit"), "x", [this] {
+    add("quit", QCoreApplication::translate("Fora.Deck", "Quit"), "x", [this] {
         quitting = true;
         close();
         qApp->quit();
@@ -363,20 +364,20 @@ void MainWindow::refresh_actions() {
         record && (Application::file_target(*record) ||
                    (Application::target_kind(*record) == "steam" && !Application::application_path(*record).isEmpty()));
     context.actions.value("copy_path")
-        ->setText(!record || local_path ? QCoreApplication::translate("XLibrary", "Copy path")
-                                        : QCoreApplication::translate("XLibrary", "Copy launch target"));
+        ->setText(!record || local_path ? QCoreApplication::translate("Fora.Deck", "Copy path")
+                                        : QCoreApplication::translate("Fora.Deck", "Copy launch target"));
     context.actions.value("launch")->setEnabled(context.actions.value("launch")->isEnabled() && record &&
                                                 record->available);
     auto *new_instance = context.actions.value("new_instance");
     const bool can_start = profile_available && record && record->available && record->new_instance_error.isEmpty();
     new_instance->setEnabled(can_start && (service.section() != "scenarios" && service.section() != "workspaces") &&
                              service.section() != "files" && !service.file_search_active());
-    new_instance->setText(QCoreApplication::translate("XLibrary", "Request new instance"));
+    new_instance->setText(QCoreApplication::translate("Fora.Deck", "Request new instance"));
     new_instance->setToolTip(
         record && !record->new_instance_error.isEmpty()
             ? record->new_instance_error
             : QCoreApplication::translate(
-                  "XLibrary", "Runs the launch command directly. The application may reuse an existing window."));
+                  "Fora.Deck", "Runs the launch command directly. The application may reuse an existing window."));
     context.actions.value("add_application")->setEnabled(profile_available && service.is_ready());
     context.actions.value("add_items")->setEnabled(can_add_items());
     context.actions.value("refresh_availability")->setEnabled(profile_available && service.is_ready());
@@ -392,16 +393,16 @@ void MainWindow::refresh_actions() {
         ->setEnabled(profile_available && service.is_ready() &&
                      (!service.is_discovering() || service.can_cancel_discovery()));
     context.actions.value("discover")
-        ->setText(service.is_discovering() ? QCoreApplication::translate("XLibrary", "Cancel discovery")
-                                           : QCoreApplication::translate("XLibrary", "Find installed applications"));
+        ->setText(service.is_discovering() ? QCoreApplication::translate("Fora.Deck", "Cancel discovery")
+                                           : QCoreApplication::translate("Fora.Deck", "Find installed applications"));
     context.actions.value("discover")->setIcon(appearance::icon(service.is_discovering() ? "stop" : "scan"));
     context.actions.value("launch")->setText(
         record && record->running && service.settings.value("behavior/relaunch", "activate").toString() == "activate"
-            ? QCoreApplication::translate("XLibrary", "Switch to window")
-            : QCoreApplication::translate("XLibrary", "Launch"));
+            ? QCoreApplication::translate("Fora.Deck", "Switch to window")
+            : QCoreApplication::translate("Fora.Deck", "Launch"));
     context.actions.value("favorite")
-        ->setText(record && record->favorite ? QCoreApplication::translate("XLibrary", "Remove from favorites")
-                                             : QCoreApplication::translate("XLibrary", "Add to favorites"));
+        ->setText(record && record->favorite ? QCoreApplication::translate("Fora.Deck", "Remove from favorites")
+                                             : QCoreApplication::translate("Fora.Deck", "Add to favorites"));
     context.actions.value("favorite")
         ->setIcon(
             appearance::icon(record && record->favorite ? "favorite_filled" : "favorite",
@@ -467,7 +468,7 @@ void MainWindow::load_plugins() {
         errors.insert(id, error);
         if (service.settings.value("plugins/enabled").toStringList().contains(id))
             QTimer::singleShot(0, &service, [this, id, error] {
-                service.notify(QCoreApplication::translate("XLibrary", "Could not load ") + id + ": " + error);
+                service.notify(QCoreApplication::translate("Fora.Deck", "Could not load ") + id + ": " + error);
             });
     };
     for (const auto &file : directory.entryInfoList(QDir::Files | QDir::NoSymLinks, QDir::Name)) {
@@ -488,7 +489,10 @@ void MainWindow::load_plugins() {
                 continue;
             // Registry callbacks may outlive a failed transaction or the loader itself.
             loader->setLoadHints(QLibrary::PreventUnloadHint);
-            auto *plugin = qobject_cast<UiPlugin *>(loader->instance());
+            auto *instance = loader->instance();
+            auto *plugin = qobject_cast<UiPlugin *>(instance);
+            if (!plugin && instance && embedded.value("IID").toString() == UiRegistry::previous_plugin_iid)
+                plugin = static_cast<UiPlugin *>(instance->qt_metacast(UiRegistry::previous_plugin_iid));
             if (!plugin) {
                 report_error(id, loader->errorString());
                 continue;
@@ -502,7 +506,7 @@ void MainWindow::load_plugins() {
         } catch (const std::exception &error) {
             report_error(id, QString::fromUtf8(error.what()));
         } catch (...) {
-            report_error(id, QCoreApplication::translate("XLibrary", "Unknown C++ exception while loading plugin."));
+            report_error(id, QCoreApplication::translate("Fora.Deck", "Unknown C++ exception while loading plugin."));
         }
     }
     context.parameters.insert("available_plugins", available);
@@ -533,26 +537,7 @@ void MainWindow::show_overlay() {
     overlay->show_search();
 }
 
-void MainWindow::offer_brand_transition() {
-    if (!isVisible() || !service.is_ready() || service.profile_busy() || service.restart_required() ||
-        QCoreApplication::arguments().contains("--check-startup") ||
-        service.settings.value("onboarding/fora_deck_announced", false).toBool())
-        return;
-    const bool existing_profile =
-        service.settings.value("onboarding/completed", false).toBool() || !service.catalog().applications.isEmpty();
-    service.settings.setValue("onboarding/fora_deck_announced", true);
-    if (existing_profile)
-        service.notify(QCoreApplication::translate(
-            "XLibrary", "XLibrary is now Fora.Deck. Your library and settings have been preserved."));
-}
-
-void MainWindow::showEvent(QShowEvent *event) {
-    QMainWindow::showEvent(event);
-    QTimer::singleShot(0, this, &MainWindow::offer_brand_transition);
-}
-
 void MainWindow::start() {
-    connect(&service, &DesktopService::catalog_changed, this, &MainWindow::offer_brand_transition);
     const auto offer_welcome = [this] {
         if (welcome_offered || !service.is_ready() || service.profile_busy() || service.restart_required() ||
             QCoreApplication::arguments().contains("--check-startup"))
@@ -566,7 +551,7 @@ void MainWindow::start() {
     if (service.safe_mode() && !QCoreApplication::arguments().contains("--check-startup"))
         QTimer::singleShot(0, &service, [this] {
             service.notify(
-                QCoreApplication::translate("XLibrary", "Safe mode: user plugins are disabled for this session."));
+                QCoreApplication::translate("Fora.Deck", "Safe mode: user plugins are disabled for this session."));
         });
     const bool background = QCoreApplication::arguments().contains("--background") ||
                             service.settings.value("behavior/startup", "show").toString() == "tray";
@@ -601,7 +586,7 @@ void MainWindow::show_welcome() {
     auto *dialog = new QDialog(this);
     dialog->setObjectName("welcome");
     dialog->setAttribute(Qt::WA_DeleteOnClose);
-    dialog->setWindowTitle(QCoreApplication::translate("XLibrary", "Welcome to Fora.Deck"));
+    dialog->setWindowTitle(QCoreApplication::translate("Fora.Deck", "Welcome to Fora.Deck"));
     prepare_dialog(dialog, context, {700, 640}, {480, 400});
     auto *root = new QVBoxLayout(dialog);
     root->setContentsMargins(28, 28, 28, 28);
@@ -611,9 +596,9 @@ void MainWindow::show_welcome() {
     logo->setPixmap(appearance::logo().pixmap(logo_size, logo_size));
     root->addWidget(logo, 0, Qt::AlignHCenter);
     root->addWidget(label(QGuiApplication::applicationDisplayName(), "heading"), 0, Qt::AlignHCenter);
-    root->addWidget(label(QCoreApplication::translate("XLibrary", "Your applications. One home."), "heading"));
+    root->addWidget(label(QCoreApplication::translate("Fora.Deck", "Your applications. One home."), "heading"));
     root->addWidget(label(
-        QCoreApplication::translate("XLibrary", "Choose how to start. You can return to this screen in Settings."),
+        QCoreApplication::translate("Fora.Deck", "Choose how to start. You can return to this screen in Settings."),
         "muted"));
     auto *contents = new QWidget;
     auto *cards = new QVBoxLayout(contents);
@@ -633,18 +618,18 @@ void MainWindow::show_welcome() {
             QTimer::singleShot(0, this, callback);
         });
     };
-    choice(QCoreApplication::translate("XLibrary", "Find my applications"),
-           QCoreApplication::translate("XLibrary", "Review installed applications and choose what to keep."), "scan",
+    choice(QCoreApplication::translate("Fora.Deck", "Find my applications"),
+           QCoreApplication::translate("Fora.Deck", "Review installed applications and choose what to keep."), "scan",
            [this] { service.discover(); });
-    choice(QCoreApplication::translate("XLibrary", "Add an application manually"),
-           QCoreApplication::translate("XLibrary", "Choose a file or shortcut to add it to your library."), "add",
+    choice(QCoreApplication::translate("Fora.Deck", "Add an application manually"),
+           QCoreApplication::translate("Fora.Deck", "Choose a file or shortcut to add it to your library."), "add",
            [this] { context.actions.value("add_application")->trigger(); });
-    choice(QCoreApplication::translate("XLibrary", "Restore my library"),
-           QCoreApplication::translate("XLibrary", "Preview and restore a complete .xlprofile backup."), "folder",
-           [this] { select_profile_restore(context, this); });
+    choice(QCoreApplication::translate("Fora.Deck", "Restore my library"),
+           QCoreApplication::translate("Fora.Deck", "Preview and restore a complete .foradeckprofile backup."),
+           "folder", [this] { select_profile_restore(context, this); });
     root->addWidget(ui_helpers::scroll(contents), 1);
-    auto *later = button(QCoreApplication::translate("XLibrary", "Start with an empty library"), "quiet");
-    auto *tour = button(QCoreApplication::translate("XLibrary", "Take a quick tour"));
+    auto *later = button(QCoreApplication::translate("Fora.Deck", "Start with an empty library"), "quiet");
+    auto *tour = button(QCoreApplication::translate("Fora.Deck", "Take a quick tour"));
     tour->setIcon(appearance::icon("help"));
     root->addWidget(tour);
     connect(tour, &QPushButton::clicked, dialog, [this, dialog] {
@@ -673,7 +658,7 @@ void MainWindow::show_tutorial() {
     auto *dialog = new QDialog(parent ? parent : this);
     dialog->setObjectName("tutorial");
     dialog->setAttribute(Qt::WA_DeleteOnClose);
-    dialog->setWindowTitle(QCoreApplication::translate("XLibrary", "A quick tour of Fora.Deck"));
+    dialog->setWindowTitle(QCoreApplication::translate("Fora.Deck", "A quick tour of Fora.Deck"));
     prepare_dialog(dialog, context, {640, 500}, {420, 340});
     auto *root = new QVBoxLayout(dialog);
     root->setContentsMargins(28, 24, 28, 24);
@@ -682,29 +667,29 @@ void MainWindow::show_tutorial() {
     root->addWidget(progress);
     auto *pages = new QStackedWidget;
     const QList<QStringList> topics{
-        {"search", QCoreApplication::translate("XLibrary", "Find it in a few keystrokes"),
-         QCoreApplication::translate("XLibrary",
+        {"search", QCoreApplication::translate("Fora.Deck", "Find it in a few keystrokes"),
+         QCoreApplication::translate("Fora.Deck",
                                      "Search by name, alias or filename. Add #work to narrow results or -#games to "
                                      "exclude a tag. Quick search can also browse a path or calculate an expression."),
          QStringLiteral("#work browser     ·     (2 + 3) * 4")},
-        {"library", QCoreApplication::translate("XLibrary", "Make the library yours"),
+        {"library", QCoreApplication::translate("Fora.Deck", "Make the library yours"),
          QCoreApplication::translate(
-             "XLibrary",
+             "Fora.Deck",
              "Add an application from a file or find installed applications. Edit its name, arguments and tags. Use "
              "Ctrl or Shift to select several entries and edit them together. Removing an entry keeps its files."),
-         QCoreApplication::translate("XLibrary", "Add → Edit → Tags → Favorites")},
-        {"scenarios", QCoreApplication::translate("XLibrary", "Open your workspace in order"),
+         QCoreApplication::translate("Fora.Deck", "Add → Edit → Tags → Favorites")},
+        {"scenarios", QCoreApplication::translate("Fora.Deck", "Open your workspace in order"),
          QCoreApplication::translate(
-             "XLibrary",
+             "Fora.Deck",
              "Create a scenario, choose applications and set a delay before each launch. Review problems before "
              "starting and follow each step's status. Stop leaves already opened applications running."),
-         QCoreApplication::translate("XLibrary", "Waiting → Delay → Launching → Success")},
-        {"keyboard", QCoreApplication::translate("XLibrary", "Keep Fora.Deck close"),
-         QCoreApplication::translate("XLibrary",
+         QCoreApplication::translate("Fora.Deck", "Waiting → Delay → Launching → Success")},
+        {"keyboard", QCoreApplication::translate("Fora.Deck", "Keep Fora.Deck close"),
+         QCoreApplication::translate("Fora.Deck",
                                      "Settings → Keyboard shortcuts shows your current bindings for the library, quick "
                                      "search and individual applications or scenarios. Settings also contains local "
                                      "data information, profile backups and quick help."),
-         QCoreApplication::translate("XLibrary", "Settings → Keyboard shortcuts / Quick help")}};
+         QCoreApplication::translate("Fora.Deck", "Settings → Keyboard shortcuts / Quick help")}};
     for (const auto &topic : topics) {
         auto *contents = new QWidget;
         auto *layout = new QVBoxLayout(contents);
@@ -732,19 +717,19 @@ void MainWindow::show_tutorial() {
     auto *transition = new PageTransition(pages);
     root->addWidget(transition, 1);
     auto *controls = new QHBoxLayout;
-    auto *back = button(QCoreApplication::translate("XLibrary", "Back"));
+    auto *back = button(QCoreApplication::translate("Fora.Deck", "Back"));
     auto *next = button("", "primary");
     controls->addWidget(back);
     controls->addStretch();
     controls->addWidget(next);
     root->addLayout(controls);
     const auto update = [=] {
-        progress->setText(QCoreApplication::translate("XLibrary", "Step %1 of %2")
+        progress->setText(QCoreApplication::translate("Fora.Deck", "Step %1 of %2")
                               .arg(pages->currentIndex() + 1)
                               .arg(pages->count()));
         back->setEnabled(pages->currentIndex() > 0);
-        next->setText(pages->currentIndex() + 1 == pages->count() ? QCoreApplication::translate("XLibrary", "Finish")
-                                                                  : QCoreApplication::translate("XLibrary", "Next"));
+        next->setText(pages->currentIndex() + 1 == pages->count() ? QCoreApplication::translate("Fora.Deck", "Finish")
+                                                                  : QCoreApplication::translate("Fora.Deck", "Next"));
     };
     connect(back, &QPushButton::clicked, dialog, [=] { pages->setCurrentIndex(pages->currentIndex() - 1); });
     connect(next, &QPushButton::clicked, dialog, [=] {
@@ -810,7 +795,7 @@ void MainWindow::review_add_applications(const QStringList &paths) {
     if (paths.size() > 1) {
         if (service.is_discovering())
             service.notify(QCoreApplication::translate(
-                "XLibrary", "Wait for the current scan or import to finish, then try again."));
+                "Fora.Deck", "Wait for the current scan or import to finish, then try again."));
         else
             service.preview_files(paths);
         return;
